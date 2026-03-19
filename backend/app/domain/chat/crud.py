@@ -7,9 +7,9 @@ from uuid import UUID
 from sqlalchemy import select, desc, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
-from app.domain.chat.model import Conversation, Message, ChatAnalysis
+from app.domain.chat.model import Conversation, Message, ConversationParticipant, ChatAnalysis
 
 # --- Conversations ---
 
@@ -166,10 +166,10 @@ async def get_messages(
     conversation_id: UUID,
     limit: int = 50,
     before_message_id: int | None = None,
-) -> list[Message]:
+) -> tuple[list[Message], bool]:
     """
     היסטוריית הודעות בשיחה (pagination).
-    before_message_id = אופציונלי, לשליפה "לפני" הודעה מסוימת (int – BigInt ב-DB).
+    מחזיר (רשימה בסדר כרונולוגי ישן→חדש, has_more).
     """
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
     q = (
@@ -182,8 +182,28 @@ async def get_messages(
         sub = select(Message.created_at).where(Message.message_id == before_message_id)
         q = q.where(Message.created_at < sub.scalar_subquery())
     result = await db.execute(q)
-    messages = list(result.scalars().unique().all())
-    return messages[::-1]  # ישן → חדש
+    rows = list(result.scalars().unique().all())
+    has_more = len(rows) > limit
+    items = rows[:limit][::-1]  # ישן → חדש
+    return (items, has_more)
+
+
+async def get_all_messages_for_conversation(
+    db: AsyncSession,
+    conversation_id: UUID,
+    limit: int | None = 5000,
+) -> list[Message]:
+    """שליפת כל ההודעות בשיחה (לשימוש פנימי: calendar export, AI analysis). בסדר כרונולוגי."""
+    cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
+    q = (
+        select(Message)
+        .where(Message.conversation_id == cid)
+        .order_by(Message.created_at.asc())
+    )
+    if limit is not None:
+        q = q.limit(limit)
+    result = await db.execute(q)
+    return list(result.scalars().unique().all())
 
 
 async def get_last_message(db: AsyncSession, conversation_id: UUID) -> Message | None:
@@ -196,3 +216,89 @@ async def get_last_message(db: AsyncSession, conversation_id: UUID) -> Message |
         .limit(1)
     )
     return result.scalars().first()
+
+
+# --- Read / Unread ---
+
+
+async def mark_conversation_read(db: AsyncSession, conversation_id: UUID, user_id: UUID) -> None:
+    """עדכון last_read_at למשתמש בשיחה."""
+    cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
+    uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(ConversationParticipant).where(
+            ConversationParticipant.conversation_id == cid,
+            ConversationParticipant.user_id == uid,
+        )
+    )
+    participant = result.scalars().first()
+    if not participant:
+        return
+    participant.last_read_at = now
+    await db.commit()
+
+
+async def get_unread_conversations_count(db: AsyncSession, user_id: UUID) -> int:
+    """
+    מספר שיחות שבהן יש הודעות חדשות שנשלחו ע"י הצד השני אחרי last_read_at.
+    נספר unread ברמת שיחה (conversation), לא הודעות.
+    """
+    uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+
+    subq = (
+        select(
+            Message.conversation_id.label("conversation_id"),
+            func.max(Message.created_at).label("last_message_at"),
+        )
+        .where(Message.sender_id != uid)
+        .group_by(Message.conversation_id)
+        .subquery()
+    )
+
+    q = (
+        select(func.count())
+        .select_from(ConversationParticipant)
+        .join(subq, ConversationParticipant.conversation_id == subq.c.conversation_id)
+        .where(
+            ConversationParticipant.user_id == uid,
+            or_(
+                ConversationParticipant.last_read_at.is_(None),
+                ConversationParticipant.last_read_at < subq.c.last_message_at,
+            ),
+        )
+    )
+    result = await db.execute(q)
+    return int(result.scalar() or 0)
+
+
+async def has_unread_messages(db: AsyncSession, conversation_id: UUID, user_id: UUID) -> bool:
+    """
+    האם יש הודעות חדשות בשיחה (מאת הצד השני) אחרי last_read_at של המשתמש.
+    """
+    cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
+    uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+
+    part_res = await db.execute(
+        select(ConversationParticipant.last_read_at).where(
+            ConversationParticipant.conversation_id == cid,
+            ConversationParticipant.user_id == uid,
+        )
+    )
+    last_read_at = part_res.scalar_one_or_none()
+
+    msg_q = (
+        select(func.max(Message.created_at))
+        .where(
+            Message.conversation_id == cid,
+            Message.sender_id != uid,
+        )
+    )
+    msg_res = await db.execute(msg_q)
+    last_other_msg_at = msg_res.scalar_one_or_none()
+    if not last_other_msg_at:
+        return False
+    if last_read_at is None:
+        return True
+    return last_other_msg_at > last_read_at

@@ -39,7 +39,7 @@ export default function RouteMapModal({ data, onClose }: RouteMapModalProps) {
 
   useEffect(() => {
     if (GOOGLE_MAPS_API_KEY) {
-      setResolvedKey(GOOGLE_MAPS_API_KEY);
+      queueMicrotask(() => setResolvedKey(GOOGLE_MAPS_API_KEY));
       return;
     }
     let cancelled = false;
@@ -63,23 +63,23 @@ export default function RouteMapModal({ data, onClose }: RouteMapModalProps) {
   useEffect(() => {
     if (resolvedKey === null) return;
     if (window.google?.maps) {
-      setScriptLoaded(true);
+      queueMicrotask(() => setScriptLoaded(true));
       return;
     }
     if (!resolvedKey) {
-      setLoadError(
+      queueMicrotask(() => setLoadError(
         'המפתח לא התקבל מהבקאנד. וודא ש-GOOGLE_MAPS_API_KEY מוגדר ב-backend/.env (אותו מפתח שמשמש להמרות כתובות ומסלולים). אין צורך להגדיר מפתח בפרונט – הוא נשלח אוטומטית מ-GET /api/v1/geo/maps-key.'
-      );
+      ));
       return;
     }
     const existing = document.querySelector('script[src*="maps.googleapis.com"]');
     if (existing) {
-      if (window.google?.maps) setScriptLoaded(true);
+      if (window.google?.maps) queueMicrotask(() => setScriptLoaded(true));
       return;
     }
     window.__linkupMapsInit = () => setScriptLoaded(true);
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${resolvedKey}&callback=__linkupMapsInit`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${resolvedKey}&callback=__linkupMapsInit&loading=async`;
     script.async = true;
     script.defer = true;
     script.onerror = () => setLoadError('טעינת Google Maps נכשלה');

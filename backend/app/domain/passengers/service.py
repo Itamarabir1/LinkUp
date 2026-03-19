@@ -1,3 +1,4 @@
+
 import logging
 from typing import List, Optional
 from uuid import UUID
@@ -8,13 +9,13 @@ from geoalchemy2.shape import to_shape
 from app.core.exceptions.booking import PassengerRequestNotFoundError
 from app.core.exceptions.infrastructure import GeocodingError
 from app.domain.passengers.crud import crud_passenger
-from app.domain.bookings.service import BookingService
+from app.domain.bookings.crud import crud_booking
+from app.domain.bookings.model import Booking
 from app.domain.passengers.enum import PassengerStatus
 from app.domain.passengers.schema import (
     PassengerRequestCreate,
     PassengerRequestResponse,
     RideSearchRequest,
-    PassengerRequestUpdateNotifications,
 )
 from app.domain.rides.crud import crud_ride
 from app.domain.rides.enum import RideStatus
@@ -47,9 +48,10 @@ class PassengerService:
                 db, request_in, p_lat, p_lon, d_lat, d_lon, passenger_id=passenger_id
             )
 
-            # 3. מציאת נהגים רלוונטיים באופן מיידי
+            # 3. מציאת נהגים רלוונטיים באופן מיידי (לא כולל נסיעות של המשתמש עצמו)
             matches = crud_passenger.find_rides_by_coordinates(
-                db, p_lat, p_lon, d_lat, d_lon, request_in.search_radius
+                db, p_lat, p_lon, d_lat, d_lon, request_in.search_radius,
+                passenger_id=passenger_id,
             )
 
             # הוספת התוצאות לאובייקט החוזר
@@ -59,23 +61,6 @@ class PassengerService:
         except Exception as e:
             logger.error(f"Error in create_passenger_request: {e}")
             raise e
-
-    @staticmethod
-    def toggle_request_notifications(
-        db: Session, request_id: UUID, update_data: PassengerRequestUpdateNotifications
-    ):
-        """עדכון כפתור ההתראות (הסוכן החכם) לבקשה ספציפית"""
-        p_req = crud_passenger.get_by_id(db, request_id)
-        if not p_req:
-            raise PassengerRequestNotFoundError(request_id=str(request_id))
-
-        p_req.is_notification_active = update_data.is_notification_active
-        db.commit()
-        db.refresh(p_req)
-
-        status_text = "מופעלות" if p_req.is_notification_active else "מבוטלות"
-        logger.info(f"Notifications for request {request_id} are now {status_text}")
-        return p_req
 
     @staticmethod
     def cancel_request(db: Session, request_id: UUID, passenger_id: UUID):
@@ -91,9 +76,13 @@ class PassengerService:
             raise ForbiddenRideActionError("גישה חסומה")
 
         # 1. ביטול כל ההזמנות ושחרור מושבים
-        BookingService.cancel_all_bookings_for_request(db, request_id)
+        bookings = (
+            db.query(Booking).filter(Booking.request_id == request_id).all()
+        )
+        for b in bookings:
+            crud_booking.execute_booking_cancellation(db, b)
 
-        # 2. עדכון סטטוס הבקשה עצמה
+        # 2. עדכון סטטוס הבקשה עצמה (ביטול בקשה = CANCELLED, לא כיבוי התראות)
         p_req.status = PassengerStatus.CANCELLED
 
         db.commit()
@@ -133,16 +122,14 @@ class PassengerService:
             p_req, "search_radius", 1000
         )
         return crud_passenger.find_rides_by_coordinates(
-            db, p_lat, p_lon, d_lat, d_lon, radius
+            db, p_lat, p_lon, d_lat, d_lon, radius,
+            passenger_id=p_req.passenger_id,
         )
 
     @staticmethod
     def search_rides_for_passenger(db: Session, search_data: RideSearchRequest):
-        """חיפוש נסיעות פעיל לפי קואורדינטות של כתובות. אם המשתמש מחובר, יוצר/מעדכן בקשה ב-DB."""
-        from app.domain.passengers.schema import (
-            RideSearchResponse,
-            PassengerRequestCreate,
-        )
+        """חיפוש נסיעות פעיל לפי קואורדינטות של כתובות. לא שומר בקשה ב-DB."""
+        from app.domain.passengers.schema import RideSearchResponse
         from app.domain.rides.schema import RideResponse
 
         try:
@@ -158,43 +145,29 @@ class PassengerService:
                 search_data, "radius", 1000
             )
 
-            # אם המשתמש מחובר, יצור/עדכן בקשה ב-DB
-            request_id = None
-            if search_data.passenger_id:
-                request_in = PassengerRequestCreate(
-                    pickup_name=search_data.pickup_name,
-                    destination_name=search_data.destination_name,
-                    num_passengers=1,  # ברירת מחדל, יכול להיות מותאם בעתיד
-                    requested_departure_time=search_data.departure_time,
-                    search_radius=radius,
-                    is_notification_active=True,
-                    is_auto_generated=True,  # בקשה שנוצרה מחיפוש
-                )
-                # יצירת בקשה חדשה (תמיד ליצור חדשה לפי העדפת המשתמש)
-                passenger_request = crud_passenger.create(
-                    db,
-                    request_in,
-                    p_lat,
-                    p_lon,
-                    d_lat,
-                    d_lon,
-                    passenger_id=search_data.passenger_id,
-                )
-                request_id = passenger_request.request_id
-
-            matches = crud_passenger.find_rides_by_coordinates(
-                db, p_lat, p_lon, d_lat, d_lon, radius
+            matches, has_more = crud_passenger.find_rides_by_coordinates(
+                db,
+                p_lat,
+                p_lon,
+                d_lat,
+                d_lon,
+                radius,
+                limit=search_data.limit,
+                after_ride_id=search_data.after,
+                min_departure_time=search_data.departure_time,
+                passenger_id=search_data.passenger_id,
             )
 
-            if search_data.departure_time:
-                matches = [
-                    r for r in matches if r.departure_time >= search_data.departure_time
-                ]
-
-            # החזר תמיד RideSearchResponse (עם request_id אם המשתמש מחובר)
+            items = []
+            for ride, booking_status in matches:
+                ride_response = RideResponse.model_validate(ride)
+                ride_response.user_booking_status = booking_status
+                items.append(ride_response)
+            next_cursor = str(items[-1].ride_id) if has_more and items else None
             return RideSearchResponse(
-                rides=[RideResponse.model_validate(r) for r in matches],
-                request_id=request_id,
+                items=items,
+                next_cursor=next_cursor,
+                has_more=has_more,
             )
 
         except Exception as e:
@@ -212,7 +185,7 @@ class PassengerService:
         ride = crud_ride.get_with_driver(db, ride_id)
         if not ride:
             raise ValueError("נסיעה לא נמצאה")
-        if ride.status not in (RideStatus.OPEN, RideStatus.FULL):
+        if ride.status not in (RideStatus.OPEN, RideStatus.FULL, RideStatus.ACTIVE):
             raise ValueError("הנסיעה אינה פתוחה להצטרפות")
         driver = ride.driver
         if not driver:

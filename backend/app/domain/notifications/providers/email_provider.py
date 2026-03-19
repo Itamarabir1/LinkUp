@@ -47,6 +47,11 @@ class EmailProvider(BaseNotificationProvider):
                     recipient_name,
                     (subject or "")[:60],
                 )
+                logger.info(
+                    "[EMAIL DEBUG] action_url=%s ride_url=%s",
+                    context.get("action_url"),
+                    context.get("ride_url"),
+                )
                 await email_client.send(
                     recipient=user.email,
                     subject=subject,

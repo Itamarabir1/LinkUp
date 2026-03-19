@@ -22,6 +22,7 @@ export interface Ride {
   ride_id: string;
   driver_id: string;
   group_id?: string | null;
+  group_name?: string | null;
   origin_name: string | null;
   destination_name: string | null;
   departure_time: string;
@@ -30,6 +31,7 @@ export interface Ride {
   price: number;
   status: string;
   created_at: string;
+  user_booking_status?: string | null;
   distance_km?: number;
   duration_min?: number;
   route_coords?: number[][];
@@ -38,8 +40,31 @@ export interface Ride {
 }
 
 export interface RideSearchResponse {
-  rides: Ride[];
-  request_id: string | null;
+  items: Ride[];
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
+export interface MessageResponse {
+  message_id: number;
+  conversation_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+}
+
+export interface PaginatedMessagesResponse {
+  items: MessageResponse[];
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
+export interface PaginatedBookingsResponse {
+  items: Booking[];
+  total: number;
+  page: number;
+  limit: number;
+  has_more: boolean;
 }
 
 export interface PassengerRequest {

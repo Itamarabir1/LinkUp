@@ -28,7 +28,7 @@ chat-ws/
 
 ### דרישות מוקדמות
 
-1. **Redis** חייב לרוץ (אותו Redis של ה־backend).
+1. **Redis** — **אותו שרת** כמו ה-backend; בדרך כלל **DB 1** לצ'אט (pub/sub, `presence`, ערוץ `user:offline`). DB 0 משמש את ה-API לדברים אחרים.
 2. **משתני סביבה** (אותם כמו ב־backend, או ב־`.env` בשורש):
    - `SECRET_KEY` – אותו סוד כמו ב־Python (לאימות JWT).
    - `REDIS_URL` – למשל `redis://localhost:6379/1` (DB 1 לצ'אט).

@@ -3,8 +3,7 @@ import logging
 from urllib.parse import quote
 from typing import List, Optional
 from uuid import UUID
-from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions.booking import (
@@ -67,39 +66,6 @@ def _request_to_join_sync(
     return new_booking
 
 
-def _cancel_ride_sync(sess: Session, ride_id: UUID, driver_id: UUID) -> list:
-    """לוגיקה סינכרונית – רצה ב-run_sync באותה טרנזקציה. מחזיר req_ids."""
-    ride = sess.get(Ride, ride_id)
-    if not ride or ride.driver_id != driver_id:
-        raise ForbiddenRideActionError("אינך מורשה לבטל נסיעה זו")
-    req_ids = crud_booking.get_request_ids_for_ride(sess, ride_id)
-    logger.info(
-        "cancel_ride: updating bookings to status=%s for ride_id=%s",
-        BookingStatus.CANCELLED.value,
-        ride_id,
-    )
-    crud_booking.bulk_update_bookings_status(sess, ride_id, BookingStatus.CANCELLED)
-    # אחרי ביטול כל ה-bookings של הנסיעה, מחשבים מחדש סטטוס לכל בקשת נוסע
-    # (כדי לא לדרוס סטטוס אם לאותה בקשה יש bookings נוספים על נסיעות אחרות)
-    if req_ids:
-        for rid in sorted(set([r for r in req_ids if r is not None])):
-            crud_booking.update_passenger_request_status_from_bookings(sess, rid)
-    logger.info(
-        "cancel_ride: updating ride to status=%s for ride_id=%s",
-        RideStatus.CANCELLED.value,
-        ride_id,
-    )
-    # PostgreSQL ride_status enum expects lowercase 'cancelled'; ORM would send enum name 'CANCELLED'
-    sess.execute(
-        text(
-            "UPDATE rides SET status = CAST(:status AS ride_status), updated_at = now() WHERE ride_id = :ride_id"
-        ),
-        {"status": RideStatus.CANCELLED.value, "ride_id": ride_id},
-    )
-    sess.flush()
-    return req_ids
-
-
 class BookingService:
     @staticmethod
     async def request_to_join(
@@ -160,21 +126,10 @@ class BookingService:
     ) -> None:
         """
         לוגיקה עסקית לביטול נסיעה שלמה על ידי נהג.
-        אירועים דרך Outbox – ה-Worker ישלח הודעות לנוסעים.
+        חשוב: לא מפרסם Outbox. ה-caller אחראי על אירועים.
         """
         try:
-            await db.run_sync(_cancel_ride_sync, ride_id, driver_id)
-            try:
-                await publish_to_outbox(
-                    db,
-                    NotificationEvent.RIDE_CANCELLED_BY_DRIVER.value,
-                    {"ride_id": str(ride_id)},
-                    [DispatchTarget.RABBITMQ.value],
-                )
-            except Exception as e:
-                logger.warning(
-                    "Outbox publish failed (ride cancel will still commit): %s", e
-                )
+            await db.run_sync(crud_booking.cancel_ride_and_bookings_sync, ride_id, driver_id)
             await db.commit()
         except ForbiddenRideActionError:
             await db.rollback()
@@ -188,16 +143,27 @@ class BookingService:
     async def get_ride_manifest(
         db: AsyncSession, ride_id: UUID, driver_id: UUID
     ) -> RideManifestResponse:
-        """הפקת רשימת נוסעים מאושרים עבור הנהג"""
+        """הפקת רשימת נוסעים עבור הנהג (כולל pending_approval + confirmed)."""
 
         def _sync(sess: Session):
             ride = sess.get(Ride, ride_id)
             if not ride or ride.driver_id != driver_id:
                 raise ForbiddenRideActionError("גישה חסומה")
 
-            # שליפת כל ה-bookings (לא רק CONFIRMED, כדי שהפרונט יוכל לסנן)
-            bookings = crud_booking.get_ride_bookings_by_status(
-                sess, ride_id, BookingStatus.CONFIRMED
+            # חשוב: להחזיר גם בקשות ממתינות כדי שהנהג יוכל לאשר/לדחות.
+            bookings = (
+                sess.query(Booking)
+                .filter(
+                    Booking.ride_id == ride_id,
+                    Booking.status.in_(
+                        [BookingStatus.PENDING.value, BookingStatus.CONFIRMED.value]
+                    ),
+                )
+                .options(
+                    joinedload(Booking.passenger_request).joinedload(PassengerRequest.user)
+                )
+                .order_by(Booking.created_at.desc())
+                .all()
             )
 
             manifest = []
@@ -221,6 +187,11 @@ class BookingService:
                         "reminder_sent": b.reminder_sent,
                         "pickup_name": b.pickup_name,
                         "pickup_time": b.pickup_time,
+                        "destination_name": (
+                            b.passenger_request.destination_name
+                            if b.passenger_request
+                            else None
+                        ),
                     }
                 )
                 total_confirmed_seats += b.num_seats
@@ -360,11 +331,34 @@ class BookingService:
 
     @staticmethod
     async def get_user_bookings(
-        db: AsyncSession, user_id: UUID, status: Optional[str] = None
+        db: AsyncSession,
+        user_id: UUID,
+        status: Optional[str] = None,
+        page: int = 1,
+        limit: int = 20,
     ):
-        """שליפת כל ההזמנות של משתמש ספציפי"""
-        return await db.run_sync(
-            lambda sess: crud_booking.get_user_bookings_filtered(sess, user_id, status)
+        """שליפת הזמנות משתמש עם page-based pagination."""
+        from app.domain.bookings.schema import PaginatedBookingsResponse, BookingResponse
+
+        def _sync(sess: Session):
+            total = crud_booking.get_user_bookings_count(sess, user_id, status)
+            offset = (page - 1) * limit
+            bookings = crud_booking.get_user_bookings_filtered(
+                sess, user_id, status, offset=offset, limit=limit
+            )
+            return (
+                [BookingResponse.model_validate(b) for b in bookings],
+                total,
+            )
+
+        items, total = await db.run_sync(_sync)
+        has_more = (page * limit) < total
+        return PaginatedBookingsResponse(
+            items=items,
+            total=total,
+            page=page,
+            limit=limit,
+            has_more=has_more,
         )
 
     @staticmethod

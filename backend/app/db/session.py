@@ -7,6 +7,7 @@ engine = create_async_engine(
     echo=False,
     pool_size=10,  # ניהול נכון של מאגר חיבורים
     max_overflow=20,
+    pool_pre_ping=True,  # מונע חיבורים מתים (PostgreSQL סוגר חיבורים לא פעילים)
 )
 
 # שימוש ב-async_sessionmaker לרמה של סניור

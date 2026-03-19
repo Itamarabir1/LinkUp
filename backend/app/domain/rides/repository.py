@@ -25,7 +25,7 @@ class RideCacheRepository:
             cache_data = preview.model_dump()
             cache_data.update(
                 {
-                    "driver_id": preview_in.driver_id,
+                    "driver_id": str(preview_in.driver_id),
                     "departure_time": preview_in.departure_time.isoformat(),
                     "available_seats": preview_in.available_seats,
                     "price": preview_in.price,
@@ -55,7 +55,6 @@ class RideCacheRepository:
             )
 
         except Exception as e:
-            # בדרגת סניור, אנחנו לא נותנים לשגיאת תשתית גנרית "לברוח"
             logger.error(f"Failed to save ride preview to cache: {e}")
             raise InfrastructureError(
                 f"Cache write error for session: {preview.session_id}", detail=str(e)

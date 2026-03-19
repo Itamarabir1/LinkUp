@@ -50,7 +50,10 @@ class PassengerRequest(Base):
 
     # FK למשתמש הפיזי
     passenger_id = Column(
-        PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     group_id = Column(
         PG_UUID(as_uuid=True),
@@ -71,7 +74,7 @@ class PassengerRequest(Base):
         Geography(geometry_type="POINT", srid=4326), nullable=False
     )
 
-    requested_departure_time = Column(DateTime, nullable=False)
+    requested_departure_time = Column(DateTime(timezone=True), nullable=False)
     # התאמה לשם העמודה ב-SQL: search_radius_meters
     search_radius_meters = Column(Integer, default=500)
 
@@ -92,8 +95,8 @@ class PassengerRequest(Base):
         server_default=text("'active'"),
     )
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
         Index("idx_passenger_status_time", "status", "requested_departure_time"),

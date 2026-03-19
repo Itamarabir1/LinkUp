@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { Camera } from 'lucide-react';
 import {
   createGroup,
   getGroupImageUploadUrl,
@@ -14,6 +15,7 @@ export default function CreateGroup() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [createdGroup, setCreatedGroup] = useState<{ inviteCode: string; name: string } | null>(null);
@@ -21,6 +23,20 @@ export default function CreateGroup() {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setImageFile(file);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(file ? URL.createObjectURL(file) : null);
+    e.target.value = '';
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +60,7 @@ export default function CreateGroup() {
           });
           if (!putRes.ok) throw new Error('Upload failed');
           await confirmGroupImage(group.group_id, key);
-        } catch (imgErr) {
+        } catch {
           setImageError('הקבוצה נוצרה, אך העלאת התמונה נכשלה. ניתן לעדכן תמונה בהגדרות הקבוצה.');
         }
       }
@@ -131,17 +147,38 @@ export default function CreateGroup() {
           rows={3}
         />
         <span className={styles.charCount}>{description.length}/{DESCRIPTION_MAX}</span>
-        <label className={styles.label}>תמונת קבוצה (אופציונלי)</label>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className={styles.fileInput}
-          onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
-        />
-        {imageFile && (
-          <p className={styles.fileName}>{imageFile.name}</p>
-        )}
+        <div
+          className={styles.avatarUpload}
+          onClick={() => fileInputRef.current?.click()}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
+          aria-label="הוסף תמונה לקבוצה"
+        >
+          {previewUrl ? (
+            <img src={previewUrl} className={styles.avatarPreview} alt="תצוגה מקדימה" />
+          ) : (
+            <div className={styles.avatarPlaceholder}>
+              <Camera size={28} color="#9CA3AF" />
+              <span>הוסף תמונה</span>
+            </div>
+          )}
+          <div className={styles.avatarOverlay}>
+            <Camera size={20} color="white" />
+          </div>
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleImageChange}
+          />
+        </div>
         <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={submitting}>
           {submitting ? 'יוצר...' : 'צור קבוצה'}
         </button>

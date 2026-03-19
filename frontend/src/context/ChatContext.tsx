@@ -14,6 +14,7 @@ import {
 import { useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { api } from '../api/client';
+import { getWsBaseUrl } from '../config/env';
 import type { NotificationItem } from '../types/api';
 
 const NOTIF_READ_KEY = 'linkup_notif_read';
@@ -55,6 +56,8 @@ interface ChatContextValue {
   closeChat: () => void;
   /** מספר שיחות שלא נקראו (לbadge הודעות). כרגע 0 עד שיהיה endpoint. */
   unreadMessages: number;
+  /** רענון מיידי של מונה הודעות שלא נקראו. */
+  refreshUnread: () => void;
   /** מספר התראות שלא נקראו (לbadge התראות). */
   unreadNotifications: number;
   markNotificationRead: (key: string) => void;
@@ -81,9 +84,19 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const { user } = useAuth();
   const [openConversationId, setOpenConversationId] = useState<string | null>(null);
   const [panelConversationId, setPanelConversationId] = useState<string | null>(null);
-  const [unreadMessages] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [notificationList, setNotificationList] = useState<NotificationItem[]>([]);
+
+  const refreshUnread = useCallback(async () => {
+    if (!user?.user_id) return;
+    try {
+      const { data } = await api.get<{ count: number }>('/chat/unread-count');
+      setUnreadMessages(typeof data?.count === 'number' ? data.count : 0);
+    } catch {
+      // ignore
+    }
+  }, [user?.user_id]);
 
   const openChat = useCallback((conversationId: string) => {
     if (location.pathname === '/messages') {
@@ -132,14 +145,79 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
   useEffect(() => {
     if (!user?.user_id) {
-      setUnreadNotifications(0);
-      setNotificationList([]);
+      queueMicrotask(() => {
+        setUnreadMessages(0);
+        setUnreadNotifications(0);
+        setNotificationList([]);
+      });
       return;
     }
-    refreshUnreadNotifications();
+    queueMicrotask(() => refreshUnreadNotifications());
     const interval = setInterval(refreshUnreadNotifications, 30000);
     return () => clearInterval(interval);
   }, [user?.user_id, refreshUnreadNotifications]);
+
+  /** WebSocket להתראות in-app (בקשת הצטרפות לנהג וכו') — רענון רשימה ו-badge */
+  useEffect(() => {
+    if (!user?.user_id) return;
+    const token = localStorage.getItem('linkup_access_token');
+    if (!token) return;
+    const url = `${getWsBaseUrl()}/notifications/ws?token=${encodeURIComponent(token)}`;
+    let ws: WebSocket | null = null;
+    let closed = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const onRefresh = () => {
+      void refreshUnreadNotifications();
+      window.dispatchEvent(new CustomEvent('linkup-notifications-refresh'));
+    };
+
+    const connect = () => {
+      if (closed) return;
+      try {
+        ws = new WebSocket(url);
+      } catch {
+        reconnectTimer = setTimeout(connect, 5000);
+        return;
+      }
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(String(ev.data)) as { type?: string };
+          if (msg?.type === 'notifications_refresh') onRefresh();
+        } catch {
+          /* ignore */
+        }
+      };
+      ws.onclose = () => {
+        ws = null;
+        if (!closed) reconnectTimer = setTimeout(connect, 4000);
+      };
+      ws.onerror = () => {
+        try {
+          ws?.close();
+        } catch {
+          /* ignore */
+        }
+      };
+    };
+    connect();
+    return () => {
+      closed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      try {
+        ws?.close();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [user?.user_id, refreshUnreadNotifications]);
+
+  useEffect(() => {
+    if (!user?.user_id) return;
+    void refreshUnread();
+    const interval = setInterval(refreshUnread, 30000);
+    return () => clearInterval(interval);
+  }, [user?.user_id, refreshUnread]);
 
   const value = useMemo<ChatContextValue>(
     () => ({
@@ -148,6 +226,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       openChat,
       closeChat,
       unreadMessages,
+      refreshUnread,
       unreadNotifications,
       markNotificationRead,
       markAllNotificationsRead,
@@ -160,6 +239,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       openChat,
       closeChat,
       unreadMessages,
+      refreshUnread,
       unreadNotifications,
       markNotificationRead,
       markAllNotificationsRead,

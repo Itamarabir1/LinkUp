@@ -35,10 +35,10 @@ export default function ChatPopup({ conversationId }: ChatPopupProps) {
     try {
       const [convRes, msgRes] = await Promise.all([
         getConversation(conversationId),
-        getMessages(conversationId, { limit: 100 }),
+        getMessages(conversationId, { limit: 30 }),
       ]);
       setConversation(convRes.data);
-      setMessages(Array.isArray(msgRes.data) ? msgRes.data : []);
+      setMessages(msgRes.data?.items ?? []);
     } catch {
       setConversation(null);
       setMessages([]);

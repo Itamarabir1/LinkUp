@@ -18,6 +18,8 @@ from app.domain.passengers.enum import PassengerStatus
 from app.domain.passengers.schema import PassengerRequestCreate
 from app.domain.rides.model import Ride
 from app.domain.rides.enum import RideStatus
+from app.domain.bookings.model import Booking
+from app.domain.bookings.enum import BookingStatus
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +76,7 @@ class CRUDPassenger:
         req_time = request.requested_departure_time
         if req_time is None:
             req_time = datetime.now(timezone.utc)
-        # DB column is TIMESTAMP WITHOUT TIME ZONE – pass naive UTC to avoid asyncpg error
-        if getattr(req_time, "tzinfo", None) is not None:
-            req_time = req_time.astimezone(timezone.utc).replace(tzinfo=None)
+        # עמודה TIMESTAMP WITH TIME ZONE – מקבלת aware או naive
         db_request = PassengerRequest(
             passenger_id=passenger_id,
             num_passengers=request.num_passengers,
@@ -106,36 +106,97 @@ class CRUDPassenger:
         d_lat: float,
         d_lon: float,
         radius: int,
-    ) -> List[Ride]:
-        """מנוע חיפוש נסיעות לפי קואורדינטות ורדיוס, עם כיווניות על המסלול."""
+        limit: int | None = None,
+        after_ride_id: Optional[UUID] = None,
+        min_departure_time: Optional[datetime] = None,
+        passenger_id: Optional[UUID] = None,
+    ) -> tuple[List[tuple[Ride, Optional[str]]], bool]:
+        """
+        מנוע חיפוש נסיעות לפי קואורדינטות ורדיוס. מיון קבוע: departure_time.asc(), ride_id.asc().
+        מחזיר (רשימה, has_more). אם limit=None מחזיר את כל התוצאות ו-has_more=False.
+        """
         pickup_geo = func.ST_SetSRID(func.ST_MakePoint(p_lon, p_lat), 4326)
         dest_geo = func.ST_SetSRID(func.ST_MakePoint(d_lon, d_lat), 4326)
-        return (
-            db.query(Ride)
-            .filter(
-                and_(
-                    Ride.status == RideStatus.OPEN,
-                    Ride.available_seats > 0,
-                    func.ST_DWithin(
-                        cast(Ride.route_coords, Geography),
-                        cast(pickup_geo, Geography),
-                        radius,
-                    ),
-                    func.ST_DWithin(
-                        cast(Ride.route_coords, Geography),
-                        cast(dest_geo, Geography),
-                        radius,
-                    ),
-                    func.ST_LineLocatePoint(
-                        cast(Ride.route_coords, Geometry), cast(pickup_geo, Geometry)
-                    )
-                    < func.ST_LineLocatePoint(
-                        cast(Ride.route_coords, Geometry), cast(dest_geo, Geometry)
+        filters = and_(
+            Ride.status.in_([RideStatus.OPEN, RideStatus.FULL]),
+            Ride.available_seats > 0,
+            func.ST_DWithin(
+                cast(Ride.route_coords, Geography),
+                cast(pickup_geo, Geography),
+                radius,
+            ),
+            func.ST_DWithin(
+                cast(Ride.route_coords, Geography),
+                cast(dest_geo, Geography),
+                radius,
+            ),
+            func.ST_LineLocatePoint(
+                cast(Ride.route_coords, Geometry), cast(pickup_geo, Geometry)
+            )
+            < func.ST_LineLocatePoint(
+                cast(Ride.route_coords, Geometry), cast(dest_geo, Geometry)
+            ),
+        )
+        if min_departure_time is not None:
+            from datetime import timedelta
+            FLEXIBILITY_HOURS = 2
+            earliest = min_departure_time - timedelta(hours=FLEXIBILITY_HOURS)
+            latest = min_departure_time + timedelta(hours=FLEXIBILITY_HOURS)
+            filters = and_(
+                filters,
+                Ride.departure_time >= earliest,
+                Ride.departure_time <= latest,
+            )
+        if after_ride_id is not None:
+            after_ride = db.query(Ride).filter(Ride.ride_id == after_ride_id).first()
+            if after_ride is not None:
+                filters = and_(
+                    filters,
+                    (
+                        (Ride.departure_time > after_ride.departure_time)
+                        | (
+                            (Ride.departure_time == after_ride.departure_time)
+                            & (Ride.ride_id > after_ride_id)
+                        )
                     ),
                 )
+        query = (
+            db.query(Ride, Booking.status.label("user_booking_status"))
+            .outerjoin(
+                Booking,
+                and_(
+                    Booking.ride_id == Ride.ride_id,
+                    # אם passenger_id=None → join condition לא יתאים → status יהיה NULL
+                    Booking.passenger_id == passenger_id,
+                    Booking.status.notin_(
+                        [BookingStatus.CANCELLED, BookingStatus.REJECTED]
+                    ),
+                ),
             )
-            .all()
+            .filter(filters)
+            .order_by(Ride.departure_time.asc(), Ride.ride_id.asc())
         )
+        if passenger_id is not None:
+            query = query.where(Ride.driver_id != passenger_id)
+        if limit is not None:
+            query = query.limit(limit + 1)
+        rows = query.all()
+
+        # נורמליזציה: Booking.status יכול להגיע כ-enum או string, רוצים str|None
+        normalized: List[tuple[Ride, Optional[str]]] = []
+        for ride, status in rows:
+            if status is None:
+                normalized.append((ride, None))
+            elif hasattr(status, "value"):
+                normalized.append((ride, str(status.value)))
+            else:
+                normalized.append((ride, str(status)))
+
+        if limit is None:
+            return (normalized, False)
+        has_more = len(normalized) > limit
+        items = normalized[:limit]
+        return (items, has_more)
 
     # --- חיפוש נוסעים עבור נהג ---
 
@@ -252,7 +313,7 @@ class CRUDPassenger:
         min_date = ride_date - timedelta(days=1)
         max_date = ride_date + timedelta(days=7)
 
-        # ספירת נוסעים לפני סינון גיאוגרפי (לדיבוג)
+        # ספירת נוסעים לפני סינון גיאוגרפי (לדיבוג). רק ACTIVE — ביטול בקשה = CANCELLED ולא נשלחת התראה.
         total_active = (
             db.query(PassengerRequest)
             .filter(
@@ -261,7 +322,6 @@ class CRUDPassenger:
                 func.date(PassengerRequest.requested_departure_time) <= max_date,
                 func.date(PassengerRequest.requested_departure_time) >= min_date,
                 PassengerRequest.passenger_id != driver_id,
-                PassengerRequest.is_notification_active,
             )
             .count()
         )
@@ -274,7 +334,7 @@ class CRUDPassenger:
             total_active,
         )
 
-        # מוצא הנוסע חייב להיות במרחק עד 2 ק"מ מהמסלול של הנסיעה (route)
+        # מוצא הנוסע חייב להיות במרחק עד 2 ק"מ מהמסלול של הנסיעה (route). רק ACTIVE — ביטול = CANCELLED.
         q = (
             db.query(PassengerRequest)
             .filter(
@@ -283,7 +343,6 @@ class CRUDPassenger:
                 func.date(PassengerRequest.requested_departure_time) <= max_date,
                 func.date(PassengerRequest.requested_departure_time) >= min_date,
                 PassengerRequest.passenger_id != driver_id,
-                PassengerRequest.is_notification_active,
                 # יעד בטווח של 5 ק"מ מהיעד של הנסיעה
                 func.ST_DWithin(
                     cast(PassengerRequest.destination_geom, Geography),

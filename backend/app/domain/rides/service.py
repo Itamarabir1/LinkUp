@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions.ride import (
     RideNotFoundError,
     RideAlreadyCancelledError,
+    InvalidRideStatusError,
+    NoConfirmedBookingsError,
     SessionExpiredError,
 )
 from app.core.exceptions.validation import SameOriginDestinationError
@@ -32,8 +34,11 @@ from app.domain.rides.broadcast import (
     publish_ride_update,
 )
 from app.domain.geo import processor as geo_proc
-from app.domain.bookings.service import BookingService
+from app.domain.bookings.crud import crud_booking
+from app.domain.bookings.enum import BookingStatus
 from app.domain.events.outbox import publish_to_outbox
+from app.domain.events.enum import DispatchTarget
+from app.domain.notifications.constants import NotificationEvent
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +62,7 @@ class RideService:
         geo_data = await geo_proc.get_full_routing_data(
             origin_address,
             preview_in.destination_name,
+            preview_in.departure_time,
         )
         if not geo_data:
             raise RouteNotFoundError(
@@ -215,12 +221,77 @@ class RideService:
             logger.warning("Broadcast ride updated failed: %s", e)
         return RideResponse.model_validate(ride)
 
+    # --- Start / End ride (GPS tracking) ---
+
+    async def start_ride(
+        self, db: AsyncSession, ride_id: UUID, driver_id: UUID
+    ) -> RideResponse:
+        """מעביר נסיעה לסטטוס ACTIVE. דורש לפחות הזמנה אחת מאושרת."""
+        try:
+            ride = await db.run_sync(
+                lambda sess: crud_ride.get_for_update(
+                    sess, ride_id=ride_id, driver_id=driver_id
+                )
+            )
+            if not ride:
+                raise RideNotFoundError(ride_id)
+            if ride.status not in (RideStatus.OPEN, RideStatus.FULL):
+                raise InvalidRideStatusError(
+                    ride.status.value, action="start_ride"
+                )
+            confirmed = await db.run_sync(
+                lambda sess: crud_booking.get_ride_bookings_by_status(
+                    sess, ride_id, BookingStatus.CONFIRMED.value
+                )
+            )
+            if not confirmed:
+                raise NoConfirmedBookingsError(ride_id=ride_id)
+            updated = await db.run_sync(
+                lambda sess: crud_ride.update_status(
+                    sess, ride_id, RideStatus.ACTIVE
+                )
+            )
+            await db.commit()
+            await db.refresh(updated)
+            return RideResponse.model_validate(updated)
+        except Exception:
+            await db.rollback()
+            raise
+
+    async def end_ride(
+        self, db: AsyncSession, ride_id: UUID, driver_id: UUID
+    ) -> RideResponse:
+        """מעביר נסיעה לסטטוס COMPLETED."""
+        try:
+            ride = await db.run_sync(
+                lambda sess: crud_ride.get_for_update(
+                    sess, ride_id=ride_id, driver_id=driver_id
+                )
+            )
+            if not ride:
+                raise RideNotFoundError(ride_id)
+            if ride.status != RideStatus.ACTIVE:
+                raise InvalidRideStatusError(
+                    ride.status.value, action="end_ride"
+                )
+            updated = await db.run_sync(
+                lambda sess: crud_ride.update_status(
+                    sess, ride_id, RideStatus.COMPLETED
+                )
+            )
+            await db.commit()
+            await db.refresh(updated)
+            return RideResponse.model_validate(updated)
+        except Exception:
+            await db.rollback()
+            raise
+
     # --- Cancel ---
 
     async def cancel_ride_by_driver(
         self, db: AsyncSession, ride_id: UUID, driver_id: UUID
     ) -> None:
-        """ביטול נסיעה על ידי הנהג. לוגיקה + Outbox ב-BookingService."""
+        """ביטול נסיעה על ידי הנהג. לוגיקה ב-crud, Outbox נשאר כאן."""
         ride = await db.run_sync(
             lambda sess: crud_ride.get_for_update(
                 sess, ride_id=ride_id, driver_id=driver_id
@@ -232,7 +303,18 @@ class RideService:
             raise RideAlreadyCancelledError()
         origin_name = getattr(ride, "origin_name", None) or "—"
         destination_name = getattr(ride, "destination_name", None) or "—"
-        await BookingService.cancel_ride_and_all_bookings(db, ride_id, driver_id)
+        try:
+            await db.run_sync(crud_booking.cancel_ride_and_bookings_sync, ride_id, driver_id)
+            await publish_to_outbox(
+                db,
+                NotificationEvent.RIDE_CANCELLED_BY_DRIVER.value,
+                {"ride_id": str(ride_id)},
+                [DispatchTarget.RABBITMQ.value],
+            )
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
         # WebSocket: עדכון מיידי – ערוץ הנסיעה + רשימת נסיעות (ללא שימוש ב-session אחרי commit)
         try:
             await publish_ride_update(

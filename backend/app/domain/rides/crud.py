@@ -54,7 +54,11 @@ class CRUDRide:
     async def get_async(self, db: AsyncSession, ride_id: UUID) -> Optional[Ride]:
         """שליפה לפי מפתח ראשי ל-AsyncSession (לשימוש ב-read_ride ו-API אסינכרוני)."""
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
-        stmt = select(Ride).where(Ride.ride_id == rid)
+        stmt = (
+            select(Ride)
+            .where(Ride.ride_id == rid)
+            .options(selectinload(Ride.group))
+        )
         result = await db.execute(stmt)
         return result.scalars().first()
 
@@ -104,7 +108,11 @@ class CRUDRide:
     ) -> List[Ride]:
         """שליפת נסיעות לפי נהג (למסך 'הנסיעות שלי')."""
         did = UUID(str(driver_id)) if isinstance(driver_id, str) else driver_id
-        stmt = select(Ride).where(Ride.driver_id == did)
+        stmt = (
+            select(Ride)
+            .where(Ride.driver_id == did)
+            .options(selectinload(Ride.group))
+        )
         if status is not None:
             stmt = stmt.where(Ride.status == status)
         stmt = stmt.order_by(Ride.departure_time.desc())

@@ -61,7 +61,7 @@ cp frontend/.env.example frontend/.env
 - **RTL ועברית** – האפליקציה בנויה מיסודה ל-RTL; סגנונות וקומפוננטות `pages/*` מותאמות לימין.
 - **אימות** – קומפוננטות התחברות/הרשמה עובדות מול backend OAuth/JWT; תמיכה ב-Google Sign-In באמצעות `GoogleSignIn.tsx` ו-`VITE_GOOGLE_CLIENT_ID`.
 - **ניהול קבוצות** – במסכי `GroupManage` אפשר ליצור קבוצה, לשתף קישור הזמנה, להעתיק URL בלחיצה עם פידבק חזותי (העתקה מוצלחת/שגיאה) ולסגור קבוצה.
-- **צ'אט** – הצ'אט עצמו מנוהל מול שירות ה-WebSocket (`chat-ws`) דרך URL שמוגדר ב-`VITE_CHAT_WS_URL`.
+- **צ'אט** – WebSocket ל-`chat-ws` (`VITE_CHAT_WS_URL`); HTTP ל-`GET /presence/...` (`CHAT_WS_HTTP_BASE` / `VITE_CHAT_HTTP_URL`). עדכון **מיידי** כששותף מתנתק: הודעת WS `user_offline` (פולינג נשאר גיבוי).
 
 למידע רחב יותר על הארכיטקטורה וההרצה הכוללת (Docker, Kubernetes, chat-ws, mobile) ראו את ה-`README` בשורש הפרויקט.
 

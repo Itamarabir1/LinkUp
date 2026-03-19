@@ -4,7 +4,7 @@
 
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 
@@ -35,6 +35,14 @@ class MessageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PaginatedMessagesResponse(BaseModel):
+    """הודעות בשיחה עם pagination (cursor-based)."""
+
+    items: list[MessageResponse] = Field(default_factory=list)
+    next_cursor: Optional[str] = Field(None, description="message_id של הישן ביותר להבא (before=)")
+    has_more: bool = False
+
+
 class ConversationPartner(BaseModel):
     """מידע מינימלי על הצד השני בשיחה (להרשימה)."""
 
@@ -52,6 +60,7 @@ class ConversationListItem(BaseModel):
     partner: ConversationPartner
     last_message_at: Optional[datetime] = None
     last_message_preview: Optional[str] = None
+    has_unread: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

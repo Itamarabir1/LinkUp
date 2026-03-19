@@ -44,6 +44,7 @@ class BookingManifestItem(BaseModel):
     # פרטי תחנת עלייה ושעה
     pickup_name: Optional[str] = None
     pickup_time: Optional[datetime] = None
+    destination_name: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -74,6 +75,18 @@ class TripStats(BaseModel):
     count: int
     total_km: float
     total_hours: float
+
+
+class PaginatedBookingsResponse(BaseModel):
+    """הזמנות משתמש עם page-based pagination."""
+
+    items: List[BookingResponse] = Field(default_factory=list)
+    total: int = 0
+    page: int = 1
+    limit: int = 20
+    has_more: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TripHistoryResponse(BaseModel):

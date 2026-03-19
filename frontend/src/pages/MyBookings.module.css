@@ -79,41 +79,82 @@
   padding-top: 0.75rem;
   border-top: 1px solid var(--border);
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.passengerPendingActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .btnOutline {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 0.5rem 1rem;
+  min-height: 40px;
+  padding: 8px 14px;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
-  background: transparent;
+  font-family: "Heebo", sans-serif;
+  background: var(--bg-card);
   color: var(--text-primary);
   border: 1px solid var(--border);
   cursor: pointer;
+  transition: background 150ms, border-color 150ms, color 150ms;
 }
 
-.btnOutline:hover {
+.btnOutline:hover:not(:disabled) {
   background: var(--bg-secondary);
 }
 
-.btnDanger {
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  background: var(--danger-text);
-  color: #fff;
-  border: none;
-  cursor: pointer;
+.btnOutline:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
-.btnDanger:hover {
-  filter: brightness(0.9);
+.btnAccentBlue {
+  border-color: #1d6fe8;
+  color: #1d6fe8;
+}
+
+.btnAccentBlue:hover:not(:disabled) {
+  background: #eff6ff;
+}
+
+/* שיתוף מיקום פעיל — נהג */
+.btnAccentBlueActive {
+  border-color: #1d6fe8;
+  color: #1d6fe8;
+  background: #eff6ff;
+}
+
+.btnAccentBlueActive:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+.btnAccentGreen {
+  border-color: #059669;
+  color: #059669;
+  background: #ecfdf5;
+}
+
+.btnAccentGreen:hover:not(:disabled) {
+  background: #d1fae5;
+}
+
+.btnDangerOutline {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.btnDangerOutline:hover:not(:disabled) {
+  background: #fef2f2;
 }
 
 /* Driver block */
@@ -133,6 +174,36 @@
   font-size: 0.875rem;
   color: var(--text-secondary);
   margin-top: 0.25rem;
+}
+
+.groupTag {
+  font-size: 11px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.groupTagPublic {
+  font-size: 11px;
+  color: #9ca3af;
+  background: transparent;
+  padding: 2px 8px;
+}
+
+.cardTagWrap,
+.driverBlockTagWrap {
+  margin-top: 0.5rem;
+}
+
+.driverBlockActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
 }
 
 .countSep {
@@ -191,68 +262,6 @@
   align-items: center;
   gap: 0.5rem;
   flex-shrink: 0;
-}
-
-.btnApprove {
-  padding: 0.35rem 0.75rem;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  background: var(--primary);
-  color: #fff;
-  border: none;
-  cursor: pointer;
-}
-
-.btnApprove:hover:not(:disabled) {
-  background: var(--primary-hover);
-}
-
-.btnApprove:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.btnReject {
-  padding: 0.35rem 0.75rem;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  background: transparent;
-  color: var(--danger-text);
-  border: 1px solid var(--danger-text);
-  cursor: pointer;
-}
-
-.btnReject:hover:not(:disabled) {
-  background: rgba(220, 38, 38, 0.08);
-}
-
-.btnReject:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.btnChat {
-  padding: 0.35rem;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btnChat:hover:not(:disabled) {
-  background: var(--bg-secondary);
-  color: var(--primary);
-}
-
-.btnChat:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .statusConfirmed {

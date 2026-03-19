@@ -1,8 +1,16 @@
 """
 Firebase Admin SDK initialization.
-For local development, create firebase-credentials.json from
-firebase-credentials.example.json and fill in your service account values.
-Do not commit real credentials; the real file is in .gitignore.
+
+Pattern (from Firebase docs):
+    import firebase_admin
+    from firebase_admin import credentials
+    cred = credentials.Certificate("path/to/serviceAccountKey.json")
+    firebase_admin.initialize_app(cred)
+
+Here: path comes from FIREBASE_SERVICE_ACCOUNT_PATH (local) or
+FIREBASE_CREDENTIALS_JSON (production). Do not commit real credentials; the real
+file is in .gitignore. For local dev, copy firebase-credentials.example.json
+to firebase-credentials.json and set FIREBASE_SERVICE_ACCOUNT_PATH to its path.
 """
 
 import os
@@ -25,7 +33,7 @@ def initialize_firebase():
                 credentials_dict = json.loads(credentials_json)
                 cred = credentials.Certificate(credentials_dict)
             else:
-                # Local development: load from file path
+                # Local development: load from file path (e.g. path/to/serviceAccountKey.json)
                 cred = credentials.Certificate(settings.FIREBASE_SERVICE_ACCOUNT_PATH)
             firebase_admin.initialize_app(cred)
             logger.info("✅ Firebase Admin SDK initialized in Core")

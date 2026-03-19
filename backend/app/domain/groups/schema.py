@@ -54,6 +54,12 @@ class GroupMemberOut(BaseModel):
     role: str
     joined_at: datetime
 
+    @computed_field
+    @property
+    def full_name(self) -> Optional[str]:
+        user = getattr(self, "user", None)
+        return getattr(user, "full_name", None) if user is not None else None
+
     class Config:
         from_attributes = True
 

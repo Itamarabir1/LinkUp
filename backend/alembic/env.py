@@ -18,7 +18,7 @@ from app.domain.rides.model import Ride
 from app.domain.bookings.model import Booking
 from app.domain.passengers.model import PassengerRequest
 from app.domain.groups.model import Group, GroupMember
-from app.domain.chat.model import Conversation, Message, ChatAnalysis
+from app.domain.chat.model import Conversation, Message, ConversationParticipant, ChatAnalysis
 from app.infrastructure.outbox.model import OutboxEvent
 
 config = context.config

@@ -8,7 +8,7 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from app.infrastructure.redis.pubsub import redis_pubsub
+from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ async def publish_chat_message(conversation_id: UUID, payload: dict[str, Any]) -
     """
     channel = _channel(conversation_id)
     message = json.dumps(payload, default=str)
-    count = await redis_pubsub.publish(channel, message)
+    count = await redis_chat_pubsub.publish(channel, message)
     if count > 0:
         logger.debug("Published chat message to %s (%d subscriber(s))", channel, count)
     return count

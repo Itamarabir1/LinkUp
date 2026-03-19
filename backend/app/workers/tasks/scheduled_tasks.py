@@ -6,6 +6,7 @@
 import asyncio
 import logging
 import time
+from datetime import datetime
 from typing import Dict, Any
 
 from app.infrastructure.rabbitmq.client import rabbit_client
@@ -96,7 +97,15 @@ async def handle_scheduled_task(data: Dict[str, Any], routing_key: str) -> None:
         else:
             logger.warning("⚠️ Unknown scheduled task routing_key: %s", routing_key)
     except Exception as e:
-        logger.error("❌ Scheduled task failed [%s]: %s", routing_key, e, exc_info=True)
+        logger.error(
+            "Scheduled task failed — will retry on next schedule",
+            extra={
+                "task_type": routing_key,
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+            exc_info=True,
+        )
         # לא עושים raise: משימות מתוזמנות הן תקופתיות, ו-requeue גורם ללולאה אינסופית (poison message).
         # עדיף להיכשל פעם אחת, לכתוב לוג, והמתזמן כבר ישלח טריגר חדש בפעם הבאה.
         return

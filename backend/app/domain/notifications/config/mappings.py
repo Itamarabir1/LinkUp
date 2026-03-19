@@ -43,26 +43,26 @@ NOTIFICATION_STRATEGY = {
         "role": "passenger",
         "builder": RideBuilder(),
         "template": "ride_cancelled_by_driver",
-        "channels": ["email", "push"],
+        "channels": ["email", "push", "websocket"],
     },
     # --- Booking & Interaction (Booking Object) ---
     NotificationEvent.PASSENGER_JOIN_REQUEST: {
         "role": "driver",
         "builder": BookingBuilder(),
         "template": "new_ride_request",
-        "channels": ["email", "push"],
+        "channels": ["email", "push", "websocket"],
     },
     NotificationEvent.BOOKING_APPROVED_BY_DRIVER: {
         "role": "passenger",
         "builder": BookingBuilder(),
         "template": "booking_confirmed",
-        "channels": ["email", "push"],
+        "channels": ["email", "push", "websocket"],
     },
     NotificationEvent.BOOKING_REJECTED_BY_DRIVER: {
         "role": "passenger",
         "builder": BookingBuilder(),
         "template": "booking_rejected",
-        "channels": ["email", "push"],
+        "channels": ["email", "push", "websocket"],
     },
     # --- Reminders (מהסקדיולר) ---
     NotificationEvent.PICKUP_REMINDER_PASSENGER: {

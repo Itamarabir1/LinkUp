@@ -22,7 +22,6 @@ from app.domain.passengers.schema import (
     PassengerRequestCreate,
     PassengerRequestResponse,
     PassengerRequestWithMatches,
-    PassengerRequestUpdateNotifications,
     RideSearchRequest,
     RequestRideFromSearch,
     RideSearchResponse,
@@ -74,21 +73,6 @@ def create_new_request(
     except Exception as e:
         logger.error(f"Error in create_new_request: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="שגיאת שרת פנימית ביצירת הבקשה")
-
-
-# 2. עדכון הגדרות התראה
-@router.patch(
-    "/{request_id}/notifications",
-    response_model=PassengerRequestResponse,
-    summary="עדכון סטטוס התראות לסוכן החכם",
-)
-def update_notification_status(
-    request_id: UUID,
-    update_data: PassengerRequestUpdateNotifications,
-    db: Session = Depends(get_db),
-):
-    """מעדכן האם הנוסע מעוניין לקבל התראות אקטיביות עבור בקשה זו."""
-    return PassengerService.toggle_request_notifications(db, request_id, update_data)
 
 
 # --- Passenger rides sub-router: GET /passenger/rides/{ride_id}/driver-info ---
@@ -160,6 +144,16 @@ async def request_ride_from_search(
         raise HTTPException(status_code=409, detail=str(e))
     except PassengerRequestNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except ForbiddenRideActionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        logger.error("request_ride_from_search failed: %s", e, exc_info=True)
+        try:
+            from app.core.config import settings
+            detail = str(e) if getattr(settings, "DEBUG", False) else "שגיאה בשליחת הבקשה – נסה שוב או פנה לתמיכה"
+        except Exception:
+            detail = "שגיאה בשליחת הבקשה – נסה שוב או פנה לתמיכה"
+        raise HTTPException(status_code=500, detail=detail)
 
 
 # 3. חיפוש חופשי (אם המשתמש מחובר, נשמרת בקשה ב-DB)
@@ -177,6 +171,8 @@ async def search_available_rides(
     departure_time: Optional[datetime] = Query(
         None, description="אם ריק – יחפש מעכשיו"
     ),
+    limit: int = Query(20, ge=1, le=50, description="כמות תוצאות"),
+    after: Optional[UUID] = Query(None, description="cursor: ride_id להמשך"),
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
@@ -187,6 +183,8 @@ async def search_available_rides(
             destination_name=destination_name,
             search_radius=search_radius,
             departure_time=departure_time,
+            limit=limit,
+            after=after,
         )
         result = await db.run_sync(
             lambda sync_db: PassengerService.search_rides_for_passenger(

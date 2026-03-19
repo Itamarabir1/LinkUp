@@ -15,6 +15,7 @@ from sqlalchemy.types import TypeDecorator
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM, UUID as PG_UUID
 from geoalchemy2 import Geography
 import uuid
+from typing import Optional
 
 from app.db.base import Base
 from app.domain.rides.enum import RideStatus
@@ -62,12 +63,16 @@ class Ride(Base):
 
     # ה-FK שמחבר את הנסיעה ל-User הפיזי (הנהג)
     driver_id = Column(
-        PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     group_id = Column(
         PG_UUID(as_uuid=True),
         ForeignKey("groups.group_id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
 
     # --- זמנים ---
@@ -120,6 +125,13 @@ class Ride(Base):
     # הקשר ל-User: 'rides_as_driver' חייב להופיע ב-back_populates של מודל User
     driver = relationship("User", back_populates="rides_as_driver")
     group = relationship("Group")
+
+    @property
+    def group_name(self) -> Optional[str]:
+        """שם הקבוצה לתצוגה (למשל בתג כרטיסייה). נדרש טעינת group (למשל selectinload)."""
+        if self.group is None:
+            return None
+        return getattr(self.group, "name", None)
 
     # הקשר ל-Bookings: כל המושבים שנתפסו בנסיעה הזו (lazy=select – נטען רק בעת גישה, כדי ש-refresh אחרי יצירת נסיעה לא ייכשל אם טבלת bookings עדיין לא קיימת)
     bookings = relationship(

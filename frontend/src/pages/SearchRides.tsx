@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { he } from 'date-fns/locale';
 import { api } from '../api/client';
 import type { Ride, DriverInfo, RideSearchResponse } from '../types/api';
 import { formatDateTimeNoSeconds } from '../utils/date';
+import { ArrowUpDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import styles from './SearchRides.module.css';
 
@@ -11,11 +15,17 @@ export default function SearchRides() {
   const [pickup, setPickup] = useState('');
   const [destination, setDestination] = useState('');
   const [searchRadius, setSearchRadius] = useState(1000);
-  const [departureDate, setDepartureDate] = useState('');
-  const [departureTime, setDepartureTime] = useState('');
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(9, 0, 0, 0);
+    return d;
+  });
   const [results, setResults] = useState<Ride[]>([]);
-  const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
+  const [resultsNextCursor, setResultsNextCursor] = useState<string | null>(null);
+  const [resultsHasMore, setResultsHasMore] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
   const [driverInfoMap, setDriverInfoMap] = useState<Record<string, DriverInfo>>({});
@@ -55,6 +65,13 @@ export default function SearchRides() {
     );
   };
 
+  const handleSwap = () => {
+    const p = pickup;
+    const dest = destination;
+    setPickup(dest);
+    setDestination(p);
+  };
+
   const search = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pickup.trim() || !destination.trim()) {
@@ -64,7 +81,8 @@ export default function SearchRides() {
     setError('');
     setSearching(true);
     setResults([]);
-    setCurrentRequestId(null);
+    setResultsNextCursor(null);
+    setResultsHasMore(false);
     setRequestSuccessRideId(null);
     setDriverInfoMap({});
     try {
@@ -72,16 +90,18 @@ export default function SearchRides() {
         pickup_name: pickup.trim(),
         destination_name: destination.trim(),
         search_radius: searchRadius,
+        limit: 20,
       };
-      if (departureDate && departureTime) {
-        params.departure_time = new Date(`${departureDate}T${departureTime}`).toISOString();
+      if (selectedDate) {
+        params.departure_time = selectedDate.toISOString();
       }
       const { data } = await api.get<RideSearchResponse>(
         '/passenger/passengers/search-rides',
         { params }
       );
-      setResults(Array.isArray(data.rides) ? data.rides : []);
-      setCurrentRequestId(data.request_id || null);
+      setResults(data?.items ?? []);
+      setResultsNextCursor(data?.next_cursor ?? null);
+      setResultsHasMore(data?.has_more ?? false);
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { detail?: string } } })?.response?.data
@@ -89,6 +109,38 @@ export default function SearchRides() {
       setError(typeof msg === 'string' ? msg : String(msg));
     } finally {
       setSearching(false);
+    }
+  };
+
+  const loadMoreResults = async () => {
+    if (!resultsNextCursor || loadingMore || !pickup.trim() || !destination.trim()) return;
+    setLoadingMore(true);
+    setError('');
+    try {
+      const params: Record<string, string | number | undefined> = {
+        pickup_name: pickup.trim(),
+        destination_name: destination.trim(),
+        search_radius: searchRadius,
+        limit: 20,
+        after: resultsNextCursor,
+      };
+      if (selectedDate) {
+        params.departure_time = selectedDate.toISOString();
+      }
+      const { data } = await api.get<RideSearchResponse>(
+        '/passenger/passengers/search-rides',
+        { params }
+      );
+      const newItems = data?.items ?? [];
+      setResults((prev) => [...prev, ...newItems]);
+      setResultsNextCursor(data?.next_cursor ?? null);
+      setResultsHasMore(data?.has_more ?? false);
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'טעינה נכשלה';
+      setError(typeof msg === 'string' ? msg : String(msg));
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -122,7 +174,6 @@ export default function SearchRides() {
     try {
       await api.post('/passenger/passengers/request-ride-from-search', {
         ride_id: r.ride_id,
-        request_id: currentRequestId,
         pickup_name: pickup.trim(),
         destination_name: destination.trim(),
         num_seats: 1,
@@ -188,6 +239,17 @@ export default function SearchRides() {
             {locationLoading ? '...' : 'מיקום עצמי'}
           </button>
         </div>
+        <div className={styles.swapWrap}>
+          <button
+            type="button"
+            className={styles.swapBtn}
+            onClick={handleSwap}
+            aria-label="הפוך כיוון"
+            title="הפוך כיוון"
+          >
+            <ArrowUpDown size={18} />
+          </button>
+        </div>
         <input
           type="text"
           placeholder="יעד (כתובת)"
@@ -203,19 +265,19 @@ export default function SearchRides() {
           onChange={(e) => setSearchRadius(parseInt(e.target.value, 10) || 1000)}
           className={styles.formInput}
         />
-        <label className={styles.formLabel}>תאריך יציאה (אופציונלי – ריק = מעכשיו)</label>
-        <input
-          type="date"
-          value={departureDate}
-          onChange={(e) => setDepartureDate(e.target.value)}
-          className={styles.formInput}
-        />
-        <label className={styles.formLabel}>שעת יציאה (אופציונלי)</label>
-        <input
-          type="time"
-          value={departureTime}
-          onChange={(e) => setDepartureTime(e.target.value)}
-          className={styles.formInput}
+        <label className={styles.formLabel}>תאריך ושעת יציאה</label>
+        <DatePicker
+          selected={selectedDate}
+          onChange={(date: Date | null) => date && setSelectedDate(date)}
+          showTimeSelect
+          timeFormat="HH:mm"
+          timeIntervals={15}
+          dateFormat="dd/MM/yyyy HH:mm"
+          locale={he}
+          minDate={new Date()}
+          className={styles.datetimeInput}
+          placeholderText="בחר תאריך ושעה"
+          wrapperClassName={styles.datetimeWrapper}
         />
         <button
           type="submit"
@@ -229,21 +291,18 @@ export default function SearchRides() {
         {results.length === 0 && pickup && destination && !searching ? (
           <div>
             <p className={styles.emptyText} style={{ marginBottom: '0.5rem' }}>לא נמצאו נסיעות.</p>
-            {user && currentRequestId ? (
-              <p className={styles.pageMeta} style={{ color: '#6b7280', fontSize: '0.9rem', textAlign: 'center', padding: '0.5rem', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
-                ✅ נסיעתך נכנסה ל-DB ותקבל התראות כאשר יימצאו נסיעות מתאימות.
-              </p>
-            ) : user ? (
+            {user ? (
               <p className={styles.pageMeta} style={{ color: '#6b7280', fontSize: '0.9rem', textAlign: 'center', padding: '0.5rem', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
                 ✅ פרטי החיפוש שלך נשמרו ותקבל התראות כאשר יימצאו נסיעות מתאימות.
               </p>
             ) : null}
           </div>
         ) : (
-          results.map((r) => (
+          <>
+          {results.map((r) => (
             <div key={r.ride_id} className={styles.card}>
               <div className={styles.cardRoute}>
-                {r.origin_name ?? '?'} → {r.destination_name ?? '?'}
+                {r.origin_name ?? '?'} ← {r.destination_name ?? '?'}
               </div>
               <div className={styles.cardMeta}>
                 {formatDateTimeNoSeconds(r.departure_time)} ·{' '}
@@ -263,18 +322,24 @@ export default function SearchRides() {
                 >
                   {loadingDriverRideId === r.ride_id ? '...' : 'הצג פרטי הנהג'}
                 </button>
-                <button
-                  type="button"
-                  className={`${styles.btn} ${styles.btnSuccess}`}
-                  onClick={() => sendRequestToJoin(r)}
-                  disabled={sendingRequestRideId !== null || requestSuccessRideId === r.ride_id}
-                >
-                  {requestSuccessRideId === r.ride_id
-                    ? 'הבקשה נשלחה'
-                    : sendingRequestRideId === r.ride_id
-                      ? 'מעבד...'
-                      : 'בקש להצטרפות לנסיעה'}
-                </button>
+                {r.user_booking_status === 'pending_approval' ? (
+                  <span className={styles.statusPending}>⏳ ממתין לאישור</span>
+                ) : r.user_booking_status === 'confirmed' ? (
+                  <span className={styles.statusConfirmed}>✅ מאושר</span>
+                ) : (
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.btnSuccess}`}
+                    onClick={() => sendRequestToJoin(r)}
+                    disabled={sendingRequestRideId !== null || requestSuccessRideId === r.ride_id}
+                  >
+                    {requestSuccessRideId === r.ride_id
+                      ? 'הבקשה נשלחה'
+                      : sendingRequestRideId === r.ride_id
+                        ? 'מעבד...'
+                        : 'בקש להצטרפות לנסיעה'}
+                  </button>
+                )}
               </div>
               {requestErrorRideId === r.ride_id && requestErrorMessage && (
                 <p className={styles.pageError} style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
@@ -290,7 +355,20 @@ export default function SearchRides() {
                 </div>
               )}
             </div>
-          ))
+          ))}
+          {resultsHasMore && (
+            <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+              <button
+                type="button"
+                className={`${styles.btn} ${styles.btnOutline}`}
+                onClick={loadMoreResults}
+                disabled={loadingMore}
+              >
+                {loadingMore ? 'טוען...' : 'טען עוד נסיעות'}
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>

@@ -116,7 +116,7 @@ export default function MyRequests() {
                 ×
               </button>
               <RideCard
-                route={`${r.destination_name ?? '?'} ← ${r.pickup_name ?? '?'}`}
+                route={`${r.pickup_name ?? '?'} ← ${r.destination_name ?? '?'}`}
                 time={formatRideDate(r.requested_departure_time)}
                 status={statusLabels[r.status] || r.status}
                 source={getSource(r)}

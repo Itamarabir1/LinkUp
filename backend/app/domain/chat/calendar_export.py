@@ -32,12 +32,11 @@ async def get_conversation_for_calendar_export(
     if not conv:
         return None
 
-    # איסוף הודעות
-    messages = await chat_crud.get_messages(
+    # איסוף הודעות (פנימי – לא pagination)
+    messages = await chat_crud.get_all_messages_for_conversation(
         db,
         conversation_id=conversation_id,
-        limit=100,  # יותר הודעות ללוח שנה
-        before_message_id=None,
+        limit=100,
     )
 
     # זיהוי הצד השני

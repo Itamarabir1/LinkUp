@@ -4,7 +4,7 @@ import { Car, Plus } from 'lucide-react';
 import { api } from '../api/client';
 import type { Ride } from '../types/api';
 import { formatRideDate } from '../utils/date';
-import { API_BASE_URL } from '../config/env';
+import { getWsBaseUrl } from '../config/env';
 import { useAuth } from '../context/AuthContext';
 import { useGroup } from '../context/GroupContext';
 import Chips, { type ChipItem } from '../components/Chips/Chips';
@@ -12,17 +12,12 @@ import RideCard from '../components/RideCard/RideCard';
 import ConfirmModal from '../components/ConfirmModal/ConfirmModal';
 import styles from './MyRides.module.css';
 
-function getRideWsUrl(rideId: string): string {
-  const base = API_BASE_URL.startsWith('http')
-    ? API_BASE_URL.replace(/^http/, 'ws')
-    : (typeof window !== 'undefined'
-        ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}${API_BASE_URL}`
-        : `${API_BASE_URL}`);
-  return `${base}/rides/ws/${rideId}`;
-}
+const getRideWsUrl = (rideId: string): string =>
+  `${getWsBaseUrl()}/rides/ws/${rideId}`;
 
 function getStatusLabel(r: Ride): string {
   if (r.status === 'cancelled') return 'בוטלה';
+  if (r.status === 'active') return 'פעילה';
   const seats = r.available_seats ?? 0;
   if (seats <= 0) return 'מלא';
   if (seats === 1) return '1 מקום';
@@ -187,7 +182,7 @@ export default function MyRides() {
                 ×
               </button>
               <RideCard
-                route={`${r.destination_name ?? '?'} ← ${r.origin_name ?? '?'}`}
+                route={`${r.origin_name ?? '?'} ← ${r.destination_name ?? '?'}`}
                 time={formatRideDate(r.departure_time)}
                 status={getStatusLabel(r)}
                 source={getSource(r)}
@@ -207,6 +202,7 @@ export default function MyRides() {
         onConfirm={handleConfirmCancel}
         titleId="confirm-cancel-ride-title"
       />
+
     </div>
   );
 }

@@ -1,4 +1,5 @@
-from typing import Optional
+from typing import Optional, Union
+from uuid import UUID
 from .base import LinkupError
 
 # --- Ride Discovery & General Errors ---
@@ -69,6 +70,20 @@ class InvalidDateTimeError(LinkupError):
 
 
 # --- Booking Errors ---
+
+
+class NoConfirmedBookingsError(LinkupError):
+    """נזרקת כאשר מנסים להתחיל נסיעה בלי אף נוסע מאושר."""
+
+    status_code = 400
+    error_code = "RIDE_NO_CONFIRMED_BOOKINGS"
+    message = "אין נוסעים מאושרים לנסיעה"
+
+    def __init__(self, ride_id: Optional[Union[UUID, str]] = None):
+        super().__init__(
+            message=self.message,
+            payload={"ride_id": str(ride_id)} if ride_id is not None else None,
+        )
 
 
 class RideFullError(LinkupError):

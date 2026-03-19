@@ -6,8 +6,14 @@ import sys
 # רישום כל המודלים לפני שימוש ב-ORM (מניעת "expression 'Group' failed to locate a name")
 import app.db.models  # noqa: F401
 
+# Firebase Admin SDK init (side-effect import; safe idempotent)
+import app.infrastructure.firebase_core.firebase  # noqa: F401
+
+from app.core.logging import setup_logging
+
 # Infrastructure
 from app.infrastructure.rabbitmq.client import rabbit_client
+from app.infrastructure.redis.broadcast import broadcast
 from app.infrastructure.rabbitmq.consumer import RabbitMQConsumer
 from app.infrastructure.events.dispatcher.factory import DispatcherFactory
 from app.domain.events.routing import (
@@ -28,8 +34,7 @@ from app.workers.tasks.scheduled_tasks import (
 )
 from app.workers.tasks.chat_summary_task import run_chat_completion_redis_listener
 
-# הגדרת לוגר
-logging.basicConfig(level=logging.INFO)
+setup_logging()
 logger = logging.getLogger("WorkerMain")
 
 
@@ -55,9 +60,19 @@ async def main():
         # ב-Windows אנחנו נסמוך על KeyboardInterrupt בתוך ה-try
         logger.info("ℹ️ Windows detected: Using standard interrupt handling.")
 
+    broadcast_ok = False
     try:
         # 2. אתחול תשתיות
         await rabbit_client.connect()
+        try:
+            await broadcast.connect()
+            broadcast_ok = True
+            logger.info("✅ [Worker] Redis Broadcast connected (in-app notifications)")
+        except Exception as e:
+            logger.warning(
+                "⚠️ [Worker] Redis Broadcast unavailable (WS notifications disabled): %s",
+                e,
+            )
 
         # 3. הזרקת תלויות (Dependency Injection)
         rmq_publisher = RabbitMQPublisher(rabbit_client=rabbit_client)
@@ -124,7 +139,11 @@ async def main():
             # המתנה של מקסימום 5 שניות לסגירת המשימות
             await asyncio.wait(tasks, timeout=5)
 
-        # סגירת החיבור הפיזי לרביט
+        if broadcast_ok:
+            try:
+                await broadcast.disconnect()
+            except Exception as e:
+                logger.warning("⚠️ [Worker] broadcast.disconnect: %s", e)
         await rabbit_client.close()
         logger.info("🏁 Linkup Worker Engine shut down cleanly.")
 

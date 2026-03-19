@@ -35,8 +35,18 @@ class GroupMember(Base):
     __tablename__ = "group_members"
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    group_id = Column(PG_UUID(as_uuid=True), ForeignKey("groups.group_id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    group_id = Column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("groups.group_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     role = Column(String(20), default="member", nullable=False)
     joined_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

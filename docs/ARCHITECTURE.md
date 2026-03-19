@@ -1,32 +1,14 @@
-# Linkup — Architecture Overview
+# ארכיטקטורה — הפניה
 
-## Services
+תיעוד הארכיטקטורה המלא נמצא בשורש הפרויקט:
 
-| Service        | Path        | Language        | Port | Purpose                          |
-|----------------|-------------|-----------------|------|----------------------------------|
-| linkup-api     | backend/    | Python / FastAPI| 8000 | REST API, auth, rides, bookings  |
-| linkup-chat-ws | chat-ws/    | Go              | 8081 | WebSocket server for real-time chat |
-| linkup-web     | frontend/   | React / TypeScript | 5173 | Web client                    |
-| linkup-mobile  | mobile/     | React Native / Expo | —  | Mobile client                  |
+**[../ARCHITECTURE.md](../ARCHITECTURE.md)** — סקירת שירותים, תשתית, זרימת תקשורת, דפוסים, ביצועים ואבטחה.
 
-## Communication
+תיעוד מפורט (תיקיית `architecture/`):
 
-- Clients → linkup-api: REST HTTP
-- Clients → linkup-chat-ws: WebSocket
-- linkup-chat-ws ↔ Redis: Pub/Sub for message routing
-- linkup-api → Redis: Publish chat messages and chat completion events (DB 1)
-- linkup-api → RabbitMQ: Event publishing via Outbox pattern
-- Backend worker: Listens to Redis DB 1 for chat completion, runs AI analysis (Groq), saves to DB and outbox
-
-## Key Patterns
-
-- **Outbox Pattern**: events written to DB first,
-  worker publishes to RabbitMQ asynchronously
-- **Domain-Driven Design**: each domain owns
-  model, schema, crud, service
-- **JWT Auth**: shared secret between backend
-  and chat-ws for WebSocket authentication
-
-## Future Considerations
-
-- **Kafka**: Kafka was considered for high-throughput event streaming but removed in favor of RabbitMQ for simplicity at current scale.
+- [architecture/DATABASE.md](architecture/DATABASE.md) — מסד נתונים, טבלאות, indexes, migrations
+- [architecture/API.md](architecture/API.md) — endpoints, Auth, Pagination
+- [architecture/EVENTS.md](architecture/EVENTS.md) — Outbox, RabbitMQ, Workers
+- [architecture/REALTIME.md](architecture/REALTIME.md) — WebSocket, Redis Pub/Sub, צ'אט
+- [ENGINEERING_HIGHLIGHTS.md](ENGINEERING_HIGHLIGHTS.md) — סיכום להצגה: פיצ'רים, סקייל, טריקים, real-time, Outbox
+- [architecture/DEVELOPMENT.md](architecture/DEVELOPMENT.md) — Setup, env vars, מבנה פרויקט

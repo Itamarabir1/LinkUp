@@ -23,8 +23,9 @@ from app.domain.rides.schema import (
 from app.core.exceptions.ride import RideNotFoundError
 from app.infrastructure.redis.broadcast import broadcast
 from app.domain.users.model import User
-from app.api.dependencies.auth import get_current_user
+from app.api.dependencies.auth import get_current_user, get_current_user_ws
 from app.domain.rides.service import ride_service
+from app.services.location.location_service import PASSENGER_LOCATIONS_CHANNEL_SUFFIX
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -58,7 +59,8 @@ async def get_my_rides(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     status: Optional[str] = Query(
-        None, description="סנן לפי סטטוס: open, full, cancelled, completed"
+        None,
+        description="סנן לפי סטטוס: open, full, active, completed, cancelled",
     ),
 ):
     """רשימת הנסיעות שלי כנהג."""
@@ -81,6 +83,36 @@ async def update_ride(
         raise HTTPException(status_code=404, detail="נסיעה לא נמצאה או שאין הרשאה")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{ride_id}/start", response_model=RideResponse)
+async def start_ride(
+    ride_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """התחל נסיעה — מעביר לסטטוס ACTIVE. דורש לפחות נוסע מאושר אחד."""
+    try:
+        return await ride_service.start_ride(
+            db, ride_id=ride_id, driver_id=current_user.user_id
+        )
+    except RideNotFoundError:
+        raise HTTPException(status_code=404, detail="נסיעה לא נמצאה או שאין הרשאה")
+
+
+@router.post("/{ride_id}/end", response_model=RideResponse)
+async def end_ride(
+    ride_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """סיים נסיעה — מעביר לסטטוס COMPLETED."""
+    try:
+        return await ride_service.end_ride(
+            db, ride_id=ride_id, driver_id=current_user.user_id
+        )
+    except RideNotFoundError:
+        raise HTTPException(status_code=404, detail="נסיעה לא נמצאה או שאין הרשאה")
 
 
 @router.delete("/{ride_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)
@@ -125,3 +157,43 @@ async def ride_status_websocket(websocket: WebSocket, ride_id: UUID):
 
     except WebSocketDisconnect:
         logger.info(f"Client disconnected from ride {ride_id}")
+
+
+@router.websocket("/ws/{ride_id}/passengers")
+async def ride_passengers_locations_websocket(
+    websocket: WebSocket,
+    ride_id: UUID,
+    user: Optional[User] = Depends(get_current_user_ws),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    ערוץ WebSocket לעדכוני מיקום נוסעים בנסיעה. רק נהג הנסיעה יכול להתחבר.
+    חיבור: GET /api/v1/rides/ws/{ride_id}/passengers?token=JWT
+    """
+    if not user:
+        logger.warning("WS passengers: no user, closing")
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+    ride = await ride_service.get_ride_by_id(db, ride_id)
+    logger.info(
+        "WS passengers: ride=%s user=%s driver=%s",
+        ride_id,
+        getattr(user, "user_id", None),
+        getattr(ride, "driver_id", None) if ride else "NONE",
+    )
+    if not ride or str(ride.driver_id) != str(user.user_id):
+        logger.warning(
+            "WS passengers: auth failed, ride=%s user=%s",
+            ride_id,
+            getattr(user, "user_id", None),
+        )
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+    await websocket.accept()
+    channel_name = f"ride_{ride_id}{PASSENGER_LOCATIONS_CHANNEL_SUFFIX}"
+    try:
+        async with broadcast.subscribe(channel=channel_name) as subscriber:
+            async for event in subscriber:
+                await websocket.send_text(event.message)
+    except WebSocketDisconnect:
+        logger.info(f"Driver disconnected from passengers stream for ride {ride_id}")

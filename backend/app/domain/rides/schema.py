@@ -156,7 +156,9 @@ class RideResponse(RideBase):
     ride_id: UUID
     status: RideStatus
     created_at: datetime
+    user_booking_status: Optional[str] = None
     group_id: Optional[UUID] = None
+    group_name: Optional[str] = None
     total_distance_km: float = Field(..., validation_alias="distance_km")
     total_duration_min: float = Field(..., validation_alias="duration_min")
     # שימוש ב-Alias כדי למשוך מה-Property של SQLAlchemy

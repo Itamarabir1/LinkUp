@@ -13,4 +13,35 @@ const CHAT_WS_URL =
   import.meta.env.VITE_CHAT_WS_URL ||
   (import.meta.env.DEV ? 'ws://localhost:8081' : 'ws://127.0.0.1:8081');
 
-export { API_BASE_URL, GOOGLE_MAPS_API_KEY, API_TIMEOUT_MS, CHAT_WS_URL };
+/** HTTP base של chat-ws (presence וכו'). אופציונלי: VITE_CHAT_HTTP_URL */
+function chatWsUrlToHttpBase(wsUrl: string): string {
+  const s = wsUrl.trim();
+  const withProto = s.startsWith('ws') ? s : `ws://${s}`;
+  try {
+    const u = new URL(withProto);
+    const protocol = u.protocol === 'wss:' ? 'https:' : 'http:';
+    return `${protocol}//${u.host}`;
+  } catch {
+    return (
+      s.replace(/^wss:\/\//i, 'https://').replace(/^ws:\/\//i, 'http://').split('/')[0] ||
+      'http://127.0.0.1:8081'
+    );
+  }
+}
+const CHAT_WS_HTTP_BASE =
+  (import.meta.env.VITE_CHAT_HTTP_URL as string | undefined)?.replace(/\/$/, '') ||
+  chatWsUrlToHttpBase(CHAT_WS_URL);
+
+export function getWsBaseUrl(): string {
+  if (import.meta.env.DEV) {
+    return 'ws://localhost:8000/api/v1';
+  }
+  const protocol =
+    typeof window !== 'undefined' && window.location.protocol === 'https:'
+      ? 'wss:'
+      : 'ws:';
+  const host = typeof window !== 'undefined' ? window.location.host : '';
+  return `${protocol}//${host}/api/v1`;
+}
+
+export { API_BASE_URL, GOOGLE_MAPS_API_KEY, API_TIMEOUT_MS, CHAT_WS_URL, CHAT_WS_HTTP_BASE };

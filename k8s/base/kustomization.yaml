@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
+  - ../worker
 
 commonLabels:
   app.kubernetes.io/part-of: linkup

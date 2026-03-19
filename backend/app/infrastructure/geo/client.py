@@ -1,4 +1,6 @@
+import time
 import httpx
+from datetime import datetime
 from geopy.geocoders import Nominatim
 from typing import Optional, List, Dict, Tuple, Any
 from app.core.config import settings
@@ -116,17 +118,23 @@ class GeoClient:
                 return None
 
     async def fetch_raw_routes(
-        self, start: Tuple[float, float], end: Tuple[float, float]
+        self,
+        start: Tuple[float, float],
+        end: Tuple[float, float],
+        departure_time: Optional[datetime] = None,
     ) -> List[Dict]:
         """
         שליפת 2-3 מסלולים מ-Google Directions API.
         זמן ומרחק לכל מסלול מגיעים מ-Distance Matrix API (fallback ל-Directions אם נכשל).
         מחזיר רשימת dict עם: summary, duration (שניות), distance (מטרים), coords [[lat,lon],...].
         """
-        return await self.fetch_routes_google_directions(start, end)
+        return await self.fetch_routes_google_directions(start, end, departure_time)
 
     async def fetch_routes_google_directions(
-        self, start: Tuple[float, float], end: Tuple[float, float]
+        self,
+        start: Tuple[float, float],
+        end: Tuple[float, float],
+        departure_time: Optional[datetime] = None,
     ) -> List[Dict]:
         """
         שליפת עד 3 מסלולים מ-Google Directions API (alternatives=true).
@@ -141,6 +149,13 @@ class GeoClient:
             "alternatives": "true",
             "language": "he",
         }
+        if departure_time:
+            ts = int(departure_time.timestamp())
+            now_ts = int(time.time())
+            # Google דורש departure_time בעתיד (לפחות ~דקה מהעכשיו)
+            params["departure_time"] = max(ts, now_ts + 60)
+        else:
+            params["departure_time"] = "now"
         async with httpx.AsyncClient(timeout=TIMEOUT_DIRECTIONS) as client:
             try:
                 response = await client.get(GOOGLE_DIRECTIONS_URL, params=params)

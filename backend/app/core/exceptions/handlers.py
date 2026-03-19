@@ -11,13 +11,16 @@ async def linkup_exception_handler(request: Request, exc: LinkupError):
     """
     Handler מרכזי שתופס את כל סוגי השגיאות שלנו
     """
-    # תיעוד השגיאה בלוגים
-    # ה-f-string משתמש בערכים שקיימים בתוך האובייקט exc
+    request_id = getattr(request.state, "request_id", None)
     logger.error(
-        f"🚨 Error: {exc.error_code} | Trace: {exc.trace_id} | Message: {exc.message}"
+        "LinkupError: %s | trace_id=%s | message=%s",
+        exc.error_code,
+        exc.trace_id,
+        exc.message,
+        extra={"request_id": request_id or ""},
     )
 
-    return JSONResponse(
+    response = JSONResponse(
         status_code=exc.status_code,
         content={
             "status": "error",
@@ -27,3 +30,6 @@ async def linkup_exception_handler(request: Request, exc: LinkupError):
             "details": exc.payload,
         },
     )
+    if request_id:
+        response.headers["X-Request-ID"] = request_id
+    return response

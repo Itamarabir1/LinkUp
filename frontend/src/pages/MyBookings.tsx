@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { MessageCircle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { MapPin, MessageCircle, Navigation } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useGroup } from '../context/GroupContext';
 import { useChat } from '../context/ChatContext';
@@ -7,6 +8,10 @@ import { api, openChatByBooking } from '../api/client';
 import type { Ride } from '../types/api';
 import { formatRideDate } from '../utils/date';
 import ConfirmModal from '../components/ConfirmModal/ConfirmModal';
+import LiveMapModal from '../components/LiveMapModal';
+import LiveRideMapModal from '../components/LiveRideMapModal';
+import { usePassengerLocationBroadcast } from '../hooks/usePassengerLocationBroadcast';
+import { useLocationBroadcast } from '../hooks/useLocationBroadcast';
 import styles from './MyBookings.module.css';
 
 interface BookingRow {
@@ -38,6 +43,8 @@ interface PassengerInRide {
   status: string;
   pickupName?: string | null;
   pickupTime?: string | null;
+  /** יעד הבקשה של הנוסע (מ-passenger_request) */
+  dropoffName?: string | null;
 }
 
 /** הזמנות שבהן אני נהג – נסיעה עם כל הנוסעים שלה */
@@ -50,6 +57,13 @@ type TabKind = 'driver' | 'passenger';
 
 const AVATAR_COLORS = ['#6366f1', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0ea5e9'];
 
+const canPassengerShare = (bookingStatus: string, rideStatus: string) =>
+  bookingStatus === 'confirmed' && rideStatus === 'active';
+
+const canDriverShare = (confirmedCount: number) => confirmedCount >= 1;
+
+const canDriverOpenMap = (confirmedCount: number) => confirmedCount >= 1;
+
 function getSource(ride: Ride, myGroups: { group_id: string; name: string }[]): string {
   if (!ride.group_id) return 'ציבורי';
   const g = myGroups.find((x) => x.group_id === ride.group_id);
@@ -61,10 +75,15 @@ function avatarInitial(name: string): string {
 }
 
 export default function MyBookings() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { myGroups } = useGroup();
   const { openChat } = useChat();
-  const [activeTab, setActiveTab] = useState<TabKind>('passenger');
+  const activeTab: TabKind = searchParams.get('tab') === 'driver' ? 'driver' : 'passenger';
+  const setActiveTab = (tab: TabKind) => {
+    if (tab === 'driver') setSearchParams({ tab: 'driver' });
+    else setSearchParams({});
+  };
   const [passengerList, setPassengerList] = useState<PassengerBookingItem[]>([]);
   const [driverList, setDriverList] = useState<DriverBookingItem[]>([]);
   const [passengerLoading, setPassengerLoading] = useState(true);
@@ -74,15 +93,24 @@ export default function MyBookings() {
   const [bookingToCancel, setBookingToCancel] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [actionBookingId, setActionBookingId] = useState<string | null>(null);
+  const [trackDriverBookingId, setTrackDriverBookingId] = useState<string | null>(null);
+  const [sharingLocationBookingId, setSharingLocationBookingId] = useState<string | null>(null);
+  const [sharingRideId, setSharingRideId] = useState<string | null>(null);
+  const [liveRideId, setLiveRideId] = useState<string | null>(null);
+  const [rideToCancel, setRideToCancel] = useState<string | null>(null);
+  const [cancellingRide, setCancellingRide] = useState(false);
+
+  usePassengerLocationBroadcast(sharingLocationBookingId, !!sharingLocationBookingId);
 
   const fetchPassengerBookings = useCallback(async () => {
     if (!user?.user_id) return;
     setPassengerLoading(true);
     setError('');
     try {
-      const { data: bookings } = await api.get<BookingRow[]>('/bookings/my-bookings', {
-        params: { user_id: user.user_id },
+      const { data } = await api.get<BookingRow[]>('/bookings/my-bookings', {
+        params: { user_id: user.user_id, limit: 50 },
       });
+      const bookings = Array.isArray(data) ? data : [];
       const asPassenger = (Array.isArray(bookings) ? bookings : []).filter(
         (b) => b.passenger_id === user.user_id && (b.status === 'pending_approval' || b.status === 'confirmed')
       );
@@ -135,10 +163,19 @@ export default function MyBookings() {
       await Promise.all(
         activeRides.map(async (ride) => {
           try {
-            const manifestRes = await api.get<{ passengers: Array<{ booking_id: string; passenger_name: string; num_seats: number; status: string; pickup_name?: string | null; pickup_time?: string | null }> }>(
-              `/bookings/ride/${ride.ride_id}/manifest`,
-              { params: { driver_id: user.user_id } }
-            );
+            const manifestRes = await api.get<{
+              passengers: Array<{
+                booking_id: string;
+                passenger_name: string;
+                num_seats: number;
+                status: string;
+                pickup_name?: string | null;
+                pickup_time?: string | null;
+                destination_name?: string | null;
+              }>;
+            }>(`/bookings/ride/${ride.ride_id}/manifest`, {
+              params: { driver_id: user.user_id },
+            });
             const passengers = manifestRes.data?.passengers ?? [];
             const filteredPassengers = passengers
               .filter((p) => p.status === 'pending_approval' || p.status === 'confirmed')
@@ -149,6 +186,7 @@ export default function MyBookings() {
                 status: p.status,
                 pickupName: p.pickup_name ?? null,
                 pickupTime: p.pickup_time ?? null,
+                dropoffName: p.destination_name ?? null,
               }));
             
             // רק אם יש נוסעים - נוסיף את הנסיעה לרשימה
@@ -173,6 +211,65 @@ export default function MyBookings() {
       setDriverLoading(false);
     }
   }, [user?.user_id]);
+
+  const handleShareStart = useCallback(
+    async (rideId: string) => {
+      setError('');
+      try {
+        await api.post(`/rides/${rideId}/start`);
+        await fetchDriverBookings();
+      } catch (err: unknown) {
+        const res = (err as { response?: { status?: number; data?: { detail?: string; error_code?: string } } })
+          ?.response;
+        const code = res?.data?.error_code;
+        const detail = typeof res?.data?.detail === 'string' ? res.data.detail : '';
+        /** נסיעה כבר ACTIVE — ממשיכים לשלוח מיקום בלי לחסום את ה-watch */
+        if (
+          res?.status === 400 &&
+          (code === 'RIDE_INVALID_STATUS' || /active|ACTIVE|פעיל/i.test(detail))
+        ) {
+          await fetchDriverBookings();
+          return;
+        }
+        const msg = detail || 'התחלת הנסיעה נכשלה';
+        setError(msg);
+        throw err;
+      }
+    },
+    [fetchDriverBookings]
+  );
+
+  const handleShareStop = useCallback(
+    async (rideId: string) => {
+      try {
+        await api.post(`/rides/${rideId}/end`);
+        setLiveRideId((prev) => (prev === rideId ? null : prev));
+      } catch (err: unknown) {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 400) return;
+        console.error('handleShareStop error:', err);
+      } finally {
+        await fetchDriverBookings();
+      }
+    },
+    [fetchDriverBookings]
+  );
+
+  const driverShareConfirmedBookingId = useMemo(() => {
+    if (!sharingRideId) return null;
+    const block = driverList.find((d) => d.ride.ride_id === sharingRideId);
+    return block?.passengers.find((p) => p.status === 'confirmed')?.bookingId ?? null;
+  }, [sharingRideId, driverList]);
+
+  useLocationBroadcast({
+    rideId: sharingRideId,
+    driverId: user?.user_id ?? null,
+    bookingId: driverShareConfirmedBookingId,
+    enabled:
+      !!sharingRideId && !!user?.user_id && !!driverShareConfirmedBookingId,
+    onStart: handleShareStart,
+    onStop: handleShareStop,
+  });
 
   useEffect(() => {
     fetchPassengerBookings();
@@ -271,32 +368,82 @@ export default function MyBookings() {
             passengerList.map(({ ride, bookingId, bookingStatus, driverName }) => (
               <div key={bookingId} className={styles.bookingCard}>
                 <div className={styles.cardRoute}>
-                  {ride.destination_name ?? '?'} ← {ride.origin_name ?? '?'}
+                  {ride.origin_name ?? '?'} ← {ride.destination_name ?? '?'}
                 </div>
                 <div className={styles.cardMeta}>
                   {formatRideDate(ride.departure_time)} · {statusLabel[bookingStatus] ?? bookingStatus}
                 </div>
                 {driverName && <div className={styles.cardMeta}>נהג: {driverName}</div>}
                 <div className={styles.cardMeta}>{getSource(ride, myGroups)}</div>
+                {(ride.group_name ?? (ride.group_id ? getSource(ride, myGroups) : null)) && (
+                  <div className={styles.cardTagWrap}>
+                    <span className={styles.groupTag}>
+                      {ride.group_name ?? getSource(ride, myGroups)}
+                    </span>
+                  </div>
+                )}
                 {(bookingStatus === 'pending_approval' || bookingStatus === 'confirmed') && (
                   <div className={styles.bookingCardActions}>
-                    <button
-                      type="button"
-                      className={styles.btnOutline}
-                      onClick={() => handleOpenChat(bookingId)}
-                      disabled={chatLoading === bookingId}
-                    >
-                      <MessageCircle size={14} />
-                      שיחה עם הנהג
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.btnDanger}
-                      onClick={() => setBookingToCancel(bookingId)}
-                      disabled={cancelling}
-                    >
-                      בטל הזמנה
-                    </button>
+                    {canPassengerShare(bookingStatus, ride.status) ? (
+                      <>
+                        <button
+                          type="button"
+                          className={`${styles.btnOutline} ${
+                            sharingLocationBookingId === bookingId ? styles.btnAccentGreen : ''
+                          }`}
+                          onClick={() =>
+                            setSharingLocationBookingId((prev) => (prev === bookingId ? null : bookingId))
+                          }
+                        >
+                          <Navigation size={15} />
+                          {sharingLocationBookingId === bookingId ? 'הפסק שיתוף' : 'שתף מיקום'}
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.btnOutline} ${styles.btnAccentBlue}`}
+                          onClick={() => setTrackDriverBookingId(bookingId)}
+                        >
+                          <MapPin size={15} /> מפה
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
+                          onClick={() => setBookingToCancel(bookingId)}
+                          disabled={cancelling}
+                        >
+                          בטל
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.btnOutline}
+                          onClick={() => handleOpenChat(bookingId)}
+                          disabled={chatLoading === bookingId}
+                        >
+                          <MessageCircle size={15} />
+                          צ&apos;אט
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className={styles.btnOutline}
+                          onClick={() => handleOpenChat(bookingId)}
+                          disabled={chatLoading === bookingId}
+                        >
+                          <MessageCircle size={15} />
+                          צ&apos;אט
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
+                          onClick={() => setBookingToCancel(bookingId)}
+                          disabled={cancelling}
+                        >
+                          בטל הזמנה
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -319,10 +466,10 @@ export default function MyBookings() {
                 <div key={ride.ride_id} className={styles.driverBlock}>
                   <div className={styles.driverBlockHeader}>
                     <div className={styles.cardRoute}>
-                      {ride.destination_name ?? '?'} ← {ride.origin_name ?? '?'}
+                      {ride.origin_name ?? '?'} ← {ride.destination_name ?? '?'}
                     </div>
                     <div className={styles.cardMeta}>
-                      {formatRideDate(ride.departure_time)} · {ride.available_seats} מושבים
+                      {formatRideDate(ride.departure_time)} · {ride.available_seats} מושבים פנויים
                     </div>
                     <div className={styles.driverBlockCounts}>
                       {pendingCount > 0 && <span>{pendingCount} בקשות</span>}
@@ -331,6 +478,66 @@ export default function MyBookings() {
                           {confirmedCount} מאושרים
                         </span>
                       )}
+                    </div>
+                    <div className={styles.driverBlockTagWrap}>
+                      {(ride.group_name ?? (ride.group_id ? getSource(ride, myGroups) : null)) ? (
+                        <span className={styles.groupTag}>
+                          {ride.group_name ?? getSource(ride, myGroups)}
+                        </span>
+                      ) : (
+                        <span className={styles.groupTagPublic}>ציבורי</span>
+                      )}
+                    </div>
+                    <div className={styles.driverBlockActions}>
+                      {canDriverShare(confirmedCount) && (
+                        <>
+                          <button
+                            type="button"
+                            className={`${styles.btnOutline} ${
+                              sharingRideId === ride.ride_id ? styles.btnAccentBlueActive : ''
+                            }`}
+                            onClick={() =>
+                              setSharingRideId((prev) => (prev === ride.ride_id ? null : ride.ride_id))
+                            }
+                          >
+                            <Navigation size={15} />
+                            {sharingRideId === ride.ride_id ? 'הפסק שיתוף' : 'שתף מיקום'}
+                          </button>
+                          {ride.status === 'active' ? (
+                            <button
+                              type="button"
+                              className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
+                              onClick={() => handleShareStop(ride.ride_id)}
+                            >
+                              ■ סיים נסיעה
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className={styles.btnOutline}
+                              onClick={() => handleShareStart(ride.ride_id)}
+                            >
+                              ▶ התחל נסיעה
+                            </button>
+                          )}
+                          {canDriverOpenMap(confirmedCount) && (
+                            <button
+                              type="button"
+                              className={`${styles.btnOutline} ${styles.btnAccentBlue}`}
+                              onClick={() => setLiveRideId(ride.ride_id)}
+                            >
+                              <MapPin size={15} /> מפה
+                            </button>
+                          )}
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
+                        onClick={() => setRideToCancel(ride.ride_id)}
+                      >
+                        בטל נסיעה
+                      </button>
                     </div>
                   </div>
                   <ul className={styles.passengerList}>
@@ -349,47 +556,61 @@ export default function MyBookings() {
                         <div className={styles.passengerInfo}>
                           <div className={styles.passengerName}>{passenger.passengerName}</div>
                           <div className={styles.passengerMeta}>
-                            {passenger.numSeats} מושב{passenger.numSeats > 1 ? 'ים' : ''}
-                            {passenger.pickupName && ` · ${passenger.pickupName}`}
+                            {passenger.numSeats} מושבים
+                            {passenger.pickupName
+                              ? ` · עולה: ${passenger.pickupName}`
+                              : ''}
+                            {passenger.dropoffName
+                              ? ` · יורד: ${passenger.dropoffName}`
+                              : ''}
                           </div>
                         </div>
                         <div className={styles.passengerActions}>
                           {passenger.status === 'pending_approval' && (
-                            <>
+                            <div className={styles.passengerPendingActions}>
                               <button
                                 type="button"
-                                className={styles.btnApprove}
+                                className={`${styles.btnOutline} ${styles.btnAccentGreen}`}
                                 onClick={() => handleApprove(passenger.bookingId)}
                                 disabled={actionBookingId === passenger.bookingId}
                               >
-                                אזור
+                                ✅ אשר
                               </button>
                               <button
                                 type="button"
-                                className={styles.btnReject}
+                                className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
                                 onClick={() => handleReject(passenger.bookingId)}
                                 disabled={actionBookingId === passenger.bookingId}
                               >
-                                דחה
+                                ❌ דחה
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.btnOutline}
+                                onClick={() => handleOpenChat(passenger.bookingId)}
+                                disabled={chatLoading === passenger.bookingId}
+                              >
+                                <MessageCircle size={15} />
+                                צ&apos;אט
+                              </button>
+                            </div>
+                          )}
+                          {passenger.status === 'confirmed' && (
+                            <>
+                              <span className={styles.statusConfirmed}>מאושר</span>
+                              <button
+                                type="button"
+                                className={styles.btnOutline}
+                                onClick={() => handleOpenChat(passenger.bookingId)}
+                                disabled={chatLoading === passenger.bookingId}
+                              >
+                                <MessageCircle size={15} />
+                                צ&apos;אט
                               </button>
                             </>
                           )}
-                          {passenger.status === 'confirmed' && (
-                            <span className={styles.statusConfirmed}>מאושר</span>
-                          )}
                           {passenger.status === 'rejected' && (
                             <span className={styles.statusRejected}>נדחה</span>
-                          )}
-                          {(passenger.status === 'pending_approval' || passenger.status === 'confirmed') && (
-                            <button
-                              type="button"
-                              className={styles.btnChat}
-                              onClick={() => handleOpenChat(passenger.bookingId)}
-                              disabled={chatLoading === passenger.bookingId}
-                              title="שיחה"
-                            >
-                              <MessageCircle size={14} />
-                            </button>
                           )}
                         </div>
                       </li>
@@ -429,6 +650,50 @@ export default function MyBookings() {
         titleId="confirm-cancel-booking-title"
       />
 
+      <ConfirmModal
+        open={rideToCancel != null}
+        onClose={() => setRideToCancel(null)}
+        title="האם אתה בטוח שאתה רוצה לבטל את הנסיעה?"
+        confirmLabel="אישור"
+        variant="danger"
+        loading={cancellingRide}
+        onConfirm={async () => {
+          if (rideToCancel == null) return;
+          setCancellingRide(true);
+          setError('');
+          try {
+            await api.delete(`/rides/${rideToCancel}/cancel`);
+            if (sharingRideId === rideToCancel) setSharingRideId(null);
+            setLiveRideId((prev) => (prev === rideToCancel ? null : prev));
+            setRideToCancel(null);
+            await fetchDriverBookings();
+          } catch (err: unknown) {
+            const msg =
+              (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+              'ביטול הנסיעה נכשל';
+            setError(typeof msg === 'string' ? msg : String(msg));
+          } finally {
+            setCancellingRide(false);
+          }
+        }}
+        titleId="confirm-cancel-ride-mybookings"
+      />
+
+      {trackDriverBookingId && (
+        <LiveMapModal
+          bookingId={trackDriverBookingId}
+          onClose={() => setTrackDriverBookingId(null)}
+        />
+      )}
+
+      {liveRideId && user && (
+        <LiveRideMapModal
+          rideId={liveRideId}
+          driverId={user.user_id}
+          broadcastToServer={false}
+          onClose={() => setLiveRideId(null)}
+        />
+      )}
     </div>
   );
 }

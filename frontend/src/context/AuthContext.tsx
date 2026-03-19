@@ -6,6 +6,7 @@ import React, {
   useState,
 } from 'react';
 import { api, clearTokens, setTokens } from '../api/client';
+import { initFCM } from '../services/fcm';
 import type { User } from '../types/api';
 
 type AuthState = {
@@ -72,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
     const token = localStorage.getItem('linkup_access_token');
     if (!token || !mounted) {
-      if (mounted) setState((s) => ({ ...s, isLoading: false }));
+      if (mounted) queueMicrotask(() => setState((s) => ({ ...s, isLoading: false })));
       return;
     }
     api
@@ -126,6 +127,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearTokens();
     setState({ user: null, isAuthenticated: false, isLoading: false });
   }, []);
+
+  useEffect(() => {
+    if (state.user) void initFCM();
+  }, [state.user]);
 
   const value: AuthContextValue = {
     ...state,

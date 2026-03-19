@@ -42,10 +42,21 @@ export default function JoinGroup() {
     setJoining(true);
     setError('');
     try {
-      await joinGroup(inviteCode);
-      navigate('/', { replace: true });
-    } catch {
-      setError('הצטרפות לקבוצה נכשלה.');
+      const joined = await joinGroup(inviteCode);
+      if (joined?.group_id) {
+        navigate(`/groups/${joined.group_id}`, { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 409) {
+        setError('אתה כבר חבר בקבוצה זו');
+      } else if (status === 404) {
+        setError('קוד ההצטרפות אינו תקף');
+      } else {
+        setError('הצטרפות לקבוצה נכשלה');
+      }
     } finally {
       setJoining(false);
     }

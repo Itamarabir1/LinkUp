@@ -29,6 +29,10 @@ class EmailClient:
     async def send(
         self, recipient: str, subject: str, body: str, recipient_name: str = "User"
     ):
+        if not (getattr(settings, "BREVO_API_KEY", None) or "").strip():
+            raise ValueError(
+                "BREVO_API_KEY is not set in .env. Set it in backend/.env to send emails (e.g. verification, password reset)."
+            )
         sender = {
             "name": settings.BREVO_SENDER_NAME,
             "email": settings.BREVO_SENDER_EMAIL,

@@ -105,6 +105,21 @@ spec:
                 configMapKeyRef:
                   name: linkup-backend-config
                   key: FRONTEND_URL
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: linkup-backend-config
+                  key: LOG_LEVEL
+            - name: LOG_FORMAT
+              valueFrom:
+                configMapKeyRef:
+                  name: linkup-backend-config
+                  key: LOG_FORMAT
+            - name: WORKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: linkup-backend-config
+                  key: WORKERS
           resources:
             requests:
               memory: "256Mi"

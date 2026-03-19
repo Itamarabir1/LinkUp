@@ -4,6 +4,7 @@
 """
 
 import logging
+import json
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -14,6 +15,7 @@ from app.domain.chat.schema import (
     ConversationDetail,
     ConversationPartner,
     MessageResponse,
+    PaginatedMessagesResponse,
 )
 from app.domain.users.crud import crud_user
 from app.domain.users.schema import _avatar_url_from_key
@@ -21,6 +23,7 @@ from app.domain.bookings.model import Booking
 from app.domain.bookings.enum import BookingStatus
 from app.domain.rides.model import Ride
 from app.infrastructure.events.publishers.redis import publish_chat_message
+from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 
 logger = logging.getLogger(__name__)
 
@@ -168,6 +171,11 @@ async def list_my_conversations(
             avatar_url=_avatar_url_from_key(partner_user.avatar_key, "150x150.webp"),
         )
         last = await chat_crud.get_last_message(db, conv.conversation_id)
+        has_unread = False
+        if last:
+            has_unread = await chat_crud.has_unread_messages(
+                db, conversation_id=conv.conversation_id, user_id=current_user_id
+            )
         out.append(
             ConversationListItem(
                 conversation_id=conv.conversation_id,
@@ -176,6 +184,7 @@ async def list_my_conversations(
                 last_message_preview=(last.body[:80] + "…")
                 if last and len(last.body) > 80
                 else (last.body if last else None),
+                has_unread=has_unread,
             )
         )
     return out
@@ -231,6 +240,16 @@ async def send_message(
     }
     await publish_chat_message(conversation_id, payload)
 
+    # Publish unread-count notification to recipient (for instant badge updates via chat-ws).
+    try:
+        unread = await chat_crud.get_unread_conversations_count(db, recipient_id)
+        await redis_chat_pubsub.publish(
+            f"chat:notification:{recipient_id}",
+            json.dumps({"type": "unread_count", "count": unread}),
+        )
+    except Exception as e:
+        logger.debug("Publish unread_count failed: %s", e)
+
     # בדיקה אם זו הודעת סיום — מפרסם ל-Redis DB=1; worker יטפל בניתוח AI
     if is_conversation_completion_message(body):
         try:
@@ -253,21 +272,20 @@ async def get_messages(
     current_user_id: UUID,
     limit: int = 50,
     before_message_id: int | None = None,
-) -> list[MessageResponse] | None:
+) -> PaginatedMessagesResponse | None:
     """
     היסטוריית הודעות בשיחה (pagination). None אם המשתמש לא participant.
-    before_message_id remains int (BigInt in DB).
     """
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
     if not conv:
         return None
-    messages = await chat_crud.get_messages(
+    messages, has_more = await chat_crud.get_messages(
         db,
         conversation_id=conversation_id,
         limit=limit,
         before_message_id=before_message_id,
     )
-    return [
+    items = [
         MessageResponse(
             message_id=m.message_id,
             conversation_id=m.conversation_id,
@@ -277,3 +295,9 @@ async def get_messages(
         )
         for m in messages
     ]
+    next_cursor = str(items[0].message_id) if has_more and items else None
+    return PaginatedMessagesResponse(
+        items=items,
+        next_cursor=next_cursor,
+        has_more=has_more,
+    )

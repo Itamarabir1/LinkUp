@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
-import { API_BASE_URL, API_TIMEOUT_MS } from '../config/env';
+import { API_BASE_URL, API_TIMEOUT_MS, CHAT_WS_HTTP_BASE } from '../config/env';
+import type { PaginatedMessagesResponse } from '../types/api';
 
 // לוודא לאן הבקשות הולכות (יופיע בקונסול של הדפדפן F12)
 console.log('[Linkup Frontend] API Base URL:', API_BASE_URL);
@@ -114,6 +115,18 @@ api.interceptors.response.use(
   }
 );
 
+/** בקשות HTTP ל-chat-ws (presence) — לא ל-backend */
+export const chatWsApi = axios.create({
+  baseURL: CHAT_WS_HTTP_BASE,
+  timeout: API_TIMEOUT_MS,
+  headers: { 'Content-Type': 'application/json' },
+});
+chatWsApi.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const token = getStoredAccessToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
 // Chat API helpers
 export interface ConversationDetail {
   conversation_id: string;
@@ -162,9 +175,9 @@ export function getConversation(conversationId: string): Promise<{ data: Convers
 
 export function getMessages(
   conversationId: string,
-  params?: { limit?: number; before_message_id?: number }
-): Promise<{ data: MessageResponse[] }> {
-  return api.get<MessageResponse[]>(`/chat/conversations/${conversationId}/messages`, { params });
+  params?: { limit?: number; before?: number }
+): Promise<{ data: PaginatedMessagesResponse }> {
+  return api.get<PaginatedMessagesResponse>(`/chat/conversations/${conversationId}/messages`, { params });
 }
 
 export function sendMessage(conversationId: string, body: string): Promise<{ data: MessageResponse }> {

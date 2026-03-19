@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 from pydantic import BaseModel
 from app.domain.notifications.providers.email_provider import EmailProvider
 from app.domain.notifications.providers.push_provider import PushProvider
+from app.domain.notifications.providers.websocket_provider import WebSocketProvider
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,11 @@ class NotificationCommand(BaseModel):
 class NotificationManager:
     def __init__(self):
         # אתחול ה-Providers (Lazy loading עדיף במערכות גדולות, אבל זה מצוין להתחלה)
-        self.providers = {"email": EmailProvider(), "push": PushProvider()}
+        self.providers = {
+            "email": EmailProvider(),
+            "push": PushProvider(),
+            "websocket": WebSocketProvider(),
+        }
 
     async def process_and_send(self, cmd: NotificationCommand):
         """
@@ -60,8 +65,8 @@ class NotificationManager:
 
     async def _safe_send(self, provider, channel_name, cmd: NotificationCommand):
         try:
-            # הפרוויידר מקבל רק את מה שהוא צריך
-            await provider.send(cmd.user, cmd.template, cmd.context)
+            ctx = {**cmd.context, "event_key": cmd.event_key}
+            await provider.send(cmd.user, cmd.template, ctx)
             logger.info(
                 f"✅ {channel_name} sent to user_id={getattr(cmd.user, 'user_id', getattr(cmd.user, 'id', 'N/A'))}"
             )

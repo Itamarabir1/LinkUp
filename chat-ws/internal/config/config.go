@@ -11,6 +11,7 @@ type Config struct {
 	RedisURL   string // e.g. redis://localhost:6379/0
 	SecretKey  string // JWT secret (same as Python SECRET_KEY)
 	JWTAlg     string // HS256
+	BackendURL string // e.g. http://localhost:8000
 }
 
 func LoadConfig() Config {
@@ -21,8 +22,9 @@ func LoadConfig() Config {
 		}
 	}
 	redisURL := os.Getenv("REDIS_URL")
+	// ברירת מחדל DB=1 — תואם ל-backend REDIS_CHAT_DB (הודעות + chat-ws באותו DB)
 	if redisURL == "" {
-		redisURL = "redis://localhost:6379/0"
+		redisURL = "redis://localhost:6379/1"
 	}
 	secret := os.Getenv("SECRET_KEY")
 	if secret == "" {
@@ -32,10 +34,15 @@ func LoadConfig() Config {
 	if alg == "" {
 		alg = "HS256"
 	}
+	backendURL := os.Getenv("BACKEND_URL")
+	if backendURL == "" {
+		backendURL = "http://localhost:8000"
+	}
 	return Config{
 		Port:      port,
 		RedisURL:  redisURL,
 		SecretKey: secret,
 		JWTAlg:    alg,
+		BackendURL: backendURL,
 	}
 }

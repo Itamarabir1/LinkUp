@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { ERROR_MESSAGES } from '../config/constants';
 
 interface GoogleSignInProps {
   onError?: (error: string) => void;
@@ -61,13 +62,13 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
         return false;
       }
       
-      // בדיקה אם כבר אתחלנו (מונע קריאות כפולות)
+      // בדיקה אם כבר אתחלנו (מונע קריאות כפולות באותו mount)
       if (initializedRef.current) {
         return true;
       }
-      
+
       const currentOrigin = window.location.origin;
-      
+
       try {
         // אתחול עם הגדרות נוספות שיכולות לעזור
         window.google.accounts.id.initialize({
@@ -89,7 +90,7 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
         const msg = err instanceof Error ? err.message : String(err);
         const isOriginError = /origin|not allowed|403|client id/i.test(msg);
         if (isOriginError && onError) {
-          const originMsg = `ה-origin לא מורשה ב-Google. הוסף בדיוק את הכתובת הזו ב-Google Cloud Console → Credentials → ה-Client ID → Authorized JavaScript origins: ${currentOrigin}`;
+          const originMsg = `ה-origin לא מורשה ב-Google. Origin: ${currentOrigin}. Client ID: ${googleClientId}. הוסף בדיוק את ה-origin הזה ב-Google Cloud Console → Credentials → ה-Client ID → Authorized JavaScript origins.`;
           onError(originMsg);
         }
         if (err instanceof Error) {
@@ -102,6 +103,15 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
 
     // בדיקה אם ה-script כבר נטען
     const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+    if (existingScript && window.google?.accounts?.id) {
+      initializeGoogleSignIn();
+      setScriptLoaded(true);
+      return () => {
+        setInitialized(false);
+        setScriptLoaded(false);
+        initializedRef.current = false;
+      };
+    }
     if (existingScript) {
       // מחכים שה-script יסיים לטעון ואז מאתחלים מיד
       let checkCount = 0;
@@ -120,7 +130,12 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
           }
         }
       }, 100);
-      return () => clearInterval(checkInterval);
+      return () => {
+        clearInterval(checkInterval);
+        setInitialized(false);
+        setScriptLoaded(false);
+        initializedRef.current = false;
+      };
     }
 
     // טעינת ה-script
@@ -146,15 +161,18 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
       console.error('Failed to load Google Identity Services script (may be 403 - origin not allowed)');
       if (onError) {
         const origin = window.location.origin;
-        onError(`טעינת Google Sign-In נכשלה. הוסף את הכתובת הזו ב-Google Cloud Console → Credentials → Authorized JavaScript origins: ${origin}`);
+        onError(`טעינת Google Sign-In נכשלה. Origin: ${origin}. Client ID: ${googleClientId}. בדוק שה-origin מורשה עבור ה-Client ID הזה ב-Google Cloud Console → Credentials → Authorized JavaScript origins.`);
       }
     };
     document.head.appendChild(script);
 
     return () => {
       // לא מוחקים את ה-script כי הוא יכול להיות בשימוש במקומות אחרים
+      setInitialized(false);
+      setScriptLoaded(false);
+      initializedRef.current = false;
     };
-  }, [onError, initialized, scriptLoaded]);
+  }, [onError]);
 
   // הגדרת ה-callback
   useEffect(() => {
@@ -166,7 +184,7 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
       } catch (err: unknown) {
         const error = err as { code?: string; message?: string; response?: { data?: { detail?: string } } };
         if ((error.code === 'ECONNABORTED' || (error.message && error.message.includes('timeout'))) && onError) {
-          onError('השרת לא מגיב בזמן. וודא שהבקאנד רץ (למשל http://127.0.0.1:8000) ושה-URL ב-frontend/.env (VITE_API_URL) נכון.');
+          onError(ERROR_MESSAGES.BACKEND_TIMEOUT);
           return;
         }
         const errorMessage = error.response?.data?.detail || error.message || 'התחברות נכשלה';

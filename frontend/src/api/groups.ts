@@ -24,8 +24,9 @@ export async function getGroupByInviteCode(inviteCode: string): Promise<Group> {
 }
 
 // הצטרפות לקבוצה
-export async function joinGroup(inviteCode: string): Promise<void> {
-  await api.post(`/groups/join/${inviteCode}`);
+export async function joinGroup(inviteCode: string): Promise<Group> {
+  const { data } = await api.post<Group>(`/groups/join/${inviteCode}`);
+  return data;
 }
 
 // שליפת חברי קבוצה

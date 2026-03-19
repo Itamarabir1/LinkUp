@@ -1,5 +1,6 @@
 import logging
 import re
+import uuid
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import FastAPI, Request, HTTPException
@@ -7,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
+from app.core.logging import setup_logging, request_id_ctx
 from app.core.lifespan import lifespan
 from app.core.exceptions.handlers import LinkupError, linkup_exception_handler
 from app.core.middleware import HTTPSRedirectMiddleware, SecurityHeadersMiddleware
@@ -16,9 +18,12 @@ from app.api.v1.api_router import api_router
 # רישום כל המודלים לפני טעינת admin (מניעת "expression 'Group' failed to locate a name")
 import app.db.models  # noqa: F401
 
+# Firebase Admin SDK init (side-effect import; safe idempotent)
+import app.infrastructure.firebase_core.firebase  # noqa: F401
+
 from app.admin.setup import setup_admin
 
-logging.basicConfig(level=logging.INFO)
+setup_logging()
 logger = logging.getLogger(__name__)
 
 # CORS: origins ממ-config או FRONTEND_URL (מחשבים לפני יצירת app)
@@ -30,6 +35,21 @@ if not _cors_origins:
 _allow_origin_regex = None
 if getattr(settings, "DEBUG", False):
     _allow_origin_regex = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    """מקצה request_id קצר (8 תווים) לכל בקשה; מוסיף ל-response header ול-context ללוגים."""
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = str(uuid.uuid4())[:8]
+        request.state.request_id = request_id
+        token = request_id_ctx.set(request_id)
+        try:
+            response = await call_next(request)
+            response.headers["X-Request-ID"] = request_id
+            return response
+        finally:
+            request_id_ctx.reset(token)
 
 
 # Middleware שמוסיף CORS לכל תגובה (כולל 500) – רץ ראשון על התגובה
@@ -73,6 +93,9 @@ app.add_middleware(
 # גיבוי: הוספת CORS גם לתגובות שעשויות לדלג על ה-middleware (למשל 500)
 app.add_middleware(EnsureCORSHeadersMiddleware)
 
+# Request ID — ראשון כדי שכל לוג בתוך בקשה יקבל request_id
+app.add_middleware(RequestIDMiddleware)
+
 # Security headers (X-Content-Type-Options, X-Frame-Options, וכו')
 app.add_middleware(SecurityHeadersMiddleware)
 
@@ -90,12 +113,17 @@ async def global_exception_handler(request: Request, exc: Exception):
     """מחזיר 500 כ-JSON עם CORS headers. לא תופס HTTPException."""
     if isinstance(exc, HTTPException):
         raise exc
-    print("[Linkup] !!! שגיאה 500:", type(exc).__name__, str(exc), flush=True)
-    logger.exception("Unhandled exception: %s", exc)
+    request_id = getattr(request.state, "request_id", None)
+    logger.exception(
+        "Unhandled exception: %s",
+        exc,
+        extra={"request_id": request_id or ""},
+    )
 
-    # הוספת CORS headers גם לשגיאות
     origin = request.headers.get("origin")
     headers = {}
+    if request_id:
+        headers["X-Request-ID"] = request_id
     if origin and (
         origin in _cors_origins
         or (_allow_origin_regex and re.match(_allow_origin_regex, origin))
@@ -107,7 +135,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error", "type": type(exc).__name__},
+        content={
+            "detail": "Internal server error",
+            "type": type(exc).__name__,
+            "request_id": request_id,
+        },
         headers=headers,
     )
 

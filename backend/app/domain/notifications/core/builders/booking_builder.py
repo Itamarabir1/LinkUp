@@ -91,9 +91,7 @@ class BookingBuilder(BaseContextBuilder):
                     "passenger_request.destination_name",
                     context.get("destination", "—"),
                 ),
-                "action_url": inst._get_cta_url(f"rides/{ride_id}")
-                if ride_id
-                else f"{inst.BASE_URL}/bookings/{booking_id}",
+                "action_url": inst._get_cta_url("my-bookings?tab=driver"),
                 "is_urgent": "urgent" in (event_key or "").lower(),
             }
         )

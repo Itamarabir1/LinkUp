@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle,
   XCircle,
@@ -43,6 +44,7 @@ function getTimeGroup(date: string): string {
 const GROUP_ORDER = ['היום', 'אתמול', 'השבוע', 'קודם לכן'];
 
 export default function Notifications() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const {
     markNotificationRead,
@@ -74,6 +76,14 @@ export default function Notifications() {
     fetchNotifications();
   }, [fetchNotifications]);
 
+  useEffect(() => {
+    const onRefresh = () => {
+      void fetchNotifications();
+    };
+    window.addEventListener('linkup-notifications-refresh', onRefresh);
+    return () => window.removeEventListener('linkup-notifications-refresh', onRefresh);
+  }, [fetchNotifications]);
+
   const grouped = useCallback(() => {
     const groups: Record<string, NotificationItem[]> = {};
     GROUP_ORDER.forEach((g) => { groups[g] = []; });
@@ -88,7 +98,9 @@ export default function Notifications() {
   const handleRowClick = (n: NotificationItem) => {
     const key = getNotificationItemKey(n);
     if (!isNotificationRead(key)) markNotificationRead(key);
-    // TODO: navigation by action_url when backend supports it
+    if (n.type === 'ride_request') {
+      navigate('/my-bookings', { state: { tab: 'driver' } });
+    }
   };
 
   if (loading) {
@@ -132,7 +144,7 @@ export default function Notifications() {
                 const key = getNotificationItemKey(n);
                 const read = isNotificationRead(key);
                 const displayType = getDisplayType(n.type);
-                const routeStr = [n.ride_origin, n.ride_destination].filter(Boolean).join(' → ') || null;
+                const routeStr = [n.ride_origin, n.ride_destination].filter(Boolean).join(' ← ') || null;
                 const bodyLine = n.body && routeStr ? `${n.body} · ${routeStr}` : (n.body || routeStr);
                 return (
                   <button

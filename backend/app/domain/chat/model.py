@@ -85,6 +85,38 @@ class Message(Base):
         return f"<Message(id={self.message_id}, conv={self.conversation_id}, sender={self.sender_id})>"
 
 
+class ConversationParticipant(Base):
+    """
+    משתתף בשיחה (conversation).
+
+    נשמר כשורה לכל (conversation_id, user_id) ומאפשר last_read_at לכל משתמש.
+    מוכן להרחבה לקבוצות בעתיד.
+    """
+
+    __tablename__ = "conversation_participants"
+
+    conversation_id = Column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("conversations.conversation_id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    )
+    user_id = Column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    )
+    joined_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_read_at = Column(DateTime(timezone=True), nullable=True)
+
+    conversation = relationship("Conversation", foreign_keys=[conversation_id])
+    user = relationship("User", foreign_keys=[user_id])
+
+    def __repr__(self):
+        return f"<ConversationParticipant(conv={self.conversation_id}, user={self.user_id})>"
+
+
 class ChatAnalysis(Base):
     """ניתוח AI של שיחת צ'אט."""
 

@@ -13,11 +13,12 @@ from app.core.exceptions.validation import InvalidLocationError
 from app.domain.users.model import User
 from app.domain.users.schema import UserUpdate
 from app.domain.events.outbox import publish_to_outbox
+from app.domain.events.enum import DispatchTarget
+from app.domain.notifications.constants import NotificationEvent
 
 # 3. Infrastructure & Services
 from app.infrastructure.s3.service import storage_service
 from app.domain.users.crud import crud_user
-from app.domain.auth.service import auth_service
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +28,6 @@ class UserService:
         # הצמדת המופעים שהזרקנו מהייבוא ל-self
         self.s3 = storage_service
         self.crud = crud_user
-        # הוספנו את זה כדי שלא נצטרך לקרוא ל-auth_service גלובלי באמצע פונקציה
-        self.auth = auth_service
 
     async def get_user_by_id(self, db: AsyncSession, user_id: int) -> User:
         user = await self.crud.get_by_id(db, id=user_id)
@@ -136,13 +135,33 @@ class UserService:
             update_dict["is_verified"] = False
             email_changed = True
 
-        updated_user = await self.crud.update(db, db_obj=db_user, obj_in=update_dict)
+        # עדכון השדות בפועל באותה טרנזקציה (commit אחד בלבד)
+        protected_fields = ["user_id", "created_at", "hashed_password"]
+        for field, value in update_dict.items():
+            if hasattr(db_user, field) and field not in protected_fields:
+                setattr(db_user, field, value)
+        db.add(db_user)
+
+        # שמירה ב-DB בלי commit כדי ש-Outbox יקבל את הנתונים המעודכנים
+        await db.flush()
 
         if email_changed:
-            # שימוש ב-self.auth במקום auth_service גלובלי
-            await self.auth.initiate_email_verification(db, email=updated_user.email)
+            await publish_to_outbox(
+                db,
+                NotificationEvent.EMAIL_VERIFICATION.value,
+                {
+                    "user_id": str(db_user.user_id),
+                    "data": {
+                        "email": db_user.email,
+                        "user_name": (db_user.full_name or ""),
+                    },
+                },
+                [DispatchTarget.RABBITMQ.value],
+            )
 
-        return updated_user
+        await db.commit()
+        await db.refresh(db_user)
+        return db_user
 
     async def update_fcm_token(
         self, db: AsyncSession, user_id: int, fcm_token: str

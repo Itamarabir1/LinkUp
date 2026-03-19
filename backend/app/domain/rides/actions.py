@@ -6,7 +6,7 @@ from app.domain.rides.model import Ride
 class RideActions:
     """
     פעולות על נסיעות (WebSocket, וכו').
-    אירועים למיילים/פוש נשלחים דרך Outbox מהשירות (BookingService.cancel_ride_and_all_bookings).
+    אירועים למיילים/פוש נשלחים דרך Outbox מהשירות.
     """
 
     @staticmethod

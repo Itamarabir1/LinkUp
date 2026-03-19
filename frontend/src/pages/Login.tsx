@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import GoogleSignIn from '../components/GoogleSignIn';
+import { ERROR_MESSAGES } from '../config/constants';
 import styles from './Login.module.css';
 
 export default function Login() {
   const location = useLocation();
-  const state = location.state as { email?: string; verified?: boolean } | null;
+  const state = location.state as { email?: string; verified?: boolean; from?: { pathname: string; search?: string } } | null;
   const [email, setEmail] = useState(state?.email ?? '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,11 +26,19 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email.trim(), password);
-      navigate('/', { replace: true });
+      const searchParams = new URLSearchParams(location.search);
+      const fromQuery = searchParams.get('from');
+      if (fromQuery) {
+        navigate(decodeURIComponent(fromQuery), { replace: true });
+        return;
+      }
+      const fromState = state?.from;
+      const path = fromState ? `${fromState.pathname}${fromState.search ?? ''}` : '/';
+      navigate(path, { replace: true });
     } catch (err: unknown) {
       const ax = err as { code?: string; message?: string; response?: { data?: Record<string, unknown> } };
       if (ax.code === 'ECONNABORTED' || (ax.message && ax.message.includes('timeout'))) {
-        setError('השרת לא מגיב בזמן. וודא שהבקאנד רץ (למשל http://127.0.0.1:8000) ושה-URL ב-frontend/.env (VITE_API_URL) נכון.');
+        setError(ERROR_MESSAGES.BACKEND_TIMEOUT);
         return;
       }
       const res = ax?.response;

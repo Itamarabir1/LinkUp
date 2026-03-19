@@ -176,30 +176,32 @@ class AuthService:
         if user_in.email and await self.crud_user.get_by_email(db, email=user_in.email):
             raise EmailAlreadyRegisteredError(email=user_in.email)
 
-    async def initiate_email_verification(
-        self, db: Session, email: str
-    ):  # שינוי ל-email
-        user = self.crud_user.get_by_email(db, email=email)
+    async def initiate_email_verification(self, db: AsyncSession, email: str):
+        normalized_email = normalize_email_for_auth(email)
+        user = await self.crud_user.get_by_email(db, email=normalized_email)
         if not user:
             raise UserNotFoundError(identifier=email)
 
         if user.is_verified:
             return {"detail": "Account already verified"}
 
-        verification_code = f"{random.randint(100000, 999999)}"
-        # שמירה ב-Redis לפי מייל
-        await self.redis.save(f"verify_code:{email}", verification_code, expire=1800)
+        # שמירת הקוד ב-Redis באותו מפתח ש-verify_user_email בודק (user_id + event_name)
+        verification_code = await verification_service.create_verification_event(
+            str(user.user_id), "email_verification"
+        )
 
+        # אותו פורמט כמו ב-outbox: ה-consumer מצפה ל-user_id + data עם code/email
         await self.rabbit.publish(
             message={
-                "event_type": "email_verification",
                 "user_id": str(user.user_id),
                 "data": {
-                    "email": user.email,  # חובה ל-Worker!
-                    "token": verification_code,
-                    "user_name": user.full_name,
+                    "email": user.email,
+                    "code": verification_code,
+                    "user_name": getattr(user, "full_name", None) or "",
                 },
-            }
+            },
+            routing_key="auth.email_verification",
+            exchange_name="user",
         )
         return {"detail": "Verification code sent to email"}
 

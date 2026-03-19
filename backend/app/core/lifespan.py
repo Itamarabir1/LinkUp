@@ -5,7 +5,7 @@ from fastapi import FastAPI
 # ייבוא ה-Singletons של התשתיות
 from app.infrastructure.rabbitmq.client import rabbit_client
 from app.infrastructure.redis.client import redis_client
-from app.infrastructure.redis.pubsub import redis_pubsub
+from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 from app.infrastructure.redis.broadcast import broadcast
 
 logger = logging.getLogger(__name__)
@@ -38,9 +38,9 @@ async def lifespan(app: FastAPI):
         await redis_client.connect()
         logger.info("✅ [Lifespan] Redis Client connected")
 
-        # 3. חיבור ל-Redis Pub/Sub (עבור פרסום הודעות צ'אט ל-WS)
-        await redis_pubsub.connect()
-        logger.info("✅ [Lifespan] Redis Pub/Sub connected")
+        # 3. Pub/Sub צ'אט — אותו Redis DB כמו chat-ws (REDIS_CHAT_URL)
+        await redis_chat_pubsub.connect()
+        logger.info("✅ [Lifespan] Redis Chat Pub/Sub connected")
 
         # 4. חיבור ל-Redis Broadcast (עבור Real-time Websockets/UI)
         await broadcast.connect()
@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI):
         await rabbit_client.close()
         if redis_ok:
             await redis_client.close()
-            await redis_pubsub.close()
+            await redis_chat_pubsub.close()
             await broadcast.disconnect()
         logger.info("👋 [Lifespan] All infrastructure connections closed safely")
     except Exception as e:

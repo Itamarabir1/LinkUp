@@ -22,6 +22,8 @@ export default function Groups() {
   const { user } = useAuth();
   const { myGroups, isLoadingGroups } = useGroup();
 
+  const handleCreateGroup = () => navigate('/groups/new');
+
   if (isLoadingGroups) {
     return (
       <div className={styles.page}>
@@ -37,7 +39,7 @@ export default function Groups() {
         <button
           type="button"
           className={styles.btnPrimary}
-          onClick={() => navigate('/groups/new')}
+          onClick={handleCreateGroup}
         >
           <Plus size={14} />
           צור קבוצה
@@ -49,14 +51,6 @@ export default function Groups() {
           <Users size={48} strokeWidth={1.5} className={styles.emptyIcon} />
           <h2 className={styles.emptyTitle}>אין קבוצות עדיין</h2>
           <p className={styles.emptySubtitle}>צור קבוצה או הצטרף לאחת</p>
-          <button
-            type="button"
-            className={styles.btnPrimary}
-            onClick={() => navigate('/groups/new')}
-          >
-            <Plus size={14} />
-            צור קבוצה
-          </button>
         </div>
       ) : (
         <div className={styles.grid}>
@@ -120,21 +114,6 @@ export default function Groups() {
               </article>
             );
           })}
-          <article
-            className={styles.cardCreate}
-            onClick={() => navigate('/groups/new')}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                navigate('/groups/new');
-              }
-            }}
-          >
-            <Plus size={24} strokeWidth={2} />
-            <span>צור קבוצה חדשה</span>
-          </article>
         </div>
       )}
     </div>

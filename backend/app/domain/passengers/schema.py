@@ -113,15 +113,16 @@ class RideSearchRequest(BaseModel):
         None,
         description="מתי הנוסע צריך לצאת (אם ריק – יחפש מעכשיו)",
     )
+    limit: int = Field(default=20, ge=1, le=50)
+    after: Optional[UUID] = Field(None, description="cursor: ride_id אחרייו להמשיך")
 
 
 class RideSearchResponse(BaseModel):
-    """תשובת חיפוש נסיעות - כוללת נסיעות ו-request_id אם נוצרה בקשה."""
+    """תשובת חיפוש נסיעות עם cursor-based pagination."""
 
-    rides: List[RideResponse] = Field(default=[], description="רשימת נסיעות שנמצאו")
-    request_id: Optional[UUID] = Field(
-        None, description="מזהה הבקשה שנוצרה (אם המשתמש מחובר)"
-    )
+    items: List[RideResponse] = Field(default_factory=list)
+    next_cursor: Optional[str] = Field(None, description="ride_id להבא (after=)")
+    has_more: bool = False
 
 
 class RequestRideFromSearch(BaseModel):

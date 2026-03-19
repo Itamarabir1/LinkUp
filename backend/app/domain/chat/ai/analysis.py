@@ -31,12 +31,11 @@ async def get_conversation_text_for_analysis(
     if not conv:
         return None
 
-    # איסוף הודעות
-    messages = await chat_crud.get_messages(
+    # איסוף הודעות (פנימי – לא pagination)
+    messages = await chat_crud.get_all_messages_for_conversation(
         db,
         conversation_id=conversation_id,
         limit=limit,
-        before_message_id=None,
     )
 
     if not messages:

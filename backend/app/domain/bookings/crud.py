@@ -13,8 +13,8 @@ from app.domain.rides.enum import RideStatus
 from app.domain.bookings.enum import BookingStatus
 from app.domain.passengers.enum import PassengerStatus
 from app.core.exceptions.booking import NoSeatsAvailableError
-from sqlalchemy import and_
-from sqlalchemy import select
+from app.core.exceptions.booking import ForbiddenRideActionError
+from sqlalchemy import and_, select, func
 
 
 class CRUDBooking:
@@ -162,7 +162,12 @@ class CRUDBooking:
         if request_id:
             p_req = db.get(PassengerRequest, request_id)
 
-        # יצירת Booking עם העתקת פרטי תחנת העלייה מ-PassengerRequest
+        # יצירת Booking עם העתקת פרטי תחנת העלייה מ-PassengerRequest (עמודה עם timezone – מקבל aware/naive)
+        pickup_time = (
+            p_req.requested_departure_time
+            if p_req and p_req.requested_departure_time
+            else None
+        )
         db_booking = Booking(
             ride_id=ride_id,
             request_id=request_id,
@@ -172,7 +177,7 @@ class CRUDBooking:
             # העתקת פרטי תחנת העלייה מ-PassengerRequest
             pickup_name=p_req.pickup_name if p_req else None,
             pickup_point=p_req.pickup_geom if p_req else None,
-            pickup_time=p_req.requested_departure_time if p_req else None,
+            pickup_time=pickup_time,
         )
         db.add(db_booking)
         db.flush()  # צריך flush לפני עדכון הסטטוס כדי שה-booking יהיה ב-DB
@@ -254,21 +259,39 @@ class CRUDBooking:
 
     # --- פונקציות נוספות שנדרשות על ידי ה-BookingService ---
 
-    def get_user_bookings_filtered(
+    def get_user_bookings_count(
         self, db: Session, user_id: UUID, status_filter: Optional[str] = None
+    ) -> int:
+        """ספירת הזמנות של משתמש (לפי פילטר אופציונלי)."""
+        uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+        q = db.query(func.count()).select_from(Booking).filter(Booking.passenger_id == uid)
+        if status_filter:
+            q = q.filter(Booking.status == status_filter)
+        return q.scalar() or 0
+
+    def get_user_bookings_filtered(
+        self,
+        db: Session,
+        user_id: UUID,
+        status_filter: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 20,
     ) -> List[Booking]:
-        """שליפת כל ההזמנות שמשתמש ביצע (כנוסע) – עם passenger_request.user ו-passenger כדי ש-passenger_name יופיע ב-API."""
+        """שליפת הזמנות של משתמש עם offset/limit (לפי passenger_id וסטטוס אופציונלי)."""
+        uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
         query = (
             db.query(Booking)
             .options(
                 joinedload(Booking.passenger_request).joinedload(PassengerRequest.user),
                 joinedload(Booking.passenger),
             )
-            .filter(Booking.passenger_id == user_id)
+            .filter(Booking.passenger_id == uid)
         )
         if status_filter:
             query = query.filter(Booking.status == status_filter)
-        return query.order_by(Booking.created_at.desc()).all()
+        return (
+            query.order_by(Booking.created_at.desc()).offset(offset).limit(limit).all()
+        )
 
     def get_user_bookings_with_relations(
         self, db: Session, user_id: UUID
@@ -340,6 +363,42 @@ class CRUDBooking:
             ),
             {"status": status_val, "ride_id": rid},
         )
+
+    def cancel_ride_and_bookings_sync(
+        self, db: Session, ride_id: UUID, driver_id: UUID
+    ) -> list:
+        """
+        ביטול נסיעה על ידי נהג (לוגיקה סינכרונית לריצה בתוך db.run_sync).
+        - שומר הרשאות (רק נהג הנסיעה)
+        - מבטל את כל ה-bookings של הנסיעה (CANCELLED)
+        - מחשב מחדש סטטוס PassengerRequest לכל request_id של הנסיעה
+        - מבטל את הנסיעה עצמה (Ride.status=cancelled)
+
+        חשוב: אין כאן commit. ה-caller אחראי על commit/rollback.
+        """
+        ride = self.get_ride_for_update(db, ride_id)
+        if not ride or ride.driver_id != driver_id:
+            raise ForbiddenRideActionError("אינך מורשה לבטל נסיעה זו")
+
+        req_ids = self.get_request_ids_for_ride(db, ride_id)
+
+        self.bulk_update_bookings_status(db, ride_id, BookingStatus.CANCELLED)
+
+        # אחרי ביטול כל ה-bookings של הנסיעה, מחשבים מחדש סטטוס לכל בקשת נוסע
+        # (כדי לא לדרוס סטטוס אם לאותה בקשה יש bookings נוספים על נסיעות אחרות)
+        if req_ids:
+            for rid in sorted(set([r for r in req_ids if r is not None])):
+                self.update_passenger_request_status_from_bookings(db, rid)
+
+        # PostgreSQL ride_status enum expects lowercase 'cancelled'; ORM would send enum name 'CANCELLED'
+        db.execute(
+            text(
+                "UPDATE rides SET status = CAST(:status AS ride_status), updated_at = now() WHERE ride_id = :ride_id"
+            ),
+            {"status": RideStatus.CANCELLED.value, "ride_id": ride_id},
+        )
+        db.flush()
+        return req_ids
 
     def bulk_update_requests_status(
         self, db: Session, request_ids: list, new_status: PassengerStatus

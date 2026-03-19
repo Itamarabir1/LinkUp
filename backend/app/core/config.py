@@ -1,4 +1,6 @@
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, EmailStr, computed_field
 from functools import lru_cache
@@ -27,10 +29,10 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = Field("")
     POSTGRES_HOST: str = Field("localhost")
     POSTGRES_PORT: str = Field("5432")
-    # אופציונלי: חיבור מלא ל-Postgres משורת סביבה (למשל מ-Render)
+    # אופציונלי: חיבור מלא ל-Postgres משורת סביבה (למשל מ-K8s/פרודקשן)
     DATABASE_URL_RAW: Optional[str] = Field(
         default=None,
-        description="Optional full database URL (e.g. from Render). If set, overrides pieces above.",
+        description="Optional full database URL (e.g. from Kubernetes secret). If set, overrides pieces above.",
         env="DATABASE_URL",
     )
 
@@ -40,11 +42,11 @@ class Settings(BaseSettings):
         """
         מקור אמת ל-DSN של ה-DB.
         - לוקאלי / Docker: נבנה מ-POSTGRES_*
-        - פרודקשן (Render): אם DATABASE_URL (RAW) קיים – משתמשים בו ומוודאים asyncpg.
+        - פרודקשן: אם DATABASE_URL (RAW) קיים – משתמשים בו ומוודאים asyncpg.
         """
         if self.DATABASE_URL_RAW:
             url = self.DATABASE_URL_RAW
-            # Render מחזיר בד"כ postgresql://user:pass@host:port/db – ממירים ל-postgresql+asyncpg
+            # postgresql:// או postgres:// – ממירים ל-postgresql+asyncpg
             if url.startswith("postgres://"):
                 return "postgresql+asyncpg://" + url[len("postgres://") :]
             if url.startswith("postgresql://"):
@@ -63,7 +65,7 @@ class Settings(BaseSettings):
     REDIS_PASSWORD: Optional[str] = Field(None)
     # Redis DB נפרד לאירועי צ'אט (Pub/Sub completion)
     REDIS_CHAT_DB: int = Field(1)
-    # אופציונלי: חיבור Redis מלא (למשל מ-Render Key Value)
+    # אופציונלי: חיבור Redis מלא (למשל מ-K8s/פרודקשן)
     REDIS_URL_RAW: Optional[str] = Field(
         default=None,
         description="Optional full Redis URL. If set, overrides REDIS_HOST/PORT/DB/PASSWORD.",
@@ -82,9 +84,19 @@ class Settings(BaseSettings):
     @property
     def REDIS_CHAT_URL(self) -> str:
         """
-        חיבור Redis ייעודי ל-DB של אירועי צ'אט (למשל completion).
-        משתמש באותו host/password אבל עם REDIS_CHAT_DB.
+        אותו host כמו REDIS_URL, DB=REDIS_CHAT_DB (חייב להתאים ל-chat-ws).
         """
+        if self.REDIS_URL_RAW:
+            try:
+                u = urlparse(self.REDIS_URL_RAW)
+                netloc = u.netloc
+                if not netloc and u.path:
+                    return self.REDIS_URL_RAW
+                return urlunparse(
+                    (u.scheme or "redis", netloc, f"/{self.REDIS_CHAT_DB}", "", "", "")
+                )
+            except Exception:
+                pass
         auth = f":{self.REDIS_PASSWORD}@" if self.REDIS_PASSWORD else ""
         return f"redis://{auth}{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_CHAT_DB}"
 
@@ -108,8 +120,8 @@ class Settings(BaseSettings):
 
     # --- Frontend & API (לינקים במיילים / כפתורים) ---
     FRONTEND_URL: str = Field(
-        "https://linkup.co.il",
-        description="כתובת האפליקציה (פרונט). מפנה הצלחה/שגיאה אחרי אימות.",
+        "http://localhost:5173",
+        description="כתובת האפליקציה (פרונט). לוקאלי: localhost:5173; פרודקשן: הגדר ב-.env (למשל https://linkup.co.il).",
     )
     API_PUBLIC_URL: str = Field(
         "",
@@ -193,6 +205,13 @@ class Settings(BaseSettings):
     )
     FIREBASE_CREDENTIALS_JSON: Optional[str] = Field(
         None, description="Firebase credentials as JSON string (production)"
+    )
+
+    # --- Logging ---
+    LOG_LEVEL: str = Field("INFO", description="Log level: DEBUG, INFO, WARNING, ERROR")
+    LOG_FORMAT: str = Field(
+        "json",
+        description="json (production) or text (local dev)",
     )
 
     # --- Pydantic Configuration ---

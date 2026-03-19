@@ -109,9 +109,28 @@
   border-right: 3px solid var(--primary);
 }
 
+.convUnread {
+  background: #f9fafb;
+}
+
+.convName {
+  font-weight: 700;
+}
+
 .avatarWrap {
   position: relative;
   flex-shrink: 0;
+}
+
+.unreadDot {
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #374151;
+  border: 2px solid var(--bg-card);
 }
 
 .avatar {

@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Union
 from app.domain.notifications.providers.base import BaseNotificationProvider
 from app.infrastructure.redis.broadcast import broadcast
 
@@ -10,40 +10,37 @@ logger = logging.getLogger(__name__)
 class WebSocketProvider(BaseNotificationProvider):
     """
     WebSocket Provider (Real-time UI Updates).
-    מתרגם אירועי דומיין לפקודות ויזואליות עבור הפרונטנד.
+    פרסום לערוץ Redis user_{id} — ה-API מזרים ל-WebSocket של המשתמש.
     """
 
     def can_send(self, user: Any) -> bool:
-        """
-        וובסוקט תמיד אפשר "לנסות" לשלוח.
-        הבדיקה אם המשתמש באמת מחובר קורית בתוך ה-Broadcast/Socket Manager.
-        """
-        return bool(user and hasattr(user, "id"))
+        uid = getattr(user, "user_id", None) or getattr(user, "id", None)
+        return bool(user and uid)
 
     async def send(
-        self, user: Any, config: Dict[str, Any], context: Dict[str, Any]
+        self,
+        user: Any,
+        template: Union[str, Dict[str, Any]],
+        context: Dict[str, Any],
     ) -> None:
         user_id = getattr(user, "user_id", None) or getattr(user, "id", None)
         if not user_id:
             logger.error("❌ [WS Provider] User object has no ID")
             return
 
-        # 1. בניית ה-Payload מהקונפיג והקונטקסט
-        # אנחנו נותנים עדיפות לערכים דינמיים מהקונטקסט, ואז לערכים קבועים מהקונפיג
-        payload = {
-            "type": "UI_UPDATE",
-            "event": context.get("event_key"),
-            "ride_id": str(
-                context.get("ride_id", "")
-            ),  # המרה ל-string למניעת בעיות JSON
-            "data": {
-                "color": context.get("color") or config.get("color", "green"),
-                "status": context.get("status") or config.get("status", "updated"),
-                "message": context.get("message")
-                or config.get("message", "עדכון נסיעה"),
-                "timestamp": context.get("timestamp"),
-            },
+        event_key = context.get("event_key") or ""
+
+        REFRESH_EVENTS = {
+            "booking.passenger_join_request",
+            "booking.approved_by_driver",
+            "booking.rejected_by_driver",
+            "ride.cancelled_by_driver",
         }
+
+        if event_key in REFRESH_EVENTS:
+            payload = {"type": "notifications_refresh", "event": event_key}
+        else:
+            payload = {"type": "UI_UPDATE", "event": event_key}
 
         channel = f"user_{user_id}"
 

@@ -2,17 +2,21 @@
 
 ## עקרון יסוד: הפרדת אחריות
 
-### chat-ws (Go) - שרת WebSocket בלבד
-**תפקיד:** העברת הודעות real-time מ-Redis ל-WebSocket clients
+### chat-ws (Go) - WebSocket + HTTP מינימלי ל-presence
+**תפקיד:** העברת הודעות real-time מ-Redis ל-WebSocket clients; **אחריות מלאה על `online`** (מפתח `presence:*` ב-Redis DB1).
 
 **מה כן:**
 - ✅ WebSocket connections management
-- ✅ JWT authentication
-- ✅ Subscribe ל-Redis (`chat:conversation:*`)
+- ✅ JWT authentication (WS + HTTP presence)
+- ✅ Subscribe ל-Redis (`chat:conversation:*`, `chat:typing:*`, … + **`user:offline`**) — בניתוק מפרסמים `user:offline` וכל המופעים משדרים WS `user_offline` ללקוחות (עדכון מיידי ב-UI; פולינג נשאר גיבוי)
 - ✅ Forward messages ל-clients
+- ✅ Typing events (`typing_start` / `typing_stop`) דרך Redis (`chat:typing:*`)
+- ✅ **HTTP `GET /presence/{user_id}`** — `online` מ-Redis; `last_seen` מ-backend (`GET /api/v1/users/{id}/last-seen`) כשצריך
+- ✅ Presence / debounce לעדכון last-seen ב-DB:
+  - `presence:{user_id}` TTL 60s
+  - `debounce:last_seen:{user_id}` + `last_seen:hold:{user_id}`
 
 **מה לא:**
-- ❌ API endpoints (HTTP)
 - ❌ Calendar export
 - ❌ AI analysis logic (רק forward אם צריך)
 - ❌ Business logic

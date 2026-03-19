@@ -30,13 +30,3 @@ class NotificationOrchestrator:
             )
         except Exception as e:
             raise NotificationError(f"Failed to dispatch cancellation: {str(e)}")
-
-
-# # app/domain/notifications/service.py
-# class NotificationService:
-#     async def notify_ride_cancelled(self, ride_id: int):
-#         # שולח רק ID! ה-Worker כבר ידע מה לעשות.
-#         await dispatch(
-#             event_name="RIDE_CANCELLED",
-#             payload={"ride_id": ride_id}
-#         )

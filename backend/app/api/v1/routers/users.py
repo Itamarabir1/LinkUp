@@ -1,11 +1,15 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timezone
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.api.dependencies.auth import get_current_user
 from app.domain.users.service import user_service
 from app.domain.users.model import User
+from app.domain.users.crud import crud_user
 from app.domain.users.schema import (
     UserRead,
     UserUpdate,
@@ -26,6 +30,35 @@ router = APIRouter(tags=["Users"])  # prefix="/users" ניתן ב-api_router
 async def get_my_profile(current_user: User = Depends(get_current_user)):
     """מחזיר את פרטי המשתמש המחובר (כולל מידע רגיש כמו אימות)"""
     return current_user
+
+
+# --- Presence / Last seen ---
+@router.patch("/me/last-seen", status_code=status.HTTP_204_NO_CONTENT)
+async def update_last_seen(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await crud_user.get_by_id(db, current_user.user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    user.last_login = datetime.now(timezone.utc)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{user_id}/last-seen")
+async def get_user_last_seen(
+    user_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """מקור `last_seen` לצורך UI צ'אט; נקרא מ-chat-ws ב-GET /presence/{id}."""
+    user = await crud_user.get_by_id(db, user_id)
+    if not user:
+        return {"last_seen": None}
+    return {
+        "last_seen": user.last_login.isoformat() if user.last_login else None,
+    }
 
 
 # --- התראות (מסך התראות) ---

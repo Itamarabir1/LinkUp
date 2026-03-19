@@ -70,7 +70,7 @@ class Booking(Base):
     num_seats = Column(Integer, nullable=False, default=1)
     pickup_name = Column(String(255))
     pickup_point = Column(Geography(geometry_type="POINT", srid=4326), nullable=True)
-    pickup_time = Column(DateTime, nullable=True)
+    pickup_time = Column(DateTime(timezone=True), nullable=True)
 
     # ניהול תזכורות (Celery)
     reminder_sent = Column(
@@ -88,10 +88,11 @@ class Booking(Base):
         nullable=False,
         default=BookingStatus.PENDING,
         server_default=text("'pending_approval'"),
+        index=True,
     )
 
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # --- Relationships (החיבורים שמונעים KeyError) ---
 

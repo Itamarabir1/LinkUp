@@ -48,12 +48,21 @@ func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
 		}
 		c := &Conn{UserID: userID, Conn: conn, Send: make(chan []byte, 256)}
 		h.Register(userID, c)
+		h.SetPresence(context.Background(), userID)
+		h.ClearLastSeenDebounce(context.Background(), userID)
+
 		defer func() {
+			ctx := context.Background()
+			h.ClearPresence(ctx, userID)
+			if h.redisClient != nil {
+				_ = h.redisClient.Publish(ctx, ChannelUserOffline, userID).Err()
+			}
+			h.ScheduleLastSeenDebounce(ctx, userID, token)
 			h.Unregister(userID, c)
 			close(c.Send)
 		}()
 		go c.RunWritePump()
-		// Read client messages: typing_start -> publish to Redis; other types ignored for now.
+		// Read client messages: typing_start/typing_stop -> publish to Redis; other types ignored for now.
 		for {
 			_, raw, err := conn.ReadMessage()
 			if err != nil {
@@ -63,9 +72,28 @@ func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
 			if err := json.Unmarshal(raw, &in); err != nil {
 				continue // ignore malformed
 			}
+			if in.Type == "ping" {
+				h.RefreshPresence(context.Background(), userID)
+				select {
+				case c.Send <- []byte(`{"type":"pong"}`):
+				default:
+				}
+				continue
+			}
 			if in.Type == "typing_start" && in.ConversationID != "" && in.RecipientID != "" {
 				payload := TypingPayload{
 					Type:            "typing_start",
+					UserID:          userID,
+					ConversationID:  in.ConversationID,
+					RecipientID:     in.RecipientID,
+					FullName:        in.FullName,
+				}
+				body, _ := json.Marshal(payload)
+				h.PublishTyping(context.Background(), in.ConversationID, body)
+			}
+			if in.Type == "typing_stop" && in.ConversationID != "" && in.RecipientID != "" {
+				payload := TypingPayload{
+					Type:            "typing_stop",
 					UserID:          userID,
 					ConversationID:  in.ConversationID,
 					RecipientID:     in.RecipientID,

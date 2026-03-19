@@ -17,156 +17,228 @@
   padding: 2rem;
 }
 
-/* Header */
-.header {
+/* ============ HEADER ============ */
+
+.groupHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 0 20px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  text-align: center;
+}
+
+.headerSettingsBtn {
+  position: absolute;
+  top: 16px;
+  right: 0;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border);
+  justify-content: center;
+  transition: background 150ms, color 150ms;
+}
+
+.headerSettingsBtn:hover {
+  background: var(--bg-secondary);
+  color: var(--primary);
+}
+
+.headerAvatarWrap {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-bottom: 4px;
 }
 
 .headerAvatar {
-  width: 48px;
-  height: 48px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   font-weight: 700;
-  font-size: 1.25rem;
-  flex-shrink: 0;
+  font-size: 1.75rem;
+  font-family: 'Rubik', sans-serif;
 }
 
 .headerAvatarImg {
-  width: 48px;
-  height: 48px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   object-fit: cover;
-  flex-shrink: 0;
-}
-
-.headerAvatarWrap {
-  position: relative;
-  flex-shrink: 0;
-  border: none;
-  padding: 0;
-  background: none;
-  cursor: pointer;
-  border-radius: 50%;
-}
-
-.headerAvatarWrap:hover .headerAvatarOverlay {
-  opacity: 1;
+  display: block;
 }
 
 .headerAvatarOverlay {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  opacity: 0.6;
+  color: white;
+  opacity: 0;
   transition: opacity 150ms ease;
 }
 
-.headerNameInput {
-  font-family: "Rubik", "Heebo", sans-serif;
-  font-size: 1.2rem;
-  font-weight: 700;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  width: 100%;
-  max-width: 280px;
-  text-align: right;
+.headerAvatarWrap:hover .headerAvatarOverlay {
+  opacity: 1;
 }
 
-.headerDescInput {
-  font-family: "Heebo", sans-serif;
-  font-size: 0.9rem;
-  padding: 0.4rem 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  width: 100%;
-  max-width: 360px;
-  text-align: right;
-  resize: vertical;
-  margin-top: 0.5rem;
-}
-
-.headerEditActions {
+.nameRow {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-
-.headerEditBtnSave {
-  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 0.4rem 0.75rem;
-  border: none;
-  background: var(--primary);
-  color: #fff;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.headerEditBtnSave:hover:not(:disabled) {
-  background: var(--primary-hover);
-}
-
-.headerEditBtnCancel {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0.4rem 0.75rem;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-secondary);
-  border-radius: 8px;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.headerEditBtnCancel:hover:not(:disabled) {
-  background: var(--bg-secondary);
-}
-
-.headerInfo {
-  flex: 1;
-  min-width: 0;
 }
 
 .headerName {
-  font-family: "Rubik", "Heebo", sans-serif;
-  font-size: 1.35rem;
+  font-family: 'Rubik', sans-serif;
+  font-size: 1.3rem;
   font-weight: 700;
-  margin: 0 0 0.25rem 0;
   color: var(--text-primary);
+  margin: 0;
+  text-align: center;
 }
 
-.headerMeta {
-  font-size: 0.9rem;
+.descRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.headerDescription {
+  font-family: 'Heebo', sans-serif;
+  font-size: 0.95rem;
   color: var(--text-secondary);
   margin: 0;
+  text-align: center;
+}
+
+.editIconBtn {
+  background: none;
+  border: none;
+  color: #D1D5DB;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 150ms, color 150ms;
+  flex-shrink: 0;
+}
+
+.nameRow:hover .editIconBtn,
+.descRow:hover .editIconBtn {
+  opacity: 1;
+  color: #9CA3AF;
+}
+
+.groupMeta {
+  font-family: 'Heebo', sans-serif;
+  font-size: 0.8rem;
+  color: #9CA3AF;
+  margin: 2px 0 0;
+  text-align: center;
+}
+
+.inlineEditRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.inlineInput {
+  font-family: 'Rubik', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border: 1.5px solid var(--primary);
+  border-radius: 6px;
+  padding: 4px 10px;
+  outline: none;
+  text-align: center;
+  min-width: 0;
+  width: 200px;
+}
+
+.inlineEditCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.inlineTextarea {
+  font-family: 'Heebo', sans-serif;
+  font-size: 0.9rem;
+  border: 1.5px solid var(--primary);
+  border-radius: 6px;
+  padding: 6px 10px;
+  outline: none;
+  text-align: center;
+  resize: none;
+  width: 260px;
+}
+
+.inlineActions {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.inlineSave {
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: 'Heebo', sans-serif;
+}
+
+.inlineCancel {
+  background: white;
+  color: #6B7280;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  padding: 4px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: 'Heebo', sans-serif;
 }
 
 .headerActions {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
   flex-wrap: wrap;
 }
+
+/* ============ END HEADER ============ */
 
 .headerBtn {
   display: inline-flex;
@@ -533,6 +605,13 @@
   max-width: 480px;
 }
 
+.settingsSectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 10px;
+}
+
 .settingsHint {
   font-size: 0.9rem;
   color: var(--text-secondary);
@@ -656,6 +735,15 @@
   margin-bottom: 0.5rem;
 }
 
+.inviteUrl {
+  flex: 1;
+  font-size: 13px;
+  color: #6B7280;
+  word-break: break-all;
+  direction: ltr;
+  text-align: left;
+}
+
 .inviteInput {
   flex: 1;
   min-width: 180px;
@@ -694,10 +782,23 @@
   margin: 0 0 1rem 0;
 }
 
+.divider {
+  border: none;
+  border-top: 1px solid #E5E7EB;
+  margin: 0;
+}
+
 .dangerZone {
   margin-top: 2rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--border);
+}
+
+.dangerTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #DC2626;
+  margin: 0 0 12px;
 }
 
 .dangerZoneTitle {
@@ -739,4 +840,20 @@
 
 .btnOutline:hover:not(:disabled) {
   background: var(--bg-secondary);
+}
+
+.btnSecondary {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  background: white;
+  color: #374151;
+  border: 1px solid #E5E7EB;
+  cursor: pointer;
+  font-family: 'Heebo', sans-serif;
+}
+
+.btnSecondary:hover {
+  border-color: #9CA3AF;
 }

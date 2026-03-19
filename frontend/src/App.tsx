@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { GroupProvider } from './context/GroupContext';
 import { ChatProvider } from './context/ChatContext';
@@ -19,14 +19,17 @@ import CreateGroup from './pages/CreateGroup';
 import Groups from './pages/Groups';
 import GroupManage from './pages/GroupManage';
 import JoinGroup from './pages/JoinGroup';
+import FCMCheck from './pages/FCMCheck';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
   if (isLoading) {
     return <div className="page-loading" style={{ padding: '3rem', textAlign: 'center' }}>טוען...</div>;
   }
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    const from = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?from=${from}`} replace />;
   }
   return <>{children}</>;
 }
@@ -59,6 +62,8 @@ function AppRoutes() {
         <Route path="groups/new" element={<CreateGroup />} />
         <Route path="groups/:groupId" element={<GroupManage />} />
         <Route path="join/:inviteCode" element={<JoinGroup />} />
+        <Route path="rides/:rideId" element={<Navigate to="/my-bookings?tab=driver" replace />} />
+        <Route path="fcm-check" element={<FCMCheck />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

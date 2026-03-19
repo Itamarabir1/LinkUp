@@ -1,5 +1,6 @@
 # app/domain/geo/processor.py
 import logging
+from datetime import datetime
 from typing import Optional, Dict
 from app.infrastructure.geo.client import geo_client
 from app.services.location.geocoding import GeocodingService
@@ -30,7 +31,11 @@ async def resolve_origin_address(
     raise InvalidLocationError(detail="חובה לספק כתובת מוצא או מיקום GPS תקין")
 
 
-async def get_full_routing_data(origin_name: str, dest_name: str) -> Optional[Dict]:
+async def get_full_routing_data(
+    origin_name: str,
+    dest_name: str,
+    departure_time: Optional[datetime] = None,
+) -> Optional[Dict]:
     """
     מתזמר שליפת נתונים מ-API חיצוני והמרתם לסכימות של הדומיין.
     """
@@ -43,7 +48,9 @@ async def get_full_routing_data(origin_name: str, dest_name: str) -> Optional[Di
         return None
 
     # 2. שליפת עד 3 מסלולים מ-Google Directions API (GeoClient) – מחזיר כמה שגוגל מחזירה (1–3)
-    raw_routes = await geo_client.fetch_raw_routes((lat_o, lon_o), (lat_d, lon_d))
+    raw_routes = await geo_client.fetch_raw_routes(
+        (lat_o, lon_o), (lat_d, lon_d), departure_time
+    )
 
     if not raw_routes:
         logger.error(f"No routes found between {origin_name} and {dest_name}")

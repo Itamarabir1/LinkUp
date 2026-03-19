@@ -2,8 +2,7 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, status
 from app.api.dependencies.auth import get_current_user_ws
 
-# כאן הטעות שלך - צריך לייבא את הסרוויס שמכיל את הפונקציה
-from app.domain.notifications.services.notification_service import notification_service
+from app.domain.notifications.services.notification_streamer import notification_streamer
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -23,7 +22,7 @@ async def websocket_endpoint(
     logger.info(f"🔌 WebSocket connection accepted for user: {user_id}")
 
     try:
-        await notification_service.stream_user_notifications(websocket, user_id)
+        await notification_streamer.stream_user_notifications(websocket, user_id)
 
     except WebSocketDisconnect:
         logger.info(f"👋 User {user_id} disconnected")

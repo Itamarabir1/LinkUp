@@ -13,6 +13,7 @@ import (
 
 	redisv9 "github.com/redis/go-redis/v9"
 
+	"linkup/chat-ws/internal/api"
 	"linkup/chat-ws/internal/config"
 	"linkup/chat-ws/internal/hub"
 	"linkup/chat-ws/internal/redis"
@@ -30,16 +31,21 @@ func main() {
 	}
 	redisClient := redisv9.NewClient(opt)
 	defer redisClient.Close()
+	redisOfflineSub := redisv9.NewClient(opt)
+	defer redisOfflineSub.Close()
 
 	h := hub.NewHub(redisClient)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	go redis.RunSubscriber(ctx, redisClient, h)
+	go h.RunUserOfflineSubscriber(ctx, redisOfflineSub)
+	go h.RunLastSeenDebounceWorker(ctx, cfg)
 
 	http.HandleFunc("/ws", h.HandleWS(cfg))
+	http.HandleFunc("/presence/", api.HandlePresence(cfg, redisClient))
 	addr := ":" + strconv.Itoa(cfg.Port)
-	log.Printf("chat-ws listening on %s (WebSocket: /ws?token=JWT)", addr)
+	log.Printf("chat-ws listening on %s (WS /ws, HTTP GET /presence/{userID})", addr)
 
 	go func() {
 		if err := http.ListenAndServe(addr, nil); err != nil && err != http.ErrServerClosed {

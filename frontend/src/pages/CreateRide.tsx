@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+import { he } from 'date-fns/locale';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import type { RidePreviewResponse } from '../types/api';
 import { formatDurationMinutes } from '../utils/duration';
+import { ArrowUpDown } from 'lucide-react';
 import RouteMapModal, { type RouteMapData } from '../components/RouteMapModal';
 import styles from './CreateRide.module.css';
 
@@ -12,15 +16,13 @@ export default function CreateRide() {
   const navigate = useNavigate();
   const [originName, setOriginName] = useState('');
   const [destinationName, setDestinationName] = useState('');
-  const tomorrow = (() => {
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10);
-  })();
-  const [departureDate, setDepartureDate] = useState(tomorrow);
-  const [departureTime, setDepartureTime] = useState('09:00');
-  const [seats, setSeats] = useState('4');
-  const [price, setPrice] = useState('0');
+    d.setHours(9, 0, 0, 0);
+    return d;
+  });
+  const [seats, setSeats] = useState(4); // ברירת מחדל 4
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<RidePreviewResponse | null>(null);
   /** -1 = לא נבחר (כשיש יותר ממסלול אחד); 0,1,2 = אינדקס המסלול */
@@ -60,14 +62,20 @@ export default function CreateRide() {
     );
   };
 
+  const handleSwap = () => {
+    const o = originName;
+    const d = destinationName;
+    setOriginName(d);
+    setDestinationName(o);
+  };
+
   const requestPreview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!originName.trim() || !destinationName.trim()) {
       setError('נא למלא מוצא ויעד');
       return;
     }
-    const dep = new Date(`${departureDate}T${departureTime}`);
-    if (isNaN(dep.getTime()) || dep <= new Date()) {
+    if (isNaN(selectedDate.getTime()) || selectedDate <= new Date()) {
       setError('נא לבחור זמן יציאה בעתיד');
       return;
     }
@@ -81,9 +89,8 @@ export default function CreateRide() {
           driver_id: user?.user_id ?? 0,
           origin_name: originName.trim(),
           destination_name: destinationName.trim(),
-          departure_time: dep.toISOString(),
-          available_seats: parseInt(seats, 10) || 4,
-          price: parseFloat(price) || 0,
+          departure_time: selectedDate.toISOString(),
+          available_seats: seats,
         }
       );
       // תמיד להציג את כל המסלולים שהבקאנד מחזיר (גוגל יכולה להחזיר 1–3)
@@ -132,7 +139,7 @@ export default function CreateRide() {
     <div className={styles.page}>
       <h1 className={styles.pageTitle}>הצע נסיעה</h1>
       <p className={styles.pageMeta} style={{ color: '#6b7280', marginBottom: '1rem' }}>
-        מוצא, יעד, זמן יציאה, מושבים ומחיר – כמו בבקאנד.
+        מוצא, יעד, מושבים וזמן יציאה.
       </p>
       <form onSubmit={requestPreview} className={styles.formBlock}>
         {error && <p className={styles.pageError}>{error}</p>}
@@ -153,6 +160,17 @@ export default function CreateRide() {
             {locationLoading ? '...' : 'מיקום עצמי'}
           </button>
         </div>
+        <div className={styles.swapWrap}>
+          <button
+            type="button"
+            className={styles.swapBtn}
+            onClick={handleSwap}
+            aria-label="הפוך כיוון"
+            title="הפוך כיוון"
+          >
+            <ArrowUpDown size={18} />
+          </button>
+        </div>
         <input
           type="text"
           placeholder="יעד (כתובת)"
@@ -160,36 +178,39 @@ export default function CreateRide() {
           onChange={(e) => setDestinationName(e.target.value)}
           className={styles.formInput}
         />
-        <label className={styles.formLabel}>תאריך יציאה</label>
-        <input
-          type="date"
-          value={departureDate}
-          onChange={(e) => setDepartureDate(e.target.value)}
-          className={styles.formInput}
-        />
-        <label className={styles.formLabel}>שעת יציאה</label>
-        <input
-          type="time"
-          value={departureTime}
-          onChange={(e) => setDepartureTime(e.target.value)}
-          className={styles.formInput}
-        />
         <label className={styles.formLabel}>מספר מושבים</label>
-        <input
-          type="number"
-          min={1}
-          value={seats}
-          onChange={(e) => setSeats(e.target.value)}
-          className={styles.formInput}
-        />
-        <label className={styles.formLabel}>מחיר (₪)</label>
-        <input
-          type="number"
-          min={0}
-          step={0.01}
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          className={styles.formInput}
+        <div className={styles.seatsControl}>
+          <button
+            type="button"
+            className={styles.seatBtn}
+            onClick={() => setSeats((s) => Math.max(1, s - 1))}
+            disabled={seats <= 1}
+          >
+            −
+          </button>
+          <span className={styles.seatsValue}>{seats}</span>
+          <button
+            type="button"
+            className={styles.seatBtn}
+            onClick={() => setSeats((s) => Math.min(8, s + 1))}
+            disabled={seats >= 8}
+          >
+            +
+          </button>
+        </div>
+        <label className={styles.formLabel}>תאריך ושעת יציאה</label>
+        <DatePicker
+          selected={selectedDate}
+          onChange={(date: Date | null) => date && setSelectedDate(date)}
+          showTimeSelect
+          timeFormat="HH:mm"
+          timeIntervals={15}
+          dateFormat="dd/MM/yyyy HH:mm"
+          locale={he}
+          minDate={new Date()}
+          className={styles.datetimeInput}
+          placeholderText="בחר תאריך ושעה"
+          wrapperClassName={styles.datetimeWrapper}
         />
         <button
           type="submit"

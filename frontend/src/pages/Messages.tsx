@@ -66,7 +66,9 @@ export default function Messages() {
               <button
                 key={c.conversation_id}
                 type="button"
-                className={`${styles.conversationRow} ${panelConversationId === c.conversation_id ? styles.active : ''}`}
+                className={`${styles.conversationRow} ${
+                  panelConversationId === c.conversation_id ? styles.active : ''
+                } ${c.has_unread ? styles.convUnread : ''}`}
                 onClick={() => openChat(c.conversation_id)}
               >
                 <div className={styles.avatarWrap}>
@@ -81,11 +83,11 @@ export default function Messages() {
                       {(c.partner.full_name || '?').charAt(0).toUpperCase()}
                     </span>
                   )}
-                  {/* TODO: unread dot when API supports it */}
+                  {c.has_unread && <span className={styles.unreadDot} aria-hidden />}
                 </div>
                 <div className={styles.rowContent}>
                   <div className={styles.rowFirst}>
-                    <span className={styles.partnerName}>
+                    <span className={`${styles.partnerName} ${c.has_unread ? styles.convName : ''}`}>
                       {c.partner.full_name || `משתמש #${c.partner.user_id}`}
                     </span>
                     <span className={styles.rowTime}>

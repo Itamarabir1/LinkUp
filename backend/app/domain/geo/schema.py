@@ -22,11 +22,30 @@ class RouteOptionData(BaseModel):
     coords: List[List[float]]  # רשימה של [lat, lon]
 
 
+class DriverLocationReport(BaseModel):
+    """גוף בקשה לדיווח מיקום נהג (POST /bookings/{booking_id}/location)."""
+
+    lat: float = Field(..., ge=-90, le=90)
+    lng: float = Field(..., ge=-180, le=180)
+    heading: Optional[float] = None
+    speed: Optional[float] = None
+
+
+class PassengerLocationReport(BaseModel):
+    """גוף בקשה לדיווח מיקום נוסע (POST /bookings/{booking_id}/passenger-location)."""
+
+    lat: float = Field(..., ge=-90, le=90)
+    lng: float = Field(..., ge=-180, le=180)
+    heading: Optional[float] = None
+    speed: Optional[float] = None
+
+
 class LocationUpdate(BaseModel):
     booking_id: int
     latitude: float = Field(..., alias="lat")  # תמיכה גם ב-lat וגם ב-latitude
     longitude: float = Field(..., alias="lon")
     heading: Optional[float] = 0.0  # כיוון הנסיעה באייקון
+    speed: float = 0.0
 
     class Config:
         populate_by_name = True  # מאפשר לשלוח גם 'lat' וגם 'latitude'

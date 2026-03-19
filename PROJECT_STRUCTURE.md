@@ -26,7 +26,6 @@ Linkup/
 │   ├── frontend/
 │   └── infra/
 ├── README.md
-├── render.yaml
 ├── RUN.md
 ├── backend/
 ├── chat-ws/

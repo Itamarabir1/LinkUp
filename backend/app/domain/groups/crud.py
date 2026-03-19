@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.domain.groups.model import Group, GroupMember
 
@@ -54,7 +55,11 @@ async def get_user_groups(db: AsyncSession, user_id: UUID) -> list[Group]:
 
 
 async def get_group_members(db: AsyncSession, group_id: UUID) -> list[GroupMember]:
-    result = await db.execute(select(GroupMember).where(GroupMember.group_id == group_id))
+    result = await db.execute(
+        select(GroupMember)
+        .where(GroupMember.group_id == group_id)
+        .options(selectinload(GroupMember.user))
+    )
     return list(result.scalars().all())
 
 

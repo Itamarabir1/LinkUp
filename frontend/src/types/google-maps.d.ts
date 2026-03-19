@@ -4,6 +4,7 @@ declare namespace google {
     class Map {
       constructor(mapDiv: HTMLElement, opts?: MapOptions);
       fitBounds(bounds: LatLngBounds, padding?: number | Padding): void;
+      panTo?(point: LatLngLiteral): void;
     }
     interface MapOptions {
       zoom?: number;
@@ -18,6 +19,7 @@ declare namespace google {
     }
     class LatLngBounds {
       extend(point: LatLngLiteral): void;
+      isEmpty(): boolean;
     }
     class Polyline {
       constructor(opts?: PolylineOptions);
@@ -32,6 +34,8 @@ declare namespace google {
     }
     class Marker {
       constructor(opts?: MarkerOptions);
+      setMap(map: Map | null): void;
+      setPosition(position: LatLngLiteral): void;
     }
     interface MarkerOptions {
       position?: LatLngLiteral;

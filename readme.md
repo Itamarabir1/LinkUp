@@ -10,6 +10,12 @@ Linkup connects drivers and passengers for shared rides. Drivers publish trips w
 
 ---
 
+## Engineering highlights (portfolio)
+
+Single doc for **stack, scale patterns, real-time chat (disconnect / last-seen debounce), Outbox, ops**: **[docs/ENGINEERING_HIGHLIGHTS.md](docs/ENGINEERING_HIGHLIGHTS.md)**.
+
+---
+
 ## Architecture
 
 ```mermaid
@@ -52,7 +58,7 @@ flowchart LR
 
 | Service   | Language        | Role |
 |----------|------------------|------|
-| backend  | Python (FastAPI) | REST API, auth, rides, bookings, chat CRUD, AI summary (Celery), notifications, outbox worker |
+| backend  | Python (FastAPI) | REST API, auth, rides, bookings, chat CRUD, **groups**, passengers (requests/matches), AI summary (Celery), notifications, outbox worker |
 | chat-ws  | Go               | WebSocket server; real-time message delivery only (no business logic) |
 | frontend | React / TypeScript | Web app (Vite); Hebrew RTL |
 | mobile   | React Native / Expo | Mobile app (TypeScript) |
@@ -69,17 +75,22 @@ flowchart LR
 | **Mobile**    | React Native, Expo, TypeScript |
 | **Infrastructure** | Docker, Docker Compose, Kubernetes (manifests in repo) |
 | **Cloud / CI** | GitHub Actions, GHCR (GitHub Container Registry), Docker |
+| **Scaling & reliability** | Request ID (X-Request-ID), structured JSON logging; RabbitMQ retry (exponential backoff) + DLQ; pessimistic locking (booking approve/cancel); connection pooling, DB indexes |
 
 ---
 
 ## Key Features
 
-- ✅ Ride search, booking requests, and driver approve/reject
+- ✅ **Rides & bookings:** ride search, booking requests, driver approve/reject; **start/end ride** from "My Bookings" (driver tab; requires at least one confirmed passenger)
+- ✅ **Passenger requests (בקשות טרמפ):** create request from search, cancel request, view matches; optional link from booking to request
+- ✅ **Groups:** create group, join by invite code, manage members (remove, promote to admin), group rides and search; group avatar & description (S3); leave group / close group (admin)
 - ✅ Real-time chat (WebSocket) between driver and passenger
 - ✅ AI conversation summary (Groq / Llama) and email on chat end
 - ✅ Push (FCM), email (Brevo), and in-app notifications
 - ✅ Google OAuth and email/password auth with JWT + refresh
-- ✅ Geo: distance, route display, PostGIS-backed queries
+- ✅ Geo: distance, route display, PostGIS-backed queries; **ride preview cache** (Redis, 24h) for route options
+- ✅ **GPS live tracking:** driver and passengers share location during active rides (WebSocket)
+- ✅ **Group tags** on ride/booking cards (group name or "ציבורי"); RTL: route as destination ← origin; close button (×) top-left on cards
 - ✅ Profile and avatar upload (S3)
 - ✅ Outbox pattern for reliable event publishing to RabbitMQ
 - ✅ Kubernetes-ready (manifests in `k8s/`)
@@ -134,7 +145,17 @@ Apply the database schema once (see `db/schema.sql`) and run migrations: `cd bac
 | `mobile/`  | React Native (Expo) app |
 | `k8s/`     | Kubernetes base, backend, chat-ws, frontend, infra (Postgres, Redis, RabbitMQ) |
 | `db/`      | Reference schema (`schema.sql`) and utility scripts; migrations live in `backend/alembic/` |
-| `docs/`    | Architecture and operational notes |
+| `docs/`    | Architecture: `docs/architecture/` — API.md, DATABASE.md, EVENTS.md (outbox, DLQ, retry), REALTIME.md (GPS, chat), DEVELOPMENT.md |
+
+---
+
+## Observability & reliability (scale-ready)
+
+- **Request tracing:** every request gets a unique Request ID (8 chars); returned in `X-Request-ID` header and in logs for tracing.
+- **Structured logging:** JSON in production (python-json-logger); level and format via env (LOG_LEVEL, LOG_FORMAT).
+- **RabbitMQ retry & DLQ:** notifications and avatar queues use exponential backoff (e.g. 5s → 30s → 5min); after max retries, messages go to Dead Letter Queues. See `docs/architecture/EVENTS.md`.
+- **Pessimistic locking:** booking approve/cancel use `SELECT ... FOR UPDATE` on the ride to avoid race conditions.
+- **Connection pooling:** async DB pool (size 10, overflow 20, pre-ping); indexes on rides, bookings, group_members, passenger_requests — see `docs/architecture/DATABASE.md`.
 
 ---
 
