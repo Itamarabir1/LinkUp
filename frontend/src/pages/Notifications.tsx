@@ -118,7 +118,7 @@ export default function Notifications() {
           <button
             type="button"
             className={styles.markAllRead}
-            onClick={() => markAllNotificationsRead()}
+            onClick={markAllNotificationsRead}
           >
             סמן הכל כנקרא
           </button>
