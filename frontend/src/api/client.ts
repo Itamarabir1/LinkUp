@@ -144,6 +144,7 @@ export interface ConversationListItem {
   partner: { user_id: string; full_name: string; avatar_url?: string };
   last_message_at: string | null;
   last_message_preview: string | null;
+  has_unread?: boolean;
 }
 
 export interface MessageResponse {

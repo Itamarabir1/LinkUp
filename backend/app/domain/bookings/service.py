@@ -435,6 +435,7 @@ class BookingService:
                         body=f"{other or 'נוסע'} מבקש להצטרף לנסיעה"
                         if other
                         else "בקשה להצטרפות",
+                        action_url="/my-bookings?tab=driver",
                         created_at=b.created_at,
                         booking_id=b.booking_id,
                         ride_id=b.ride_id,
@@ -467,6 +468,7 @@ class BookingService:
                         type=ntype,
                         title=title,
                         body=body,
+                        action_url="/my-bookings",
                         created_at=b.created_at,
                         booking_id=b.booking_id,
                         ride_id=b.ride_id,

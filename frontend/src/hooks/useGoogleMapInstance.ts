@@ -4,7 +4,7 @@ import { loadGoogleMaps } from '../lib/loadGoogleMaps';
 const DEFAULT_CENTER = { lat: 32.0853, lng: 34.7818 };
 
 export function useGoogleMapInstance(
-  containerRef: React.RefObject<HTMLDivElement>,
+  containerRef: React.RefObject<HTMLDivElement | null>,
   resolvedKey: string | null
 ) {
   const [map, setMap] = useState<google.maps.Map | null>(null);

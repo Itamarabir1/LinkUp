@@ -101,6 +101,7 @@ class NotificationItemResponse(BaseModel):
     type: str  # ride_request | booking_confirmed | booking_rejected | pending_approval
     title: str
     body: Optional[str] = None
+    action_url: Optional[str] = None
     created_at: datetime
     booking_id: UUID
     ride_id: UUID

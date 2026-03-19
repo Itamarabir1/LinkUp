@@ -6,7 +6,6 @@ import { useGoogleMapsKey } from '../../hooks/useGoogleMapsKey';
 import { useMapMarker } from '../../hooks/useMapMarker';
 import styles from './LiveRideMapModal.module.css';
 
-const DEFAULT_CENTER = { lat: 32.0853, lng: 34.7818 };
 const DRIVER_MARKER_BLUE = '#1d6fe8';
 const PASSENGER_MARKER_GREEN = '#059669';
 

@@ -98,9 +98,7 @@ export default function Notifications() {
   const handleRowClick = (n: NotificationItem) => {
     const key = getNotificationItemKey(n);
     if (!isNotificationRead(key)) markNotificationRead(key);
-    if (n.type === 'ride_request') {
-      navigate('/my-bookings', { state: { tab: 'driver' } });
-    }
+    if (n.action_url) navigate(n.action_url);
   };
 
   if (loading) {
