@@ -26,4 +26,8 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // Main bundle ~660kB minified (maps + deps); acceptable until route-based code-splitting
+    chunkSizeWarningLimit: 700,
+  },
 })
