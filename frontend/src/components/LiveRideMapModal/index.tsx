@@ -4,6 +4,7 @@ import { usePassengerLocations } from '../../hooks/usePassengerLocations';
 import { useGoogleMapInstance } from '../../hooks/useGoogleMapInstance';
 import { useGoogleMapsKey } from '../../hooks/useGoogleMapsKey';
 import { useMapMarker } from '../../hooks/useMapMarker';
+import ErrorBanner from '../ErrorBanner';
 import styles from './LiveRideMapModal.module.css';
 
 const DRIVER_MARKER_BLUE = '#1d6fe8';
@@ -109,7 +110,13 @@ export default function LiveRideMapModal({
           </button>
         </div>
         {resolvedKey === null && !loadError && <p className={styles.statusBar}>טוען מפתח מפה...</p>}
-        {loadError && <p className={styles.statusBarError}>{loadError}</p>}
+        {loadError ? (
+          <ErrorBanner
+            message={loadError}
+            variant="compact"
+            className={`${styles.statusBar} ${styles.statusBarError}`.trim()}
+          />
+        ) : null}
         {!loadError && resolvedKey !== null && (
           <div ref={containerRef} className={styles.mapContainer} aria-hidden={!!loadError} />
         )}

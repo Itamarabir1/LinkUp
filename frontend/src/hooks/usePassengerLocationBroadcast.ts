@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
+import { postPassengerBookingLocation } from '../api/bookings';
+import { getApiErrorMessage } from '../utils/apiError';
 import { useLocationWatcher } from './useLocationWatcher';
 
 /**
@@ -20,16 +21,10 @@ export function usePassengerLocationBroadcast(bookingId: string | null, enabled:
     enabled: enabled && !!bookingId,
     onPosition: ({ lat, lng, heading, speed }) => {
       if (!bookingId) return;
-      api
-        .post(
-          `/bookings/${bookingId}/passenger-location`,
-          { lat, lng, heading, speed },
-          { timeout: 5000 }
-        )
+      postPassengerBookingLocation(bookingId, { lat, lng, heading, speed })
         .then(() => setError(null))
-        .catch((err) => {
-          const msg = err?.response?.data?.detail ?? 'שליחת מיקום נכשלה';
-          setError(typeof msg === 'string' ? msg : String(msg));
+        .catch((err: unknown) => {
+          setError(getApiErrorMessage(err, 'שליחת מיקום נכשלה'));
         });
     },
     onError: (msg) => setError(msg),

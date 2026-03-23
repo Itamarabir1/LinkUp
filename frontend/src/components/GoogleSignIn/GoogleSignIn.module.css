@@ -1,0 +1,18 @@
+.placeholder {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.containerDisabled {
+  opacity: 0.6;
+  pointer-events: none;
+}

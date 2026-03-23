@@ -1,0 +1,2 @@
+export const TYPING_THROTTLE_MS = 4000;
+export const TYPING_DISPLAY_TIMEOUT_MS = 5000;

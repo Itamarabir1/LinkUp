@@ -3,7 +3,7 @@ import {
   getMessagingSafe,
   FIREBASE_VAPID_KEY,
 } from '../config/firebase';
-import { api } from '../api/client';
+import { patchFcmToken } from '../api/users';
 import { playNotificationChime } from '../utils/notificationSound';
 import { triggerNotificationToast } from '../components/NotificationToast/notificationToast.utils';
 
@@ -68,7 +68,7 @@ export async function initFCM(): Promise<void> {
     console.log('[FCM] Token:', token ? token.substring(0, 20) + '...' : 'null');
     if (!token) return;
 
-    await api.patch('/users/fcm-token', { fcm_token: token });
+    await patchFcmToken(token);
     console.log('[FCM] Token sent to backend successfully');
   } catch (err) {
     console.warn('[FCM] init failed:', err);

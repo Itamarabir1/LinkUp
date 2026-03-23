@@ -55,7 +55,7 @@
 }
 
 .emptyIcon {
-  color: #d1d5db;
+  color: var(--text-tertiary);
   margin-bottom: 1rem;
 }
 
@@ -102,8 +102,8 @@
 }
 
 .card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  border-color: #d1d5db;
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--input-border);
 }
 
 .cardTop {
@@ -206,7 +206,7 @@
 
 .cardCreate {
   background: var(--bg-card);
-  border: 1.5px dashed #d1d5db;
+  border: 1.5px dashed var(--input-border);
   border-radius: 12px;
   min-height: 120px;
   display: flex;

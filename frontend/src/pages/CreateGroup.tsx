@@ -6,6 +6,9 @@ import {
   confirmGroupImage,
 } from '../api/groups';
 import { useGroup } from '../context/GroupContext';
+import ErrorBanner from '../components/ErrorBanner';
+import LoadingButton from '../components/LoadingButton';
+import { getApiErrorMessage } from '../utils/apiError';
 import styles from './CreateGroup.module.css';
 
 const DESCRIPTION_MAX = 500;
@@ -60,14 +63,19 @@ export default function CreateGroup() {
           });
           if (!putRes.ok) throw new Error('Upload failed');
           await confirmGroupImage(group.group_id, key);
-        } catch {
-          setImageError('הקבוצה נוצרה, אך העלאת התמונה נכשלה. ניתן לעדכן תמונה בהגדרות הקבוצה.');
+        } catch (err) {
+          setImageError(
+            getApiErrorMessage(
+              err,
+              'הקבוצה נוצרה, אך העלאת התמונה נכשלה. ניתן לעדכן תמונה בהגדרות הקבוצה.'
+            )
+          );
         }
       }
       setCreatedGroup({ inviteCode: group.invite_code, name: group.name });
       await refreshGroups();
-    } catch {
-      setError('יצירת הקבוצה נכשלה.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'יצירת הקבוצה נכשלה.'));
     } finally {
       setSubmitting(false);
     }
@@ -112,7 +120,9 @@ export default function CreateGroup() {
               {copied ? '✓ הועתק!' : 'העתק'}
             </button>
           </div>
-          {copyError && <p className={styles.inviteError}>{copyError}</p>}
+          {copyError ? (
+            <ErrorBanner message={copyError} variant="compact" className={styles.inviteError} />
+          ) : null}
         </div>
       </div>
     );
@@ -121,7 +131,7 @@ export default function CreateGroup() {
   return (
     <div className={styles.page}>
       <h1 className={styles.pageTitle}>צור קבוצה</h1>
-      {error && <p className={styles.pageError}>{error}</p>}
+      {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
       <form className={styles.form} onSubmit={handleSubmit}>
         <label className={styles.label} htmlFor="group-name">
           שם הקבוצה
@@ -175,13 +185,18 @@ export default function CreateGroup() {
             type="file"
             ref={fileInputRef}
             accept="image/*"
-            style={{ display: 'none' }}
+            className={styles.hiddenFileInput}
             onChange={handleImageChange}
           />
         </div>
-        <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={submitting}>
-          {submitting ? 'יוצר...' : 'צור קבוצה'}
-        </button>
+        <LoadingButton
+          type="submit"
+          className={`${styles.btn} ${styles.btnPrimary}`}
+          loading={submitting}
+          loadingLabel="יוצר..."
+        >
+          צור קבוצה
+        </LoadingButton>
       </form>
     </div>
   );

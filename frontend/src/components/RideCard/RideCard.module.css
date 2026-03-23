@@ -1,15 +1,15 @@
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 16px;
   cursor: pointer;
   transition: box-shadow 200ms ease, border-color 200ms ease;
 }
 
 .card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  border-color: #d1d5db;
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--input-border);
 }
 
 .route {
@@ -60,6 +60,8 @@
   font-weight: 500;
   padding: 3px 8px;
   border-radius: 999px;
+  background-color: var(--badge-bg, var(--neutral-bg));
+  color: var(--badge-color, var(--neutral-text));
 }
 
 .source {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
+import { fetchMapsKey } from '../api/geo';
 import { GOOGLE_MAPS_API_KEY } from '../config/env';
 
 export function useGoogleMapsKey() {
@@ -13,8 +13,7 @@ export function useGoogleMapsKey() {
     }
 
     let cancelled = false;
-    api
-      .get<{ google_maps_api_key: string }>('/geo/maps-key')
+    fetchMapsKey()
       .then(({ data }) => {
         if (cancelled) return;
         if (data?.google_maps_api_key) setResolvedKey(data.google_maps_api_key);

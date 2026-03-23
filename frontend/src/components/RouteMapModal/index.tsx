@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from '../../api/client';
+import { fetchMapsKey } from '../../api/geo';
 import { GOOGLE_MAPS_API_KEY } from '../../config/env';
+import ErrorBanner from '../ErrorBanner';
 import styles from './RouteMapModal.module.css';
 
 declare global {
@@ -43,8 +44,7 @@ export default function RouteMapModal({ data, onClose }: RouteMapModalProps) {
       return;
     }
     let cancelled = false;
-    api
-      .get<{ google_maps_api_key: string }>('/geo/maps-key')
+    fetchMapsKey()
       .then(({ data }) => {
         if (!cancelled && data?.google_maps_api_key) {
           setResolvedKey(data.google_maps_api_key);
@@ -170,9 +170,9 @@ export default function RouteMapModal({ data, onClose }: RouteMapModalProps) {
         {resolvedKey === null && !loadError && (
           <p className={styles.loading}>טוען מפתח מפה מהבקאנד...</p>
         )}
-        {loadError && (
-          <p className={styles.error}>{loadError}</p>
-        )}
+        {loadError ? (
+          <ErrorBanner message={loadError} variant="compact" className={styles.error} />
+        ) : null}
         {!loadError && resolvedKey !== null && (
           <div
             ref={containerRef}

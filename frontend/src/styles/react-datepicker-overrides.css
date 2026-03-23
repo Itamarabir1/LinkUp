@@ -1,0 +1,81 @@
+/**
+ * עיצוב react-datepicker לפי טוקנים (בהיר / כהה).
+ * נטען גלובלית — לא בתוך CSS Modules.
+ */
+
+.react-datepicker {
+  font-family: 'Heebo', sans-serif !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-dropdown) !important;
+  background-color: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+.react-datepicker__header {
+  background: var(--bg-secondary) !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
+}
+
+.react-datepicker__current-month,
+.react-datepicker__day-name,
+.react-datepicker-time__header,
+.react-datepicker-year-header {
+  font-family: 'Heebo', sans-serif !important;
+  color: var(--text-primary) !important;
+}
+
+.react-datepicker__day {
+  color: var(--text-primary) !important;
+}
+
+.react-datepicker__day--disabled,
+.react-datepicker__day--outside-month {
+  color: var(--text-tertiary) !important;
+}
+
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background: var(--primary) !important;
+  border-radius: 50% !important;
+  color: var(--text-inverse) !important;
+}
+
+.react-datepicker__day:hover:not(.react-datepicker__day--disabled) {
+  background: var(--primary-light) !important;
+  border-radius: 50% !important;
+  color: var(--text-primary) !important;
+}
+
+.react-datepicker__day--selected:hover,
+.react-datepicker__day--keyboard-selected:hover {
+  color: var(--text-inverse) !important;
+}
+
+.react-datepicker__time-list-item:hover {
+  background: var(--primary-light) !important;
+}
+
+.react-datepicker__time-list-item--selected {
+  background: var(--primary) !important;
+  color: var(--text-inverse) !important;
+}
+
+.react-datepicker__time-container,
+.react-datepicker__time,
+.react-datepicker__time-box {
+  border-color: var(--border) !important;
+}
+
+.react-datepicker__time-list {
+  background: var(--bg-card) !important;
+}
+
+.react-datepicker__navigation-icon::before {
+  border-color: var(--text-secondary) !important;
+}
+
+.react-datepicker__triangle {
+  display: none;
+}

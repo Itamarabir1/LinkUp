@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Car, Plus } from 'lucide-react';
-import { api } from '../api/client';
+import { cancelRide, fetchMyRides } from '../api/rides';
 import type { Ride } from '../types/api';
 import { formatDateTimeNoSeconds } from '../utils/date';
 import { getWsBaseUrl } from '../config/env';
@@ -9,6 +9,9 @@ import { useGroup } from '../context/GroupContext';
 import Chips, { type ChipItem } from '../components/Chips/Chips';
 import RideCard from '../components/RideCard/RideCard';
 import ConfirmModal from '../components/ConfirmModal/ConfirmModal';
+import ErrorBanner from '../components/ErrorBanner';
+import { getApiErrorMessage } from '../utils/apiError';
+import { getRideSourceLabel } from '../utils/rideDisplay';
 import styles from './MyRides.module.css';
 
 const getRideWsUrl = (rideId: string): string =>
@@ -25,11 +28,10 @@ function getStatusLabel(r: Ride): string {
 
 export default function MyRides() {
   const navigate = useNavigate();
-  const { myGroups } = useGroup();
+  const { myGroups, activeChipId, setActiveChipId } = useGroup();
   const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeChip, setActiveChip] = useState<string>('all');
   const [rideToCancel, setRideToCancel] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const wsRefs = useRef<Map<string, WebSocket>>(new Map());
@@ -41,30 +43,21 @@ export default function MyRides() {
   ];
 
   const displayedRides = rides.filter((r) => {
-    if (activeChip === 'all') return true;
-    if (activeChip === 'public') return !r.group_id;
-    return r.group_id === activeChip;
+    if (activeChipId === 'all') return true;
+    if (activeChipId === 'public') return !r.group_id;
+    return r.group_id === activeChipId;
   });
-
-  const getSource = (r: Ride): string => {
-    if (!r.group_id) return 'ציבורי';
-    const g = myGroups.find((x) => x.group_id === r.group_id);
-    return g?.name ?? 'ציבורי';
-  };
 
   const fetchRides = useCallback(async () => {
     try {
-      const { data } = await api.get<Ride[]>('/rides/me');
+      const { data } = await fetchMyRides();
       const active = (Array.isArray(data) ? data : []).filter(
         (r) => r.status !== 'cancelled'
       );
       setRides(active);
       setError('');
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || 'טעינת נסיעות נכשלה';
-      setError(typeof msg === 'string' ? msg : String(msg));
+      setError(getApiErrorMessage(err, 'טעינת נסיעות נכשלה'));
     } finally {
       setLoading(false);
     }
@@ -119,14 +112,11 @@ export default function MyRides() {
     setCancelling(true);
     setError('');
     try {
-      await api.delete(`/rides/${rideToCancel}/cancel`);
+      await cancelRide(rideToCancel);
       setRides((prev) => prev.filter((r) => r.ride_id !== rideToCancel));
       setRideToCancel(null);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || 'ביטול הנסיעה נכשל';
-      setError(typeof msg === 'string' ? msg : String(msg));
+      setError(getApiErrorMessage(err, 'ביטול הנסיעה נכשל'));
       setRideToCancel(null);
     } finally {
       setCancelling(false);
@@ -145,10 +135,10 @@ export default function MyRides() {
     <div className={styles.page}>
       <Chips
         items={chipItems}
-        activeId={activeChip}
-        onChange={setActiveChip}
+        activeId={activeChipId}
+        onChange={setActiveChipId}
       />
-      {error && <p className={styles.pageError}>{error}</p>}
+      {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
 
       {rides.length === 0 ? (
         <div className={styles.emptyState}>
@@ -185,7 +175,7 @@ export default function MyRides() {
                 scheduleCaption="זמן הנסיעה"
                 time={formatDateTimeNoSeconds(r.departure_time)}
                 status={getStatusLabel(r)}
-                source={getSource(r)}
+                source={getRideSourceLabel(r.group_id, myGroups)}
               />
             </div>
           ))}

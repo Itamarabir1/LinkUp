@@ -1,56 +1,23 @@
-import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
-import { useEffect, useRef, useState } from 'react';
+import { Outlet, NavLink, Link } from 'react-router-dom';
 import { MessageCircle, Bell, User, Search, Plus } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import { useChat } from '../../context/ChatContext';
 import ChatPopup from '../ChatPopup/ChatPopup';
 import { NotificationToast } from '../NotificationToast/NotificationToast';
-import { initFCM } from '../../services/fcm';
+import { useLayoutShell } from './useLayoutShell';
 import styles from './Layout.module.css';
 
 export default function Layout() {
-  const { logout } = useAuth();
-  const { unreadMessages, unreadNotifications, openConversationId } = useChat();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [profileOpen, setProfileOpen] = useState(false);
-  const profileRef = useRef<HTMLDivElement>(null);
-  const [notifPermission, setNotifPermission] = useState<NotificationPermission | null>(
-    'Notification' in window ? Notification.permission : null
-  );
-
-  const showChatPopup = openConversationId && location.pathname !== '/messages';
-
-  const messagesBadge = unreadMessages > 0 ? (unreadMessages >= 10 ? '9+' : String(unreadMessages)) : null;
-  const notificationsBadge = unreadNotifications > 0 ? (unreadNotifications >= 10 ? '9+' : String(unreadNotifications)) : null;
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
-        setProfileOpen(false);
-      }
-    };
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      void initFCM();
-    }
-  }, []);
-
-  const handleLogout = async () => {
-    setProfileOpen(false);
-    await logout();
-    navigate('/login', { replace: true });
-  };
-
-  const handleEnableNotifications = async () => {
-    await initFCM();
-    setNotifPermission(Notification.permission);
-    setProfileOpen(false);
-  };
+  const {
+    openConversationId,
+    showChatPopup,
+    messagesBadge,
+    notificationsBadge,
+    profileOpen,
+    setProfileOpen,
+    profileRef,
+    notifPermission,
+    handleLogout,
+    handleEnableNotifications,
+  } = useLayoutShell();
 
   return (
     <div className={styles.layout}>

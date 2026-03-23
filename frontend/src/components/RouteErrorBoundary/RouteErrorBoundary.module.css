@@ -1,0 +1,45 @@
+.wrap {
+  max-width: 480px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  text-align: center;
+  direction: rtl;
+}
+
+.title {
+  font-size: 1.25rem;
+  margin: 0 0 0.5rem;
+}
+
+.desc {
+  color: var(--text-secondary);
+  margin: 0 0 1rem;
+  line-height: 1.5;
+}
+
+.pre {
+  text-align: right;
+  font-size: 0.75rem;
+  background: var(--surface);
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  overflow: auto;
+  max-height: 120px;
+  margin-bottom: 1rem;
+}
+
+.btn {
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--primary);
+  color: var(--text-inverse);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--primary-hover);
+  outline-offset: 2px;
+}

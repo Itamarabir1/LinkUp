@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { api } from '../api/client';
+import { resendVerificationEmail, verifyEmailCode } from '../api/auth';
+import ErrorBanner from '../components/ErrorBanner';
+import LoadingButton from '../components/LoadingButton';
+import { getApiErrorMessage } from '../utils/apiError';
 import styles from './VerifyEmail.module.css';
 
 export default function VerifyEmail() {
@@ -38,27 +41,13 @@ export default function VerifyEmail() {
     setSuccess('');
     setLoading(true);
     try {
-      await api.post('/auth/verify-email', { code: code.trim(), email });
+      await verifyEmailCode(email, code.trim());
       setSuccess('החשבון אומת בהצלחה.');
       setTimeout(() => {
         navigate('/login', { replace: true, state: { email, verified: true } });
       }, 1200);
     } catch (err: unknown) {
-      const res = (err as { response?: { data?: Record<string, unknown> } })?.response;
-      const data = res?.data ?? {};
-      const raw = (data.message ?? data.detail) as string | unknown[] | undefined;
-      let msg = (err as Error)?.message ?? 'אימות נכשל';
-      if (raw !== undefined) {
-        if (typeof raw === 'string') msg = raw;
-        else if (Array.isArray(raw) && raw.length > 0) {
-          const first = raw[0];
-          msg =
-            typeof first === 'object' && first !== null && 'msg' in first
-              ? String((first as { msg: string }).msg)
-              : JSON.stringify(raw);
-        } else msg = JSON.stringify(raw);
-      }
-      setError(msg);
+      setError(getApiErrorMessage(err, 'אימות נכשל'));
     } finally {
       setLoading(false);
     }
@@ -69,13 +58,10 @@ export default function VerifyEmail() {
     setSuccess('');
     setResendLoading(true);
     try {
-      await api.post('/auth/resend-verification', { email });
+      await resendVerificationEmail(email);
       setSuccess('קוד חדש נשלח למייל.');
     } catch (err: unknown) {
-      const res = (err as { response?: { data?: Record<string, unknown> } })?.response;
-      const data = res?.data ?? {};
-      const raw = (data.message ?? data.detail) as string | undefined;
-      setError(typeof raw === 'string' ? raw : (err as Error)?.message ?? 'שליחת קוד מחדש נכשלה');
+      setError(getApiErrorMessage(err, 'שליחת קוד מחדש נכשלה'));
     } finally {
       setResendLoading(false);
     }
@@ -84,12 +70,12 @@ export default function VerifyEmail() {
   return (
     <div className={styles.page}>
       <h1 className={styles.title}>אימות חשבון מייל</h1>
-      <p style={{ marginBottom: '1rem', color: '#374151' }}>
+      <p className={styles.intro}>
         נשלח קוד אימות ל־<strong>{email}</strong>. הזן את הקוד למטה.
       </p>
       <form onSubmit={handleVerify} className={styles.form}>
-        {error && <p className={styles.error}>{error}</p>}
-        {success && <p style={{ color: '#059669', margin: 0 }}>{success}</p>}
+        {error ? <ErrorBanner message={error} className={styles.error} /> : null}
+        {success && <p className={styles.successText}>{success}</p>}
         <input
           type="text"
           inputMode="numeric"
@@ -100,26 +86,25 @@ export default function VerifyEmail() {
           className={styles.input}
           maxLength={6}
         />
-        <button type="submit" className={styles.button} disabled={loading}>
-          {loading ? 'מאמת...' : 'אמת חשבון'}
-        </button>
-      </form>
-      <p className={styles.link} style={{ marginTop: '1rem' }}>
-        <button
-          type="button"
-          onClick={handleResend}
-          disabled={resendLoading}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#2563eb',
-            cursor: resendLoading ? 'not-allowed' : 'pointer',
-            padding: 0,
-            fontSize: 'inherit',
-          }}
+        <LoadingButton
+          type="submit"
+          className={styles.button}
+          loading={loading}
+          loadingLabel="מאמת..."
         >
-          {resendLoading ? 'שולח...' : 'שלח קוד שוב'}
-        </button>
+          אמת חשבון
+        </LoadingButton>
+      </form>
+      <p className={`${styles.link} ${styles.linkSpaced}`}>
+        <LoadingButton
+          type="button"
+          className={styles.resendBtn}
+          loading={resendLoading}
+          loadingLabel="שולח..."
+          onClick={handleResend}
+        >
+          שלח קוד שוב
+        </LoadingButton>
       </p>
       <p className={styles.link}>
         <Link to="/login">חזרה להתחברות</Link>

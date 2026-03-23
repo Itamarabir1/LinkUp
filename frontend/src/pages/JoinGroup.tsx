@@ -1,8 +1,10 @@
-import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getGroupByInviteCode, joinGroup } from '../api/groups';
 import type { Group } from '../types/api';
+import ErrorBanner from '../components/ErrorBanner';
+import LoadingButton from '../components/LoadingButton';
+import { getApiErrorMessage, getApiStatus } from '../utils/apiError';
 import styles from './JoinGroup.module.css';
 
 export default function JoinGroup() {
@@ -49,18 +51,14 @@ export default function JoinGroup() {
       } else {
         navigate('/', { replace: true });
       }
-    } catch (error) {
-      if (axios.isAxiosError(error)) {
-        const status = error.response?.status;
-        if (status === 409) {
-          setError('אתה כבר חבר בקבוצה זו');
-        } else if (status === 404) {
-          setError('קוד ההצטרפות אינו תקף');
-        } else {
-          setError('הצטרפות לקבוצה נכשלה');
-        }
+    } catch (err: unknown) {
+      const status = getApiStatus(err);
+      if (status === 409) {
+        setError('אתה כבר חבר בקבוצה זו');
+      } else if (status === 404) {
+        setError('קוד ההצטרפות אינו תקף');
       } else {
-        setError('הצטרפות לקבוצה נכשלה');
+        setError(getApiErrorMessage(err, 'הצטרפות לקבוצה נכשלה'));
       }
     } finally {
       setJoining(false);
@@ -87,7 +85,7 @@ export default function JoinGroup() {
     return (
       <div className={styles.page}>
         <h1 className={styles.pageTitle}>הצטרפות לקבוצה</h1>
-        <p className={styles.pageError}>{error || 'הקבוצה לא נמצאה.'}</p>
+        <ErrorBanner message={error || 'הקבוצה לא נמצאה.'} className={styles.pageError} />
       </div>
     );
   }
@@ -100,14 +98,15 @@ export default function JoinGroup() {
         <div className={styles.memberCount}>
           {group.member_count != null ? `${group.member_count} חברים` : 'קבוצה פעילה'}
         </div>
-        <button
+        <LoadingButton
           type="button"
           className={`${styles.btn} ${styles.btnPrimary}`}
+          loading={joining}
+          loadingLabel="מצטרף..."
           onClick={handleJoin}
-          disabled={joining}
         >
-          {joining ? 'מצטרף...' : 'הצטרף לקבוצה'}
-        </button>
+          הצטרף לקבוצה
+        </LoadingButton>
       </div>
     </div>
   );

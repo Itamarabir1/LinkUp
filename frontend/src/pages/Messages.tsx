@@ -2,15 +2,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
-import { listConversations } from '../api/client';
-import type { ConversationListItem } from '../api/client';
+import { listConversations } from '../api/chat';
+import type { ConversationListItem } from '../types/api';
 import { formatConversationTime } from '../utils/date';
+import ErrorBanner from '../components/ErrorBanner';
+import { getApiErrorMessage } from '../utils/apiError';
 import MessageThread from './MessageThread';
 import styles from './Messages.module.css';
 
 export default function Messages() {
   const { user } = useAuth();
-  const { openChat, panelConversationId } = useChat();
+  const { openChat, panelConversationId, unreadMessages } = useChat();
   const [list, setList] = useState<ConversationListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,8 +29,8 @@ export default function Messages() {
         return bt - at;
       });
       setList(sorted);
-    } catch {
-      setError('לא ניתן לטעון את השיחות');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'לא ניתן לטעון את השיחות'));
     } finally {
       setLoading(false);
     }
@@ -38,22 +40,20 @@ export default function Messages() {
     fetchList();
   }, [fetchList]);
 
-  const unreadCount = 0; // TODO: from API when available
-
   return (
     <div className={styles.container}>
       <aside className={styles.sidebar}>
         <header className={styles.sidebarHeader}>
           <h1 className={styles.title}>הודעות</h1>
-          {unreadCount > 0 && (
-            <span className={styles.newCount}>({unreadCount} חדשות)</span>
+          {unreadMessages > 0 && (
+            <span className={styles.newCount}>({unreadMessages} חדשות)</span>
           )}
         </header>
 
         {loading ? (
           <div className={styles.loading}>טוען...</div>
         ) : error ? (
-          <div className={styles.error}>{error}</div>
+          <ErrorBanner message={error} variant="compact" className={styles.error} />
         ) : list.length === 0 ? (
           <div className={styles.emptyList}>
             <MessageCircle size={48} strokeWidth={1.5} className={styles.emptyIcon} />

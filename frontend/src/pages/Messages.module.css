@@ -61,7 +61,7 @@
 }
 
 .emptyIcon {
-  color: #d1d5db;
+  color: var(--text-tertiary);
 }
 
 .emptyTitle {
@@ -110,7 +110,7 @@
 }
 
 .convUnread {
-  background: #f9fafb;
+  background: var(--bg-secondary);
 }
 
 .convName {
@@ -129,7 +129,7 @@
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: #374151;
+  background: var(--text-secondary);
   border: 2px solid var(--bg-card);
 }
 
@@ -222,7 +222,7 @@
 }
 
 .placeholderIcon {
-  color: #d1d5db;
+  color: var(--text-tertiary);
 }
 
 .placeholderText {

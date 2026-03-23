@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
-import { api } from '../api/client';
-import type { PassengerRequest } from '../types/api';
-import { formatDateTimeNoSeconds } from '../utils/date';
 import { useGroup } from '../context/GroupContext';
-import Chips, { type ChipItem } from '../components/Chips/Chips';
+import { useMyRequests } from './useMyRequests';
+import type { ChipItem } from '../components/Chips/Chips';
+import Chips from '../components/Chips/Chips';
 import RideCard from '../components/RideCard/RideCard';
 import ConfirmModal from '../components/ConfirmModal/ConfirmModal';
+import ErrorBanner from '../components/ErrorBanner';
+import { formatDateTimeNoSeconds } from '../utils/date';
+import { getRideSourceLabel } from '../utils/rideDisplay';
 import styles from './MyRequests.module.css';
 
 const statusLabels: Record<string, string> = {
@@ -23,13 +24,17 @@ const statusLabels: Record<string, string> = {
 
 export default function MyRequests() {
   const navigate = useNavigate();
-  const { myGroups } = useGroup();
-  const [requests, setRequests] = useState<PassengerRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [activeChip, setActiveChip] = useState<string>('all');
-  const [requestToCancel, setRequestToCancel] = useState<PassengerRequest | null>(null);
-  const [cancelling, setCancelling] = useState(false);
+  const { myGroups, activeChipId, setActiveChipId } = useGroup();
+
+  const {
+    requests,
+    loading,
+    error,
+    requestToCancel,
+    setRequestToCancel,
+    cancelling,
+    confirmCancelRequest,
+  } = useMyRequests();
 
   const chipItems: ChipItem[] = [
     { id: 'all', label: 'הכל' },
@@ -38,38 +43,10 @@ export default function MyRequests() {
   ];
 
   const displayedRequests = requests.filter((r) => {
-    if (activeChip === 'all') return true;
-    if (activeChip === 'public') return !r.group_id;
-    return r.group_id === activeChip;
+    if (activeChipId === 'all') return true;
+    if (activeChipId === 'public') return !r.group_id;
+    return r.group_id === activeChipId;
   });
-
-  const getSource = (r: PassengerRequest): string => {
-    if (!r.group_id) return 'ציבורי';
-    const g = myGroups.find((x) => x.group_id === r.group_id);
-    return g?.name ?? 'ציבורי';
-  };
-
-  const fetchRequests = useCallback(async () => {
-    try {
-      const { data } = await api.get<PassengerRequest[]>(
-        '/passenger/passengers/me'
-      );
-      const all = Array.isArray(data) ? data : [];
-      setRequests(all.filter((r) => r.status !== 'cancelled'));
-      setError('');
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || 'טעינת בקשות נכשלה';
-      setError(typeof msg === 'string' ? msg : String(msg));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchRequests();
-  }, [fetchRequests]);
 
   if (loading) {
     return (
@@ -81,13 +58,8 @@ export default function MyRequests() {
 
   return (
     <div className={styles.page}>
-      <Chips
-        items={chipItems}
-        activeId={activeChip}
-        onChange={setActiveChip}
-      />
-      {error && <p className={styles.pageError}>{error}</p>}
-
+      <Chips items={chipItems} activeId={activeChipId} onChange={setActiveChipId} />
+      {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
       {requests.length === 0 ? (
         <div className={styles.emptyState}>
           <Search size={48} strokeWidth={1.5} className={styles.emptyIcon} />
@@ -120,13 +92,12 @@ export default function MyRequests() {
                 scheduleCaption="זמן מבוקש לנסיעה"
                 time={formatDateTimeNoSeconds(r.requested_departure_time)}
                 status={statusLabels[r.status] || r.status}
-                source={getSource(r)}
+                source={getRideSourceLabel(r.group_id, myGroups)}
               />
             </div>
           ))}
         </div>
       )}
-
       <ConfirmModal
         open={requestToCancel != null}
         onClose={() => setRequestToCancel(null)}
@@ -135,27 +106,7 @@ export default function MyRequests() {
         confirmLabel="אישור"
         variant="danger"
         loading={cancelling}
-        onConfirm={async () => {
-          if (!requestToCancel) return;
-          setCancelling(true);
-          setError('');
-          try {
-            await api.delete(
-              `/passenger/passengers/${requestToCancel.request_id}/cancel`
-            );
-            setRequests((prev) =>
-              prev.filter((p) => p.request_id !== requestToCancel.request_id)
-            );
-            setRequestToCancel(null);
-          } catch (err: unknown) {
-            const msg =
-              (err as { response?: { data?: { detail?: string } } })
-                ?.response?.data?.detail || 'ביטול הבקשה נכשל';
-            setError(typeof msg === 'string' ? msg : String(msg));
-          } finally {
-            setCancelling(false);
-          }
-        }}
+        onConfirm={confirmCancelRequest}
         titleId="confirm-cancel-request-title"
       />
     </div>

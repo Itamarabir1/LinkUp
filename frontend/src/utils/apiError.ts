@@ -1,0 +1,39 @@
+/**
+ * Normalizes Axios-like error shapes (FastAPI detail / custom message).
+ */
+export function getApiErrorMessage(err: unknown, fallback: string): string {
+  const data = (err as { response?: { data?: unknown } })?.response?.data as
+    | { detail?: unknown; message?: unknown }
+    | undefined;
+  if (!data) {
+    return err instanceof Error && err.message ? err.message : fallback;
+  }
+  const raw = data.message ?? data.detail;
+  if (typeof raw === 'string') return raw;
+  if (Array.isArray(raw) && raw.length > 0) {
+    const first = raw[0];
+    if (typeof first === 'object' && first !== null && 'msg' in first) {
+      return String((first as { msg: string }).msg);
+    }
+    return JSON.stringify(raw);
+  }
+  if (raw != null && typeof raw === 'object') return JSON.stringify(raw);
+  return fallback;
+}
+
+export function getApiStatus(err: unknown): number | undefined {
+  return (err as { response?: { status?: number } })?.response?.status;
+}
+
+export function getApiErrorCode(err: unknown): string | undefined {
+  const data = (err as { response?: { data?: { error_code?: string } } })?.response?.data;
+  return typeof data?.error_code === 'string' ? data.error_code : undefined;
+}
+
+/** Axios timeout / abort — לטיפול נפרד מ־getApiErrorMessage (למשל הודעת timeout ייעודית). */
+export function isTimeoutOrAbortError(err: unknown): boolean {
+  const ax = err as { code?: string; message?: string };
+  if (ax.code === 'ECONNABORTED') return true;
+  if (typeof ax.message === 'string' && /timeout/i.test(ax.message)) return true;
+  return false;
+}

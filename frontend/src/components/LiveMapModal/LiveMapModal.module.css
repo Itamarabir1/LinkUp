@@ -8,7 +8,7 @@
 .modal {
   position: fixed;
   inset: 0;
-  background: #fff;
+  background: var(--bg-card);
   z-index: 1000;
   display: flex;
   flex-direction: column;
@@ -24,7 +24,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -32,18 +32,18 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #111;
+  color: var(--text-primary);
 }
 
 .close {
   width: 36px;
   height: 36px;
   border: none;
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--surface);
+  color: var(--text-primary);
   font-size: 1.5rem;
   line-height: 1;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -53,7 +53,7 @@
 }
 
 .close:hover {
-  background: #e5e7eb;
+  background: var(--border);
 }
 
 .mapContainer {
@@ -66,10 +66,10 @@
 .statusBar {
   padding: 0.5rem 1rem;
   font-size: 0.85rem;
-  color: #6b7280;
-  border-top: 1px solid #e5e7eb;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
 }
 
 .statusBarError {
-  color: #dc2626;
+  color: var(--danger-text);
 }

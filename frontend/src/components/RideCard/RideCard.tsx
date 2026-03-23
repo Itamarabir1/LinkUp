@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import styles from './RideCard.module.css';
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
@@ -68,7 +69,12 @@ export default function RideCard({
       <div className={styles.footer}>
         <span
           className={styles.badge}
-          style={{ backgroundColor: style.bg, color: style.text }}
+          style={
+            {
+              '--badge-bg': style.bg,
+              '--badge-color': style.text,
+            } as CSSProperties
+          }
         >
           {status}
         </span>

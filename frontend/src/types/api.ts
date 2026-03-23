@@ -59,6 +59,27 @@ export interface PaginatedMessagesResponse {
   has_more: boolean;
 }
 
+export interface ConversationDetail {
+  conversation_id: string;
+  partner: {
+    user_id: string;
+    full_name: string;
+    avatar_url?: string;
+  };
+  created_at: string;
+  booking_id?: string;
+  /** אם הבקאנד מחזיר – מוצג בכותרת הצ'אט (למשל מוצא ← יעד) */
+  route_label?: string | null;
+}
+
+export interface ConversationListItem {
+  conversation_id: string;
+  partner: { user_id: string; full_name: string; avatar_url?: string };
+  last_message_at: string | null;
+  last_message_preview: string | null;
+  has_unread?: boolean;
+}
+
 export interface PaginatedBookingsResponse {
   items: Booking[];
   total: number;

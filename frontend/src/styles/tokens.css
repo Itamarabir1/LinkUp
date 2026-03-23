@@ -1,0 +1,128 @@
+/**
+ * טוקנים גלובליים — צבעים, ריווחים, רדיוסים, צללים.
+ * ערכת נושא: html[data-theme="light"] (ברירת מחדל) | html[data-theme="dark"]
+ */
+
+:root,
+html[data-theme="light"] {
+  color-scheme: light;
+
+  /* Brand */
+  --primary: #1d6fe8;
+  --primary-hover: #1558c0;
+  --primary-light: #ebf2fd;
+  --primary-text: #1d6fe8;
+
+  /* Surfaces */
+  --bg-page: #f5f7fa;
+  --bg-card: #ffffff;
+  --bg-secondary: #f0f2f5;
+  --surface: #f3f4f6;
+  --input-bg: #ffffff;
+  --input-border: #d1d5db;
+
+  /* Text */
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+
+  --border: #e5e7eb;
+  --border-focus: #1d6fe8;
+
+  /* Semantic chips / badges */
+  --success-bg: #ecfdf5;
+  --success-text: #059669;
+  --success-border: #bbf7d0;
+  --warning-bg: #fffbeb;
+  --warning-text: #d97706;
+  --warning-border: #fcd34d;
+  --warning-strong-text: #92400e;
+  --danger-bg: #fef2f2;
+  --danger-text: #dc2626;
+  --info-bg: #ebf2fd;
+  --info-text: #1d6fe8;
+  --neutral-bg: #f3f4f6;
+  --neutral-text: #6b7280;
+  --unread-dot: #ef4444;
+
+  /* על רקע מותג / כפתור ראשי */
+  --text-inverse: #ffffff;
+  --success-hover: #047857;
+  --danger-hover: #b91c1c;
+  --danger-border: #fecaca;
+  /** גבול רך סביב כפתורי משנה (מפה, מסלול) */
+  --primary-soft-border: #93c5fd;
+  --focus-ring-primary: rgba(29, 111, 232, 0.2);
+  --info-tint-bg: #f0f9ff;
+  --info-tint-border: #bfdbfe;
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Elevation */
+  --shadow-dropdown: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.15);
+  --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --primary: #5b9fff;
+  --primary-hover: #7eb0ff;
+  --primary-light: rgba(91, 159, 255, 0.12);
+  --primary-text: #7eb0ff;
+
+  --bg-page: #0f1419;
+  --bg-card: #1a222c;
+  --bg-secondary: #252f3d;
+  --surface: #2d3a4d;
+  --input-bg: #1a222c;
+  --input-border: #3d4f66;
+
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+
+  --border: #334155;
+  --border-focus: #5b9fff;
+
+  --success-bg: rgba(16, 185, 129, 0.12);
+  --success-text: #34d399;
+  --success-border: rgba(52, 211, 153, 0.35);
+  --warning-bg: rgba(245, 158, 11, 0.12);
+  --warning-text: #fbbf24;
+  --warning-border: rgba(251, 191, 36, 0.35);
+  --warning-strong-text: #fcd34d;
+  --danger-bg: rgba(239, 68, 68, 0.12);
+  --danger-text: #f87171;
+  --info-bg: rgba(91, 159, 255, 0.12);
+  --info-text: #7eb0ff;
+  --neutral-bg: #252f3d;
+  --neutral-text: #94a3b8;
+  --unread-dot: #f87171;
+
+  --text-inverse: #ffffff;
+  --success-hover: #6ee7b7;
+  --danger-hover: #fca5a5;
+  --danger-border: rgba(248, 113, 113, 0.35);
+  --primary-soft-border: #4a6fa5;
+  --focus-ring-primary: rgba(91, 159, 255, 0.25);
+  --info-tint-bg: rgba(91, 159, 255, 0.1);
+  --info-tint-border: #3d5a80;
+
+  --shadow-dropdown: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --shadow-card-hover: 0 4px 20px rgba(0, 0, 0, 0.35);
+}

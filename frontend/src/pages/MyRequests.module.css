@@ -130,7 +130,7 @@
 
 .btnDanger {
   background: var(--danger-text);
-  color: #fff;
+  color: var(--text-inverse);
   border: none;
   padding: 0.6rem 1.2rem;
   border-radius: 8px;

@@ -1,0 +1,19 @@
+.banner {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-md);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border: 1px solid var(--danger-border);
+  font-size: 0.95rem;
+  text-align: right;
+}
+
+/** שורת שגיאה צרה (הזמנה, סרגל מפה, כרטיס חיפוש) */
+.compact {
+  margin: 0;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  border-radius: var(--radius-sm);
+}

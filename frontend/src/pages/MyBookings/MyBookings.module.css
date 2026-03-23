@@ -1,0 +1,277 @@
+.page {
+  padding: 20px 24px;
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: right;
+}
+
+.pageTabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab,
+.tabActive {
+  height: 44px;
+  padding: 0 1rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: "Heebo", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+
+.tab:hover {
+  color: var(--text-primary);
+}
+
+.tabActive {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+}
+
+.pageError {
+  color: var(--danger-text);
+  margin-bottom: 1rem;
+}
+
+.pageLoading,
+.emptyText {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 2rem;
+}
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.bookingCard {
+  background: var(--bg-card);
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.cardRoute {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.cardMeta {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.bookingCardActions {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.passengerPendingActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.btnOutline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: "Heebo", sans-serif;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms, color 150ms;
+}
+
+.btnOutline:hover:not(:disabled) {
+  background: var(--bg-secondary);
+}
+
+.btnOutline:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.btnAccentBlue {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.btnAccentBlue:hover:not(:disabled) {
+  background: var(--info-tint-bg);
+}
+
+/* שיתוף מיקום פעיל — נהג */
+.btnAccentBlueActive {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--info-tint-bg);
+}
+
+.btnAccentBlueActive:hover:not(:disabled) {
+  background: var(--primary-light);
+}
+
+.btnAccentGreen {
+  border-color: var(--success-text);
+  color: var(--success-text);
+  background: var(--success-bg);
+}
+
+.btnAccentGreen:hover:not(:disabled) {
+  background: var(--success-border);
+}
+
+.btnDangerOutline {
+  border-color: var(--unread-dot);
+  color: var(--unread-dot);
+}
+
+.btnDangerOutline:hover:not(:disabled) {
+  background: var(--danger-bg);
+}
+
+/* Driver block */
+.driverBlock {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.driverBlockHeader {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.driverBlockCounts {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.groupTag {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--surface);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.groupTagPublic {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: transparent;
+  padding: 2px 8px;
+}
+
+.cardTagWrap,
+.driverBlockTagWrap {
+  margin-top: 0.5rem;
+}
+
+.driverBlockActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.countSep {
+  margin-right: 0.75rem;
+}
+
+.passengerList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.passengerRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.passengerRow:last-child {
+  border-bottom: none;
+}
+
+.passengerAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-inverse);
+  font-weight: 600;
+  font-size: 1rem;
+  flex-shrink: 0;
+  background-color: var(--avatar-bg, #64748b);
+}
+
+.passengerInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.passengerName {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.passengerMeta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+}
+
+.passengerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.statusConfirmed {
+  font-size: 13px;
+  color: var(--success-text);
+  font-weight: 500;
+}
+
+.statusRejected {
+  font-size: 13px;
+  color: var(--text-secondary);
+}

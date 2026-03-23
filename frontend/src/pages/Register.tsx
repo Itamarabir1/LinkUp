@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import type { RegisterData } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/env';
+import ErrorBanner from '../components/ErrorBanner';
+import LoadingButton from '../components/LoadingButton';
+import { getApiErrorMessage } from '../utils/apiError';
 import styles from './Register.module.css';
 
 export default function Register() {
@@ -57,21 +60,7 @@ export default function Register() {
       await register({ ...form, full_name: form.full_name.trim(), email: form.email.trim(), phone_number: form.phone_number.trim() });
       navigate('/verify-email', { replace: true, state: { email: form.email.trim() } });
     } catch (err: unknown) {
-      const res = (err as { response?: { data?: Record<string, unknown>; status?: number } })?.response;
-      const data = res?.data ?? {};
-      // Backend LinkupError uses "message"; FastAPI validation uses "detail"
-      const raw = (data.message ?? data.detail) as string | unknown[] | undefined;
-      let msg = (err as Error)?.message || 'הרשמה נכשלה';
-      if (raw !== undefined) {
-        if (typeof raw === 'string') msg = raw;
-        else if (Array.isArray(raw) && raw.length > 0) {
-          const first = raw[0];
-          msg = typeof first === 'object' && first !== null && 'msg' in first
-            ? String((first as { msg: string }).msg)
-            : JSON.stringify(raw);
-        } else msg = JSON.stringify(raw);
-      }
-      setError(msg);
+      setError(getApiErrorMessage(err, 'הרשמה נכשלה'));
     } finally {
       setLoading(false);
     }
@@ -81,7 +70,7 @@ export default function Register() {
     <div className={styles.page}>
       <h1 className={styles.title}>הרשמה</h1>
       <form onSubmit={handleSubmit} className={styles.form}>
-        {error && <p className={styles.error}>{error}</p>}
+        {error ? <ErrorBanner message={error} className={styles.error} /> : null}
         <input
           type="text"
           placeholder="שם מלא"
@@ -124,22 +113,29 @@ export default function Register() {
           className={styles.input}
           autoComplete="new-password"
         />
-        <button type="submit" className={styles.button} disabled={loading}>
-          {loading ? 'נרשם...' : 'הירשם'}
-        </button>
+        <LoadingButton
+          type="submit"
+          className={styles.button}
+          loading={loading}
+          loadingLabel="נרשם..."
+        >
+          הירשם
+        </LoadingButton>
       </form>
       <p className={styles.link}>
         <Link to="/login">כבר יש חשבון? התחבר</Link>
       </p>
-      <p style={{ fontSize: 11, color: '#888', marginTop: 24, direction: 'ltr', textAlign: 'center' }}>
+      <p className={styles.devMeta}>
         API: {API_BASE_URL}
       </p>
-      <p style={{ marginTop: 8, textAlign: 'center' }}>
-        <button type="button" onClick={testConnection} style={{ fontSize: 12, padding: '6px 12px' }}>
+      <p className={styles.connectionRow}>
+        <button type="button" onClick={testConnection} className={styles.connectionBtn}>
           בדיקת חיבור לבקאנד
         </button>
         {connectionTest && (
-          <span style={{ display: 'block', marginTop: 8, fontSize: 12, color: connectionTest.startsWith('✓') ? '#059669' : '#dc2626' }}>
+          <span
+            className={connectionTest.startsWith('✓') ? styles.connectionOk : styles.connectionErr}
+          >
             {connectionTest}
           </span>
         )}

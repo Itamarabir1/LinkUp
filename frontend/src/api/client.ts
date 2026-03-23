@@ -1,6 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { API_BASE_URL, API_TIMEOUT_MS } from '../config/env';
-import type { PaginatedMessagesResponse } from '../types/api';
 
 // לוודא לאן הבקשות הולכות (יופיע בקונסול של הדפדפן F12)
 console.log('[Linkup Frontend] API Base URL:', API_BASE_URL);
@@ -126,61 +125,3 @@ chatWsApi.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
-
-// Chat API helpers
-export interface ConversationDetail {
-  conversation_id: string;
-  partner: {
-    user_id: string;
-    full_name: string;
-    avatar_url?: string;
-  };
-  created_at: string;
-  booking_id?: string;
-}
-
-export interface ConversationListItem {
-  conversation_id: string;
-  partner: { user_id: string; full_name: string; avatar_url?: string };
-  last_message_at: string | null;
-  last_message_preview: string | null;
-  has_unread?: boolean;
-}
-
-export interface MessageResponse {
-  message_id: number;
-  conversation_id: string;
-  sender_id: string;
-  body: string;
-  created_at: string;
-}
-
-/**
- * פותח שיחה עם נהג/נוסע דרך booking_id.
- * רק נהג או נוסע של ה-booking יכולים לפתוח שיחה.
- */
-export async function openChatByBooking(bookingId: string): Promise<ConversationDetail> {
-  const { data } = await api.post<ConversationDetail>(
-    `/chat/conversations/by-booking/${bookingId}`
-  );
-  return data;
-}
-
-export function listConversations(): Promise<{ data: ConversationListItem[] }> {
-  return api.get<ConversationListItem[]>('/chat/conversations');
-}
-
-export function getConversation(conversationId: string): Promise<{ data: ConversationDetail }> {
-  return api.get<ConversationDetail>(`/chat/conversations/${conversationId}`);
-}
-
-export function getMessages(
-  conversationId: string,
-  params?: { limit?: number; before?: number }
-): Promise<{ data: PaginatedMessagesResponse }> {
-  return api.get<PaginatedMessagesResponse>(`/chat/conversations/${conversationId}/messages`, { params });
-}
-
-export function sendMessage(conversationId: string, body: string): Promise<{ data: MessageResponse }> {
-  return api.post<MessageResponse>(`/chat/conversations/${conversationId}/messages`, { body });
-}

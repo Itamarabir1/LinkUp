@@ -25,7 +25,7 @@
 }
 
 .emptyIcon {
-  color: #d1d5db;
+  color: var(--text-tertiary);
   margin-bottom: 1rem;
 }
 
@@ -93,7 +93,7 @@
   gap: 8px;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid var(--border, #e5e7eb);
+  border-top: 1px solid var(--border);
 }
 
 .cardActions .btnPrimary,
@@ -153,11 +153,11 @@
   font-weight: 500;
   border: none;
   background: var(--danger-text);
-  color: white;
+  color: var(--text-inverse);
   cursor: pointer;
 }
 
 .btnDanger:hover {
-  background: #b91c1c;
+  background: var(--danger-hover);
 }
 

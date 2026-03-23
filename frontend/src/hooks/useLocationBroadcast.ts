@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../api/client';
+import { fetchRideManifest, postDriverBookingLocation, type RideManifestPassenger } from '../api/bookings';
+import { getApiErrorMessage, getApiStatus } from '../utils/apiError';
 import { useLocationWatcher } from './useLocationWatcher';
 
 export interface DriverPosition {
@@ -47,11 +48,8 @@ export function useLocationBroadcast(options: UseLocationBroadcastOptions) {
 
   const fetchOneBookingId = useCallback(async (rId: string, dId: string): Promise<string | null> => {
     try {
-      const { data } = await api.get<{ passengers: Array<{ booking_id: string; status: string }> }>(
-        `/bookings/ride/${rId}/manifest`,
-        { params: { driver_id: dId } }
-      );
-      const confirmed = (data?.passengers ?? []).find((p) => p.status === 'confirmed');
+      const { data } = await fetchRideManifest(rId, dId);
+      const confirmed = (data?.passengers ?? []).find((p: RideManifestPassenger) => p.status === 'confirmed');
       return confirmed?.booking_id ?? data?.passengers?.[0]?.booking_id ?? null;
     } catch {
       return null;
@@ -121,7 +119,7 @@ export function useLocationBroadcast(options: UseLocationBroadcastOptions) {
         await startFn(rideId);
         hasStartedRef.current = true;
       } catch (error: unknown) {
-        const status = (error as { response?: { status?: number } })?.response?.status;
+        const status = getApiStatus(error);
         // 400 = נסיעה כבר active (או סטטוס לא מאפשר start) — לא חוסם שידור מיקום
         if (status === 400) {
           hasStartedRef.current = true;
@@ -135,16 +133,14 @@ export function useLocationBroadcast(options: UseLocationBroadcastOptions) {
     onPosition: ({ lat, lng, heading, speed }) => {
       if (!bookingId) return;
       const payload = { lat, lng, heading, speed };
-      api
-        .post(`/bookings/${bookingId}/location`, payload, { timeout: 5000 })
+      postDriverBookingLocation(bookingId, payload)
         .then(() => {
           setError(null);
           const ts = new Date().toISOString();
           onPositionRef.current?.({ lat, lng, heading, speed, timestamp: ts });
         })
-        .catch((err) => {
-          const msg = err?.response?.data?.detail ?? 'שליחת מיקום נכשלה';
-          setError(typeof msg === 'string' ? msg : String(msg));
+        .catch((err: unknown) => {
+          setError(getApiErrorMessage(err, 'שליחת מיקום נכשלה'));
         });
     },
     onError: (msg) => setError(msg),

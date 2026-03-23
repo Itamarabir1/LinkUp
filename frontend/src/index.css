@@ -1,33 +1,5 @@
-/* Design system — CSS variables + Heebo/Rubik */
-:root {
-  --primary: #1d6fe8;
-  --primary-hover: #1558c0;
-  --primary-light: #ebf2fd;
-  --primary-text: #1d6fe8;
-
-  --bg-page: #f5f7fa;
-  --bg-card: #ffffff;
-  --bg-secondary: #f0f2f5;
-
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --text-tertiary: #9ca3af;
-
-  --border: #e5e7eb;
-  --border-focus: #1d6fe8;
-
-  --success-bg: #ecfdf5;
-  --success-text: #059669;
-  --warning-bg: #fffbeb;
-  --warning-text: #d97706;
-  --danger-bg: #fef2f2;
-  --danger-text: #dc2626;
-  --info-bg: #ebf2fd;
-  --info-text: #1d6fe8;
-  --neutral-bg: #f3f4f6;
-  --neutral-text: #6b7280;
-  --unread-dot: #ef4444;
-}
+@import './styles/tokens.css';
+@import './styles/react-datepicker-overrides.css';
 
 * {
   box-sizing: border-box;
@@ -57,6 +29,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
 }
 
 #root {
@@ -84,6 +58,6 @@ button {
 
 /* Focus visible for accessibility */
 :focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--border-focus);
   outline-offset: 2px;
 }

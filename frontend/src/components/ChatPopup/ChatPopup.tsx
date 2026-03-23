@@ -1,16 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { MapPin, Maximize2, X, Send } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import { useChat } from '../../context/ChatContext';
-import {
-  getConversation,
-  getMessages,
-  sendMessage,
-  type ConversationDetail,
-  type MessageResponse,
-} from '../../api/client';
 import { formatDateTimeNoSeconds } from '../../utils/date';
+import { useChatPopup } from './useChatPopup';
 import styles from './ChatPopup.module.css';
 
 interface ChatPopupProps {
@@ -18,79 +8,25 @@ interface ChatPopupProps {
 }
 
 export default function ChatPopup({ conversationId }: ChatPopupProps) {
-  const { user } = useAuth();
-  const { closeChat } = useChat();
-  const navigate = useNavigate();
-  const [conversation, setConversation] = useState<ConversationDetail | null>(null);
-  const [messages, setMessages] = useState<MessageResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [input, setInput] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
+  const {
+    user,
+    closeChat,
+    conversation,
+    messages,
+    loading,
+    sending,
+    fetchError,
+    sendError,
+    input,
+    setInput,
+    messagesEndRef,
+    listRef,
+    handleSend,
+    onKeyDown,
+    handleMaximize,
+  } = useChatPopup(conversationId);
 
-  const fetchData = useCallback(async () => {
-    if (!conversationId || !user?.user_id) return;
-    setLoading(true);
-    try {
-      const [convRes, msgRes] = await Promise.all([
-        getConversation(conversationId),
-        getMessages(conversationId, { limit: 30 }),
-      ]);
-      setConversation(convRes.data);
-      setMessages(msgRes.data?.items ?? []);
-    } catch {
-      setConversation(null);
-      setMessages([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [conversationId, user?.user_id]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const handleSend = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      const body = input.trim();
-      if (!body || !conversationId || sending) return;
-      setSending(true);
-      setInput('');
-      try {
-        const { data } = await sendMessage(conversationId, body);
-        setMessages((prev) => [...prev, data]);
-      } catch {
-        setInput(body);
-      } finally {
-        setSending(false);
-      }
-    },
-    [conversationId, input, sending]
-  );
-
-  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend(e as unknown as React.FormEvent);
-    }
-  };
-
-  const handleMaximize = () => {
-    navigate(`/messages/${conversationId}`);
-    closeChat();
-  };
-
-  const partnerName = conversation?.partner?.full_name || 'שיחה';
-  const partnerAvatar = conversation?.partner?.avatar_url;
-  const routeLabel = null; // TODO: when conversation has route info
-
-  if (loading || !conversation) {
+  if (loading) {
     return (
       <div className={styles.popup}>
         <div className={styles.header}>
@@ -101,6 +37,24 @@ export default function ChatPopup({ conversationId }: ChatPopupProps) {
       </div>
     );
   }
+
+  if (!conversation) {
+    return (
+      <div className={styles.popup}>
+        <div className={styles.header}>
+          <div className={styles.headerPlaceholder} role="alert">
+            {fetchError || 'לא ניתן לטעון את השיחה'}
+          </div>
+        </div>
+        <div className={styles.messagesArea} />
+        <div className={styles.sendArea} />
+      </div>
+    );
+  }
+
+  const partnerName = conversation.partner?.full_name || 'שיחה';
+  const partnerAvatar = conversation.partner?.avatar_url;
+  const routeLabel = conversation.route_label?.trim() || null;
 
   return (
     <div className={styles.popup}>
@@ -164,23 +118,30 @@ export default function ChatPopup({ conversationId }: ChatPopupProps) {
       </div>
 
       <form className={styles.sendArea} onSubmit={handleSend}>
-        <textarea
-          className={styles.textarea}
-          placeholder="כתוב הודעה..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          rows={1}
-          maxLength={10000}
-        />
-        <button
-          type="submit"
-          className={styles.sendBtn}
-          disabled={sending || !input.trim()}
-          aria-label="שלח"
-        >
-          <Send size={16} />
-        </button>
+        {sendError ? (
+          <p className={styles.sendError} role="alert">
+            {sendError}
+          </p>
+        ) : null}
+        <div className={styles.sendRow}>
+          <textarea
+            className={styles.textarea}
+            placeholder="כתוב הודעה..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            rows={1}
+            maxLength={10000}
+          />
+          <button
+            type="submit"
+            className={styles.sendBtn}
+            disabled={sending || !input.trim()}
+            aria-label="שלח"
+          >
+            <Send size={16} />
+          </button>
+        </div>
       </form>
     </div>
   );

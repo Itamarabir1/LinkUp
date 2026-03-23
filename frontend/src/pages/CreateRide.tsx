@@ -1,148 +1,45 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { he } from 'date-fns/locale';
-import { api } from '../api/client';
-import { useAuth } from '../context/AuthContext';
-import type { RidePreviewResponse } from '../types/api';
 import { formatDurationMinutes } from '../utils/duration';
 import { ArrowUpDown } from 'lucide-react';
-import RouteMapModal, { type RouteMapData } from '../components/RouteMapModal';
+import ErrorBanner from '../components/ErrorBanner';
+import LoadingButton from '../components/LoadingButton';
+import RouteMapModal from '../components/RouteMapModal';
+import { useCreateRide } from './useCreateRide';
 import styles from './CreateRide.module.css';
 
 export default function CreateRide() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [originName, setOriginName] = useState('');
-  const [destinationName, setDestinationName] = useState('');
-  const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    d.setHours(9, 0, 0, 0);
-    return d;
-  });
-  const [seats, setSeats] = useState(4); // ברירת מחדל 4
-  const [loading, setLoading] = useState(false);
-  const [preview, setPreview] = useState<RidePreviewResponse | null>(null);
-  /** -1 = לא נבחר (כשיש יותר ממסלול אחד); 0,1,2 = אינדקס המסלול */
-  const [selectedRouteIndex, setSelectedRouteIndex] = useState(-1);
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState('');
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [mapPreviewData, setMapPreviewData] = useState<RouteMapData | null>(null);
-
-  const fillOriginFromMyLocation = () => {
-    if (!navigator.geolocation) {
-      setError('הדפדפן לא תומך במיקום');
-      return;
-    }
-    setLocationLoading(true);
-    setError('');
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        try {
-          const { data } = await api.get<{ address: string }>('/geo/address', {
-            params: { lat, lon },
-          });
-          setOriginName(data.address ?? '');
-        } catch {
-          setError('לא נמצאה כתובת למיקום זה');
-        } finally {
-          setLocationLoading(false);
-        }
-      },
-      () => {
-        setError('לא ניתן לקבל מיקום – בדוק הרשאות');
-        setLocationLoading(false);
-      },
-      { timeout: 10000 }
-    );
-  };
-
-  const handleSwap = () => {
-    const o = originName;
-    const d = destinationName;
-    setOriginName(d);
-    setDestinationName(o);
-  };
-
-  const requestPreview = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!originName.trim() || !destinationName.trim()) {
-      setError('נא למלא מוצא ויעד');
-      return;
-    }
-    if (isNaN(selectedDate.getTime()) || selectedDate <= new Date()) {
-      setError('נא לבחור זמן יציאה בעתיד');
-      return;
-    }
-    setError('');
-    setLoading(true);
-    setPreview(null);
-    try {
-      const { data } = await api.post<RidePreviewResponse>(
-        '/rides/preview-routes',
-        {
-          driver_id: user?.user_id ?? 0,
-          origin_name: originName.trim(),
-          destination_name: destinationName.trim(),
-          departure_time: selectedDate.toISOString(),
-          available_seats: seats,
-        }
-      );
-      // תמיד להציג את כל המסלולים שהבקאנד מחזיר (גוגל יכולה להחזיר 1–3)
-      const routesList = Array.isArray(data.routes) ? data.routes : (data.routes ? [data.routes] : []);
-      setPreview({ ...data, routes: routesList });
-      // רק אם יש מסלול בודד – נבחר אוטומטית; אחרת המשתמש חייב ללחוץ
-      setSelectedRouteIndex(routesList.length === 1 ? 0 : -1);
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || 'תצוגה מקדימה נכשלה';
-      setError(typeof msg === 'string' ? msg : String(msg));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createRide = async () => {
-    if (!preview?.session_id) return;
-    const routesCount = preview.routes?.length ?? 0;
-    if (routesCount > 1 && (selectedRouteIndex < 0 || selectedRouteIndex >= routesCount)) {
-      setError('נא לבחור מסלול');
-      return;
-    }
-    const indexToSend = routesCount === 1 ? 0 : selectedRouteIndex;
-    setCreating(true);
-    setError('');
-    try {
-      await api.post('/rides/', {
-        session_id: preview.session_id,
-        selected_route_index: indexToSend,
-      });
-      setPreview(null);
-      navigate('/my-rides', { replace: true });
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || 'יצירת נסיעה נכשלה';
-      setError(typeof msg === 'string' ? msg : String(msg));
-    } finally {
-      setCreating(false);
-    }
-  };
+  const {
+    originName,
+    setOriginName,
+    destinationName,
+    setDestinationName,
+    selectedDate,
+    setSelectedDate,
+    seats,
+    setSeats,
+    loading,
+    preview,
+    selectedRouteIndex,
+    setSelectedRouteIndex,
+    creating,
+    error,
+    locationLoading,
+    mapPreviewData,
+    setMapPreviewData,
+    fillOriginFromMyLocation,
+    handleSwap,
+    requestPreview,
+    createRide,
+  } = useCreateRide();
 
   return (
     <div className={styles.page}>
       <h1 className={styles.pageTitle}>הצע נסיעה</h1>
-      <p className={styles.pageMeta} style={{ color: '#6b7280', marginBottom: '1rem' }}>
-        מוצא, יעד, מושבים וזמן יציאה.
-      </p>
+      <p className={styles.pageMeta}>מוצא, יעד, מושבים וזמן יציאה.</p>
       <form onSubmit={requestPreview} className={styles.formBlock}>
-        {error && <p className={styles.pageError}>{error}</p>}
+        {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
         <div className={styles.formRowWithBtn}>
           <input
             type="text"
@@ -212,24 +109,23 @@ export default function CreateRide() {
           placeholderText="בחר תאריך ושעה"
           wrapperClassName={styles.datetimeWrapper}
         />
-        <button
+        <LoadingButton
           type="submit"
           className={`${styles.btn} ${styles.btnPrimary}`}
-          disabled={loading}
+          loading={loading}
+          loadingLabel="טוען..."
         >
-          {loading ? 'טוען...' : 'תצוגה מקדימה'}
-        </button>
+          תצוגה מקדימה
+        </LoadingButton>
       </form>
 
       {preview && (preview.routes?.length ?? 0) === 0 && (
-        <p className={styles.emptyText} style={{ marginTop: '1rem' }}>לא נמצאו מסלולים. נסה מוצא/יעד אחרים.</p>
+        <p className={styles.routesEmptyHint}>לא נמצאו מסלולים. נסה מוצא/יעד אחרים.</p>
       )}
       {preview && (preview.routes?.length ?? 0) > 0 && (
         <div className={styles.previewCard}>
           <h2 className={styles.pageSubtitle}>בחר מסלול</h2>
-          <p className={styles.pageMeta} style={{ marginBottom: '1rem' }}>
-            גוגל מפות מחזיר עד 3 מסלולים – בחר את המסלול הרצוי.
-          </p>
+          <p className={styles.pageMeta}>גוגל מפות מחזיר עד 3 מסלולים – בחר את המסלול הרצוי.</p>
           <div className={styles.routeOptions}>
             {(preview.routes ?? []).map((route) => (
               <div
@@ -272,14 +168,15 @@ export default function CreateRide() {
             ))}
           </div>
           <RouteMapModal data={mapPreviewData} onClose={() => setMapPreviewData(null)} />
-          <button
+          <LoadingButton
             type="button"
             className={`${styles.btn} ${styles.btnSuccess}`}
+            loading={creating}
+            loadingLabel="יוצר..."
             onClick={createRide}
-            disabled={creating}
           >
-            {creating ? 'יוצר...' : 'צור נסיעה עם המסלול הנבחר'}
-          </button>
+            צור נסיעה עם המסלול הנבחר
+          </LoadingButton>
         </div>
       )}
     </div>

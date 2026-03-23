@@ -13,19 +13,19 @@
 .pageError,
 .pageLoading {
   text-align: center;
-  color: #6b7280;
+  color: var(--text-secondary);
   padding: 2rem;
 }
 
 .pageError {
-  color: #dc2626;
+  color: var(--danger-text);
 }
 
 .card {
-  background: #fff;
+  background: var(--bg-card);
   padding: 1.5rem;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
   margin-bottom: 1rem;
 }
 
@@ -37,7 +37,7 @@
 
 .memberCount {
   font-size: 0.95rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-bottom: 1.25rem;
 }
 
@@ -56,12 +56,12 @@
 }
 
 .btnPrimary {
-  background: #2563eb;
-  color: #fff;
+  background: var(--primary);
+  color: var(--text-inverse);
 }
 
 .btnPrimary:hover {
-  background: #1d4ed8;
+  background: var(--primary-hover);
 }
 
 .btnPrimary:disabled {

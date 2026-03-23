@@ -1,0 +1,33 @@
+.wrap {
+  position: fixed;
+  z-index: 200;
+  bottom: var(--space-4);
+  inset-inline-start: var(--space-4);
+}
+
+.btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-dropdown);
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.btn:hover {
+  background: var(--bg-secondary);
+  transform: scale(1.04);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}

@@ -11,16 +11,20 @@
 }
 
 .pageError {
-  color: #dc2626;
+  color: var(--danger-text);
   margin-bottom: 1rem;
 }
 
+.hiddenFileInput {
+  display: none;
+}
+
 .card {
-  background: #fff;
+  background: var(--bg-card);
   padding: 1rem 1.25rem;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  border-right: 4px solid #2563eb;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  border-right: 4px solid var(--primary);
 }
 
 .profileCard {
@@ -38,7 +42,7 @@
   height: 96px;
   border-radius: 50%;
   overflow: hidden;
-  background: #e5e7eb;
+  background: var(--border);
   margin: 0 auto;
 }
 
@@ -64,14 +68,14 @@
   justify-content: center;
   font-size: 2.25rem;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .profileAvatarOverlay {
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  color: #fff;
+  color: var(--text-inverse);
   font-size: 0.85rem;
   display: flex;
   align-items: center;
@@ -92,7 +96,7 @@
   border: none;
   padding: 0;
   font-size: 0.9rem;
-  color: #2563eb;
+  color: var(--primary);
   cursor: pointer;
   text-decoration: none;
 }
@@ -107,15 +111,15 @@
 }
 
 .profileAvatarLinkMuted {
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .profileAvatarLinkMuted:hover:not(:disabled) {
-  color: #374151;
+  color: var(--text-primary);
 }
 
 .profileAvatarLinkSep {
-  color: #d1d5db;
+  color: var(--input-border);
   font-weight: 300;
 }
 
@@ -130,7 +134,7 @@
 .profileLabel {
   display: block;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .profileValue {
@@ -157,7 +161,7 @@
   height: 40px;
   border: none;
   background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  color: var(--text-inverse);
   font-size: 1.5rem;
   line-height: 1;
   border-radius: 50%;
@@ -199,11 +203,11 @@
 }
 
 .btnDanger {
-  background: #dc2626;
-  color: #fff;
+  background: var(--danger-text);
+  color: var(--text-inverse);
   margin-top: 1rem;
 }
 
 .btnDanger:hover {
-  background: #b91c1c;
+  background: var(--danger-hover);
 }

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Users, Plus } from 'lucide-react';
 import { useGroup } from '../context/GroupContext';
+import ErrorBanner from '../components/ErrorBanner';
 import { useAuth } from '../context/AuthContext';
 import styles from './Groups.module.css';
 
@@ -20,7 +21,7 @@ function getAvatarStyle(index: number) {
 export default function Groups() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { myGroups, isLoadingGroups } = useGroup();
+  const { myGroups, isLoadingGroups, groupsError } = useGroup();
 
   const handleCreateGroup = () => navigate('/groups/new');
 
@@ -34,6 +35,7 @@ export default function Groups() {
 
   return (
     <div className={styles.page}>
+      {groupsError ? <ErrorBanner message={groupsError} /> : null}
       <header className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>הקבוצות שלי</h1>
         <button

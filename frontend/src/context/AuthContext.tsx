@@ -5,7 +5,14 @@ import React, {
   useEffect,
   useState,
 } from 'react';
-import { api, clearTokens, setTokens } from '../api/client';
+import {
+  loginWithPassword,
+  logoutSession,
+  registerUser,
+  signInWithGoogleToken,
+} from '../api/auth';
+import { clearTokens, setTokens } from '../api/client';
+import { fetchCurrentUser } from '../api/users';
 import type { User } from '../types/api';
 
 type AuthState = {
@@ -51,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      const { data } = await api.get<User>('/users/me');
+      const { data } = await fetchCurrentUser();
       setState((s) => ({
         ...s,
         user: data,
@@ -59,6 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: false,
       }));
     } catch {
+      clearTokens();
       setState((s) => ({
         ...s,
         user: null,
@@ -75,16 +83,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (mounted) queueMicrotask(() => setState((s) => ({ ...s, isLoading: false })));
       return;
     }
-    api
-      .get<User>('/users/me')
+    fetchCurrentUser()
       .then(({ data }) => {
-        if (mounted)
-          setState({ user: data, isAuthenticated: true, isLoading: false });
+        if (mounted) setState({ user: data, isAuthenticated: true, isLoading: false });
       })
-      .catch(async () => {
-        await clearTokens();
-        if (mounted)
-          setState({ user: null, isAuthenticated: false, isLoading: false });
+      .catch(() => {
+        clearTokens();
+        if (mounted) setState({ user: null, isAuthenticated: false, isLoading: false });
       });
     return () => {
       mounted = false;
@@ -92,34 +97,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const { data } = await api.post<{
-      access_token: string;
-      refresh_token: string;
-      user: User;
-    }>('/auth/login', { email, password });
+    const { data } = await loginWithPassword(email, password);
     setTokens(data.access_token, data.refresh_token);
     setState({ user: data.user, isAuthenticated: true, isLoading: false });
   }, []);
 
   const register = useCallback(async (payload: RegisterData) => {
-    await api.post('/auth/register', payload);
-    // אחרי הרשמה עוברים למסך אימות אימייל – בלי התחברות אוטומטית
+    await registerUser(payload);
   }, []);
 
   const signInWithGoogle = useCallback(async (idToken: string) => {
-    // הגדלת timeout ל-60 שניות עבור Google Sign-In (יכול לקחת זמן בגלל אימות עם Google)
-    const { data } = await api.post<{
-      access_token: string;
-      refresh_token: string;
-      user: User;
-    }>('/auth/google-signin', { id_token: idToken }, { timeout: 60000 });
+    const { data } = await signInWithGoogleToken(idToken);
     setTokens(data.access_token, data.refresh_token);
     setState({ user: data.user, isAuthenticated: true, isLoading: false });
   }, []);
 
   const logout = useCallback(async () => {
     try {
-      await api.post('/auth/logout');
+      await logoutSession();
     } catch {
       // ignore
     }

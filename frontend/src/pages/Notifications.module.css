@@ -56,7 +56,7 @@
 }
 
 .emptyIcon {
-  color: #d1d5db;
+  color: var(--text-tertiary);
 }
 
 .emptyTitle {

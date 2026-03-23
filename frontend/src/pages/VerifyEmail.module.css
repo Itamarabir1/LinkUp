@@ -10,6 +10,12 @@
   margin-bottom: 1.5rem;
 }
 
+.intro {
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
 .form {
   display: flex;
   flex-direction: column;
@@ -17,7 +23,7 @@
 }
 
 .error {
-  color: #dc2626;
+  color: var(--danger-text);
   font-size: 0.9rem;
   margin: 0;
 }
@@ -25,24 +31,26 @@
 .input {
   width: 100%;
   padding: 0.75rem 1rem;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-md);
   font-size: 1rem;
   box-sizing: border-box;
   text-align: right;
+  background: var(--input-bg);
+  color: var(--text-primary);
 }
 
 .input:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: var(--border-focus);
 }
 
 .button {
-  background: #2563eb;
-  color: #fff;
+  background: var(--primary);
+  color: var(--text-inverse);
   border: none;
   padding: 0.75rem 1.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
@@ -50,7 +58,7 @@
 }
 
 .button:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: var(--primary-hover);
 }
 
 .button:disabled {
@@ -64,10 +72,32 @@
 }
 
 .link a {
-  color: #2563eb;
+  color: var(--primary);
   text-decoration: none;
 }
 
 .link a:hover {
   text-decoration: underline;
+}
+
+.successText {
+  color: var(--success-text);
+  margin: 0;
+}
+
+.linkSpaced {
+  margin-top: 1rem;
+}
+
+.resendBtn {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+}
+
+.resendBtn:disabled {
+  cursor: not-allowed;
 }
