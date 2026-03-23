@@ -10,6 +10,8 @@ export function loadGoogleMaps(
     return;
   }
 
+  
+
   if (loadPromise) {
     loadPromise
       .then(onLoad)
@@ -34,3 +36,4 @@ export function loadGoogleMaps(
       onError();
     });
 }
+
