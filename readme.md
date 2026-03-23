@@ -76,7 +76,7 @@ flowchart LR
 | **Mobile**    | React Native, Expo, TypeScript |
 | **Infrastructure** | Docker, Docker Compose, Kubernetes (manifests in repo) |
 | **Cloud / CI** | GitHub Actions, GHCR (GitHub Container Registry), Docker |
-| **Scaling & reliability** | Request ID (X-Request-ID), structured JSON logging; RabbitMQ retry (exponential backoff) + DLQ; pessimistic locking (booking approve/cancel); connection pooling, DB indexes |
+| **Scaling & reliability** | Request ID (X-Request-ID), structured JSON logging; RabbitMQ retry (exponential backoff) + DLQ; pessimistic locking (booking approve/cancel); **configurable SQLAlchemy async pool** (`DB_POOL_*` in `.env`), DB indexes |
 
 ---
 
@@ -161,7 +161,9 @@ Apply the database schema once (see `db/schema.sql`) and run migrations: `cd bac
 - **Structured logging:** JSON in production (python-json-logger); level and format via env (LOG_LEVEL, LOG_FORMAT).
 - **RabbitMQ retry & DLQ:** notifications and avatar queues use exponential backoff (e.g. 5s → 30s → 5min); after max retries, messages go to Dead Letter Queues. See `docs/architecture/EVENTS.md`.
 - **Pessimistic locking:** booking approve/cancel use `SELECT ... FOR UPDATE` on the ride to avoid race conditions.
-- **Connection pooling:** async DB pool (size 10, overflow 20, pre-ping); indexes on rides, bookings, group_members, passenger_requests — see `docs/architecture/DATABASE.md`.
+- **Connection pooling:** async SQLAlchemy pool — `pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle`, `pool_pre_ping` מ-`settings` / `.env` (`DB_POOL_*`); indexes on rides, bookings, group_members, passenger_requests — see `docs/architecture/DATABASE.md`.
+- **Auth hardening:** bcrypt hashing/verify רץ ב-**thread pool** (`asyncio.run_in_executor`) כדי לא לחסום את event loop; **rate limit** על `/register` ועל login/refresh (Redis); OTP: `secrets`, `hmac.compare_digest`, מונה ניסיונות + איפוס בקוד חדש — ראו `docs/ENGINEERING_HIGHLIGHTS.md`.
+- **Load testing (optional):** `backend/load_test.js` (k6) — register + login; ראו `backend/README.md`.
 
 ---
 

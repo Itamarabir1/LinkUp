@@ -35,6 +35,7 @@ async def register(
     user_in: UserRegister,
     db: AsyncSession = Depends(get_db),
     response: Response = Response(),
+    _: None = Depends(rate_limit_auth),
 ):
     """רישום משתמש חדש - השלב הראשון"""
     logger.info("[Linkup] register נקרא: email=%s", getattr(user_in, "email", ""))

@@ -94,7 +94,7 @@
 - **Backend stateless** — כל הלוגיקה העסקית ב-FastAPI; אפשר להרחיב replicas; WebSocket לצ’אט **לא** על אותו process (מפורק ל-Go).
 - **הפרדת שירותים**: REST + DB ב-Python; **מאות אלפי חיבורי WS** יכולים לרוץ על מופעי `chat-ws` נפרדים מאחורי load balancer (sticky או shared Redis).
 - **Redis Pub/Sub** — publish מה-API, subscribe ב-Go; לא דוחפים הודעות דרך Python WS.
-- **Connection pool** ל-Postgres: `pool_size`, `max_overflow`, `pool_pre_ping` — מפחית חיבורים מתים תחת עומס.
+- **Connection pool** ל-Postgres: `pool_size`, `max_overflow`, **`pool_timeout`**, **`pool_recycle`**, `pool_pre_ping` — מוגדרים מ-**`settings` / `.env`** (`DB_POOL_*`); מפחית חיבורים מתים והמתנה אינסופית לחיבור פנוי.
 - **Cursor pagination** לחיפוש נסיעות ולהודעות צ’אט — עמידות בנתונים גדולים לעומת offset גדול.
 
 ---
@@ -173,7 +173,8 @@
 | **DDD** | דומיינים מבודדים (rides, bookings, chat, …) — קל להרחבה וטסטים. |
 | **Pessimistic locking** | אישור/ביטול הזמנה תחת `SELECT FOR UPDATE` — מונע race ו”כפל” לוגיקה תחרותית על אותה נסיעה. |
 | **JWT קצר + Refresh ב-DB** | אבטחה + אפשרות לביטול sessions. |
-| **Rate limiting (Redis)** | על **login / refresh** — מונה ב-Redis, חלון זמן + מקסימום בקשות ל-IP — מגביל ניסיונות חוזרים (brute force). |
+| **Rate limiting (Redis)** | על **register**, **login / refresh** ונקודות auth נוספות — מונה ב-Redis, חלון זמן + מקסימום בקשות ל-IP — מגביל הרשמה/כניסה אגרסיבית. |
+| **bcrypt ב-thread pool** | `get_password_hash` / `verify_password` — **async** עם `asyncio.get_running_loop().run_in_executor` — לא חוסמים את לולאת ה-ASGI תחת עומס סיסמאות. |
 | **Request ID** | `X-Request-ID` — מעקב בין לוגים לבקשה. |
 | **JSON logging בפרודקשן** | ingestion ל-ELK / CloudWatch בעתיד. |
 | **Gunicorn + מספר workers** | ניצול מספר cores ל-API. |
@@ -187,7 +188,7 @@
 |------|----------------|
 | **עסקי / DB** | בדיקות `if not ride` / בעלות לפני פעולה; **pessimistic lock** על הזמנות; **Outbox** כדי שלא יאבדו אירועים אחרי commit. |
 | **רשת / חיצוני** | **Timeouts** ל-Google Geocoding / Directions; טיפול ב-**429** (rate limit) עם הודעה למשתמש; debounce **last-seen** + ביטול ב-reconnect — לא מציפים DB ולא מעדכנים “offline” בטעות. |
-| **תשתית** | **`pool_pre_ping`** — לא משתמשים בחיבור Postgres מת; **rate limit** על login/refresh; **FCM** — טוקן לא תקף מטופל (איפוס / דילוג). |
+| **תשתית** | **`pool_pre_ping`**, **`pool_timeout`**, **`pool_recycle`** — מאגר DB עמיד יותר; **rate limit** על register + login/refresh; **FCM** — טוקן לא תקף מטופל (איפוס / דילוג). |
 | **chat-ws (Go)** | `if redisClient == nil` לפני פעולות; **select default** על ערוץ Send — לא חוסם לנצח אם buffer מלא; לקוח Redis נפרד ל-`user:offline` שלא ייתקע עם PSubscribe. |
 | **API / HTTP** | **LinkupError** + handlers מרוכזים; **CORS** גם על תגובות שגיאה; אימות JWT לפני WS ולפני `/presence`. |
 | **פרונט** | `try/catch` על טעינת presence / WS; **פיצול הודעות WS לפי `\n`**; `user_offline` עם **ref** ל-partner כדי לא לאבד עדכון אחרי טעינה אסינכרונית. |
@@ -201,11 +202,12 @@
 
 | נושא | מימוש |
 |------|--------|
-| סיסמאות | Hash (bcrypt דרך ה-stack של FastAPI/SQLAlchemy). |
+| סיסמאות | Hash (**bcrypt** / passlib); חישוב ואימות **אסינכרוניים** דרך **`run_in_executor`** (לא חוסמים event loop). |
+| OTP (אימות מייל וכו’) | יצירה עם **`secrets`**; השוואה עם **`hmac.compare_digest`**; מונה ניסיונות ב-Redis; איפוס מונה בעת **`create_verification_event`** (קוד חדש). |
+| עומס על Auth | **Rate limit** (Redis) על נקודות רגישות — כולל **`POST /register`**, login, refresh וכו’. |
 | סשן | JWT (HS256), `SECRET_KEY` חובה בפרודקשן; אותו סוד ל-chat-ws לאימות WS. |
 | Google | אימות טוקן מול Google; לא מחליפים לבד ללא אימות שרת. |
 | HTTP | CORS מוגדר (`CORS_ORIGINS` / `FRONTEND_URL`); אופציה לכפיית HTTPS מאחורי proxy. |
-| עומס על Auth | **Rate limit** (Redis) על נקודות רגישות. |
 
 ---
 
@@ -249,7 +251,7 @@
 | FCM | סעיפים 1, 2, 8 + **`docs/FCM_SYSTEM_SUMMARY.md`** |
 | מייל Brevo | סעיפים 1, 2, 6, 8 |
 | כניסה עם Google | סעיפים 1, 2, 7א |
-| אבטחה + rate limit | סעיפים 7, 7א |
+| אבטחה + rate limit + OTP + מאגר DB | סעיפים 3, 7, 7א, 12 |
 | Google Maps (Directions + Distance Matrix) | **סעיף 2** (טבלת APIs) + סעיף 12 |
 | CI/CD, S3, מובייל, בדיקות | **סעיף 12** |
 | Unread WS, קבוצות, SQLAdmin, UUID, RTL, EIA | **סעיף 13** |
@@ -298,7 +300,8 @@
 | מה | פירוט |
 |----|--------|
 | **Web + Mobile** | **React (Vite)** וגם אפליקציה ב-**Expo/React Native** (`mobile/`) — אותו REST API, לקוחות מרובים. |
-| **אימות מייל** | קוד ב-**Redis** (TTL) + מייל דרך Brevo; resend verification. |
+| **אימות מייל** | קוד ב-**Redis** (TTL) + מייל דרך Brevo; resend verification; OTP מוגן (**`secrets`**, **`compare_digest`**, מונה ניסיונות). |
+| **עומס auth (k6)** | סקריפט אופציונלי **`backend/load_test.js`** — register + login, thresholds ל-p95 ושגיאות; ראו `backend/README.md`. |
 
 ### מסד וסכימה
 
@@ -332,4 +335,4 @@
 
 ---
 
-*עודכן כחלק מתיעוד הפרויקט — ניתן להרחיב לפי פיצ’רים חדשים.*
+*עודכן כחלק מתיעוד הפרויקט — כולל מאגר DB ניתן להגדרה, bcrypt אסינכרוני, rate limit על register, חיזוק OTP, ו-k6 (`backend/load_test.js`).*

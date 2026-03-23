@@ -44,6 +44,10 @@
 | POSTGRES_DB | כן | שם DB |
 | POSTGRES_HOST | — | localhost / db (Docker) |
 | POSTGRES_PORT | — | 5432 |
+| DB_POOL_SIZE | — | SQLAlchemy `pool_size` (ברירת מחדל 5) |
+| DB_MAX_OVERFLOW | — | חיבורים נוספים תחת עומס (ברירת מחדל 10) |
+| DB_POOL_TIMEOUT | — | שניות המתנה לחיבור מהמאגר (ברירת מחדל 30) |
+| DB_POOL_RECYCLE | — | מחזור חיבורים בשניות (ברירת מחדל 1800) |
 | DATABASE_URL | אופציונלי | override מלא (למשל פרודקשן / K8s) |
 | REDIS_HOST | — | localhost / redis |
 | REDIS_PORT | — | 6379 |
@@ -89,6 +93,18 @@
 | PORT | 8081 |
 | REDIS_URL | redis://[:password@]host:6379/1 |
 | SECRET_KEY / JWT_SECRET | אותו ערך כמו ב-backend (לאימות JWT) |
+
+---
+
+## Load testing (k6, optional)
+
+מתוך `backend/` אחרי שה-API ורישום ב-Swagger עובדים:
+
+```bash
+k6 run load_test.js
+```
+
+פירוט: `backend/README.md` — סקריפט עומס על `/api/v1/auth/register` ו-`/login`.
 
 ---
 

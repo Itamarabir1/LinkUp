@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = Field("")
     POSTGRES_HOST: str = Field("localhost")
     POSTGRES_PORT: str = Field("5432")
+
+    # --- DB Connection Pool ---
+    DB_POOL_SIZE: int = Field(5, description="SQLAlchemy pool_size (חיבורים קבועים)")
+    DB_MAX_OVERFLOW: int = Field(10, description="חיבורים נוספים תחת עומס")
+    DB_POOL_TIMEOUT: int = Field(30, description="שניות המתנה לחיבור פנוי")
+    DB_POOL_RECYCLE: int = Field(1800, description="חידוש חיבורים כל 30 דקות")
+
     # אופציונלי: חיבור מלא ל-Postgres משורת סביבה (למשל מ-K8s/פרודקשן)
     DATABASE_URL_RAW: Optional[str] = Field(
         default=None,

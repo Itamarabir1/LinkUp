@@ -63,7 +63,7 @@ class AuthService:
     # app/services/auth_service.py
     async def register_new_user(self, db: AsyncSession, user_in: UserRegister) -> User:
         await self._validate_unique_user(db, user_in)
-        hashed_password = get_password_hash(user_in.password)
+        hashed_password = await get_password_hash(user_in.password)
 
         # 1. יצירת המשתמש (בלי commit בתוך ה-CRUD!)
         new_user = await self.crud_user.create(
@@ -108,13 +108,15 @@ class AuthService:
             await db.commit()
             await db.refresh(new_user)
             return new_user
-        except Exception:
+        except Exception as e:
             await db.rollback()
+            logger.error("register_new_user failed: %s", e)
             # כאן נכנס השימוש ב-LinkupError שביקשת לרשת ממנו
             # raise LinkupError(
             #     message=f"Registration failed: {str(e)}",
             #     status_code=500
             # )
+            raise
 
     async def verify_user_email(self, db: AsyncSession, email: str, code: str):
         # נרמול האימייל לפני החיפוש (כמו ב-register)
@@ -219,7 +221,7 @@ class AuthService:
         user = await self.crud_user.get_by_email(db, email=email)
 
         # 2. בדיקת קיום משתמש וסיסמה (Security: תשובה אחידה למניעת Enumeration)
-        if not user or not verify_password(password, user.hashed_password):
+        if not user or not await verify_password(password, user.hashed_password):
             raise InvalidCredentialsError()
 
         # 3. בדיקת סטטוס אימות מייל - שימוש בעמודה החדשה שלך
@@ -304,7 +306,7 @@ class AuthService:
             import secrets
 
             dummy_password = secrets.token_urlsafe(32)
-            hashed_password = get_password_hash(dummy_password)
+            hashed_password = await get_password_hash(dummy_password)
 
             # יצירת UserCreate object (password דמה - לא בשימוש)
             user_create = UserCreate(
@@ -357,15 +359,12 @@ class AuthService:
         access_token = create_access_token(data={"sub": str(user.user_id)})
         refresh_token = create_refresh_token(data={"sub": str(user.user_id)})
 
-        # 5. שמירת Refresh Token ב-DB
-        await self.crud_user.update_refresh_token(
-            db, user=user, refresh_token=refresh_token
-        )
-
-        # 6. עדכון last_login
+        # 5+6. שמירת Refresh Token + עדכון last_login ב-commit אחד
         from datetime import datetime, timezone
 
+        user.refresh_token = refresh_token
         user.last_login = datetime.now(timezone.utc)
+        db.add(user)
         await db.commit()
 
         logger.info(f"User {email} authenticated via Google successfully.")
@@ -432,9 +431,9 @@ class AuthService:
         user = await self.crud_user.get_by_id(db, id=user_id)
         if not user:
             raise UserNotFoundError(user_id=user_id)
-        if not verify_password(data.old_password, user.hashed_password):
+        if not await verify_password(data.old_password, user.hashed_password):
             raise InvalidPasswordError()
-        hashed = get_password_hash(data.new_password)
+        hashed = await get_password_hash(data.new_password)
         await self.crud_user.update_password(db, user=user, hashed_password=hashed)
         return {"message": "הסיסמה עודכנה בהצלחה", "status": "success"}
 
@@ -471,7 +470,7 @@ class AuthService:
             raise InvalidResetCodeError(email=email)
 
         await verification_service.verify_otp(str(user.user_id), "password_reset", code)
-        hashed = get_password_hash(new_password)
+        hashed = await get_password_hash(new_password)
         await self.crud_user.update_password(db, user=user, hashed_password=hashed)
         return {"message": "Password reset successfully.", "status": "success"}
 

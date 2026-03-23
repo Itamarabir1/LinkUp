@@ -88,7 +88,7 @@ outbox-worker
 ## Performance
 
 - **ASGI server**: Gunicorn with 4 workers (`uvicorn.workers.UvicornWorker`), bind `0.0.0.0:8000` (production / Docker). Local dev may use uvicorn with `--reload`.
-- **Connection Pool** (`backend/app/db/session.py`): `pool_size=10`, `max_overflow=20`, `pool_pre_ping=True` (מונע חיבורים מתים).
+- **Connection Pool** (`backend/app/db/session.py`): `pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle` מ-**config** (`DB_POOL_*` ב-`.env`; ברירות מחדל ב-`Settings`), `pool_pre_ping=True`.
 - **Indexes**: ראה `docs/DATABASE.md` — כולל 11 ה-indexes מ-migration 004 (rides, bookings, group_members, passenger_requests).
 - **Caching**: Redis לפי צורך — TTL וכו' לפי סוג (למשל OTP, broadcast channels).
 
@@ -113,7 +113,9 @@ outbox-worker
 
 - **JWT**: HS256, `SECRET_KEY` חובה בפרודקשן. Access/Refresh expiry מ-config.
 - **CORS**: `CORS_ORIGINS` או `FRONTEND_URL`; ב-DEBUG גם localhost regex.
-- **Rate Limiting**: Auth endpoints — חלון שניות + מקסימום בקשות ל-IP (config).
+- **Rate Limiting**: Auth endpoints — חלון שניות + מקסימום בקשות ל-IP (`RATE_LIMIT_AUTH_*`); כולל **`POST /register`** לצד login/refresh וכו’.
+- **Password hashing**: bcrypt; חישוב/אימות סיסמה רץ ב-**thread pool** (`run_in_executor`) כדי לא לחסום את ה-event loop.
+- **OTP (אימות מייל / איפוס סיסמה)**: קוד אקראי עם **`secrets`**; השוואה עם **`hmac.compare_digest`**; מונה ניסיונות ב-Redis + איפוס בעת הנפקת קוד חדש.
 - **HTTPS**: `FORCE_HTTPS_REDIRECT` מאחורי proxy בפרודקשן.
 
 ---

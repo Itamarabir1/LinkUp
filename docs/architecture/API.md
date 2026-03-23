@@ -45,7 +45,7 @@ Authorization: Bearer <access_token>
 
 | Method | Path | Auth | תיאור |
 |--------|------|------|--------|
-| POST | /register | לא | רישום — body: UserRegister (email, password, full_name, ...). מחזיר UserOut, שומר cookie לאימות מייל. |
+| POST | /register | לא | רישום — body: UserRegister (email, password, full_name, ...). מחזיר UserOut, שומר cookie לאימות מייל. **Rate limited** (Redis, אותו מנגנון כמו login/refresh). |
 | POST | /login | לא | התחברות — body: LoginRequest (email, password). מחזיר LoginResponse (access_token, refresh_token, user). Rate limited. |
 | POST | /refresh | לא | רענון טוקן — body: RefreshRequest (refresh_token). מחזיר RefreshResponse. Rate limited. |
 | POST | /logout | כן | ביטול refresh token (204). |

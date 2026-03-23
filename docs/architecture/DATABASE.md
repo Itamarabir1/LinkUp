@@ -13,11 +13,15 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 
 ## Connection Pool
 
-| Parameter | Value | הערות |
-|-----------|--------|--------|
-| pool_size | 10 | חיבורים קבועים במאגר |
-| max_overflow | 20 | חיבורים נוספים מעבר ל-pool_size |
-| pool_pre_ping | True | בודק חיבור לפני שימוש (מונע חיבורים מתים) |
+מקור: `backend/app/db/session.py` — ערכים מ-`app.core.config.settings` (ניתן לעקוף ב-`.env`).
+
+| Parameter | Env / default | הערות |
+|-----------|----------------|--------|
+| pool_size | `DB_POOL_SIZE` (default 5) | חיבורים קבועים במאגר |
+| max_overflow | `DB_MAX_OVERFLOW` (default 10) | חיבורים נוספים מעבר ל-pool_size |
+| pool_timeout | `DB_POOL_TIMEOUT` (default 30s) | המתנה לחיבור פנוי מהמאגר |
+| pool_recycle | `DB_POOL_RECYCLE` (default 1800s) | מחזור חיבורים (למניעת חיבורים “מתים” אצל שרת ה-DB) |
+| pool_pre_ping | True (קוד) | בודק חיבור לפני שימוש (מונע חיבורים מתים) |
 
 ---
 
