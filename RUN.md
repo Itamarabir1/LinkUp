@@ -99,9 +99,9 @@ docker stop linkup_backend
 - **שגיאה על חוסר מודול (module)** – מתוך `backend` להריץ:  
   `pip install -r requirements.txt`
 
-- **שגיאה על DB / Redis / RabbitMQ** – להריץ את התשתית (למשל עם Docker):  
-  `docker compose up -d db redis rabbitmq`  
-  משורש הפרויקט (`Linkup`).
+- **שגיאה על DB / Redis / RabbitMQ / chat-ws / worker** – להריץ את התשתית (למשל עם Docker) משורש הפרויקט (`Linkup`):  
+  `docker compose up -d` — מרים `db`, `redis`, `rabbitmq`, `chat-ws`, `outbox-worker`, `backend` וכו׳ (ללא **nginx** אלא אם מריצים `docker compose --profile prod up -d`).  
+  אפשר גם במפורש: `docker compose up -d db redis rabbitmq chat-ws` אם צריך רק חלק מהשירותים.
 
 ---
 

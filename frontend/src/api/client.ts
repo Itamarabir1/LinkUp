@@ -1,5 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
-import { API_BASE_URL, API_TIMEOUT_MS, CHAT_WS_HTTP_BASE } from '../config/env';
+import { API_BASE_URL, API_TIMEOUT_MS } from '../config/env';
 import type { PaginatedMessagesResponse } from '../types/api';
 
 // לוודא לאן הבקשות הולכות (יופיע בקונסול של הדפדפן F12)
@@ -117,7 +117,7 @@ api.interceptors.response.use(
 
 /** בקשות HTTP ל-chat-ws (presence) — לא ל-backend */
 export const chatWsApi = axios.create({
-  baseURL: CHAT_WS_HTTP_BASE,
+  baseURL: '',
   timeout: API_TIMEOUT_MS,
   headers: { 'Content-Type': 'application/json' },
 });

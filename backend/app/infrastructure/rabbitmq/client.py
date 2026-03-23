@@ -57,5 +57,14 @@ class RabbitMQClient:
                 await self._connection.close()
                 logger.info("🛑 RabbitMQ Connection closed")
 
+    def is_connected(self) -> bool:
+        """לשימוש ב-health checks (ללא await)."""
+        if self._connection is None:
+            return False
+        try:
+            return not self._connection.is_closed
+        except Exception:
+            return False
+
 
 rabbit_client = RabbitMQClient()

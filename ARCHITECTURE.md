@@ -24,7 +24,7 @@
 | Database | PostgreSQL + PostGIS | 15-3.3 | טבלאות, גיאומטריה, חיפוש מרחבי |
 | Cache / Pub-Sub | Redis | 7.2.0-v10 | Broadcast (ride updates), chat channels, chat completion, OTP |
 | Message Broker | RabbitMQ | 3-management | אירועים (Outbox), תורי משימות (notifications, avatar, scheduled) |
-| Runtime | Docker Compose | — | db, redis, rabbitmq, backend, outbox-worker, chat-ws |
+| Runtime | Docker Compose | — | פיתוח: db, redis, rabbitmq, backend (**8000** ל-host), outbox-worker, chat-ws; פרוד מקומי: **frontend** סטטי + **nginx** (80) דרך override + `--profile prod` |
 
 ---
 
@@ -33,7 +33,9 @@
 ```
 Clients (Web/Mobile)
     │
-    ├── HTTP REST ──────────────► backend:8000 (FastAPI)
+    ├── HTTP (Docker Compose) ──► nginx:80 → /api/v1/* backend:8000; /ws + /presence/* chat-ws:8081; /* frontend:80
+    │
+    ├── HTTP REST (מקומי / ישיר) ► backend:8000 (FastAPI)
     │                                    │
     │                                    ├── PostgreSQL (asyncpg)
     │                                    ├── Redis DB 0 (broadcast, cache)
@@ -46,7 +48,7 @@ Clients (Web/Mobile)
 
 outbox-worker
     ├── Poll outbox_events (PENDING) ──► Publish to RabbitMQ (exchanges: user, ride, booking, tasks, scheduled)
-    ├── notifications_queue consumer ──► Send email (Brevo), push (Firebase)
+    ├── notifications_queue consumer ──► Send email (Brevo), push (Firebase FCM, **`data` map only** — title/body strings in `data`; UI: toast+chime / SW notification)
     ├── avatar_upload_queue consumer ──► S3 resize, DB update
     ├── scheduled_tasks_queue consumer ──► Reminders, fuel scan, maintenance
     └── Redis DB 1 SUB (chat:completion:*) ──► AI analysis (Groq), save ChatAnalysis, optional outbox
@@ -70,6 +72,16 @@ outbox-worker
 - **Page-based Pagination**: הזמנות שלי — `page`, `limit`, תגובה עם `total`, `has_more`.
 - **Pessimistic Locking**: `approve_booking`, `cancel_booking` — שליפת נסיעה עם `SELECT ... FOR UPDATE` כדי למנוע race.
 - **Race Condition Protection**: אישור/ביטול הזמנה תחת lock על ה-ride; ביטול מחזיר נסיעה ל-OPEN רק אם לא CANCELLED.
+
+---
+
+## Push notifications (FCM, Web)
+
+- **Outbox → RabbitMQ → notifications consumer** שולח דרך Firebase Admin ל־`users.fcm_token`.
+- **פורמט הודעה מהשרת:** רק מפת **`data`** ב־FCM (אין אצלנו שדה `notification` ברמת ה-API של Firebase Admin) — `title` ו־`body` כמחרוזות בתוך `data`, ראה `backend/app/domain/notifications/channels/push/client.py`. זה **לא** אומר שאין UI: יש **חלונית Toast קופצת + צליל** בחזית והתראת מערכת ברקע.
+- **דפדפן:** Service Worker (`frontend/public/firebase-messaging-sw.js`) — handler ל־`push` שמפרש את גוף ה־FCM ומציג התראת מערכת כשהאפליקציה לא בחזית.
+- **חזית:** `onMessage` ב־`frontend/src/services/fcm.ts` קורא `title`/`body` מ־`payload.data` (ונופל ל־`notification` אם קיים), מציג Toast (`NotificationToast` ב־Layout) + צליל.
+- **תיעוד מפורט:** `docs/FCM_SYSTEM_SUMMARY.md`.
 
 ---
 

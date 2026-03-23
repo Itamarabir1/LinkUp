@@ -12,7 +12,8 @@ Linkup connects drivers and passengers for shared rides. Drivers publish trips w
 
 ## Engineering highlights (portfolio)
 
-Single doc for **stack, scale patterns, real-time chat (disconnect / last-seen debounce), Outbox, ops**: **[docs/ENGINEERING_HIGHLIGHTS.md](docs/ENGINEERING_HIGHLIGHTS.md)**.
+Single doc for **stack, scale patterns, real-time chat (disconnect / last-seen debounce), Outbox, ops**: **[docs/ENGINEERING_HIGHLIGHTS.md](docs/ENGINEERING_HIGHLIGHTS.md)**.  
+**FCM (Web push — `data` map מהשרת; SW + Toast + צליל):** **[docs/FCM_SYSTEM_SUMMARY.md](docs/FCM_SYSTEM_SUMMARY.md)**.
 
 ---
 
@@ -86,7 +87,7 @@ flowchart LR
 - ✅ **Groups:** create group, join by invite code, manage members (remove, promote to admin), group rides and search; group avatar & description (S3); leave group / close group (admin)
 - ✅ Real-time chat (WebSocket) between driver and passenger
 - ✅ AI conversation summary (Groq / Llama) and email on chat end
-- ✅ Push (FCM), email (Brevo), and in-app notifications
+- ✅ Push (**FCM**): מהשרת נשלחת רק מפת **`data`** ב־FCM (ללא בלוק `notification` של Firebase) — בחזית **חלונית Toast קופצת** + צליל, ברקע התראת מערכת דרך Service Worker (`push`); מייל (**Brevo**) והתראות in-app
 - ✅ Google OAuth and email/password auth with JWT + refresh
 - ✅ Geo: distance, route display, PostGIS-backed queries; **ride preview cache** (Redis, 24h) for route options
 - ✅ **GPS live tracking:** driver and passengers share location during active rides (WebSocket)
@@ -115,21 +116,25 @@ cp chat-ws/.env.example chat-ws/.env
 # Edit *.env and set secrets (DB, Redis, RabbitMQ, JWT, Brevo, Google, Groq, S3, Firebase, etc.)
 ```
 
-For local development with hot-reload:
+**Docker Compose — מה עולה ומתי:**
+
+- ב־[`docker-compose.yml`](docker-compose.yml) **אין profile** על `db`, `redis`, `rabbitmq`, `outbox-worker`, `backend`, `chat-ws` — כולם עולים ב־`docker compose up -d`. **ה־backend** מפרסם **`8000:8000`** ל־host (Vite על המחשב → `localhost:8000`).
+- **`nginx`** ו־**`frontend`** (אימג׳ סטטי) **לא** בקובץ הבסיסי לפיתוח: הם מוגדרים ב־[`docker-compose.override.yml`](docker-compose.override.yml) עם `profiles: ["prod"]` — עולים רק עם `--profile prod`. **חובה** קובץ override כזה (העתק מ־[`.example`](docker-compose.override.yml.example)) אם רוצים `docker compose --profile prod` — בלי `frontend` בפרויקט, `nginx` ייכשל ב־`depends_on`.
 
 ```bash
-cp docker-compose.override.yml.example docker-compose.override.yml
+docker compose up -d
 ```
 
-Start the stack:
+→ `db`, `redis`, `rabbitmq`, `outbox-worker`, `backend` (**פורט 8000** ל־host), `chat-ws` (**8081**). **לא** `frontend` בקונטיינר, **לא** nginx.
 
 ```bash
-docker compose up --build
+docker compose --profile prod up -d --build
 ```
 
-- **API:** <http://localhost:8000> — Docs: <http://localhost:8000/docs>  
-- **Frontend:** run separately with `cd frontend && npm install && npm run dev` (or add to compose)  
-- **Chat WebSocket:** <ws://localhost:8081/ws?token=JWT>
+(עם override שמכיל `frontend` + `nginx`) — <http://localhost> (API, צ׳אט, פרונט סטטי).
+
+- **פיתוח נפוץ (אפשרות ב):** `docker compose up -d` + `cd frontend && npm run dev` (Vite **5173**). ה־API מהדפדפן: proxy ל־**`http://localhost:8000`** (ה־backend בדוקר). צ׳אט: **WebSocket ישיר ל־`localhost:8081`**, WS נסיעות ל־**`localhost:8000/api/v1`** (ראו `frontend/src/config/env.ts`). אופציונלי: `uvicorn` מקומי במקום backend בדוקר.
+- **FCM בדוקר:** קובץ שירות Firebase נטען מ־host דרך volume ל־**backend** ול־**outbox-worker** (נתיב בקונטיינר: `/app/infrastructure/firebase_core/firebase-credentials.json`); ב־`backend/.env` הגדר `FIREBASE_SERVICE_ACCOUNT_PATH` בהתאם (הקובץ מוחרג מ־image בגלל `.dockerignore`).
 
 Apply the database schema once (see `db/schema.sql`) and run migrations: `cd backend && alembic upgrade head`.
 
@@ -141,7 +146,8 @@ Apply the database schema once (see `db/schema.sql`) and run migrations: `cd bac
 |------------|-------------|
 | `backend/` | FastAPI app: API, domain logic, workers (outbox, notifications, chat completion listener), Alembic migrations |
 | `chat-ws/` | Go WebSocket server: Redis subscribe, JWT auth, message fan-out to clients |
-| `frontend/`| React (Vite) web app; Dockerfile + nginx.conf for production build |
+| `frontend/`| React (Vite) web app; Dockerfile + `nginx.conf` לתוך image סטטי |
+| `nginx/`   | קונפיג Nginx ל־Compose — reverse proxy (פורט 80): API, chat-ws, פרונט |
 | `mobile/`  | React Native (Expo) app |
 | `k8s/`     | Kubernetes base, backend, chat-ws, frontend, infra (Postgres, Redis, RabbitMQ) |
 | `db/`      | Reference schema (`schema.sql`) and utility scripts; migrations live in `backend/alembic/` |

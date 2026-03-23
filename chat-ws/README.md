@@ -53,13 +53,13 @@ go run main.go
 
 ```bash
 cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8080
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 ## חיבור מהקליינט
 
-- **WebSocket:** `ws://localhost:8081/ws?token=ACCESS_TOKEN`
-- ה־token הוא ה־Access Token מה־login (JWT). אותו SECRET_KEY ב־Python וב־Go.
+- **WebSocket (פיתוח):** `ws://localhost:8081/ws?token=ACCESS_TOKEN` — תואם ל־`getChatWebSocketUrl` ב־`frontend/src/config/env.ts` ב־DEV.
+- **פרודקשן (דפדפן):** אותו host כמו האתר, נתיב `/ws` (דרך Nginx). ה־token הוא ה־Access Token מה־login (JWT). אותו SECRET_KEY ב־Python וב־Go.
 
 ## זרימה
 

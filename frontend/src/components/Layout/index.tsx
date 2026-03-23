@@ -4,6 +4,8 @@ import { MessageCircle, Bell, User, Search, Plus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
 import ChatPopup from '../ChatPopup/ChatPopup';
+import { NotificationToast } from '../NotificationToast/NotificationToast';
+import { initFCM } from '../../services/fcm';
 import styles from './Layout.module.css';
 
 export default function Layout() {
@@ -13,6 +15,7 @@ export default function Layout() {
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | null>(null);
 
   const showChatPopup = openConversationId && location.pathname !== '/messages';
 
@@ -29,10 +32,28 @@ export default function Layout() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotifPermission(Notification.permission);
+    }
+  }, []);
+
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      void initFCM();
+    }
+  }, []);
+
   const handleLogout = async () => {
     setProfileOpen(false);
     await logout();
     navigate('/login', { replace: true });
+  };
+
+  const handleEnableNotifications = async () => {
+    await initFCM();
+    setNotifPermission(Notification.permission);
+    setProfileOpen(false);
   };
 
   return (
@@ -115,6 +136,17 @@ export default function Layout() {
                 >
                   הפרופיל שלי
                 </Link>
+                {notifPermission !== 'granted' && (
+                  <button
+                    type="button"
+                    className={styles.profileDropdownItem}
+                    onClick={handleEnableNotifications}
+                  >
+                    {notifPermission === 'denied'
+                      ? '🔕 התראות חסומות בדפדפן'
+                      : '🔔 הפעל התראות'}
+                  </button>
+                )}
                 <div className={styles.profileDropdownDivider} />
                 <button
                   type="button"
@@ -143,6 +175,7 @@ export default function Layout() {
       {showChatPopup && openConversationId && (
         <ChatPopup conversationId={openConversationId} />
       )}
+      <NotificationToast />
     </div>
   );
 }

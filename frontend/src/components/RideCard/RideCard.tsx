@@ -19,7 +19,10 @@ function getStatusVariant(status: string): keyof typeof STATUS_STYLES {
 
 interface RideCardProps {
   route: string;
+  /** תאריך ושעה של הנסיעה/הבקשה (לא זמן יצירה באתר) */
   time: string;
+  /** כותרת מעל השעה, למשל "זמן הנסיעה" */
+  scheduleCaption?: string;
   status: string;
   source?: string;
   onClick?: () => void;
@@ -28,6 +31,7 @@ interface RideCardProps {
 export default function RideCard({
   route,
   time,
+  scheduleCaption,
   status,
   source,
   onClick,
@@ -53,7 +57,14 @@ export default function RideCard({
       }
     >
       <div className={styles.route}>{route}</div>
-      <div className={styles.time}>{time}</div>
+      {scheduleCaption ? (
+        <div className={styles.scheduleBlock}>
+          <span className={styles.scheduleCaption}>{scheduleCaption}</span>
+          <span className={styles.time}>{time || '—'}</span>
+        </div>
+      ) : (
+        <div className={styles.time}>{time}</div>
+      )}
       <div className={styles.footer}>
         <span
           className={styles.badge}

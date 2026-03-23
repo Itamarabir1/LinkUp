@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { api } from '../api/client';
 import type { PassengerRequest } from '../types/api';
-import { formatRideDate } from '../utils/date';
+import { formatDateTimeNoSeconds } from '../utils/date';
 import { useGroup } from '../context/GroupContext';
 import Chips, { type ChipItem } from '../components/Chips/Chips';
 import RideCard from '../components/RideCard/RideCard';
@@ -117,7 +117,8 @@ export default function MyRequests() {
               </button>
               <RideCard
                 route={`${r.pickup_name ?? '?'} ← ${r.destination_name ?? '?'}`}
-                time={formatRideDate(r.requested_departure_time)}
+                scheduleCaption="זמן מבוקש לנסיעה"
+                time={formatDateTimeNoSeconds(r.requested_departure_time)}
                 status={statusLabels[r.status] || r.status}
                 source={getSource(r)}
               />

@@ -86,6 +86,22 @@ async def update_fcm_token(
     return MessageResponse(message="FCM Token updated successfully", status="success")
 
 
+@router.post("/me/test-push")
+async def test_push(
+    current_user: User = Depends(get_current_user),
+):
+    from app.domain.notifications.channels.push.client import fcm_client
+
+    if not current_user.fcm_token:
+        return {"error": "no fcm_token"}
+    result = await fcm_client.send(
+        token=current_user.fcm_token,
+        title="בדיקת FCM",
+        body="אם אתה רואה את זה — FCM עובד!",
+    )
+    return {"result": str(result)}
+
+
 # --- 5. העלאת תמונת פרופיל (שתי דרכים) ---
 
 

@@ -11,4 +11,5 @@
 - [architecture/EVENTS.md](architecture/EVENTS.md) — Outbox, RabbitMQ, Workers
 - [architecture/REALTIME.md](architecture/REALTIME.md) — WebSocket, Redis Pub/Sub, צ'אט
 - [ENGINEERING_HIGHLIGHTS.md](ENGINEERING_HIGHLIGHTS.md) — סיכום להצגה: פיצ'רים, סקייל, טריקים, real-time, Outbox
+- [FCM_SYSTEM_SUMMARY.md](FCM_SYSTEM_SUMMARY.md) — FCM end-to-end (שרת: מפת `data` בלבד; SW + Toast + צליל בפרונט)
 - [architecture/DEVELOPMENT.md](architecture/DEVELOPMENT.md) — Setup, env vars, מבנה פרויקט

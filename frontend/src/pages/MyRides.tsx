@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Car, Plus } from 'lucide-react';
 import { api } from '../api/client';
 import type { Ride } from '../types/api';
-import { formatRideDate } from '../utils/date';
+import { formatDateTimeNoSeconds } from '../utils/date';
 import { getWsBaseUrl } from '../config/env';
 import { useAuth } from '../context/AuthContext';
 import { useGroup } from '../context/GroupContext';
@@ -183,7 +183,8 @@ export default function MyRides() {
               </button>
               <RideCard
                 route={`${r.origin_name ?? '?'} ← ${r.destination_name ?? '?'}`}
-                time={formatRideDate(r.departure_time)}
+                scheduleCaption="זמן הנסיעה"
+                time={formatDateTimeNoSeconds(r.departure_time)}
                 status={getStatusLabel(r)}
                 source={getSource(r)}
               />

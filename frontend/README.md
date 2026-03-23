@@ -36,9 +36,10 @@ cp frontend/.env.example frontend/.env
 
 המשתנים העיקריים:
 
-- `VITE_API_URL` – בסיס ל-REST API בפרודקשן (למשל `https://api.example.com/api/v1`).  
-  בפיתוח, אם לא נגדיר – נשתמש בכתובת ברירת המחדל `http://127.0.0.1:8000/api/v1` דרך proxy של Vite.
-- `VITE_CHAT_WS_URL` – בסיס ל-WebSocket של הצ'אט (למשל `ws://localhost:8081/ws` או `wss://chat.example.com/ws`). אם לא הוגדר, משתמשים בכתובת שיושבת על אותו origin כמו הדפדפן.
+- **REST API** – תמיד נתיב יחסי `/api/v1` (אותו host; Vite proxy בפיתוח ל־`localhost:8000`, Nginx בפרודקשן).
+- **צ'אט WebSocket** – ב־[`src/config/env.ts`](src/config/env.ts) פונקציה `getChatWebSocketUrl`: ב־**DEV** (`import.meta.env.DEV`) חיבור **ישיר** ל־`ws://localhost:8081/ws?token=…` (שירות `chat-ws` בדוקר מפרסם 8081 ל־host). ב־**production** — `ws:` / `wss:` לפי הדף, עם `window.location.host` ונתיב `/ws`. אין משתנה `VITE_CHAT_WS_URL`. ב־Vite מוגדר גם proxy ל־`/ws` → 8081 (שימושי אם קוד אחר פונה לנתיב יחסי).
+- **WebSocket נסיעות / התראות (Backend)** – `getWsBaseUrl()` ב־**DEV**: `ws://localhost:8000/api/v1`; בפרודקשן: אותו host + `/api/v1`.
+- **Presence HTTP** – `GET /presence/...` דרך `chatWsApi`: ב־dev ה־Vite מפרוקסי `/presence` ל־`localhost:8081` (ראו `vite.config.ts`), בפרודקשן — דרך Nginx לאותו origin.
 - `VITE_API_TIMEOUT_MS` – timeout לבקשות HTTP במילישניות (ברירת מחדל: `30000`).
 - `VITE_GOOGLE_MAPS_API_KEY` – מפתח Google Maps להצגת מפה ונתיב נסיעה (אופציונלי; חלק מהמסכים עובדים גם בלעדיו).
 - `VITE_GOOGLE_CLIENT_ID` – Client ID של Google OAuth (חובה לכניסה עם Google, בשימוש ב-`GoogleSignIn`).
@@ -61,7 +62,7 @@ cp frontend/.env.example frontend/.env
 - **RTL ועברית** – האפליקציה בנויה מיסודה ל-RTL; סגנונות וקומפוננטות `pages/*` מותאמות לימין.
 - **אימות** – קומפוננטות התחברות/הרשמה עובדות מול backend OAuth/JWT; תמיכה ב-Google Sign-In באמצעות `GoogleSignIn.tsx` ו-`VITE_GOOGLE_CLIENT_ID`.
 - **ניהול קבוצות** – במסכי `GroupManage` אפשר ליצור קבוצה, לשתף קישור הזמנה, להעתיק URL בלחיצה עם פידבק חזותי (העתקה מוצלחת/שגיאה) ולסגור קבוצה.
-- **צ'אט** – WebSocket ל-`chat-ws` (`VITE_CHAT_WS_URL`); HTTP ל-`GET /presence/...` (`CHAT_WS_HTTP_BASE` / `VITE_CHAT_HTTP_URL`). עדכון **מיידי** כששותף מתנתק: הודעת WS `user_offline` (פולינג נשאר גיבוי).
+- **צ'אט** – בפיתוח: WS ל־`chat-ws` ב־**8081** (`getChatWebSocketUrl`); בפרודקשן: `/ws` מאותו host (Nginx). Presence דרך `chatWsApi` + proxy ל־8081 ב־dev. עדכון **מיידי** כששותף מתנתק: הודעת WS `user_offline` (פולינג נשאר גיבוי). אירועי `typing_start` / `typing_stop` מסוננים בצד הלקוח כדי לא לטפל ב-echo של המשתמש הנוכחי.
 
 למידע רחב יותר על הארכיטקטורה וההרצה הכוללת (Docker, Kubernetes, chat-ws, mobile) ראו את ה-`README` בשורש הפרויקט.
 

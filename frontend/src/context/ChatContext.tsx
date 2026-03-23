@@ -54,7 +54,7 @@ interface ChatContextValue {
   panelConversationId: string | null;
   openChat: (conversationId: string) => void;
   closeChat: () => void;
-  /** מספר שיחות שלא נקראו (לbadge הודעות). כרגע 0 עד שיהיה endpoint. */
+  /** מספר שיחות שלא נקראו (לbadge הודעות). */
   unreadMessages: number;
   /** רענון מיידי של מונה הודעות שלא נקראו. */
   refreshUnread: () => void;
@@ -157,7 +157,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     return () => clearInterval(interval);
   }, [user?.user_id, refreshUnreadNotifications]);
 
-  /** WebSocket להתראות in-app (בקשת הצטרפות לנהג וכו') — רענון רשימה ו-badge */
+  /** WebSocket גלובלי יחיד להתראות in-app — רענון badge ורשימת התראות. */
   useEffect(() => {
     if (!user?.user_id) return;
     const token = localStorage.getItem('linkup_access_token');
@@ -169,6 +169,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
     const onRefresh = () => {
       void refreshUnreadNotifications();
+      // Keep message badge reasonably fresh from a single global socket flow.
+      void refreshUnread();
       window.dispatchEvent(new CustomEvent('linkup-notifications-refresh'));
     };
 
@@ -210,7 +212,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         /* ignore */
       }
     };
-  }, [user?.user_id, refreshUnreadNotifications]);
+  }, [user?.user_id, refreshUnreadNotifications, refreshUnread]);
 
   useEffect(() => {
     if (!user?.user_id) return;

@@ -84,6 +84,17 @@ export default function Notifications() {
     return () => window.removeEventListener('linkup-notifications-refresh', onRefresh);
   }, [fetchNotifications]);
 
+  // Auto-mark notifications as read when user enters this page (and on realtime refresh while here).
+  useEffect(() => {
+    if (list.length === 0) return;
+    for (const n of list) {
+      const key = getNotificationItemKey(n);
+      if (!isNotificationRead(key)) {
+        markNotificationRead(key);
+      }
+    }
+  }, [list, isNotificationRead, markNotificationRead]);
+
   const grouped = useCallback(() => {
     const groups: Record<string, NotificationItem[]> = {};
     GROUP_ORDER.forEach((g) => { groups[g] = []; });

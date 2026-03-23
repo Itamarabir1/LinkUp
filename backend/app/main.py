@@ -3,7 +3,7 @@ import re
 import uuid
 
 from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -14,6 +14,7 @@ from app.core.exceptions.handlers import LinkupError, linkup_exception_handler
 from app.core.middleware import HTTPSRedirectMiddleware, SecurityHeadersMiddleware
 from app.db.session import engine
 from app.api.v1.api_router import api_router
+from app.infrastructure.health.health_service import check_health
 
 # רישום כל המודלים לפני טעינת admin (מניעת "expression 'Group' failed to locate a name")
 import app.db.models  # noqa: F401
@@ -154,9 +155,11 @@ def read_root():
 
 
 @app.get("/api/v1/health", tags=["Health"])
-def api_health():
-    """פתח בדפדפן: http://localhost:8000/api/v1/health – אם אתה רואה את זה, הבקאנד הנכון רץ."""
-    return {"ok": True, "message": "Linkup API", "version": "1.0.0"}
+async def api_health(response: Response):
+    """בדיקת תשתיות: DB, Redis, RabbitMQ. 503 אם אחד מהם לא זמין."""
+    health = await check_health()
+    response.status_code = 200 if health["status"] == "healthy" else 503
+    return health
 
 
 # הדפסה בעלייה – לוודא שהקוד הנכון רץ

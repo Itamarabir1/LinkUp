@@ -1,17 +1,14 @@
-# ============================================================
-# Local Development Override — DO NOT COMMIT docker-compose.override.yml
-# Copy this file: cp docker-compose.override.yml.example docker-compose.override.yml
-# docker-compose.override.yml is in .gitignore and should never be committed
-# ============================================================
-
+# Local Development Override — copy to docker-compose.override.yml (gitignored)
+# frontend + nginx רק עם --profile prod. בפיתוח: Vite על המחשב.
 services:
-  backend:
-    volumes:
-      - ./backend:/app
-    environment:
-      - DEBUG=true
-      - RELOAD=true
-
-  outbox-worker:
-    volumes:
-      - ./backend:/app
+  nginx:
+    profiles: ["prod"]
+  frontend:
+    profiles: ["prod"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: linkup_frontend
+    restart: unless-stopped
+    networks:
+      - linkup_network

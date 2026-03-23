@@ -36,13 +36,13 @@ class FCMClient:
             logger.warning("⚠️ Skipping push: No token provided")
             return None
 
-        # הכנת ההודעה (Firebase SDK)
-        # שים לב: כל הערכים בתוך data חייבים להיות Strings ב-FCM
-        safe_data = {k: str(v) for k, v in (data or {}).items()}
-
+        # הכנת ההודעה (Firebase SDK) — data בלבד; כל הערכים חייבים להיות Strings ב-FCM
         message = messaging.Message(
-            notification=messaging.Notification(title=title, body=body),
-            data=safe_data,
+            data={
+                'title': title,
+                'body': body,
+                **{k: str(v) for k, v in (data or {}).items()},
+            },
             token=token,
         )
 

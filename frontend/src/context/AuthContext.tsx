@@ -6,7 +6,6 @@ import React, {
   useState,
 } from 'react';
 import { api, clearTokens, setTokens } from '../api/client';
-import { initFCM } from '../services/fcm';
 import type { User } from '../types/api';
 
 type AuthState = {
@@ -127,10 +126,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearTokens();
     setState({ user: null, isAuthenticated: false, isLoading: false });
   }, []);
-
-  useEffect(() => {
-    if (state.user) void initFCM();
-  }, [state.user]);
 
   const value: AuthContextValue = {
     ...state,

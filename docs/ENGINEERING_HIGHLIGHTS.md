@@ -18,7 +18,7 @@
 | **צ’אט** | הודעות real-time, typing, נראות (online / last seen), **unread** (Redis→WS), קריאת שיחה |
 | **קבוצות** | יצירה, **קוד הזמנה** (`invite_code`), הצטרפות בקישור, ניהול admin |
 | **AI** | סיום שיחה → ניתוח (Groq) → שמירה + התראות |
-| **התראות** | מייל (**Brevo**), Push (**FCM** — Firebase Cloud Messaging), in-app |
+| **התראות** | מייל (**Brevo**), Push (**FCM** — מהשרת רק מפת `data` ב־FCM, בלי שדה `notification` של Firebase; בחזית **Toast קופץ + צליל**, ברקע התראת מערכת דרך SW), in-app |
 | **משתמשים** | JWT + Refresh ב-DB, **כניסה עם Google** (OAuth / `id_token`), אווטאר (S3 + worker) |
 | **מפות** | Google: **Geocoding**, **Directions**, **Distance Matrix**, **Maps JS**; בנוסף **Nominatim** בחלק מהזרימות (ראו סעיף 2) |
 | **GPS בזמן אמת** | מיקום נהג לנוסעים, מיקום נוסעים לנהג (ערוצי Redis נפרדים + WS) |
@@ -39,7 +39,7 @@
 | פריסה | **Docker Compose**; **Kubernetes** (למשל `k8s/chat-ws`) |
 | AI (צ’אט) | **Groq** — מודל Llama (למשל `llama-3.3-70b-versatile`) לניתוח שיחה |
 | מייל | **Brevo** (API transactional) |
-| Push | **FCM** — שמירת `fcm_token` למשתמש, שליחה דרך Firebase Admin |
+| Push | **FCM** — `fcm_token` ב-DB; שליחה דרך Firebase Admin עם **`data` בלבד** (ללא בלוק `notification` של FCM); הצגה בידי האפליקציה: ברקע SW על `push`; בחזית **Toast + צליל** (`onMessage` + `payload.data`) |
 | כניסה Google | **Google Sign-In** — אימות `id_token` ב-backend; client ID משותף FE/BE (`backend/docs/GOOGLE_OAUTH.md`) |
 
 ### כל סוגי ה-API שקשורים למפות / מיקום (מלא)
@@ -217,14 +217,15 @@
 
 ### FCM + מייל (איפה בקוד)
 
-- **FCM**: `app/domain/notifications/channels/push` + `push_provider` — שליחה ל-`fcm_token` של המשתמש; טיפול בטוקן לא תקף.
+- **FCM (Backend)**: `app/domain/notifications/channels/push/client.py` — `messaging.Message` עם **`data` בלבד** (ללא `notification`), כולל `title` ו־`body` כמחרוזות + שדות metadata נוספים; `push_provider` שולח רק אם יש `fcm_token`; טיפול בטוקן לא תקף.
+- **FCM (Frontend)**: `frontend/src/services/fcm.ts` — הרשאות, רישום SW, `getToken` + `PATCH /users/fcm-token`; בחזית `onMessage` → קריאת `title`/`body` מ־**`payload.data`** (גיבוי ל־`notification`) → **Toast קופץ** + צליל; `firebase-messaging-sw.js` — **`push`** → `showNotification` כשהטאב ברקע. פירוט מלא: **`docs/FCM_SYSTEM_SUMMARY.md`**.
 - **מייל**: **Brevo** דרך `EmailClient` / `email_provider` — אימות מייל, איפוס סיסמה, התראות עסקיות דרך ה-notification pipeline.
 
 ---
 
 ## 9. DevOps ופריסה
 
-- **Docker Compose**: healthchecks, סיסמת Redis, volumes ל-RabbitMQ ו-Postgres.
+- **Docker Compose**: healthchecks, סיסמת Redis, volumes ל-RabbitMQ ו-Postgres; שירותי פיתוח (`db`, `redis`, `rabbitmq`, `outbox-worker`, `backend` עם **8000 ל-host**, `chat-ws`) ב־`docker compose up -d`; **frontend** סטטי + **nginx** ב־override עם `profiles: ["prod"]` — סטאק מלא על פורט 80 רק עם `--profile prod` וקובץ override. קובץ שירות Firebase נטען מ־host ל־**backend** ול־**outbox-worker** (volume read-only; `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env`) — נדרש ל־FCM מה־worker.
 - **גרסאות תמונות קבועות** (לא `latest` בשירותים קריטיים) — builds חוזרים.
 - **K8s**: deployment ל-`chat-ws` עם env (למשל `BACKEND_URL`) ל-worker של last-seen.
 
@@ -245,7 +246,7 @@
 | סינכרון / אסינכרון + RabbitMQ | סעיף 6 |
 | Workers רצים תמיד vs מתוזמנים | סעיף 2א |
 | AI (Groq / Llama) | סעיפים 2, 8 |
-| FCM | סעיפים 1, 2, 8 |
+| FCM | סעיפים 1, 2, 8 + **`docs/FCM_SYSTEM_SUMMARY.md`** |
 | מייל Brevo | סעיפים 1, 2, 6, 8 |
 | כניסה עם Google | סעיפים 1, 2, 7א |
 | אבטחה + rate limit | סעיפים 7, 7א |

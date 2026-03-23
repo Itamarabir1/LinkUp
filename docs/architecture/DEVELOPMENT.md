@@ -20,17 +20,16 @@
    - `chat-ws/.env` — PORT, REDIS_URL, SECRET_KEY (JWT).
 
 2. **הרצה עם Docker**
-   ```bash
-   docker compose up -d
-   ```
-   - Backend רץ עם `alembic upgrade head && gunicorn app.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000`.
-   - Outbox-worker: `python -m app.workers.main_worker`.
-   - Chat-ws: פורט 8081.
+   - `docker-compose.yml`: ל־`db`, `redis`, `rabbitmq`, `outbox-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **backend** עם **`8000:8000`** ל־host (Vite מקומי → API). ל־**nginx** יש `profiles: ["prod"]` בבסיס; **`frontend` (סטטי)** מוגדר ב־`docker-compose.override.yml` עם `profiles: ["prod"]` — בלי override מתאים, `docker compose --profile prod` ייכשל (`nginx` תלוי ב־`frontend`).
+   - `docker-compose.override.yml` (מומלץ; העתק מ־`docker-compose.override.yml.example`) — `nginx` + `frontend` עם `profiles: ["prod"]` והגדרת build מלאה ל־frontend.
+   - **פיתוח:** `docker compose up -d` → תשתית + worker + backend (**8000**) + chat-ws (**8081**). פרונט: **`npm run dev`** על המחשב, לא קונטיינר frontend.
+   - **סטאק מלא מאחורי Nginx (פורט 80):** `docker compose --profile prod up -d` (עם override).
+   - **FCM:** `firebase-credentials.json` ממופה read-only ל־**backend** ול־**outbox-worker** (נתיב בקונטיינר: `/app/infrastructure/firebase_core/firebase-credentials.json`); `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env` חייב להתאים (הקובץ לא נכנס ל־image בגלל `.dockerignore`).
 
-3. **הרצה לוקאלית (בלי Docker ל-backend)**
-   - הפעל רק db, redis, rabbitmq: `docker compose up -d db redis rabbitmq`.
-   - מתוך `backend/`: `alembic upgrade head`, ואז `uvicorn app.main:app --reload` (פיתוח לוקאלי) או `gunicorn app.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000` (פרודקשן).
-   - Worker בנפרד: `python -m app.workers.main_worker`.
+3. **הרצה לוקאלית (בלי Docker ל-backend / frontend)**
+   - תשתיות + worker: `docker compose up -d` (או לפחות `db`, `redis`, `rabbitmq`, `chat-ws`; אם `outbox-worker` כבר רץ ב־Compose — **אל** תריץ במקביל `python -m app.workers.main_worker` מקומית).
+   - מתוך `backend/`: `alembic upgrade head`, ואז `uvicorn app.main:app --reload` (פורט 8000 — מתאים ל־`frontend` ב־dev, ראו `frontend/src/config/env.ts`).
+   - Worker מקומי: רק אם **אין** `outbox-worker` בדוקר — `python -m app.workers.main_worker`.
 
 ---
 
@@ -133,10 +132,18 @@ Linkup/
 │   ├── cmd/server/
 │   ├── internal/auth, hub, redis
 │   └── Dockerfile
-├── docs/                    # DATABASE.md, API.md, EVENTS.md, REALTIME.md, DEVELOPMENT.md
+├── docs/                    # architecture/*, ENGINEERING_HIGHLIGHTS, FCM_SYSTEM_SUMMARY, …
 ├── docker-compose.yml
 └── ARCHITECTURE.md          # סקירה ברמה גבוהה
 ```
+
+---
+
+## Push (FCM) — Web
+
+- פרונט: משתני `VITE_FIREBASE_*` + `VITE_FIREBASE_VAPID_KEY` ב־`frontend/.env` (ראה `frontend/.env.example`).
+- בקאנד: `FIREBASE_CREDENTIALS_JSON` או `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env`.
+- זרימה מלאה (FCM מהשרת: `data` בלבד; Service Worker; Toast + צליל בחזית): **`docs/FCM_SYSTEM_SUMMARY.md`**.
 
 ---
 

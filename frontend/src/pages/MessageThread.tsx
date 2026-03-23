@@ -10,7 +10,7 @@ import {
   type MessageResponse,
 } from '../api/client';
 import { api, chatWsApi } from '../api/client';
-import { CHAT_WS_URL } from '../config/env';
+import { getChatWebSocketUrl } from '../config/env';
 import { formatDateTimeNoSeconds } from '../utils/date';
 import styles from './MessageThread.module.css';
 
@@ -27,6 +27,7 @@ export interface MessageThreadProps {
 export default function MessageThread({ conversationId: propConversationId, embedded }: MessageThreadProps = {}) {
   const { conversationId: paramId } = useParams<{ conversationId: string }>();
   const conversationId = propConversationId ?? paramId ?? '';
+  const cid = conversationId;
   const { user } = useAuth();
   const { refreshUnread } = useChat();
   const [conversation, setConversation] = useState<ConversationDetail | null>(null);
@@ -37,7 +38,14 @@ export default function MessageThread({ conversationId: propConversationId, embe
   const [loadingMore, setLoadingMore] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(() => {
+    if (!cid) return '';
+    try {
+      return localStorage.getItem(`chat_draft_${cid}`) ?? '';
+    } catch {
+      return '';
+    }
+  });
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [partnerTypingName, setPartnerTypingName] = useState<string | null>(null);
   const [partnerPresence, setPartnerPresence] = useState<{
@@ -50,12 +58,27 @@ export default function MessageThread({ conversationId: propConversationId, embe
   const typingHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const partnerIdRef = useRef<string | undefined>(undefined);
 
-  const cid = conversationId;
   const partnerId = conversation?.partner?.user_id;
 
   useEffect(() => {
     partnerIdRef.current = partnerId;
   }, [partnerId]);
+
+  // טעינת draft מהשיחה החדשה + איפוס אינדיקטורי שותף כשעוברים בין שיחות
+  useEffect(() => {
+    if (typingHideTimeoutRef.current) {
+      clearTimeout(typingHideTimeoutRef.current);
+      typingHideTimeoutRef.current = null;
+    }
+    setPartnerTyping(false);
+    setPartnerTypingName(null);
+    setPartnerPresence(null);
+    try {
+      setInput(cid ? localStorage.getItem(`chat_draft_${cid}`) ?? '' : '');
+    } catch {
+      setInput('');
+    }
+  }, [cid]);
 
   function formatLastSeen(isoString: string): string {
     const date = new Date(isoString);
@@ -159,85 +182,121 @@ export default function MessageThread({ conversationId: propConversationId, embe
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // WebSocket: connect when we have conversation id and token; handle incoming messages and typing.
+  // WebSocket: connect when we have conversation id and token; reconnect after close/error.
   useEffect(() => {
     if (!cid) return;
-    const token = localStorage.getItem('linkup_access_token');
-    if (!token) return;
+    let cancelled = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const url = `${CHAT_WS_URL}/ws?token=${encodeURIComponent(token)}`;
-    let ws: WebSocket;
-    try {
-      ws = new WebSocket(url.startsWith('ws') ? url : `ws://${url.replace(/^https?:\/\//, '')}`);
-    } catch {
-      return;
-    }
-    wsRef.current = ws;
-
-    ws.onmessage = (event) => {
-      const chunks = String(event.data).split('\n');
-      for (const line of chunks) {
-        if (!line.trim()) continue;
-        let data: Record<string, unknown>;
-        try {
-          data = JSON.parse(line) as Record<string, unknown>;
-        } catch {
-          continue;
-        }
-        if (data?.type === 'user_offline') {
-          const uid = String(data.user_id ?? '');
-          if (uid && uid === partnerIdRef.current) {
-            setPartnerPresence((prev) => ({
-              online: false,
-              last_seen: prev?.last_seen ?? null,
-            }));
-          }
-          continue;
-        }
-        if (data?.type === 'unread_count') {
-          void refreshUnread();
-          continue;
-        }
-        if (typeof data?.message_id === 'number' && data?.conversation_id === cid) {
-          void api
-            .post(`/chat/conversations/${cid}/read`)
-            .then(() => refreshUnread())
-            .catch(() => {});
-        }
-        if (data?.type === 'typing_start') {
-          setPartnerTyping(true);
-          setPartnerTypingName((data.full_name as string) || null);
-          if (typingHideTimeoutRef.current) clearTimeout(typingHideTimeoutRef.current);
-          typingHideTimeoutRef.current = setTimeout(() => {
-            setPartnerTyping(false);
-            setPartnerTypingName(null);
-            typingHideTimeoutRef.current = null;
-          }, TYPING_DISPLAY_TIMEOUT_MS);
-          continue;
-        }
-        if (data?.type === 'typing_stop' && data?.conversation_id === cid) {
-          setPartnerTyping(false);
-          setPartnerTypingName(null);
-          if (typingHideTimeoutRef.current) {
-            clearTimeout(typingHideTimeoutRef.current);
-            typingHideTimeoutRef.current = null;
-          }
-          continue;
-        }
-        if (typeof (data as unknown as MessageResponse).message_id === 'number') {
-          const msg = data as unknown as MessageResponse;
-          setMessages((prev) => [...prev, msg]);
-          if (msg.sender_id !== user?.user_id) setPartnerTyping(false);
-        }
-      }
+    const scheduleReconnect = () => {
+      if (cancelled) return;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, 3000);
     };
 
+    const connect = () => {
+      const token = localStorage.getItem('linkup_access_token');
+      if (!token || cancelled) return;
+
+      const url = getChatWebSocketUrl(token);
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(url);
+      } catch {
+        scheduleReconnect();
+        return;
+      }
+      wsRef.current = ws;
+
+      ws.onmessage = (event) => {
+        const chunks = String(event.data).split('\n');
+        for (const line of chunks) {
+          if (!line.trim()) continue;
+          let data: Record<string, unknown>;
+          try {
+            data = JSON.parse(line) as Record<string, unknown>;
+          } catch {
+            continue;
+          }
+          if (data?.type === 'user_offline') {
+            const uid = String(data.user_id ?? '');
+            if (uid && uid === partnerIdRef.current) {
+              setPartnerPresence((prev) => ({
+                online: false,
+                last_seen: prev?.last_seen ?? null,
+              }));
+            }
+            continue;
+          }
+          if (data?.type === 'unread_count') {
+            void refreshUnread();
+            continue;
+          }
+          if (typeof data?.message_id === 'number' && data?.conversation_id === cid) {
+            void api
+              .post(`/chat/conversations/${cid}/read`)
+              .then(() => refreshUnread())
+              .catch(() => {});
+          }
+          if (data?.type === 'typing_start' && data?.user_id !== user?.user_id) {
+            setPartnerTyping(true);
+            setPartnerTypingName((data.full_name as string) || null);
+            if (typingHideTimeoutRef.current) clearTimeout(typingHideTimeoutRef.current);
+            typingHideTimeoutRef.current = setTimeout(() => {
+              setPartnerTyping(false);
+              setPartnerTypingName(null);
+              typingHideTimeoutRef.current = null;
+            }, TYPING_DISPLAY_TIMEOUT_MS);
+            continue;
+          }
+          if (
+            data?.type === 'typing_stop' &&
+            data?.conversation_id === cid &&
+            data?.user_id !== user?.user_id
+          ) {
+            setPartnerTyping(false);
+            setPartnerTypingName(null);
+            if (typingHideTimeoutRef.current) {
+              clearTimeout(typingHideTimeoutRef.current);
+              typingHideTimeoutRef.current = null;
+            }
+            continue;
+          }
+          if (typeof (data as unknown as MessageResponse).message_id === 'number') {
+            const msg = data as unknown as MessageResponse;
+            setMessages((prev) => [...prev, msg]);
+            if (msg.sender_id !== user?.user_id) setPartnerTyping(false);
+          }
+        }
+      };
+
+      ws.onclose = () => {
+        wsRef.current = null;
+        if (!cancelled) {
+          scheduleReconnect();
+        }
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
+    };
+
+    connect();
+
     return () => {
+      cancelled = true;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
       if (typingHideTimeoutRef.current) {
         clearTimeout(typingHideTimeoutRef.current);
         typingHideTimeoutRef.current = null;
       }
-      ws.close();
+      wsRef.current?.close();
       wsRef.current = null;
     };
   }, [cid, user?.user_id, refreshUnread]);
@@ -292,6 +351,11 @@ export default function MessageThread({ conversationId: propConversationId, embe
       const { data } = await sendMessage(cid, body);
       setMessages((prev) => [...prev, data]);
       setInput('');
+      try {
+        localStorage.removeItem(`chat_draft_${cid}`);
+      } catch {
+        // ignore
+      }
       sendTypingStop();
     } catch {
       setError('שליחת ההודעה נכשלה');
@@ -438,20 +502,26 @@ export default function MessageThread({ conversationId: propConversationId, embe
             );
           })
         )}
-        {partnerTyping && (
-          <p className={styles.emptyText} style={{ margin: 0, fontSize: '0.875rem', opacity: 0.8 }}>
-            {partnerTypingName ? `${partnerTypingName} מקליד...` : 'מקליד...'}
-          </p>
-        )}
         <div ref={messagesEndRef} />
       </div>
       <form onSubmit={handleSend} style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
         <input
           type="text"
           value={input}
-          onBlur={sendTypingStop}
           onChange={(e) => {
-            setInput(e.target.value);
+            const val = e.target.value;
+            setInput(val);
+            if (cid) {
+              try {
+                if (val) {
+                  localStorage.setItem(`chat_draft_${cid}`, val);
+                } else {
+                  localStorage.removeItem(`chat_draft_${cid}`);
+                }
+              } catch {
+                // ignore (private mode, quota, …)
+              }
+            }
             sendTypingIfNeeded();
           }}
           placeholder="כתוב הודעה..."
