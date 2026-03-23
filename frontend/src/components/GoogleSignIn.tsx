@@ -172,7 +172,7 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
       setScriptLoaded(false);
       initializedRef.current = false;
     };
-  }, [onError]);
+  }, [onError]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: effect runs once on mount, initialized/scriptLoaded are managed internally
 
   // הגדרת ה-callback
   useEffect(() => {

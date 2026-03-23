@@ -5,7 +5,6 @@ import { api } from '../api/client';
 import type { Ride } from '../types/api';
 import { formatDateTimeNoSeconds } from '../utils/date';
 import { getWsBaseUrl } from '../config/env';
-import { useAuth } from '../context/AuthContext';
 import { useGroup } from '../context/GroupContext';
 import Chips, { type ChipItem } from '../components/Chips/Chips';
 import RideCard from '../components/RideCard/RideCard';
@@ -26,7 +25,6 @@ function getStatusLabel(r: Ride): string {
 
 export default function MyRides() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { myGroups } = useGroup();
   const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +68,7 @@ export default function MyRides() {
     } finally {
       setLoading(false);
     }
-  }, [user?.user_id]);
+  }, []);
 
   useEffect(() => {
     fetchRides();
@@ -109,9 +107,10 @@ export default function MyRides() {
   }, [rides]);
 
   useEffect(() => {
+    const refs = wsRefs.current;
     return () => {
-      wsRefs.current.forEach((sock) => sock.close());
-      wsRefs.current.clear();
+      refs.forEach((sock) => sock.close());
+      refs.clear();
     };
   }, []);
 

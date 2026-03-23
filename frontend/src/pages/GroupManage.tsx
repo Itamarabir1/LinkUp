@@ -159,11 +159,11 @@ export default function GroupManage() {
 
   useEffect(() => {
     if (group) setEditNameValue(group.name);
-  }, [group?.name]);
+  }, [group]);
 
   useEffect(() => {
     if (group) setEditDescriptionValue(group.description ?? '');
-  }, [group?.description]);
+  }, [group]);
 
   const handleAvatarClick = () => {
     if (!isAdmin) return;

@@ -39,17 +39,6 @@ export function useMapMarker(
       markerRef.current?.setMap(null);
       markerRef.current = null;
     };
-  }, [map, options.title, options.color, options.scale, options.strokeWeight]);
-
-  useEffect(() => {
-    const m = markerRef.current;
-    if (!m) return;
-    if (!position) {
-      m.setVisible(false);
-      return;
-    }
-    m.setPosition(position);
-    m.setVisible(true);
-  }, [position]);
+  }, [map, options.title, options.color, options.scale, options.strokeWeight, position]);
 }
 
