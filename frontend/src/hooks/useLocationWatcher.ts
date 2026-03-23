@@ -24,8 +24,10 @@ export function useLocationWatcher({
   const lastSentRef = useRef<number>(0);
   const onPositionRef = useRef(onPosition);
   const onErrorRef = useRef(onError);
-  onPositionRef.current = onPosition;
-  onErrorRef.current = onError;
+  useEffect(() => {
+    onPositionRef.current = onPosition;
+    onErrorRef.current = onError;
+  });
 
   useEffect(() => {
     if (!enabled) {

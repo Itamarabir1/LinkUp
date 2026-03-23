@@ -216,7 +216,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
   useEffect(() => {
     if (!user?.user_id) return;
-    void refreshUnread();
+    void (async () => { await refreshUnread(); })();
     const interval = setInterval(refreshUnread, 30000);
     return () => clearInterval(interval);
   }, [user?.user_id, refreshUnread]);

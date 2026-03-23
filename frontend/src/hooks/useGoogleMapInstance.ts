@@ -16,14 +16,14 @@ export function useGoogleMapInstance(
   useEffect(() => {
     if (resolvedKey === null) return;
     if (!resolvedKey) {
-      setLoadError('לא הוגדר מפתח מפה');
+      queueMicrotask(() => setLoadError('לא הוגדר מפתח מפה'));
       return;
     }
-    setLoadError(null);
+    queueMicrotask(() => setLoadError(null));
 
     if (window.google?.maps) {
       scriptLoadedRef.current = true;
-      setScriptLoaded(true);
+      queueMicrotask(() => setScriptLoaded(true));
       return;
     }
 

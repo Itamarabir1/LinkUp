@@ -33,7 +33,9 @@ export function useGoogleMapsKey() {
   }, []);
 
   useEffect(() => {
-    if (resolvedKey === '') setLoadError('לא הוגדר מפתח מפה');
+    if (resolvedKey === '') {
+      queueMicrotask(() => setLoadError('לא הוגדר מפתח מפה'));
+    }
   }, [resolvedKey]);
 
   return { resolvedKey, loadError };

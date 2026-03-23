@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getGroupByInviteCode, joinGroup } from '../api/groups';
@@ -48,12 +49,16 @@ export default function JoinGroup() {
       } else {
         navigate('/', { replace: true });
       }
-    } catch (error: any) {
-      const status = error?.response?.status;
-      if (status === 409) {
-        setError('אתה כבר חבר בקבוצה זו');
-      } else if (status === 404) {
-        setError('קוד ההצטרפות אינו תקף');
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        if (status === 409) {
+          setError('אתה כבר חבר בקבוצה זו');
+        } else if (status === 404) {
+          setError('קוד ההצטרפות אינו תקף');
+        } else {
+          setError('הצטרפות לקבוצה נכשלה');
+        }
       } else {
         setError('הצטרפות לקבוצה נכשלה');
       }

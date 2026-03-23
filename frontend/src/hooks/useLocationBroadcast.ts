@@ -39,9 +39,11 @@ export function useLocationBroadcast(options: UseLocationBroadcastOptions) {
   const onPositionRef = useRef(onPosition);
   const onStartRef = useRef(onStart);
   const onStopRef = useRef(onStop);
-  onPositionRef.current = onPosition;
-  onStartRef.current = onStart;
-  onStopRef.current = onStop;
+  useEffect(() => {
+    onPositionRef.current = onPosition;
+    onStartRef.current = onStart;
+    onStopRef.current = onStop;
+  });
 
   const fetchOneBookingId = useCallback(async (rId: string, dId: string): Promise<string | null> => {
     try {

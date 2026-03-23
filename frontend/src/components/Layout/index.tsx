@@ -15,7 +15,9 @@ export default function Layout() {
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
-  const [notifPermission, setNotifPermission] = useState<NotificationPermission | null>(null);
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | null>(
+    'Notification' in window ? Notification.permission : null
+  );
 
   const showChatPopup = openConversationId && location.pathname !== '/messages';
 
@@ -30,12 +32,6 @@ export default function Layout() {
     };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    if ('Notification' in window) {
-      setNotifPermission(Notification.permission);
-    }
   }, []);
 
   useEffect(() => {

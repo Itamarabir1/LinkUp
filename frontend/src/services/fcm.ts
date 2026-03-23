@@ -5,7 +5,7 @@ import {
 } from '../config/firebase';
 import { api } from '../api/client';
 import { playNotificationChime } from '../utils/notificationSound';
-import { triggerNotificationToast } from '../components/NotificationToast/NotificationToast';
+import { triggerNotificationToast } from '../components/NotificationToast/notificationToast.utils';
 
 let foregroundUnsubscribe: (() => void) | null = null;
 

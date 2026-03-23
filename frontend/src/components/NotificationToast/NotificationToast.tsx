@@ -1,23 +1,13 @@
 import { useEffect, useState } from 'react';
+import { setShowToastFn, type ToastData } from './notificationToast.utils';
 import styles from './NotificationToast.module.css';
-
-interface ToastData {
-  title: string;
-  body: string;
-}
-
-let showToastFn: ((data: ToastData) => void) | null = null;
-
-export function triggerNotificationToast(data: ToastData) {
-  showToastFn?.(data);
-}
 
 export function NotificationToast() {
   const [toast, setToast] = useState<ToastData | null>(null);
 
   useEffect(() => {
-    showToastFn = setToast;
-    return () => { showToastFn = null; };
+    setShowToastFn(setToast);
+    return () => setShowToastFn(null);
   }, []);
 
   useEffect(() => {
