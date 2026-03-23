@@ -17,16 +17,19 @@ defaults:
 jobs:
   lint-and-build:
     runs-on: ubuntu-latest
+    # JS-based actions (checkout, setup-node, docker/*) run on Node 24 per GitHub deprecation timeline
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
@@ -41,7 +44,7 @@ jobs:
 
       - name: Login to GHCR
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -54,7 +57,7 @@ jobs:
 
       - name: Build and push frontend image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: true
