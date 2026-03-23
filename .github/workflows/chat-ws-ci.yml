@@ -42,10 +42,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set lowercase owner
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        id: lowercase
+        run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - name: Build and push chat-ws image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: docker/build-push-action@v5
         with:
           context: ./chat-ws
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/linkup-chat-ws:latest
+          tags: ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup-chat-ws:latest
