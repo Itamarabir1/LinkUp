@@ -174,6 +174,7 @@
 | **Pessimistic locking** | אישור/ביטול הזמנה תחת `SELECT FOR UPDATE` — מונע race ו”כפל” לוגיקה תחרותית על אותה נסיעה. |
 | **JWT קצר + Refresh ב-DB** | אבטחה + אפשרות לביטול sessions. |
 | **Rate limiting (Redis)** | על **register**, **login / refresh** ונקודות auth נוספות — מונה ב-Redis, חלון זמן + מקסימום בקשות ל-IP — מגביל הרשמה/כניסה אגרסיבית. |
+| **מניעת username enumeration (OWASP)** | לוגין: **אותה** `InvalidCredentialsError` (401) לאימייל שלא קיים ולסיסמה שגויה — לא חושפים אם המשתמש רשום. |
 | **bcrypt ב-thread pool** | `get_password_hash` / `verify_password` — **async** עם `asyncio.get_running_loop().run_in_executor` — לא חוסמים את לולאת ה-ASGI תחת עומס סיסמאות. |
 | **Request ID** | `X-Request-ID` — מעקב בין לוגים לבקשה. |
 | **JSON logging בפרודקשן** | ingestion ל-ELK / CloudWatch בעתיד. |
@@ -205,6 +206,7 @@
 | סיסמאות | Hash (**bcrypt** / passlib); חישוב ואימות **אסינכרוניים** דרך **`run_in_executor`** (לא חוסמים event loop). |
 | OTP (אימות מייל וכו’) | יצירה עם **`secrets`**; השוואה עם **`hmac.compare_digest`**; מונה ניסיונות ב-Redis; איפוס מונה בעת **`create_verification_event`** (קוד חדש). |
 | עומס על Auth | **Rate limit** (Redis) על נקודות רגישות — כולל **`POST /register`**, login, refresh וכו’. |
+| User enumeration | **OWASP:** בלוגין — `InvalidCredentialsError` זהה לאימייל לא קיים **ול** סיסמה שגויה (אין הבחנה בתגובה). |
 | סשן | JWT (HS256), `SECRET_KEY` חובה בפרודקשן; אותו סוד ל-chat-ws לאימות WS. |
 | Google | אימות טוקן מול Google; לא מחליפים לבד ללא אימות שרת. |
 | HTTP | CORS מוגדר (`CORS_ORIGINS` / `FRONTEND_URL`); אופציה לכפיית HTTPS מאחורי proxy. |
@@ -251,7 +253,7 @@
 | FCM | סעיפים 1, 2, 8 + **`docs/FCM_SYSTEM_SUMMARY.md`** |
 | מייל Brevo | סעיפים 1, 2, 6, 8 |
 | כניסה עם Google | סעיפים 1, 2, 7א |
-| אבטחה + rate limit + OTP + מאגר DB | סעיפים 3, 7, 7א, 12 |
+| אבטחה + rate limit + OTP + מאגר DB + enumeration | סעיפים 3, 7, 7א, 7ב, 12 |
 | Google Maps (Directions + Distance Matrix) | **סעיף 2** (טבלת APIs) + סעיף 12 |
 | CI/CD, S3, מובייל, בדיקות | **סעיף 12** |
 | Unread WS, קבוצות, SQLAdmin, UUID, RTL, EIA | **סעיף 13** |
@@ -271,6 +273,7 @@
 | **דחיפת images ל-GHCR** | על push ל-`main`: build ו-push ל-`linkup-backend`, `linkup-frontend`, `linkup-chat-ws` — מוכן לפריסה מקונטיינרים. |
 | **uv ב-CI** | התקנת תלויות backend מהירה (`uv pip install`). |
 | **בדיקות אבטחה JWT** | `backend/tests/test_security.py` — טוקן תקין, פג תוקף, חתימה שגויה (מקרים קריטיים ל-auth). |
+| **בדיקות auth + OWASP enumeration** | `backend/tests/test_auth.py` (דורש `TEST_DATABASE_URL`) — רישום, אימייל כפול, סיסמה שגויה ואימייל לא קיים → אותה שגיאת לוגין. |
 
 ### העלאות קבצים — לא דרך ה-API
 
@@ -335,4 +338,4 @@
 
 ---
 
-*עודכן כחלק מתיעוד הפרויקט — כולל מאגר DB ניתן להגדרה, bcrypt אסינכרוני, rate limit על register, חיזוק OTP, ו-k6 (`backend/load_test.js`).*
+*עודכן כחלק מתיעוד הפרויקט — כולל מאגר DB ניתן להגדרה, bcrypt אסינכרוני, rate limit על register, חיזוק OTP, מניעת user enumeration בלוגין (OWASP), ו-k6 (`backend/load_test.js`).*

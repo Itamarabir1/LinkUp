@@ -14,6 +14,7 @@ Authorization: Bearer <access_token>
 
 - **Access Token**: מתקבל מ-`POST /auth/login` או `POST /auth/google-signin` או `POST /auth/refresh`. תוקף: `ACCESS_TOKEN_EXPIRE_MINUTES` (ברירת מחדל 30).
 - **Refresh Token**: נשמר ב-DB; משמש ל-`POST /auth/refresh` לקבלת access חדש. תוקף: `REFRESH_TOKEN_EXPIRE_DAYS` (7).
+- **לוגין מייל+סיסמה:** שגיאת אימות אחידה (**401**, `AUTH_INVALID_CREDENTIALS`) גם כשהאימייל לא רשום וגם כשהסיסמה שגויה — **מניעת username enumeration** (OWASP); אימות מייל (`is_verified`) נבדק רק אחרי אימות סיסמה מוצלח.
 
 ---
 

@@ -21,10 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 def _require_test_db_url() -> str:
     url = (os.environ.get("TEST_DATABASE_URL") or "").strip()
     if not url:
-        pytest.skip(
-            "Set TEST_DATABASE_URL to postgresql+asyncpg://... for DB integration tests "
-            "(models use PostGIS Geography — SQLite :memory: is not supported)."
-        )
+        # ברירת מחדל — ה-DB שרץ ב-docker-compose
+        url = "postgresql+asyncpg://admin:password123@localhost:5432/linkup_app"
     return url
 
 
