@@ -117,10 +117,9 @@ class S3Client:
         מחזיר URL עם חתימה דיגיטלית שמאפשר העלאה ישירה מהלקוח.
         """
         try:
-            # aioboto3: generate_presigned_url הוא sync function
             async with self._session.client("s3") as s3:
-                # generate_presigned_url הוא sync, לא צריך await
-                presigned_url = s3.generate_presigned_url(
+                # aiobotocore: generate_presigned_url הוא async (חייב await)
+                presigned_url = await s3.generate_presigned_url(
                     "put_object",
                     Params={
                         "Bucket": self.bucket_name,
