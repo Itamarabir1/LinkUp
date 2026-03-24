@@ -42,23 +42,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Install dependencies
-        run: |
-          pip install uv
-          uv pip install -e .
+        run: uv sync --frozen
 
       - name: Lint (ruff)
-        run: ruff check app/
+        run: uv run ruff check app/
 
       - name: Format check (ruff)
-        run: |
-          ruff format app/
-          git diff --exit-code
+        run: uv run ruff format --check app/
 
       - name: Run tests
         env:
           TEST_DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
-        run: pytest tests/ -v --tb=short
+        run: uv run pytest tests/ -v --tb=short
 
       - name: Login to GHCR
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
