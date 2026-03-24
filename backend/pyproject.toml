@@ -53,7 +53,7 @@ dependencies = [
 
     # --- Validation & Utilities ---
     "email-validator>=2.0.0",
-    "phonenumbers>=8.13.0",
+    "phonenumbers==8.13.48",
     "tenacity==8.5.0",
 
     # --- Admin Interface ---

@@ -12,4 +12,5 @@
 - [architecture/REALTIME.md](architecture/REALTIME.md) — WebSocket, Redis Pub/Sub, צ'אט
 - [ENGINEERING_HIGHLIGHTS.md](ENGINEERING_HIGHLIGHTS.md) — סיכום להצגה: פיצ'רים, סקייל, טריקים, real-time, Outbox
 - [FCM_SYSTEM_SUMMARY.md](FCM_SYSTEM_SUMMARY.md) — FCM end-to-end (שרת: מפת `data` בלבד; SW + Toast + צליל בפרונט)
-- [architecture/DEVELOPMENT.md](architecture/DEVELOPMENT.md) — Setup, env vars, מבנה פרויקט
+- [architecture/DEVELOPMENT.md](architecture/DEVELOPMENT.md) — Setup, env vars (שורש + `backend/.env`), **k6 load test**, מבנה פרויקט
+- [ENGINEERING_HIGHLIGHTS.md](ENGINEERING_HIGHLIGHTS.md) — כולל **סעיף 7ג** (auth בעומס), **סעיף 14** (ריפקטור פרונט)

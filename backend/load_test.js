@@ -1,4 +1,10 @@
 // k6 load test — auth register + login
+//
+// לפני הרצת load test — עדכן backend/.env:
+//   RATE_LIMIT_AUTH_MAX_REQUESTS=10000
+//   DEBUG=True   ← כדי שאימות אימייל יהיה אוטומטי
+// אחרי הבדיקה — החזר לערכים המקוריים.
+//
 // Prerequisites: backend up (e.g. docker-compose), manual register works in Swagger.
 // Run from this directory: k6 run load_test.js
 // Or from repo root: k6 run backend/load_test.js
@@ -44,13 +50,21 @@ export const options = {
 // פונקציות עזר
 // ============================================================
 
+// מספרים +972508XXXXXXX (050-8…) — טווח שעובר is_valid_number
+// __VU + __ITER מבטיחים ייחודיות בין כל האיטרציות בכל ה-VU-ים (כל עוד __ITER < 10000 לכל VU)
+function randomPhone() {
+  const vuId = __VU * 10000 + __ITER;
+  const suffix = String(8000000 + vuId).padStart(7, "0");
+  return `+97250${suffix}`;
+}
+
 // יוצר משתמש ייחודי לכל iteration (כדי לא לפגוע ב-unique constraint)
 function uniqueUser() {
   const id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   return {
     full_name: `Test User ${id}`,
     email: `test_${id}@loadtest.com`,
-    phone_number: `+9725${Math.floor(10000000 + Math.random() * 89999999)}`,
+    phone_number: randomPhone(),
     password: "Test@1234!",
     confirm_password: "Test@1234!",
   };
@@ -123,26 +137,22 @@ export default function () {
 // סיכום בסוף הריצה
 // ============================================================
 export function handleSummary(data) {
-  const r = data.metrics;
+  const dur_reg = data.metrics["register_duration"];
+  const dur_login = data.metrics["login_duration"];
+  const failed = data.metrics["http_req_failed"];
 
-  const summary = {
-    register: {
-      total:    r.http_reqs?.values?.count ?? 0,
-      errors:   `${((r.register_errors?.values?.rate ?? 0) * 100).toFixed(1)}%`,
-      p95_ms:   r.register_duration?.values?.["p(95)"] ?? 0,
-    },
-    login: {
-      errors:   `${((r.login_errors?.values?.rate ?? 0) * 100).toFixed(1)}%`,
-      p95_ms:   r.login_duration?.values?.["p(95)"] ?? 0,
-    },
-    thresholds_passed: !data.rootGroup.checks?.some?.(c => !c.passes),
-  };
-
-  console.log("\n===== תוצאות Load Test =====");
-  console.log(JSON.stringify(summary, null, 2));
-  console.log("============================\n");
-
-  return {
-    "load_test_summary.json": JSON.stringify(summary, null, 2),
-  };
+  console.log("\n=== LINKUP LOAD TEST SUMMARY ===");
+  if (dur_reg) {
+    console.log(`/register p95: ${dur_reg.values["p(95)"]?.toFixed(0)}ms`);
+  }
+  if (dur_login) {
+    console.log(`/login    p95: ${dur_login.values["p(95)"]?.toFixed(0)}ms`);
+  }
+  if (failed) {
+    const rate = (failed.values.rate * 100).toFixed(2);
+    console.log(
+      `Error rate: ${rate}% ${failed.values.rate < 0.05 ? "✅" : "❌"}`
+    );
+  }
+  return {};
 }

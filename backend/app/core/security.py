@@ -1,4 +1,5 @@
 import asyncio
+import base64
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -72,6 +73,20 @@ def decode_access_token(token: str) -> dict:
     logger = logging.getLogger(__name__)
 
     try:
+        # Reject non-canonical base64url signature segment (prevents accepting
+        # tampered tokens that still decode to the same bytes).
+        parts = token.split(".")
+        if len(parts) != 3:
+            return None
+        signature_segment = parts[2]
+        padded_signature = signature_segment + "=" * (-len(signature_segment) % 4)
+        signature_bytes = base64.urlsafe_b64decode(padded_signature.encode("ascii"))
+        canonical_signature = (
+            base64.urlsafe_b64encode(signature_bytes).decode("ascii").rstrip("=")
+        )
+        if signature_segment != canonical_signature:
+            return None
+
         payload = jwt.decode(
             token,
             settings.SECRET_KEY,

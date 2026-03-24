@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, cast, func, select
+from sqlalchemy import and_, cast, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from geoalchemy2 import Geography, Geometry
 from geoalchemy2.shape import from_shape
@@ -32,10 +32,12 @@ class CRUDPassenger:
 
     # --- שליפה ---
 
-    def get_by_id(self, db: Session, request_id: UUID) -> Optional[PassengerRequest]:
-        """שליפת בקשה לפי request_id (Session סינכרוני)."""
+    async def get_by_id(
+        self, db: AsyncSession, request_id: UUID
+    ) -> Optional[PassengerRequest]:
+        """שליפת בקשה לפי request_id (AsyncSession)."""
         rid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
-        return db.get(PassengerRequest, rid)
+        return await db.get(PassengerRequest, rid)
 
     async def get(self, db: AsyncSession, *, id: UUID) -> Optional[PassengerRequest]:
         """שליפת בקשה לפי request_id (AsyncSession – לשימוש ב־handler). חתימה: get(db, id=...)."""
@@ -60,9 +62,9 @@ class CRUDPassenger:
 
     # --- יצירה ---
 
-    def create(
+    async def create(
         self,
-        db: Session,
+        db: AsyncSession,
         request: PassengerRequestCreate,
         p_lat: float,
         p_lon: float,
@@ -92,15 +94,15 @@ class CRUDPassenger:
             status=PassengerStatus.ACTIVE,
         )
         db.add(db_request)
-        db.commit()
-        db.refresh(db_request)
+        await db.flush()
+        await db.refresh(db_request)
         return db_request
 
     # --- חיפוש נסיעות עבור נוסע ---
 
-    def find_rides_by_coordinates(
+    async def find_rides_by_coordinates(
         self,
-        db: Session,
+        db: AsyncSession,
         p_lat: float,
         p_lon: float,
         d_lat: float,
@@ -148,7 +150,9 @@ class CRUDPassenger:
                 Ride.departure_time <= latest,
             )
         if after_ride_id is not None:
-            after_ride = db.query(Ride).filter(Ride.ride_id == after_ride_id).first()
+            after_ride = (
+                await db.execute(select(Ride).where(Ride.ride_id == after_ride_id))
+            ).scalars().first()
             if after_ride is not None:
                 filters = and_(
                     filters,
@@ -160,8 +164,8 @@ class CRUDPassenger:
                         )
                     ),
                 )
-        query = (
-            db.query(Ride, Booking.status.label("user_booking_status"))
+        stmt = (
+            select(Ride, Booking.status.label("user_booking_status"))
             .outerjoin(
                 Booking,
                 and_(
@@ -173,14 +177,14 @@ class CRUDPassenger:
                     ),
                 ),
             )
-            .filter(filters)
+            .where(filters)
             .order_by(Ride.departure_time.asc(), Ride.ride_id.asc())
         )
         if passenger_id is not None:
-            query = query.where(Ride.driver_id != passenger_id)
+            stmt = stmt.where(Ride.driver_id != passenger_id)
         if limit is not None:
-            query = query.limit(limit + 1)
-        rows = query.all()
+            stmt = stmt.limit(limit + 1)
+        rows = (await db.execute(stmt)).all()
 
         # נורמליזציה: Booking.status יכול להגיע כ-enum או string, רוצים str|None
         normalized: List[tuple[Ride, Optional[str]]] = []
@@ -200,9 +204,9 @@ class CRUDPassenger:
 
     # --- חיפוש נוסעים עבור נהג ---
 
-    def find_passengers_on_route(
+    async def find_passengers_on_route(
         self,
-        db: Session,
+        db: AsyncSession,
         route_coords: list,
         radius_meters: int = 2000,
     ) -> List[PassengerRequest]:
@@ -213,9 +217,9 @@ class CRUDPassenger:
         try:
             line = LineString([(p[1], p[0]) for p in route_coords])
             route_geom = from_shape(line, srid=4326)
-            return (
-                db.query(PassengerRequest)
-                .filter(
+            stmt = (
+                select(PassengerRequest)
+                .where(
                     and_(
                         PassengerRequest.status == PassengerStatus.ACTIVE,
                         PassengerRequest.requested_departure_time > now,
@@ -226,15 +230,15 @@ class CRUDPassenger:
                         ),
                     )
                 )
-                .all()
             )
+            return list((await db.execute(stmt)).scalars().all())
         except Exception as e:
             logger.error("Error searching passengers on route: %s", e)
             return []
 
-    def find_passengers_by_start_end(
+    async def find_passengers_by_start_end(
         self,
-        db: Session,
+        db: AsyncSession,
         origin_lat: float,
         origin_lon: float,
         dest_lat: float,
@@ -245,9 +249,9 @@ class CRUDPassenger:
         now = datetime.now()
         driver_origin = func.ST_SetSRID(func.ST_MakePoint(origin_lon, origin_lat), 4326)
         driver_dest = func.ST_SetSRID(func.ST_MakePoint(dest_lon, dest_lat), 4326)
-        return (
-            db.query(PassengerRequest)
-            .filter(
+        stmt = (
+            select(PassengerRequest)
+            .where(
                 and_(
                     PassengerRequest.status == PassengerStatus.ACTIVE,
                     PassengerRequest.requested_departure_time > now,
@@ -263,8 +267,8 @@ class CRUDPassenger:
                     ),
                 )
             )
-            .all()
         )
+        return list((await db.execute(stmt)).scalars().all())
 
     def find_passengers_for_ride_notification(
         self,
@@ -373,35 +377,34 @@ class CRUDPassenger:
 
     # --- נסיעות (שליפה לצורך UI/רשימות) ---
 
-    def get_multi_rides(
+    async def get_multi_rides(
         self,
-        db: Session,
+        db: AsyncSession,
         status: Optional[str] = None,
         skip: int = 0,
         limit: int = 100,
     ) -> List[Ride]:
         """שליפת רשימת נסיעות עם סינון אופציונלי לפי סטטוס."""
-        query = db.query(Ride)
+        stmt = select(Ride)
         if status:
-            query = query.filter(Ride.status == status)
-        return query.offset(skip).limit(limit).all()
+            stmt = stmt.where(Ride.status == status)
+        stmt = stmt.offset(skip).limit(limit)
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
 
     # --- תחזוקה ---
 
     def close_expired_requests(self, db: Session, now: datetime) -> int:
         """סגירת בקשות שזמן היציאה עבר ולא שובצו. מחזיר מספר רשומות שעודכנו."""
-        result = (
-            db.query(PassengerRequest)
-            .filter(
+        result = db.execute(
+            update(PassengerRequest)
+            .where(
                 PassengerRequest.status == PassengerStatus.ACTIVE,
                 PassengerRequest.requested_departure_time < now,
             )
-            .update(
-                {PassengerRequest.status: PassengerStatus.EXPIRED.value},
-                synchronize_session=False,
-            )
+            .values({PassengerRequest.status: PassengerStatus.EXPIRED.value})
         )
-        return result
+        return result.rowcount or 0
 
 
 # Singleton לשימוש באפליקציה

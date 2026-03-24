@@ -1,5 +1,8 @@
 # --- Environment & secrets ---
 .env
+backend/.env
+frontend/.env
+chat-ws/.env
 **/.env
 .env.*
 !.env.example
@@ -105,8 +108,7 @@ yarn-debug.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# --- Docker (local overrides, keep compose in repo) ---
-# (docker-compose.yml is committed; docker-compose.override.yml is local-only)
+# --- Docker (legacy local override — לא בשימוש; frontend/nginx ב-docker-compose.yml) ---
 docker-compose.override.yml
 
 # --- Database dumps & local data ---

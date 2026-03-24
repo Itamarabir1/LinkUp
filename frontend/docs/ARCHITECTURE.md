@@ -1,6 +1,6 @@
 # Frontend architecture (Linkup)
 
-רשימת ריפקטור ואיכות מלאה (מקור אמת): [`FRONTEND_REFACTOR_AND_QUALITY.md`](./FRONTEND_REFACTOR_AND_QUALITY.md).
+רשימת ריפקטור ואיכות מלאה (מקור אמת): [`FRONTEND_REFACTOR_AND_QUALITY.md`](./FRONTEND_REFACTOR_AND_QUALITY.md). סיכום להצגה בפורטפוליו: [`../../docs/ENGINEERING_HIGHLIGHTS.md`](../../docs/ENGINEERING_HIGHLIGHTS.md) (סעיף 14).
 
 ## Stack
 
@@ -51,3 +51,7 @@
 - `npm run build` – `tsc -b` + Vite build
 - `npm run lint` – ESLint
 - `npm run test` – Vitest (node environment)
+
+## מבחני עומס (k6)
+
+עומס על **auth בבקאנד** (לא על הפרונט ישירות): סקריפט בשורש הפרויקט **`backend/load_test.js`** — ראו `backend/README.md` ו־`docs/ENGINEERING_HIGHLIGHTS.md`. הפרונט בפיתוח משתמש ב-proxy ל־API; ודאו שה-backend רץ לפני הרצת k6.

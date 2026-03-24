@@ -12,7 +12,8 @@ Linkup connects drivers and passengers for shared rides. Drivers publish trips w
 
 ## Engineering highlights (portfolio)
 
-Single doc for **stack, scale patterns, real-time chat (disconnect / last-seen debounce), Outbox, ops**: **[docs/ENGINEERING_HIGHLIGHTS.md](docs/ENGINEERING_HIGHLIGHTS.md)**.  
+Single doc for **stack, scale patterns, real-time chat (disconnect / last-seen debounce), Outbox, ops, CI/CD, tests, k6 load testing, auth under concurrent load (sync vs async), phone validation, frontend refactor**: **[docs/ENGINEERING_HIGHLIGHTS.md](docs/ENGINEERING_HIGHLIGHTS.md)**.  
+פרונט — רשימת ריפקטור מפורטת: **[frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md](frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md)**.  
 **FCM (Web push — `data` map מהשרת; SW + Toast + צליל):** **[docs/FCM_SYSTEM_SUMMARY.md](docs/FCM_SYSTEM_SUMMARY.md)**.
 
 ---
@@ -100,43 +101,64 @@ flowchart LR
 
 ## Getting Started
 
-**Prerequisites:** Docker, Docker Compose.
+**Prerequisites:** Docker, Docker Compose, Node 20+ (for local Vite dev).
 
 ```bash
 git clone <repository-url>
 cd Linkup
 ```
 
-Create environment files (see `backend/.env.example`, `frontend/.env.example`, `chat-ws/.env.example` for required variables):
+## הרצה מקומית
+
+### הכנה חד-פעמית
 
 ```bash
+cp .env.example .env
 cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
 cp chat-ws/.env.example chat-ws/.env
-# Edit *.env and set secrets (DB, Redis, RabbitMQ, JWT, Brevo, Google, Groq, S3, Firebase, etc.)
+cp frontend/.env.example frontend/.env
+# ערוך כל קובץ והכנס סודות אמיתיים
 ```
 
-**Docker Compose — מה עולה ומתי:**
+- **`.env` בשורש** — רק משתנים ש־`docker-compose` צורך להקמת Postgres / Redis / RabbitMQ; יישור עם `POSTGRES_*`, `REDIS_PASSWORD`, `RABBITMQ_*` ב־`backend/.env`.
+- **`chat-ws/.env`** — כולל `REDIS_URL` (לדוקר: `redis://:<סיסמה>@redis:6379/1`) ו־`JWT_SECRET` זהה ל־`SECRET_KEY` ב־`backend/.env`.
+- **FCM בדוקר:** `firebase-credentials.json` ממופה read-only ל־**backend** ול־**outbox-worker**; ב־`backend/.env` הגדר `FIREBASE_SERVICE_ACCOUNT_PATH` (נתיב בקונטיינר: `/app/infrastructure/firebase_core/firebase-credentials.json`).
 
-- ב־[`docker-compose.yml`](docker-compose.yml) **אין profile** על `db`, `redis`, `rabbitmq`, `outbox-worker`, `backend`, `chat-ws` — כולם עולים ב־`docker compose up -d`. **ה־backend** מפרסם **`8000:8000`** ל־host (Vite על המחשב → `localhost:8000`).
-- **`nginx`** ו־**`frontend`** (אימג׳ סטטי) **לא** בקובץ הבסיסי לפיתוח: הם מוגדרים ב־[`docker-compose.override.yml`](docker-compose.override.yml) עם `profiles: ["prod"]` — עולים רק עם `--profile prod`. **חובה** קובץ override כזה (העתק מ־[`.example`](docker-compose.override.yml.example)) אם רוצים `docker compose --profile prod` — בלי `frontend` בפרויקט, `nginx` ייכשל ב־`depends_on`.
+מיגרציות (פעם ראשונה / אחרי שינוי סכימה): `cd backend && alembic upgrade head` (עם `db/schema.sql` כעזר).
+
+### פיתוח יומיומי
 
 ```bash
+# טרמינל 1
 docker compose up -d
+
+# טרמינל 2
+cd frontend && npm run dev
 ```
 
-→ `db`, `redis`, `rabbitmq`, `outbox-worker`, `backend` (**פורט 8000** ל־host), `chat-ws` (**8081**). **לא** `frontend` בקונטיינר, **לא** nginx.
+- **פרונט:** http://localhost:5173  
+- **בקאנד:** http://localhost:8000  
+- **Swagger:** http://localhost:8000/docs  
+- צ׳אט בפיתוח: WebSocket ל־`localhost:8081`; WS נסיעות ל־`localhost:8000/api/v1` — ראו [`frontend/src/config/env.ts`](frontend/src/config/env.ts).
+
+ב־[`docker-compose.yml`](docker-compose.yml) שירותי **`frontend`** ו־**`nginx`** מוגדרים עם `profiles: ["prod"]` — לא עולים ב־`docker compose up -d` ללא הפרופיל.
+
+### בדיקת פרודקשן
 
 ```bash
 docker compose --profile prod up -d --build
 ```
 
-(עם override שמכיל `frontend` + `nginx`) — <http://localhost> (API, צ׳אט, פרונט סטטי).
+הכל מאחורי Nginx: http://localhost:80
 
-- **פיתוח נפוץ (אפשרות ב):** `docker compose up -d` + `cd frontend && npm run dev` (Vite **5173**). ה־API מהדפדפן: proxy ל־**`http://localhost:8000`** (ה־backend בדוקר). צ׳אט: **WebSocket ישיר ל־`localhost:8081`**, WS נסיעות ל־**`localhost:8000/api/v1`** (ראו `frontend/src/config/env.ts`). אופציונלי: `uvicorn` מקומי במקום backend בדוקר.
-- **FCM בדוקר:** קובץ שירות Firebase נטען מ־host דרך volume ל־**backend** ול־**outbox-worker** (נתיב בקונטיינר: `/app/infrastructure/firebase_core/firebase-credentials.json`); ב־`backend/.env` הגדר `FIREBASE_SERVICE_ACCOUNT_PATH` בהתאם (הקובץ מוחרג מ־image בגלל `.dockerignore`).
+### פקודות שימושיות
 
-Apply the database schema once (see `db/schema.sql`) and run migrations: `cd backend && alembic upgrade head`.
+```bash
+docker compose down          # עצור
+docker compose down -v       # עצור + איפוס volumes (DB וכו׳)
+docker compose logs backend  # לוגים
+docker compose ps            # סטטוס
+```
 
 ---
 
@@ -163,7 +185,7 @@ Apply the database schema once (see `db/schema.sql`) and run migrations: `cd bac
 - **Pessimistic locking:** booking approve/cancel use `SELECT ... FOR UPDATE` on the ride to avoid race conditions.
 - **Connection pooling:** async SQLAlchemy pool — `pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle`, `pool_pre_ping` מ-`settings` / `.env` (`DB_POOL_*`); indexes on rides, bookings, group_members, passenger_requests — see `docs/architecture/DATABASE.md`.
 - **Auth hardening:** bcrypt hashing/verify רץ ב-**thread pool** (`asyncio.run_in_executor`) כדי לא לחסום את event loop; **rate limit** על `/register` ועל login/refresh (Redis); OTP: `secrets`, `hmac.compare_digest`, מונה ניסיונות + איפוס בקוד חדש; **מניעת username enumeration בלוגין** (אותה תגובת שגיאה לאימייל לא קיים ולסיסמה שגויה — OWASP) — ראו `docs/ENGINEERING_HIGHLIGHTS.md` ו-`ARCHITECTURE.md` (Security).
-- **Load testing (optional):** `backend/load_test.js` (k6) — register + login; ראו `backend/README.md`.
+- **Load testing (optional, Grafana k6):** [`backend/load_test.js`](backend/load_test.js) — עומס על `/register` + `/login`; מספרי טלפון בטווח תקף `+972508…` עם `__VU`/`__ITER`. דורש הכנת `backend/.env` (זמנית `DEBUG=True`, `RATE_LIMIT_AUTH_MAX_REQUESTS` גבוה) ו־**`docker compose up -d --force-recreate backend`**. פירוט: [`backend/README.md`](backend/README.md) ו־[`docs/ENGINEERING_HIGHLIGHTS.md`](docs/ENGINEERING_HIGHLIGHTS.md) (סעיף 12).
 
 ---
 
@@ -188,7 +210,7 @@ push to `main` or `develop` (only when relevant files change).
 |-----------|----------|-------|
 | backend   | `backend-ci.yml`  | lint (Ruff), format check, tests (pytest), Docker build → push to GHCR |
 | chat-ws   | `chat-ws-ci.yml`  | build, vet, go test, Docker build → push to GHCR |
-| frontend  | `frontend-ci.yml` | lint, type check, build, Docker build → push to GHCR |
+| frontend  | `frontend-ci.yml` | ESLint, build (`tsc -b` + Vite), Docker build → push to GHCR |
 
 Docker images are published to GitHub Container Registry on every push to `main`:
 - `ghcr.io/Itamarabir1/linkup-backend:latest`

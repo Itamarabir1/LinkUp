@@ -54,9 +54,9 @@
 
 | רכיב | סטטוס |
 |------|--------|
-| `ChatContext` + `chatReducer` | ✅ |
+| `ChatContext` + `chatReducer` + `useChatNotificationsFeed` (פיד התראות מסונכרן עם מצב צ’אט) | ✅ |
 | `AuthContext` פיצול שירות session נפרד | ⬜ אופציונלי |
-| `GroupContext` | 🟡 |
+| `GroupContext` — `myGroups`, **`activeChipId`** משותף ל־MyRides/MyRequests, `refreshGroups`; איפוס צ’יפ אחרי leave/close ב־`useGroupManageMutations` | ✅ |
 
 ---
 
@@ -64,7 +64,7 @@
 
 | אזור | סטטוס |
 |------|--------|
-| CreateRide / Profile / Notifications / FCMCheck / Layout / ChatPopup / MessageThread / GroupManage / MyBookings נהג / GoogleSignIn | ✅ |
+| CreateRide / Profile / Notifications / FCMCheck / Layout / ChatPopup / MessageThread / GroupManage / MyBookings נהג / **MyRequests + `useMyRequests`** / GoogleSignIn | ✅ |
 
 ---
 

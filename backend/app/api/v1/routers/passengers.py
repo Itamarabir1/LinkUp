@@ -4,7 +4,6 @@ from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import get_current_user, get_current_user_optional
 from app.db.session import get_db
@@ -59,13 +58,13 @@ async def get_my_requests(
     status_code=status.HTTP_201_CREATED,
     summary="רישום נוסע לטרמפ (יצירת בקשה קבועה)",
 )
-def create_new_request(
+async def create_new_request(
     request: PassengerRequestCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     try:
-        return PassengerService.create_passenger_request(
+        return await PassengerService.create_passenger_request(
             db=db, request_in=request, passenger_id=current_user.user_id
         )
     except HTTPException as he:
@@ -88,9 +87,7 @@ async def get_ride_driver_info(
 ):
     """מחזיר שם וטלפון של הנהג – רק לנסיעות פתוחות. דורש התחברות."""
     try:
-        return await db.run_sync(
-            lambda sync_db: PassengerService.get_ride_driver_info(sync_db, ride_id)
-        )
+        return await PassengerService.get_ride_driver_info(db, ride_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -116,16 +113,12 @@ async def request_ride_from_search(
     try:
         request_id = body.request_id
         if not request_id:
-            new_request = await db.run_sync(
-                lambda sync_db: (
-                    PassengerService.create_passenger_request_for_ride_search(
-                        sync_db,
-                        passenger_id=current_user.user_id,
-                        pickup_name=body.pickup_name,
-                        destination_name=body.destination_name,
-                        num_seats=body.num_seats,
-                    )
-                )
+            new_request = await PassengerService.create_passenger_request_for_ride_search(
+                db,
+                passenger_id=current_user.user_id,
+                pickup_name=body.pickup_name,
+                destination_name=body.destination_name,
+                num_seats=body.num_seats,
             )
             request_id = new_request.request_id
 
@@ -186,11 +179,7 @@ async def search_available_rides(
             limit=limit,
             after=after,
         )
-        result = await db.run_sync(
-            lambda sync_db: PassengerService.search_rides_for_passenger(
-                sync_db, search_data
-            )
-        )
+        result = await PassengerService.search_rides_for_passenger(db, search_data)
         return result
     except HTTPException:
         raise
@@ -208,10 +197,8 @@ async def cancel_request(
 ):
     """מבטל את הבקשה ומשחרר אוטומטית את כל המושבים שנתפסו מול נהגים (רק לבעל הבקשה)."""
     try:
-        return await db.run_sync(
-            lambda sess: PassengerService.cancel_request(
-                sess, request_id, current_user.user_id
-            )
+        return await PassengerService.cancel_request(
+            db, request_id, current_user.user_id
         )
     except PassengerRequestNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -225,18 +212,18 @@ async def cancel_request(
     response_model=List[RideResponse],
     summary="שליפת התאמות עדכניות לבקשה קיימת",
 )
-def get_latest_matches(request_id: UUID, db: Session = Depends(get_db)):
-    return PassengerService.get_matches_by_request_id(db, request_id)
+async def get_latest_matches(request_id: UUID, db: AsyncSession = Depends(get_db)):
+    return await PassengerService.get_matches_by_request_id(db, request_id)
 
 
 @router.get(
     "/all", response_model=List[RideResponse], summary="תצוגת כל הנסיעות (ניהול ובקרה)"
 )
-def get_all_rides_admin(
+async def get_all_rides_admin(
     filter_status: str = Query(
         None, description="סנן לפי סטטוס: open, cancelled, completed"
     ),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """מחזיר את כל הנסיעות במערכת. אם נשלח סטטוס, יחזיר רק נסיעות בסטטוס הזה."""
-    return PassengerService.get_all_rides_for_admin(db, status=filter_status)
+    return await PassengerService.get_all_rides_for_admin(db, status=filter_status)

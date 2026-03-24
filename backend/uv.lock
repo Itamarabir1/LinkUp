@@ -1402,7 +1402,7 @@ requires-dist = [
     { name = "itsdangerous", specifier = "==2.1.2" },
     { name = "jinja2", specifier = ">=3.1.0" },
     { name = "passlib", extras = ["bcrypt"], specifier = "==1.7.4" },
-    { name = "phonenumbers", specifier = ">=8.13.0" },
+    { name = "phonenumbers", specifier = "==8.13.48" },
     { name = "pillow", specifier = ">=10.4.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.9" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.0.0" },
@@ -1802,11 +1802,11 @@ bcrypt = [
 
 [[package]]
 name = "phonenumbers"
-version = "9.0.25"
+version = "8.13.48"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2f/13/c1310103d1a8c61486bd507aafd864252927e8ea2c3133459ddabd23ec34/phonenumbers-9.0.25.tar.gz", hash = "sha256:a5f236fa384c6a77378d7836c8e486ade5f984ad2e8e6cc0dbe5124315cdc81b", size = 2298295, upload-time = "2026-02-26T10:24:47.372Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/61/59/d01506a791481d26a640acb0a1124e3f0a816b0711e563962d7d55184890/phonenumbers-8.13.48.tar.gz", hash = "sha256:62d8df9b0f3c3c41571c6b396f044ddd999d61631534001b8be7fdf7ba1b18f3", size = 2297098, upload-time = "2024-10-22T13:36:26.014Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/29/03/c6e12d36b307cdf8d886f1471de2dc95d807b331465fa828ec7fb4830594/phonenumbers-9.0.25-py2.py3-none-any.whl", hash = "sha256:b1fd6c20d588f5bcd40af3899d727a9f536364211ec6eac554fcd75ca58992a3", size = 2584287, upload-time = "2026-02-26T10:24:44.58Z" },
+    { url = "https://files.pythonhosted.org/packages/98/f4/a9340f98335ae6fab1ad4b56b6a04f390de65bea371c71b0cdf67e4c08d0/phonenumbers-8.13.48-py2.py3-none-any.whl", hash = "sha256:5c51939acefa390eb74119750afb10a85d3c628dc83fd62c52d6f532fcf5d205", size = 2582542, upload-time = "2024-10-22T13:36:22.837Z" },
 ]
 
 [[package]]

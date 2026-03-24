@@ -24,7 +24,7 @@
 | Database | PostgreSQL + PostGIS | 15-3.3 | טבלאות, גיאומטריה, חיפוש מרחבי |
 | Cache / Pub-Sub | Redis | 7.2.0-v10 | Broadcast (ride updates), chat channels, chat completion, OTP |
 | Message Broker | RabbitMQ | 3-management | אירועים (Outbox), תורי משימות (notifications, avatar, scheduled) |
-| Runtime | Docker Compose | — | פיתוח: db, redis, rabbitmq, backend (**8000** ל-host), outbox-worker, chat-ws; פרוד מקומי: **frontend** סטטי + **nginx** (80) דרך override + `--profile prod` |
+| Runtime | Docker Compose | — | פיתוח: db, redis, rabbitmq, backend (**8000** ל-host), outbox-worker, chat-ws; פרוד מקומי: **frontend** סטטי + **nginx** (80) מאותו `docker-compose.yml` + `--profile prod` |
 
 ---
 
@@ -118,6 +118,16 @@ outbox-worker
 - **OTP (אימות מייל / איפוס סיסמה)**: קוד אקראי עם **`secrets`**; השוואה עם **`hmac.compare_digest`**; מונה ניסיונות ב-Redis + איפוס בעת הנפקת קוד חדש.
 - **HTTPS**: `FORCE_HTTPS_REDIRECT` מאחורי proxy בפרודקשן.
 - **Username enumeration (OWASP):** בלוגין מייל/סיסמה, **אותה שגיאה** (`InvalidCredentialsError` / 401) גם כשהאימייל לא קיים ב-DB וגם כשהסיסמה שגויה — כדי שלא יהיה ניתן להבדיל תגובה ולמפות משתמשים. מימוש: `authenticate_and_create_token` ב-`auth/service.py`.
+
+---
+
+## בדיקות, עומס ואיכות
+
+- **Backend:** `pytest` תחת `backend/tests/` (auth, JWT, וכו’); ב-CI שירות Postgres + `TEST_DATABASE_URL` — workflow `backend-ci.yml`.
+- **Frontend:** Vitest לדוגמה `frontend/src/utils/*.test.ts` (`npm run test` מקומית); ב-CI — ESLint + build (כולל `tsc`).
+- **chat-ws:** `go test` / `go vet` ב־`chat-ws-ci.yml`.
+- **עומס (k6):** `backend/load_test.js` — Grafana k6; אימות זרימת הרשמה והתחברות תחת עומס מקבילי (executor ל-bcrypt, pool, rate limit, outbox). דוגמה למדידה: 10 VU למשך 30s, ~150 איטרציות, 0% שגיאות HTTP. דורש הכנת סביבה (ראו `docs/architecture/DEVELOPMENT.md`, `backend/README.md`, `docs/ENGINEERING_HIGHLIGHTS.md` סעיף 7ג).
+- **אימות טלפון:** ספריית `phonenumbers` **נעולה ל־`8.13.48`** ב־`backend/pyproject.toml` / `uv.lock` ליציבות מספרים ישראליים.
 
 ---
 

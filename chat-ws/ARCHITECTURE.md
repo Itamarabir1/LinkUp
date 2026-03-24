@@ -102,3 +102,4 @@ Client → GET /api/v1/chat/conversations/{id}/calendar.ics (backend)
 | AI analysis | backend worker (outbox-worker) | Async, Redis DB 1 listener |
 | AI analysis results API | backend (Python) | API endpoint |
 | Business logic | backend (Python) | Centralized |
+| Auth load testing (k6) | `backend/load_test.js` | עומס על REST register/login — לא ב-chat-ws |

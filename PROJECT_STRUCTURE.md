@@ -17,8 +17,8 @@ Linkup/
 ├── .vscode/
 │   └── settings.json
 ├── .gitignore
-├── docker-compose.yml
-├── docker-compose.override.yml.example   # template; copy to docker-compose.override.yml (in .gitignore)
+├── .env.example                   # דוגמה ל-.env בשורש (docker-compose: Postgres/Redis/RabbitMQ)
+├── docker-compose.yml             # כולל frontend + nginx עם profile prod
 ├── k8s/                           # הגדרות Kubernetes
 │   ├── base/
 │   ├── backend/
@@ -55,6 +55,7 @@ backend/
 ├── .dockerignore
 ├── requirements.txt
 ├── README.md
+├── load_test.js                   # Grafana k6 — עומס register/login (ראו backend/README.md)
 ├── run-backend.bat
 ├── run-backend.sh
 ├── alembic/

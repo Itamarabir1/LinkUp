@@ -61,11 +61,23 @@ class GeoClient:
     async def fetch_coordinates(
         self, address: str
     ) -> Tuple[Optional[float], Optional[float]]:
-        """הופך כתובת לקואורדינטות (Geocoding)"""
+        """הופך כתובת לקואורדינטות (Geocoding) — עם Redis cache"""
+        if not address or not address.strip():
+            return None, None
+
+        # בדוק cache קודם
+        from app.infrastructure.geo.geocode_cache import get_cached_coords, set_cached_coords
+        cached = await get_cached_coords(address)
+        if cached:
+            return cached
+
+        # קרא ל-Nominatim
         try:
-            # Nominatim עצמו הוא סינכרוני, אז אנחנו מריצים אותו בצורה שלא תחסום
             location = self.geolocator.geocode(address)
-            return (location.latitude, location.longitude) if location else (None, None)
+            if not location:
+                return None, None
+            await set_cached_coords(address, location.latitude, location.longitude)
+            return location.latitude, location.longitude
         except Exception as e:
             logger.error(f"Geocoding error for address '{address}': {e}")
             return None, None

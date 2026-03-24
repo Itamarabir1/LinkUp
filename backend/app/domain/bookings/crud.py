@@ -39,14 +39,35 @@ class CRUDBooking:
             .first()
         )
 
+    async def get_booking_by_id_async(
+        self, db: AsyncSession, booking_id: UUID
+    ) -> Optional[Booking]:
+        """Async variant של get_booking_by_id."""
+        bid = UUID(str(booking_id)) if isinstance(booking_id, str) else booking_id
+        stmt = (
+            select(Booking)
+            .options(
+                joinedload(Booking.ride).joinedload(Ride.driver),
+                joinedload(Booking.passenger_request).joinedload(PassengerRequest.user),
+                joinedload(Booking.passenger),
+            )
+            .where(Booking.booking_id == bid)
+        )
+        result = await db.execute(stmt)
+        return result.scalars().first()
+
     async def get(
-        self, db: AsyncSession, *, id: Optional[UUID] = None, booking_id: Optional[UUID] = None
+        self,
+        db: AsyncSession,
+        *,
+        id: Optional[UUID] = None,
+        booking_id: Optional[UUID] = None,
     ) -> Optional[Booking]:
         """שליפה אסינכרונית להזמנה (לנוטיפיקציות). מקבל id= או booking_id=."""
         bid = id or booking_id
         if bid is None:
             return None
-        return await db.run_sync(lambda sess: self.get_booking_by_id(sess, bid))
+        return await self.get_booking_by_id_async(db, bid)
 
     async def get_async(self, db: AsyncSession, booking_id: UUID) -> Optional[Booking]:
         """שליפה אסינכרונית להזמנה עם טעינת יחסים (לשימוש ב-API endpoints)."""
@@ -89,6 +110,19 @@ class CRUDBooking:
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         return db.query(Ride).filter(Ride.ride_id == rid).with_for_update().first()
 
+    async def get_existing_booking_async(
+        self, db: AsyncSession, ride_id: UUID, request_id: UUID
+    ) -> Optional[Booking]:
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
+        reqid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
+        stmt = select(Booking).where(
+            Booking.ride_id == rid,
+            Booking.request_id == reqid,
+            Booking.status != BookingStatus.CANCELLED,
+        )
+        result = await db.execute(stmt)
+        return result.scalars().first()
+
     def get_existing_booking(
         self, db: Session, ride_id: UUID, request_id: UUID
     ) -> Optional[Booking]:
@@ -103,6 +137,18 @@ class CRUDBooking:
             )
             .first()
         )
+
+    async def get_booking_by_ride_and_passenger_async(
+        self, db: AsyncSession, ride_id: UUID, passenger_id: UUID
+    ) -> Optional[Booking]:
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
+        pid = UUID(str(passenger_id)) if isinstance(passenger_id, str) else passenger_id
+        stmt = select(Booking).where(
+            Booking.ride_id == rid,
+            Booking.passenger_id == pid,
+        )
+        result = await db.execute(stmt)
+        return result.scalars().first()
 
     def get_booking_by_ride_and_passenger(
         self, db: Session, ride_id: UUID, passenger_id: UUID
@@ -148,6 +194,38 @@ class CRUDBooking:
         return existing
 
     # --- פעולות כתיבה (Operations) ---
+
+    async def create_booking_entry_async(
+        self,
+        db: AsyncSession,
+        ride_id: UUID,
+        request_id: UUID,
+        passenger_id: UUID,
+        num_seats: int,
+    ) -> Booking:
+        p_req = None
+        if request_id:
+            p_req = await db.get(PassengerRequest, request_id)
+        pickup_time = (
+            p_req.requested_departure_time
+            if p_req and p_req.requested_departure_time
+            else None
+        )
+        db_booking = Booking(
+            ride_id=ride_id,
+            request_id=request_id,
+            passenger_id=passenger_id,
+            num_seats=num_seats,
+            status=BookingStatus.PENDING,
+            pickup_name=p_req.pickup_name if p_req else None,
+            pickup_point=p_req.pickup_geom if p_req else None,
+            pickup_time=pickup_time,
+        )
+        db.add(db_booking)
+        await db.flush()
+        if request_id:
+            await db.run_sync(self.update_passenger_request_status_from_bookings, request_id)
+        return db_booking
 
     def create_booking_entry(
         self,
@@ -259,6 +337,16 @@ class CRUDBooking:
 
     # --- פונקציות נוספות שנדרשות על ידי ה-BookingService ---
 
+    async def get_user_bookings_count_async(
+        self, db: AsyncSession, user_id: UUID, status_filter: Optional[str] = None
+    ) -> int:
+        uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+        stmt = select(func.count()).select_from(Booking).where(Booking.passenger_id == uid)
+        if status_filter:
+            stmt = stmt.where(Booking.status == status_filter)
+        result = await db.execute(stmt)
+        return int(result.scalar() or 0)
+
     def get_user_bookings_count(
         self, db: Session, user_id: UUID, status_filter: Optional[str] = None
     ) -> int:
@@ -268,6 +356,31 @@ class CRUDBooking:
         if status_filter:
             q = q.filter(Booking.status == status_filter)
         return q.scalar() or 0
+
+    async def get_user_bookings_filtered_async(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        status_filter: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> List[Booking]:
+        uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+        stmt = (
+            select(Booking)
+            .options(
+                joinedload(Booking.passenger_request).joinedload(PassengerRequest.user),
+                joinedload(Booking.passenger),
+            )
+            .where(Booking.passenger_id == uid)
+            .order_by(Booking.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        if status_filter:
+            stmt = stmt.where(Booking.status == status_filter)
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
 
     def get_user_bookings_filtered(
         self,
@@ -308,6 +421,16 @@ class CRUDBooking:
             .order_by(Booking.created_at.desc())
             .all()
         )
+
+    async def get_ride_bookings_by_status_async(
+        self, db: AsyncSession, ride_id: UUID, booking_status: str
+    ) -> List[Booking]:
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
+        stmt = select(Booking).where(
+            Booking.ride_id == rid, Booking.status == booking_status
+        )
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
 
     def get_ride_bookings_by_status(
         self, db: Session, ride_id: UUID, booking_status: str

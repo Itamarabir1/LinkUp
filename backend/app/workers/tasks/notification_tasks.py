@@ -26,31 +26,27 @@ async def handle_ride_created(db, data: Dict[str, Any]) -> None:
         return
     ride_id = UUID(str(ride_id_raw))
 
-    def _find_passengers(sess):
-        ride = crud_ride.get(sess, ride_id)
-        if not ride:
-            logger.warning("ride.created: ride_id=%s not found", ride_id)
-            return []
+    ride = await crud_ride.get_async(db, ride_id)
+    if not ride:
+        logger.warning("ride.created: ride_id=%s not found", ride_id)
+        return
 
-        # בדיקה שהנסיעה נטענה נכון
-        logger.info(
-            "ride.created: processing ride_id=%s, driver_id=%s, origin=%s, dest=%s, route_coords=%s",
-            ride_id,
-            getattr(ride, "driver_id", None),
-            getattr(ride, "origin_name", None),
-            getattr(ride, "destination_name", None),
-            "exists" if getattr(ride, "route_coords", None) else "missing",
-        )
-
-        passengers = crud_passenger.find_passengers_for_ride_notification(sess, ride)
-        logger.info(
-            "ride.created: found %d matching passengers for ride_id=%s",
-            len(passengers),
-            ride_id,
-        )
-        return passengers
-
-    passengers = await db.run_sync(_find_passengers)
+    logger.info(
+        "ride.created: processing ride_id=%s, driver_id=%s, origin=%s, dest=%s, route_coords=%s",
+        ride_id,
+        getattr(ride, "driver_id", None),
+        getattr(ride, "origin_name", None),
+        getattr(ride, "destination_name", None),
+        "exists" if getattr(ride, "route_coords", None) else "missing",
+    )
+    passengers = await db.run_sync(
+        lambda sess: crud_passenger.find_passengers_for_ride_notification(sess, ride)
+    )
+    logger.info(
+        "ride.created: found %d matching passengers for ride_id=%s",
+        len(passengers),
+        ride_id,
+    )
     for pr in passengers:
         try:
             await notification_handler.handle_event(

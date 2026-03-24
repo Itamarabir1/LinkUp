@@ -35,4 +35,6 @@ alwaysApply: false
 - `docs/architecture/API.md` — Base URL, Auth, Pagination, כל ה-endpoints לפי קבוצה.
 - `docs/architecture/EVENTS.md` — Outbox, Exchanges, Queues, Events, Workers, Retry/DLQ.
 - `docs/architecture/REALTIME.md` — WebSocket (chat-ws), Redis Pub/Sub, Chat flow, Broadcast.
-- `docs/architecture/DEVELOPMENT.md` — Prerequisites, Setup, Environment Variables, Migrations, Project Structure, Key Decisions.
+- `docs/architecture/DEVELOPMENT.md` — Prerequisites, Setup, Environment Variables, Migrations, Project Structure, Key Decisions, **k6 load test**.
+- `docs/ENGINEERING_HIGHLIGHTS.md` — סיכום portfolio (כולל CI/CD, בדיקות, k6, phonenumbers).
+- `backend/load_test.js` — שינוי סקריפט עומס → `backend/README.md`, `docs/architecture/DEVELOPMENT.md`, `docs/ENGINEERING_HIGHLIGHTS.md`.

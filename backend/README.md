@@ -35,14 +35,29 @@ alembic upgrade head
 
 ## Load testing (k6)
 
-Focused auth load test: `load_test.js` — ramp to 500 VUs, register + login per iteration, separate thresholds for errors and p95 latency.
+Script: **`load_test.js`** (Grafana k6). Stages ramp up to 500 VUs; each iteration registers a user and logs in — custom metrics and thresholds for errors and p95 latency.
 
-Before running: ensure `docker-compose up --build` is healthy and you can register a user via Swagger.
+**Prerequisites:** API up (e.g. `docker compose up -d`); Swagger register works.
+
+**Phone numbers:** Valid Israeli-style **`+972508…`** range; uniqueness across VUs via k6 globals **`__VU`** and **`__ITER`** (see script).
+
+**Before a load run (local/Docker):**
+
+1. In **`backend/.env`** (temporary): set **`DEBUG=True`** and raise **`RATE_LIMIT_AUTH_MAX_REQUESTS`** (e.g. `10000`) so registration/login is not blocked by email verification or Redis rate limits.
+2. Recreate the backend container so env is applied:  
+   `docker compose up -d --force-recreate backend`  
+   (`docker compose restart backend` is **not** enough — env is fixed at container create time.)
+3. Optional: reset Redis DB 0 counters (e.g. `redis-cli … FLUSHDB`) — **warning:** clears other cache keys on DB 0 too.
 
 ```bash
-# Install k6 once: https://k6.io/docs/get-started/installation/
-cd backend
+# Install k6: https://grafana.com/docs/k6/latest/set-up/install-k6/
+# From repo root:
+k6 run --vus 10 --duration 30s backend/load_test.js
+
+# From backend/:
 k6 run load_test.js
 ```
 
-Writes `load_test_summary.json` in the current working directory.
+**Summary output:** `handleSummary` prints to the console (no JSON file on disk). See comments at the top of `load_test.js` and **`docs/ENGINEERING_HIGHLIGHTS.md`**.
+
+**Pinned dependency:** `phonenumbers==8.13.48` in `pyproject.toml` / `uv.lock` — stable IL validation used by the API (see `app/core/utils/validators.py`).

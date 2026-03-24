@@ -16,15 +16,16 @@
 ## Setup
 
 1. **Clone והעתקת env**
-   - `backend/.env` — העתק מ-`.env.example` אם קיים, או צור לפי הרשימה למטה.
-   - `chat-ws/.env` — PORT, REDIS_URL, SECRET_KEY (JWT).
+   - `.env` בשורש — העתק מ־`.env.example`: credentials ל־Compose בלבד (Postgres, Redis, RabbitMQ bootstrap); חייבים ליישר עם `backend/.env`.
+   - `backend/.env` — העתק מ־`backend/.env.example`.
+   - `chat-ws/.env` — העתק מ־`chat-ws/.env.example` (כולל `REDIS_URL`, `JWT_SECRET` זהה ל־`SECRET_KEY` בבקאנד).
 
 2. **הרצה עם Docker**
-   - `docker-compose.yml`: ל־`db`, `redis`, `rabbitmq`, `outbox-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **backend** עם **`8000:8000`** ל־host (Vite מקומי → API). ל־**nginx** יש `profiles: ["prod"]` בבסיס; **`frontend` (סטטי)** מוגדר ב־`docker-compose.override.yml` עם `profiles: ["prod"]` — בלי override מתאים, `docker compose --profile prod` ייכשל (`nginx` תלוי ב־`frontend`).
-   - `docker-compose.override.yml` (מומלץ; העתק מ־`docker-compose.override.yml.example`) — `nginx` + `frontend` עם `profiles: ["prod"]` והגדרת build מלאה ל־frontend.
-   - **פיתוח:** `docker compose up -d` → תשתית + worker + backend (**8000**) + chat-ws (**8081**). פרונט: **`npm run dev`** על המחשב, לא קונטיינר frontend.
-   - **סטאק מלא מאחורי Nginx (פורט 80):** `docker compose --profile prod up -d` (עם override).
+   - `docker-compose.yml`: ל־`db`, `redis`, `rabbitmq`, `outbox-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **backend** עם **`8000:8000`** ל־host. **`frontend`** ו־**`nginx`** מוגדרים באותו קובץ עם `profiles: ["prod"]` — עולים רק עם `docker compose --profile prod`.
+   - **פיתוח:** `docker compose up -d` → תשתית + worker + backend (**8000**) + chat-ws (**8081**). פרונט: **`npm run dev`** בתיקיית `frontend`, לא קונטיינר.
+   - **סטאק מלא מאחורי Nginx (פורט 80):** `docker compose --profile prod up -d --build`.
    - **FCM:** `firebase-credentials.json` ממופה read-only ל־**backend** ול־**outbox-worker** (נתיב בקונטיינר: `/app/infrastructure/firebase_core/firebase-credentials.json`); `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env` חייב להתאים (הקובץ לא נכנס ל־image בגלל `.dockerignore`).
+   - **שינוי `backend/.env`:** משתני הסביבה של מיכל ה-backend נטענים בעת **יצירת** הקונטיינר. אחרי עריכת הקובץ הרץ `docker compose up -d --force-recreate backend` (לא מספיק `docker compose restart backend`).
 
 3. **הרצה לוקאלית (בלי Docker ל-backend / frontend)**
    - תשתיות + worker: `docker compose up -d` (או לפחות `db`, `redis`, `rabbitmq`, `chat-ws`; אם `outbox-worker` כבר רץ ב־Compose — **אל** תריץ במקביל `python -m app.workers.main_worker` מקומית).
@@ -98,13 +99,22 @@
 
 ## Load testing (k6, optional)
 
-מתוך `backend/` אחרי שה-API ורישום ב-Swagger עובדים:
+סקריפט Grafana **k6**: [`backend/load_test.js`](../../backend/load_test.js) (ניתן להריץ גם משורש הפרויקט).
+
+- **מה נבדק:** לכל איטרציה — `POST /api/v1/auth/register` ואז `POST /api/v1/auth/login`; מדדי משך ושגיאות; thresholds בקובץ.
+- **טלפונים:** מספרים בפורמט **`+972508…`** (טווח תקף לפי `phonenumbers`); ייחודיות גלובלית עם **`__VU`** ו־**`__ITER`**.
+- **לפני ריצה:** ב־`backend/.env` (זמנית, לבדיקות בלבד) מומלץ `DEBUG=True` (דילוג אימות אימייל בפיתוח) והעלאת **`RATE_LIMIT_AUTH_MAX_REQUESTS`** (למשל `10000`) כדי להימנע מ־429; אחר כך **`docker compose up -d --force-recreate backend`**. אופציונלי: איפוס מוני rate limit ב-Redis (`FLUSHDB` על DB 0) — **שימו לב:** מוחק גם cache אחר ב-DB 0.
+- **הרצה:**
 
 ```bash
-k6 run load_test.js
+# מתוך שורש הפרויקט
+k6 run --vus 10 --duration 30s backend/load_test.js
+
+# או מתוך backend/
+cd backend && k6 run load_test.js
 ```
 
-פירוט: `backend/README.md` — סקריפט עומס על `/api/v1/auth/register` ו-`/login`.
+התקנת k6: <https://grafana.com/docs/k6/latest/set-up/install-k6/>. פירוט נוסף: `backend/README.md`, הערות בראש `load_test.js`, **`docs/ENGINEERING_HIGHLIGHTS.md`** (סעיף 12).
 
 ---
 
@@ -143,7 +153,8 @@ Linkup/
 │   │   ├── workers/         # main_worker, outbox_worker, tasks (notification, avatar, scheduled, chat_summary)
 │   │   └── admin/           # SQLAdmin setup
 │   ├── alembic/versions/    # 001–004
-│   └── pyproject.toml       # תלויות (אין requirements.txt)
+│   ├── load_test.js         # k6 — עומס auth (register + login)
+│   └── pyproject.toml       # תלויות + uv.lock (למשל phonenumbers==8.13.48)
 ├── chat-ws/                 # Go WebSocket server
 │   ├── cmd/server/
 │   ├── internal/auth, hub, redis
