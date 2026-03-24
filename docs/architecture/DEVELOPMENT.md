@@ -99,7 +99,19 @@
 
 ## Load testing (k6, optional)
 
-סקריפט Grafana **k6**: [`backend/load_test.js`](../../backend/load_test.js) (ניתן להריץ גם משורש הפרויקט).
+סקריפטים Grafana **k6** מרוכזים תחת:
+
+- [`backend/k6/scripts/load_test_auth.js`](../../backend/k6/scripts/load_test_auth.js)
+- [`backend/k6/scripts/load_test_rides.js`](../../backend/k6/scripts/load_test_rides.js)
+- [`backend/k6/scripts/load_test_users.js`](../../backend/k6/scripts/load_test_users.js)
+- [`backend/k6/scripts/load_test_groups.js`](../../backend/k6/scripts/load_test_groups.js)
+- [`backend/k6/scripts/load_test_chat.js`](../../backend/k6/scripts/load_test_chat.js)
+- [`backend/k6/scripts/load_test_geo.js`](../../backend/k6/scripts/load_test_geo.js)
+- [`backend/k6/scripts/load_test_ws.js`](../../backend/k6/scripts/load_test_ws.js)
+
+Wrappers נשמרו לתאימות:
+- [`backend/load_test.js`](../../backend/load_test.js)
+- [`backend/load_test_rides.js`](../../backend/load_test_rides.js)
 
 - **מה נבדק:** לכל איטרציה — `POST /api/v1/auth/register` ואז `POST /api/v1/auth/login`; מדדי משך ושגיאות; thresholds בקובץ.
 - **טלפונים:** מספרים בפורמט **`+972508…`** (טווח תקף לפי `phonenumbers`); ייחודיות גלובלית עם **`__VU`** ו־**`__ITER`**.
@@ -108,10 +120,11 @@
 
 ```bash
 # מתוך שורש הפרויקט
-k6 run --vus 10 --duration 30s backend/load_test.js
+k6 run --vus 10 --duration 30s backend/k6/scripts/load_test_auth.js
+k6 run --vus 5 --duration 30s backend/k6/scripts/load_test_rides.js
 
 # או מתוך backend/
-cd backend && k6 run load_test.js
+cd backend && k6 run k6/scripts/load_test_auth.js
 ```
 
 התקנת k6: <https://grafana.com/docs/k6/latest/set-up/install-k6/>. פירוט נוסף: `backend/README.md`, הערות בראש `load_test.js`, **`docs/ENGINEERING_HIGHLIGHTS.md`** (סעיף 12).
@@ -153,7 +166,9 @@ Linkup/
 │   │   ├── workers/         # main_worker, outbox_worker, tasks (notification, avatar, scheduled, chat_summary)
 │   │   └── admin/           # SQLAdmin setup
 │   ├── alembic/versions/    # 001–004
-│   ├── load_test.js         # k6 — עומס auth (register + login)
+│   ├── k6/                  # k6 load tests (scripts + shared helpers)
+│   ├── load_test.js         # wrapper תואם לאחור ל-auth k6
+│   ├── load_test_rides.js   # wrapper תואם לאחור ל-rides k6
 │   └── pyproject.toml       # תלויות + uv.lock (למשל phonenumbers==8.13.48)
 ├── chat-ws/                 # Go WebSocket server
 │   ├── cmd/server/
@@ -180,3 +195,11 @@ Linkup/
 - **למה RabbitMQ ולא Kafka**: פשטות בסקלה הנוכחית, ניהול קל, Outbox pattern מספיק עם תור אחד/כמה תורים.
 - **למה PostgreSQL ולא MongoDB**: טרנזקציות, שלמות referential, PostGIS לגיאו, התאמה ל-ORM (SQLAlchemy).
 - **Cursor-based vs Page-based Pagination**: נסיעות והודעות — זרימה אינסופית ויציבות עם cursor; הזמנות — מספור עמודים ו-total לממשק "הזמנות שלי".
+
+---
+
+## Recent backend architecture updates
+
+- **Async refactor (passengers/bookings/rides):** רוב זרימות הליבה עברו ל-SQLAlchemy async (`AsyncSession`, `select/execute`) כדי לשפר throughput ולשמור שרשרת async נקייה בין router -> service -> crud.
+- **Selective sync retention:** פעולות locking-sensitive (`SELECT ... FOR UPDATE`) נשמרו בצורה סינכרונית נקודתית ונקראות עם `db.run_sync(...)` בלבד איפה שחייבים.
+- **Geocode cache (24h):** כתובות שחוזרות על עצמן נשמרות ב-Redis ל-24 שעות כדי לחסוך קריאות Google/Nominatim ולשפר latency.

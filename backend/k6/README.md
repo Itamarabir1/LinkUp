@@ -1,0 +1,46 @@
+# k6 Load Tests
+
+Central location for backend load/performance tests.
+
+## Structure
+
+- `scripts/` - scenario files by layer
+- `lib/` - shared helpers
+
+## Layers
+
+- `scripts/load_test_auth.js` - Layer 1 (Auth)
+- `scripts/load_test_rides.js` - Layer 2 (Core flows: preview/create/search/join/approve/reject/cancel)
+- `scripts/load_test_users.js` - Layer 3 (Users/Profile)
+- `scripts/load_test_groups.js` - Layer 4 (Groups)
+- `scripts/load_test_chat.js` - Layer 5 (Chat HTTP)
+- `scripts/load_test_geo.js` - Layer 6 (Geo/Maps integration pressure)
+- `scripts/load_test_ws.js` - Layer 7 (WebSocket/realtime)
+
+## Run
+
+From repo root:
+
+```bash
+k6 run backend/k6/scripts/load_test_auth.js
+k6 run backend/k6/scripts/load_test_rides.js
+k6 run backend/k6/scripts/load_test_users.js
+k6 run backend/k6/scripts/load_test_groups.js
+k6 run backend/k6/scripts/load_test_chat.js
+k6 run backend/k6/scripts/load_test_geo.js
+k6 run backend/k6/scripts/load_test_ws.js
+```
+
+Optional environment overrides:
+
+- `BASE_URL` (default `http://localhost:8000/api/v1`)
+- `WS_URL` (default `ws://localhost:8081/ws`)
+- `NOTIFY_WS_URL` (default `ws://localhost:8000/api/v1/notifications/ws`)
+- `PRESENCE_URL` (default `http://localhost:8081/presence`)
+- `USER_PUBLIC_PATH` (default `/users/{id}`)
+
+## Prerequisites
+
+- Backend and dependencies up
+- `DEBUG=True` in `backend/.env` for easier registration/login in load users
+- If auth limits are active, raise `RATE_LIMIT_AUTH_MAX_REQUESTS` for test windows

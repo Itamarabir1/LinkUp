@@ -25,6 +25,15 @@ Copy `.env.example` to `.env` and set your values. See root README for full setu
 
 Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 
+## Async architecture updates (rides / bookings / passengers)
+
+- Core flows in passenger requests, bookings, and rides were refactored to SQLAlchemy 2.0 async patterns:
+  - `AsyncSession` usage in API/service paths
+  - `select(...)` + `await db.execute(...)` for async querying
+  - `await db.flush()` / `await db.commit()` in async transaction boundaries
+- Select sync methods are intentionally preserved for lock-critical operations (for example `SELECT ... FOR UPDATE`) and are invoked via `db.run_sync(...)` only where needed.
+- Result: lower event-loop blocking risk, cleaner async call chains, and safer concurrency in booking/ride state transitions.
+
 ## Migrations
 
 Alembic is in `alembic/`. Run migrations with:
@@ -35,7 +44,19 @@ alembic upgrade head
 
 ## Load testing (k6)
 
-Script: **`load_test.js`** (Grafana k6). Stages ramp up to 500 VUs; each iteration registers a user and logs in — custom metrics and thresholds for errors and p95 latency.
+Primary scripts live under **`k6/scripts/`** (Grafana k6), with shared helpers in `k6/lib/`.
+
+- `k6/scripts/load_test_auth.js`
+- `k6/scripts/load_test_rides.js`
+- `k6/scripts/load_test_users.js`
+- `k6/scripts/load_test_groups.js`
+- `k6/scripts/load_test_chat.js`
+- `k6/scripts/load_test_geo.js`
+- `k6/scripts/load_test_ws.js`
+
+Legacy wrappers kept for compatibility:
+- `load_test.js` -> `k6/scripts/load_test_auth.js`
+- `load_test_rides.js` -> `k6/scripts/load_test_rides.js`
 
 **Prerequisites:** API up (e.g. `docker compose up -d`); Swagger register works.
 
@@ -52,12 +73,18 @@ Script: **`load_test.js`** (Grafana k6). Stages ramp up to 500 VUs; each iterati
 ```bash
 # Install k6: https://grafana.com/docs/k6/latest/set-up/install-k6/
 # From repo root:
-k6 run --vus 10 --duration 30s backend/load_test.js
+k6 run --vus 10 --duration 30s backend/k6/scripts/load_test_auth.js
 
 # From backend/:
-k6 run load_test.js
+k6 run k6/scripts/load_test_auth.js
 ```
 
-**Summary output:** `handleSummary` prints to the console (no JSON file on disk). See comments at the top of `load_test.js` and **`docs/ENGINEERING_HIGHLIGHTS.md`**.
+**Summary output:** `handleSummary` prints to the console (no JSON file on disk). See `k6/README.md` and **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 
 **Pinned dependency:** `phonenumbers==8.13.48` in `pyproject.toml` / `uv.lock` — stable IL validation used by the API (see `app/core/utils/validators.py`).
+
+## Geo caching updates
+
+- Redis cache now stores geocoding results for 24 hours to reduce repeated calls for the same address input.
+- The cache is fail-open: geo flows continue even if Redis is unavailable.
+- This complements the existing 24h ride-preview cache and reduces external API pressure during repeated searches.

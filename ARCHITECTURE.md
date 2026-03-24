@@ -60,6 +60,7 @@ outbox-worker
 
 - **GPS Tracking**: מיקום נהג ונוסעים בזמן אמת במהלך נסיעה פעילה. נהג: **התחל/סיים נסיעה** מטאב "אני נהג" ב־My Bookings (דורש לפחות הזמנה אחת מאושרת), שידור מיקום ל־POST /bookings/{id}/location; נוסעים מקבלים עדכונים ב־WebSocket /bookings/ws/{id}/location. נוסעים יכולים לשתף מיקום ל־POST /bookings/{id}/passenger-location; נהג מאזין ב־WebSocket /rides/ws/{id}/passengers. ערוצי Redis: `booking_{booking_id}` (מיקום נהג), `ride_{ride_id}:passenger_locations` (מיקום נוסעים). ראה `docs/architecture/REALTIME.md` ו־`docs/architecture/API.md`.
 - **Ride preview cache**: תצוגת מקדימה לנסיעה (3 מסלולים) נשמרת ב־Redis 24 שעות; סריאליזציה עם `driver_id` כ־string. תג קבוצה בכרטיסיות (group_name או "ציבורי") מ־RideResponse (כולל group).
+- **Geocode cache (24h)**: תוצאות כתובת→קואורדינטות נשמרות ב־Redis ל־24 שעות כדי לצמצם קריאות חוזרות ל־Google/Nominatim עבור אותן כתובות. המימוש fail-open כדי לא לחסום flow אם Redis לא זמין.
 
 ---
 
@@ -72,6 +73,7 @@ outbox-worker
 - **Page-based Pagination**: הזמנות שלי — `page`, `limit`, תגובה עם `total`, `has_more`.
 - **Pessimistic Locking**: `approve_booking`, `cancel_booking` — שליפת נסיעה עם `SELECT ... FOR UPDATE` כדי למנוע race.
 - **Race Condition Protection**: אישור/ביטול הזמנה תחת lock על ה-ride; ביטול מחזיר נסיעה ל-OPEN רק אם לא CANCELLED.
+- **Async SQLAlchemy 2.0 core domains**: passenger/bookings/rides core flows עברו ל־`AsyncSession` ו־`select/execute`; פעולות sync נשמרו נקודתית רק למסלולים שדורשים row-level locking ונקראות דרך `db.run_sync`.
 
 ---
 
@@ -126,7 +128,7 @@ outbox-worker
 - **Backend:** `pytest` תחת `backend/tests/` (auth, JWT, וכו’); ב-CI שירות Postgres + `TEST_DATABASE_URL` — workflow `backend-ci.yml`.
 - **Frontend:** Vitest לדוגמה `frontend/src/utils/*.test.ts` (`npm run test` מקומית); ב-CI — ESLint + build (כולל `tsc`).
 - **chat-ws:** `go test` / `go vet` ב־`chat-ws-ci.yml`.
-- **עומס (k6):** `backend/load_test.js` — Grafana k6; אימות זרימת הרשמה והתחברות תחת עומס מקבילי (executor ל-bcrypt, pool, rate limit, outbox). דוגמה למדידה: 10 VU למשך 30s, ~150 איטרציות, 0% שגיאות HTTP. דורש הכנת סביבה (ראו `docs/architecture/DEVELOPMENT.md`, `backend/README.md`, `docs/ENGINEERING_HIGHLIGHTS.md` סעיף 7ג).
+- **עומס (k6):** סקריפטים מאורגנים תחת `backend/k6/scripts/` (auth/rides/users/groups/chat/geo/ws), עם wrappers תואמים לאחור ב־`backend/load_test*.js`. אימות זרימות ליבה תחת עומס מקבילי (executor ל-bcrypt, pool, rate limit, outbox). דורש הכנת סביבה (ראו `docs/architecture/DEVELOPMENT.md`, `backend/README.md`, `docs/ENGINEERING_HIGHLIGHTS.md` סעיף 7ג).
 - **אימות טלפון:** ספריית `phonenumbers` **נעולה ל־`8.13.48`** ב־`backend/pyproject.toml` / `uv.lock` ליציבות מספרים ישראליים.
 
 ---

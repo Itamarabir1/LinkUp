@@ -3,7 +3,7 @@
 **שם הקובץ:** `docs/ENGINEERING_HIGHLIGHTS.md` (בשורש הפרויקט, תחת `docs/`).
 
 מסמך זה אוסף **במקום אחד** את הפיצ’רים, הטכנולוגיות, הדפוסים וההחלטות שמיועדות ל**סקייל, אמינות ותחזוקה** — כדי להציג את הפרויקט ברמת מומחה.  
-*זה סיכום “להצגה”, לא מיפוי כל שורה בקוד; אחרי סקירה מול ה-repo הוכנסו גם workers, AI, FCM, Brevo, Google, **חיזוק auth ועומס מקבילי**, **k6**, ו**ריפקטור ארגון בפרונט**.*
+*זה סיכום “להצגה”, לא מיפוי כל שורה בקוד; אחרי סקירה מול ה-repo הוכנסו גם workers, AI, FCM, Brevo, Google, **חיזוק auth ועומס מקבילי**, **k6**, **ריפקטור async משמעותי ב-passengers/bookings/rides**, ו**ריפקטור ארגון בפרונט**.*
 
 לפרטים טכניים עמוקים יותר: `../ARCHITECTURE.md`, `architecture/REALTIME.md`, `architecture/EVENTS.md`, `architecture/DATABASE.md`, `architecture/API.md`, `backend/docs/GOOGLE_OAUTH.md`.
 
@@ -172,6 +172,7 @@
 |------|-----|
 | **DDD** | דומיינים מבודדים (rides, bookings, chat, …) — קל להרחבה וטסטים. |
 | **Pessimistic locking** | אישור/ביטול הזמנה תחת `SELECT FOR UPDATE` — מונע race ו”כפל” לוגיקה תחרותית על אותה נסיעה. |
+| **Async SQLAlchemy 2.0 migration** | זרימות ליבה בדומיינים passengers/bookings/rides עברו ל-`AsyncSession` + `select/execute`; פעולות sync נשמרו רק למקטעים שדורשים locking/transactional guarantees. |
 | **JWT קצר + Refresh ב-DB** | אבטחה + אפשרות לביטול sessions. |
 | **Rate limiting (Redis)** | על **register**, **login / refresh** ונקודות auth נוספות — מונה ב-Redis, חלון זמן + מקסימום בקשות ל-IP — מגביל הרשמה/כניסה אגרסיבית. |
 | **מניעת username enumeration (OWASP)** | לוגין: **אותה** `InvalidCredentialsError` (401) לאימייל שלא קיים ולסיסמה שגויה — לא חושפים אם המשתמש רשום. |
@@ -308,6 +309,7 @@
 | **Geocoding** | **Google Geocoding API** (`GeocodingService`) + **Nominatim** ב-`GeoClient` לפי זרימה. |
 | **מסלולים** | **Google Directions** + **Distance Matrix**; **Maps JS** בפרונט. |
 | **PostGIS** | שאילתות מרחביות וחיפוש נסיעות לפי מיקום. |
+| **Geocode cache 24h** | שמירת תוצאות כתובת→קואורדינטות ב-Redis ל-24 שעות (fail-open) כדי להפחית קריאות חיצוניות חוזרות ולשפר latency בחיפושים חוזרים. |
 
 ### אבטחה HTTP מעבר ל-JWT
 
@@ -328,7 +330,7 @@
 |----|--------|
 | **Web + Mobile** | **React (Vite)** וגם אפליקציה ב-**Expo/React Native** (`mobile/`) — אותו REST API, לקוחות מרובים. |
 | **אימות מייל** | קוד ב-**Redis** (TTL) + מייל דרך Brevo; resend verification; OTP מוגן (**`secrets`**, **`compare_digest`**, מונה ניסיונות). |
-| **עומס auth (Grafana k6)** | סקריפט **`backend/load_test.js`** — לכל איטרציה: **`POST /register`** + **`POST /login`**; מדדי `Trend`/`Rate`; **thresholds** ל־p95 ושגיאות. מספרי טלפון: טווח תקף **`+972508…`** (050-8…) עם ייחודיות גלובלית דרך **`__VU`** ו־**`__ITER`**. **לפני ריצה:** ב־`backend/.env` זמנית `DEBUG=True`, העלאת **`RATE_LIMIT_AUTH_MAX_REQUESTS`** (למשל `10000`); **`docker compose up -d --force-recreate backend`**; אופציונלי **`FLUSHDB`** על Redis DB 0 לאיפוס מוני rate limit. **סיכום:** `handleSummary` מדפיס ל-console (אין קובץ JSON). **דוגמה לתוצאה:** 10 VU × 30s → ~150 איטרציות, **0% שגיאות**, p95 register ~413ms / login ~363ms. הערות בראש הסקריפט + `backend/README.md`. |
+| **עומס auth + שכבות נוספות (Grafana k6)** | סקריפטים מאורגנים תחת **`backend/k6/scripts/`**: auth, rides core flows, users/profile, groups, chat HTTP, geo/maps, websocket. wrappers נשמרו ב-`backend/load_test.js` ו-`backend/load_test_rides.js` לתאימות. לפני ריצה: `DEBUG=True`, העלאת `RATE_LIMIT_AUTH_MAX_REQUESTS`, ו־`docker compose up -d --force-recreate backend`. |
 
 ### מסד וסכימה
 
