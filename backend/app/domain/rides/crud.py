@@ -70,18 +70,15 @@ class CRUDRide:
         result = await db.execute(stmt)
         return result.scalars().first()
 
-    def get_with_driver(self, db: Session, ride_id: UUID) -> Optional[Ride]:
+    async def get_with_driver(self, db: AsyncSession, ride_id: UUID) -> Optional[Ride]:
         """שליפת נסיעה עם טעינת הנהג (לפרטי נהג לתצוגה לנוסע)."""
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
-        return (
-            db.query(Ride)
-            .options(joinedload(Ride.driver))
-            .filter(Ride.ride_id == rid)
-            .first()
-        )
+        stmt = select(Ride).options(joinedload(Ride.driver)).where(Ride.ride_id == rid)
+        result = await db.execute(stmt)
+        return result.scalars().first()
 
-    def get_for_update(
-        self, db: Session, ride_id: UUID, driver_id: Optional[UUID] = None
+    async def get_for_update(
+        self, db: AsyncSession, ride_id: UUID, driver_id: Optional[UUID] = None
     ) -> Optional[Ride]:
         """
         Senior Implementation: שליפת נסיעה עם נעילת שורה (FOR UPDATE).
@@ -91,15 +88,13 @@ class CRUDRide:
           מה שמונע מ-Race Conditions לקרות (למשל: נהג ונוסע שמבטלים בו-זמנית).
         """
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
-        query = db.query(Ride).filter(Ride.ride_id == rid)
-
+        stmt = select(Ride).where(Ride.ride_id == rid)
         if driver_id is not None:
             did = UUID(str(driver_id)) if isinstance(driver_id, str) else driver_id
-            query = query.filter(Ride.driver_id == did)
-
-        # 3. ביצוע הנעילה והשליפה
-        # חשוב: המתודה מחזירה None אם השורה לא נמצאה (או לא שייכת לנהג)
-        return query.with_for_update().first()
+            stmt = stmt.where(Ride.driver_id == did)
+        stmt = stmt.with_for_update()
+        result = await db.execute(stmt)
+        return result.scalars().first()
 
     def get_all(self, db: Session, status: Optional[RideStatus] = None) -> List[Ride]:
         """שליפה עם פילטור לפי סטטוס"""
@@ -138,14 +133,14 @@ class CRUDRide:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
-    def update_status(
-        self, db: Session, ride_id: UUID, status: RideStatus
+    async def update_status(
+        self, db: AsyncSession, ride_id: UUID, status: RideStatus
     ) -> Optional[Ride]:
         """עדכון סטטוס מאובטח (SELECT FOR UPDATE)"""
-        ride = self.get_for_update(db, ride_id)
+        ride = await self.get_for_update(db, ride_id)
         if ride:
             ride.status = status
-            db.flush()
+            await db.flush()
         return ride
 
     def update_seats(
@@ -163,13 +158,17 @@ class CRUDRide:
 
     ALLOWED_UPDATE_FIELDS = ("available_seats", "departure_time")
 
-    def update_partial(
-        self, db: Session, ride_id: UUID, driver_id: UUID, **updates: Any
+    async def update_partial(
+        self, db: AsyncSession, ride_id: UUID, driver_id: UUID, **updates: Any
     ) -> Optional[Ride]:
         """עדכון חלקי – רק available_seats ו-departure_time. בודק בעלות וולידציית מושבים."""
-        ride = self.get_for_update(db, ride_id, driver_id)
+        ride = await self.get_for_update(db, ride_id, driver_id)
         if not ride:
             return None
+
+        # Avoid lazy-load (MissingGreenlet) in async context
+        await db.refresh(ride, attribute_names=["bookings"])
+
         for key, value in updates.items():
             if key not in self.ALLOWED_UPDATE_FIELDS or value is None:
                 continue
@@ -189,8 +188,8 @@ class CRUDRide:
                 if ride.duration_min is not None:
                     mins = int(ride.duration_min) if ride.duration_min else 0
                     ride.estimated_arrival_time = value + timedelta(minutes=mins)
-        db.flush()
-        db.refresh(ride)
+        await db.flush()
+        await db.refresh(ride)
         return ride
 
     def get_expired_ids(self, db: Session, now: datetime) -> list:

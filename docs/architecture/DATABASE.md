@@ -268,4 +268,4 @@ conversations ◄── messages (conversation_id), chat_analysis (conversation_
 | approve_booking | rides | נעילת נסיעה לפני עדכון מושבים וסטטוס — מונע double-approve ו-overbooking |
 | cancel_booking | rides | נעילת נסיעה לפני החזרת סטטוס ל-OPEN ושחרור מושבים — מונע race עם approve |
 
-מימוש: `get_ride_for_update(ride_id)` ב-`bookings/crud.py` מחזיר `Ride` עם `with_for_update()`. ה-service קורא ל-crud זה לפני שינוי booking/ride.
+מימוש: `get_ride_for_update(db, ride_id)` ב-`bookings/crud.py` משתמש ב־`AsyncSession` ומבצע `select(Ride).with_for_update()` כדי לנעול את שורת הנסיעה. ה-service קורא ל-crud זה לפני שינוי booking/ride.

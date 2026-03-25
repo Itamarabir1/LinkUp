@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     DATABASE_URL_RAW: Optional[str] = Field(
         default=None,
         description="Optional full database URL (e.g. from Kubernetes secret). If set, overrides pieces above.",
-        env="DATABASE_URL",
+        json_schema_extra={"env": "DATABASE_URL"},
     )
 
     @computed_field
@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     REDIS_URL_RAW: Optional[str] = Field(
         default=None,
         description="Optional full Redis URL. If set, overrides REDIS_HOST/PORT/DB/PASSWORD.",
-        env="REDIS_URL",
+        json_schema_extra={"env": "REDIS_URL"},
     )
 
     @computed_field

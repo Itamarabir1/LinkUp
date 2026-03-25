@@ -20,7 +20,7 @@
 | **AI** | סיום שיחה → ניתוח (Groq) → שמירה + התראות |
 | **התראות** | מייל (**Brevo**), Push (**FCM** — מהשרת רק מפת `data` ב־FCM, בלי שדה `notification` של Firebase; בחזית **Toast קופץ + צליל**, ברקע התראת מערכת דרך SW), in-app |
 | **משתמשים** | JWT + Refresh ב-DB, **כניסה עם Google** (OAuth / `id_token`), אווטאר (S3 + worker) |
-| **מפות** | Google: **Geocoding**, **Directions**, **Distance Matrix**, **Maps JS**; בנוסף **Nominatim** בחלק מהזרימות (ראו סעיף 2) |
+| **מפות** | Google: **Geocoding**, **Directions**, **Distance Matrix**, **Maps JS**; geocoding הוא **Google-only** עם cache ב-Redis (24h) |
 | **GPS בזמן אמת** | מיקום נהג לנוסעים, מיקום נוסעים לנהג (ערוצי Redis נפרדים + WS) |
 
 ---
@@ -52,12 +52,12 @@
 | 2 | **Google Directions API** (`/maps/api/directions/json`) | `infrastructure/geo/client.py` | עד **3 מסלולים** חלופיים, `language=he`, polyline לתצוגה. |
 | 3 | **Google Distance Matrix API** (`/maps/api/distancematrix/json`) | אותו `GeoClient` | זמן נסיעה ומרחק מוצא–יעד (מיושר למסלולים). |
 | 4 | **Google Maps JavaScript API** (`maps/api/js?key=…`) | פרונט: `loadGoogleMaps`, מודלי מפה חיים / מסלול | מפת **Google** באפליקציה; המפתח מגיע מ-**`GET /api/v1/geo/maps-key`** (או `VITE_GOOGLE_MAPS_API_KEY`). |
-| 5 | **Nominatim (OpenStreetMap)** | `GeoClient` + `geo/utils` (geopy) | גיאוקוד **במסלול אחר** (למשל `RoutingService` / חיפושים שמשתמשים ב-`geo_client`) — **בלי** חיוב Google לשלב הזה. |
+| 5 | **Geocode cache (Redis, 24h)** | `geocode_cache` (Redis) + `GeocodingService` (Google) | כתובת→קואורדינטות עם cache fail-open (חוסך קריאות חיצוניות חוזרות) |
 | 6 | **OSRM** (דוגמה ציבורית) | קבוע `OSRM_URL` ב-`GeoClient` | **לא** בשימוש בזרימת `fetch_raw_routes` הנוכחית (שם רק Google); נשאר כתשתית אפשרית. |
 
 **כניסה עם Google (לא מפות):** **OAuth / Identity** — `GOOGLE_CLIENT_ID`, ראה `backend/docs/GOOGLE_OAUTH.md`.
 
-**לסיכום לראיון:** “במפות יש לי **ארבעה APIs של Google Platform** — Geocoding (כולל reverse), Directions, Distance Matrix, ו-JavaScript למפה בדפדפן; **בנוסף Nominatim** בחלק מהזרימות; מפתח Maps נפרד מ-OAuth של Login.”
+**לסיכום לראיון:** “במפות יש לי **ארבעה APIs של Google Platform** — Geocoding (כולל reverse), Directions, Distance Matrix, ו-JavaScript למפה בדפדפן; geocoding הוא **Google-only** עם cache ב-Redis; מפתח Maps נפרד מ-OAuth של Login.”
 
 ---
 
@@ -306,7 +306,7 @@
 
 | מה | פירוט |
 |----|--------|
-| **Geocoding** | **Google Geocoding API** (`GeocodingService`) + **Nominatim** ב-`GeoClient` לפי זרימה. |
+| **Geocoding** | **Google Geocoding API** (`GeocodingService`) — כתובת→קואורדינטות ו-reverse; עטוף ב-Redis geocode cache (24h, fail-open). |
 | **מסלולים** | **Google Directions** + **Distance Matrix**; **Maps JS** בפרונט. |
 | **PostGIS** | שאילתות מרחביות וחיפוש נסיעות לפי מיקום. |
 | **Geocode cache 24h** | שמירת תוצאות כתובת→קואורדינטות ב-Redis ל-24 שעות (fail-open) כדי להפחית קריאות חיצוניות חוזרות ולשפר latency בחיפושים חוזרים. |

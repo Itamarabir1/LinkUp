@@ -229,7 +229,9 @@ class EmailOnlyRequest(BaseModel):
     """
 
     email: EmailStr = Field(
-        ..., example="user@example.com", description="The user's email address"
+        ...,
+        json_schema_extra={"example": "user@example.com"},
+        description="The user's email address",
     )
 
     @field_validator("email")

@@ -1,4 +1,4 @@
-# app/api/v1/endpoints/bookings.py
+# app/domain/bookings/router.py
 from fastapi import (
     APIRouter,
     Depends,
@@ -28,7 +28,7 @@ from app.domain.geo.schema import (
     LocationUpdate,
     PassengerLocationReport,
 )
-from app.services.location.location_service import (
+from app.infrastructure.location.location_service import (
     broadcast_location_to_participants,
     broadcast_passenger_location_to_driver,
 )
@@ -91,12 +91,12 @@ async def cancel_booking(
 
 @router.get("/my-bookings", response_model=List[BookingResponse])
 async def get_user_bookings(
-    user_id: UUID,
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     result = await BookingService.get_user_bookings(
-        db, user_id=user_id, status=status, page=1, limit=50
+        db, user_id=current_user.user_id, status=status, page=1, limit=50
     )
     return result.items
 
@@ -143,10 +143,8 @@ async def report_driver_location(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="ניתן לדווח מיקום רק בנסיעה פעילה (active)",
         )
-    confirmed = await db.run_sync(
-        lambda sess: crud_booking.get_ride_bookings_by_status(
-            sess, booking.ride_id, BookingStatus.CONFIRMED
-        )
+    confirmed = await crud_booking.get_ride_bookings_by_status_async(
+        db, booking.ride_id, BookingStatus.CONFIRMED
     )
     involved = [b.booking_id for b in confirmed]
     location_in = LocationUpdate(

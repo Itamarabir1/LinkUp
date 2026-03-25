@@ -11,7 +11,7 @@ from app.domain.rides.schema import RideResponse
 from app.core.exceptions.ride import InvalidRouteError
 
 # לוגיקה ותשתיות
-from app.domain.rides.logic import calculate_estimated_arrival
+from app.domain.rides.ride_eta import calculate_estimated_arrival
 from app.infrastructure.geo.utils import to_geo_point, to_geo_line
 
 logger = logging.getLogger(__name__)

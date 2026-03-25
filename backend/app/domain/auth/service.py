@@ -482,4 +482,3 @@ class AuthService:
         return user
 
 
-auth_service = AuthService()

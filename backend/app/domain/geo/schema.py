@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 
 
@@ -47,5 +47,4 @@ class LocationUpdate(BaseModel):
     heading: Optional[float] = 0.0  # כיוון הנסיעה באייקון
     speed: float = 0.0
 
-    class Config:
-        populate_by_name = True  # מאפשר לשלוח גם 'lat' וגם 'latitude'
+    model_config = ConfigDict(populate_by_name=True)

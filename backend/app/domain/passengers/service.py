@@ -22,7 +22,7 @@ from app.domain.rides.crud import crud_ride
 from app.domain.rides.enum import RideStatus
 from app.domain.rides.mapper import RideMapper
 from app.domain.rides.schema import DriverInfoResponse
-from app.infrastructure.geo.client import geo_client
+from app.infrastructure.geo.geocode_cache import get_coordinates
 
 # הגדרת לוגר
 logger = logging.getLogger(__name__)
@@ -38,13 +38,19 @@ class PassengerService:
             if request_in.pickup_lat is not None and request_in.pickup_lon is not None:
                 p_lat, p_lon = request_in.pickup_lat, request_in.pickup_lon
             else:
-                p_lat, p_lon = await geo_client.fetch_coordinates(request_in.pickup_name)
-            d_lat, d_lon = await geo_client.fetch_coordinates(request_in.destination_name)
+                pickup_coords = await get_coordinates(request_in.pickup_name)
+                if not pickup_coords:
+                    raise GeocodingError(
+                        address=request_in.pickup_name or request_in.destination_name
+                    )
+                p_lat, p_lon = pickup_coords
 
-            if p_lat is None or d_lat is None:
+            dest_coords = await get_coordinates(request_in.destination_name)
+            if not dest_coords:
                 raise GeocodingError(
                     address=request_in.pickup_name or request_in.destination_name
                 )
+            d_lat, d_lon = dest_coords
 
             new_request = await crud_passenger.create(
                 db, request_in, p_lat, p_lon, d_lat, d_lon, passenger_id=passenger_id
@@ -86,11 +92,7 @@ class PassengerService:
             .all()
         )
         for b in bookings:
-            await db.run_sync(
-                lambda sess, booking=b: crud_booking.execute_booking_cancellation(
-                    sess, booking
-                )
-            )
+            await crud_booking.execute_booking_cancellation(db, b)
 
         # 2. עדכון סטטוס הבקשה עצמה (ביטול בקשה = CANCELLED, לא כיבוי התראות)
         p_req.status = PassengerStatus.CANCELLED
@@ -145,13 +147,14 @@ class PassengerService:
         from app.domain.passengers.schema import RideSearchResponse
 
         try:
-            p_lat, p_lon = await geo_client.fetch_coordinates(search_data.pickup_name)
-            d_lat, d_lon = await geo_client.fetch_coordinates(search_data.destination_name)
-
-            if p_lat is None or d_lat is None:
+            pickup_coords = await get_coordinates(search_data.pickup_name)
+            dest_coords = await get_coordinates(search_data.destination_name)
+            if not pickup_coords or not dest_coords:
                 raise GeocodingError(
                     address=search_data.pickup_name or search_data.destination_name
                 )
+            p_lat, p_lon = pickup_coords
+            d_lat, d_lon = dest_coords
 
             radius = getattr(search_data, "search_radius", None) or getattr(
                 search_data, "radius", 1000
@@ -197,7 +200,7 @@ class PassengerService:
         db: AsyncSession, ride_id: UUID
     ) -> DriverInfoResponse:
         """פרטי נהג של נסיעה – רק לנסיעות פתוחות (OPEN/FULL). מחזיר 404 אם לא נמצא או לא רלוונטי."""
-        ride = await db.run_sync(lambda sess: crud_ride.get_with_driver(sess, ride_id))
+        ride = await crud_ride.get_with_driver(db, ride_id)
         if not ride:
             raise ValueError("נסיעה לא נמצאה")
         if ride.status not in (RideStatus.OPEN, RideStatus.FULL, RideStatus.ACTIVE):
@@ -219,10 +222,12 @@ class PassengerService:
         num_seats: int = 1,
     ):
         """יוצר PassengerRequest מינימלי מבקשת הצטרפות מחיפוש; מחזיר את הבקשה (עם request_id)."""
-        p_lat, p_lon = await geo_client.fetch_coordinates(pickup_name)
-        d_lat, d_lon = await geo_client.fetch_coordinates(destination_name)
-        if p_lat is None or d_lat is None:
+        pickup_coords = await get_coordinates(pickup_name)
+        dest_coords = await get_coordinates(destination_name)
+        if not pickup_coords or not dest_coords:
             raise GeocodingError(address=pickup_name or destination_name)
+        p_lat, p_lon = pickup_coords
+        d_lat, d_lon = dest_coords
         request_in = PassengerRequestCreate(
             pickup_name=pickup_name,
             destination_name=destination_name,

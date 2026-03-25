@@ -1,9 +1,9 @@
 import { api } from './client';
 import type { BookingRow } from '../pages/MyBookings/myBookings.types';
 
-export function fetchMyBookings(userId: string, limit = 50) {
+export function fetchMyBookings(limit = 50, status?: string) {
   return api.get<BookingRow[]>('/bookings/my-bookings', {
-    params: { user_id: userId, limit },
+    params: { limit, status },
   });
 }
 

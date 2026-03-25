@@ -31,7 +31,8 @@ Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
   - `AsyncSession` usage in API/service paths
   - `select(...)` + `await db.execute(...)` for async querying
   - `await db.flush()` / `await db.commit()` in async transaction boundaries
-- Select sync methods are intentionally preserved for lock-critical operations (for example `SELECT ... FOR UPDATE`) and are invoked via `db.run_sync(...)` only where needed.
+- **Bookings are async-only** now (no `db.run_sync`): lock-critical paths use `select(...).with_for_update()` directly on `AsyncSession` to prevent races while keeping the call chain fully async.
+- `db.run_sync(...)` may still appear in other parts of the backend where legacy sync CRUD is used (e.g., some ride/passenger flows or worker tasks).
 - Result: lower event-loop blocking risk, cleaner async call chains, and safer concurrency in booking/ride state transitions.
 
 ## Migrations

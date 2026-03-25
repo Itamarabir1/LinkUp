@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, patch
 from app.core.exceptions.auth import InvalidCredentialsError
 from app.core.exceptions.user import EmailAlreadyRegisteredError
 from app.domain.auth.schema import LoginRequest, UserRegister
-from app.domain.auth.service import auth_service
+from app.api.dependencies.services import get_auth_service
 
 import app.db.models  # noqa: F401 — רישום כל המודלים ל-SQLAlchemy
 
@@ -45,7 +45,8 @@ async def registered_user(db_session: AsyncSession):
         "app.domain.auth.verification_service.verification_service.create_verification_event",
         new=AsyncMock(return_value="123456"),
     ):
-        return await auth_service.register_new_user(db=db_session, user_in=user_in)
+        auth_svc = get_auth_service()
+        return await auth_svc.register_new_user(db=db_session, user_in=user_in)
 
 
 # ============================================================
@@ -66,7 +67,8 @@ async def test_register_success(db_session: AsyncSession):
         "app.domain.auth.verification_service.verification_service.create_verification_event",
         new=AsyncMock(return_value="123456"),
     ):
-        user = await auth_service.register_new_user(db=db_session, user_in=user_in)
+        auth_svc = get_auth_service()
+        user = await auth_svc.register_new_user(db=db_session, user_in=user_in)
 
     assert user.user_id is not None
     assert user.email == "new_user@example.com"
@@ -88,7 +90,8 @@ async def test_register_duplicate_email_raises(
         confirm_password="Test@1234!",
     )
     with pytest.raises(EmailAlreadyRegisteredError):
-        await auth_service.register_new_user(db=db_session, user_in=duplicate)
+        auth_svc = get_auth_service()
+        await auth_svc.register_new_user(db=db_session, user_in=duplicate)
 
 
 @pytest.mark.asyncio
@@ -118,7 +121,8 @@ async def test_login_wrong_password_raises(
     אותה שגיאה גם כשאימייל לא קיים — מניעת username enumeration (OWASP).
     """
     with pytest.raises(InvalidCredentialsError):
-        await auth_service.authenticate_and_create_token(
+        auth_svc = get_auth_service()
+        await auth_svc.authenticate_and_create_token(
             db=db_session,
             email="test_auth@example.com",
             password="WrongPassword!",
@@ -132,7 +136,8 @@ async def test_login_nonexistent_email_raises(db_session: AsyncSession):
     לא חושפים אם האימייל קיים או לא (OWASP).
     """
     with pytest.raises(InvalidCredentialsError):
-        await auth_service.authenticate_and_create_token(
+        auth_svc = get_auth_service()
+        await auth_svc.authenticate_and_create_token(
             db=db_session,
             email="ghost@example.com",
             password="Test@1234!",

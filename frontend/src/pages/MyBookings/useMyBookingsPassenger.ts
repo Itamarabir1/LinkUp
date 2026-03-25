@@ -19,12 +19,15 @@ export function useMyBookingsPassenger(
     setPassengerLoading(true);
     setError('');
     try {
-      const { data } = await fetchMyBookings(userId, 50);
-      const bookings = Array.isArray(data) ? data : [];
-      const asPassenger = bookings.filter(
+      const { data } = await fetchMyBookings(50);
+      const asPassenger = data.filter(
         (b) =>
           b.passenger_id === userId &&
-          (b.status === 'pending_approval' || b.status === 'confirmed')
+          (b.status === 'pending_approval' ||
+            b.status === 'confirmed' ||
+            b.status === 'en_route' ||
+            b.status === 'arrived' ||
+            b.status === 'trip_in_progress')
       );
       const byRideId = new Map<string, BookingRow>();
       asPassenger.forEach((b) => {

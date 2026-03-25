@@ -1,7 +1,6 @@
 import time
 import httpx
 from datetime import datetime
-from geopy.geocoders import Nominatim
 from typing import Optional, List, Dict, Tuple, Any
 from app.core.config import settings
 import logging
@@ -55,41 +54,52 @@ class GeoClient:
     OSRM_URL = "http://router.project-osrm.org/route/v1/driving"
 
     def __init__(self):
-        # Nominatim דורש User Agent ייחודי
-        self.geolocator = Nominatim(user_agent=settings.APP_NAME, timeout=10)
+        # נשאר לשמירת תאימות לאחור בבדיקות/קוד ותיק.
+        # אין שימוש ב-Nominatim; geocode מתבצע דרך Google (GeocodingService) או דרך patch בבדיקות.
+        class _GeoLocator:
+            def geocode(self, _: str):
+                return None
+
+        self.geolocator = _GeoLocator()
 
     async def fetch_coordinates(
         self, address: str
     ) -> Tuple[Optional[float], Optional[float]]:
-        """הופך כתובת לקואורדינטות (Geocoding) — עם Redis cache"""
+        """
+        הופך כתובת לקואורדינטות (Geocoding) — עם Redis cache.
+
+        מקור אמת: Google Geocoding (GeocodingService) + cache.
+        """
         if not address or not address.strip():
             return None, None
 
-        # בדוק cache קודם
-        from app.infrastructure.geo.geocode_cache import get_cached_coords, set_cached_coords
+        from app.infrastructure.geo.geocode_cache import (
+            get_cached_coords,
+            set_cached_coords,
+        )
+
         cached = await get_cached_coords(address)
         if cached:
             return cached
 
-        # קרא ל-Nominatim
+        # אם הוזרק geolocator בבדיקות/מונקי-פאצ׳ינג, השתמש בו.
         try:
-            location = self.geolocator.geocode(address)
-            if not location:
-                return None, None
-            await set_cached_coords(address, location.latitude, location.longitude)
-            return location.latitude, location.longitude
+            loc = self.geolocator.geocode(address)
+            if loc and getattr(loc, "latitude", None) is not None and getattr(
+                loc, "longitude", None
+            ) is not None:
+                await set_cached_coords(address, float(loc.latitude), float(loc.longitude))
+                return float(loc.latitude), float(loc.longitude)
         except Exception as e:
-            logger.error(f"Geocoding error for address '{address}': {e}")
-            return None, None
+            logger.error("Legacy geolocator.geocode failed for '%s': %s", address, e)
 
-    async def fetch_address(self, lat: float, lon: float) -> Optional[str]:
-        """הופך קואורדינטות לכתובת (Reverse Geocoding) - התוספת החדשה!"""
-        try:
-            location = self.geolocator.reverse((lat, lon), language="he")
-            return location.address if location else None
-        except Exception as e:
-            logger.error(f"Reverse geocoding error for {lat}, {lon}: {e}")
-            return None
+        from app.infrastructure.geo.geocoding import GeocodingService
+
+        lat, lon = await GeocodingService.get_coordinates_from_address(address)
+        if lat is None or lon is None:
+            return None, None
+        await set_cached_coords(address, lat, lon)
+        return lat, lon
 
     async def fetch_distance_matrix(
         self, start: Tuple[float, float], end: Tuple[float, float]

@@ -11,6 +11,7 @@ import json
 import logging
 from typing import Optional, Tuple
 
+from app.infrastructure.geo.geocoding import GeocodingService
 from app.infrastructure.redis.client import redis_client
 
 logger = logging.getLogger(__name__)
@@ -18,9 +19,7 @@ logger = logging.getLogger(__name__)
 GEOCODE_CACHE_TTL = 60 * 60 * 24  # 24 שעות
 
 
-async def get_cached_coords(
-    address: str,
-) -> Optional[Tuple[float, float]]:
+async def get_cached_coords(address: str) -> Optional[Tuple[float, float]]:
     """
     מחזיר קואורדינטות מcache אם קיימות.
     מחזיר None אם לא נמצא או אם Redis לא זמין (fail open).
@@ -60,3 +59,23 @@ async def set_cached_coords(
         logger.debug(f"Geocode cached: '{address}' → ({lat}, {lon})")
     except Exception as e:
         logger.warning(f"Geocode cache write failed (fail open): {e}")
+
+
+async def get_coordinates(address: str) -> Optional[Tuple[float, float]]:
+    """
+    מחזיר קואורדינטות לכתובת.
+    בודק Redis cache קודם — אם לא נמצא, קורא ל-Google ושומר.
+    """
+    if not address or not address.strip():
+        return None
+
+    cached = await get_cached_coords(address)
+    if cached:
+        return cached
+
+    lat, lon = await GeocodingService.get_coordinates_from_address(address)
+    if lat is None or lon is None:
+        return None
+
+    await set_cached_coords(address, lat, lon)
+    return lat, lon

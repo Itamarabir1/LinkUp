@@ -16,7 +16,8 @@ from app.domain.groups.schema import (
     group_member_to_out,
 )
 from app.domain.users.model import User
-from app.domain.rides.service import ride_service
+from app.api.dependencies.services import get_ride_service
+from app.domain.rides.service import RideService
 from app.domain.rides.schema import RideResponse
 from app.infrastructure.s3.service import storage_service
 
@@ -80,12 +81,13 @@ async def get_group_rides(
     group_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    ride_svc: RideService = Depends(get_ride_service),
 ):
     """פיד נסיעות של הקבוצה. רק חברי הקבוצה יכולים לראות."""
     membership = await crud.get_membership(db, group_id, current_user.user_id)
     if not membership:
         raise HTTPException(status_code=403, detail="אינך חבר בקבוצה")
-    return await ride_service.get_rides_by_group_id(db, group_id)
+    return await ride_svc.get_rides_by_group_id(db, group_id)
 
 
 @router.post("/{group_id}/upload-image", response_model=GroupImageUploadResponse)

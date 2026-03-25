@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from typing import Optional, Dict
 from app.infrastructure.geo.client import geo_client
-from app.services.location.geocoding import GeocodingService
+from app.infrastructure.geo.geocoding import GeocodingService
 from app.domain.geo.schema import GeoLocation, RouteOptionData
 from app.core.exceptions.validation import InvalidLocationError
 

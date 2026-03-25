@@ -25,8 +25,9 @@ from app.infrastructure.redis.broadcast import broadcast
 from app.domain.users.model import User
 from app.api.dependencies.auth import get_current_user, get_current_user_ws
 from app.api.dependencies.group_membership import verify_group_membership
-from app.domain.rides.service import ride_service
-from app.services.location.location_service import PASSENGER_LOCATIONS_CHANNEL_SUFFIX
+from app.api.dependencies.services import get_ride_service
+from app.domain.rides.service import RideService
+from app.infrastructure.location.location_service import PASSENGER_LOCATIONS_CHANNEL_SUFFIX
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -38,9 +39,10 @@ async def preview_ride_options(
     preview_in: RidePreviewCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),  # הוספנו את המשתמש המחובר
+    ride_svc: RideService = Depends(get_ride_service),
 ):
     """שלב 1: קבלת אפשרויות מסלול ומחירים"""
-    return await ride_service.get_ride_preview(preview_in)
+    return await ride_svc.get_ride_preview(preview_in)
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=RideResponse)
@@ -48,10 +50,11 @@ async def create_new_ride(
     ride_in: RideCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    ride_svc: RideService = Depends(get_ride_service),
 ):
     if ride_in.group_id is not None:
         await verify_group_membership(db, ride_in.group_id, current_user.user_id)
-    return await ride_service.create_ride(
+    return await ride_svc.create_ride(
         db=db, ride_in=ride_in, current_user_id=current_user.user_id
     )
 
@@ -64,9 +67,10 @@ async def get_my_rides(
         None,
         description="סנן לפי סטטוס: open, full, active, completed, cancelled",
     ),
+    ride_svc: RideService = Depends(get_ride_service),
 ):
     """רשימת הנסיעות שלי כנהג."""
-    return await ride_service.get_my_rides(db, current_user.user_id, status=status)
+    return await ride_svc.get_my_rides(db, current_user.user_id, status=status)
 
 
 @router.patch("/{ride_id}", response_model=RideResponse)
@@ -75,10 +79,11 @@ async def update_ride(
     payload: RideUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    ride_svc: RideService = Depends(get_ride_service),
 ):
     """עדכון חלקי לנסיעה – זמן יציאה ו/או מספר מושבים (רק הנהג בעלים)."""
     try:
-        return await ride_service.update_ride(
+        return await ride_svc.update_ride(
             db, ride_id, current_user.user_id, payload
         )
     except RideNotFoundError:
@@ -92,10 +97,11 @@ async def start_ride(
     ride_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    ride_svc: RideService = Depends(get_ride_service),
 ):
     """התחל נסיעה — מעביר לסטטוס ACTIVE. דורש לפחות נוסע מאושר אחד."""
     try:
-        return await ride_service.start_ride(
+        return await ride_svc.start_ride(
             db, ride_id=ride_id, driver_id=current_user.user_id
         )
     except RideNotFoundError:
@@ -107,10 +113,11 @@ async def end_ride(
     ride_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    ride_svc: RideService = Depends(get_ride_service),
 ):
     """סיים נסיעה — מעביר לסטטוס COMPLETED."""
     try:
-        return await ride_service.end_ride(
+        return await ride_svc.end_ride(
             db, ride_id=ride_id, driver_id=current_user.user_id
         )
     except RideNotFoundError:
@@ -122,8 +129,9 @@ async def cancel_ride(
     ride_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    ride_svc: RideService = Depends(get_ride_service),
 ):
-    await ride_service.cancel_ride_by_driver(
+    await ride_svc.cancel_ride_by_driver(
         db=db,
         ride_id=ride_id,
         driver_id=current_user.user_id,
@@ -131,8 +139,12 @@ async def cancel_ride(
 
 
 @router.get("/{ride_id}", response_model=RideResponse)
-async def read_ride(ride_id: UUID, db: AsyncSession = Depends(get_db)):
-    ride = await ride_service.get_ride_by_id(db, ride_id)
+async def read_ride(
+    ride_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    ride_svc: RideService = Depends(get_ride_service),
+):
+    ride = await ride_svc.get_ride_by_id(db, ride_id)
     if not ride:
         raise HTTPException(status_code=404, detail="נסיעה לא נמצאה")
     return ride
@@ -167,6 +179,7 @@ async def ride_passengers_locations_websocket(
     ride_id: UUID,
     user: Optional[User] = Depends(get_current_user_ws),
     db: AsyncSession = Depends(get_db),
+    ride_svc: RideService = Depends(get_ride_service),
 ):
     """
     ערוץ WebSocket לעדכוני מיקום נוסעים בנסיעה. רק נהג הנסיעה יכול להתחבר.
@@ -176,7 +189,7 @@ async def ride_passengers_locations_websocket(
         logger.warning("WS passengers: no user, closing")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
-    ride = await ride_service.get_ride_by_id(db, ride_id)
+    ride = await ride_svc.get_ride_by_id(db, ride_id)
     logger.info(
         "WS passengers: ride=%s user=%s driver=%s",
         ride_id,

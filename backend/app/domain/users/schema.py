@@ -72,6 +72,7 @@ class UserRead(BaseModel):
     email: Optional[EmailStr] = None
     avatar_key: Optional[str] = None
     is_verified: bool = False
+    is_admin: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

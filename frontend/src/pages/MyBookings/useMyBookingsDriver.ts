@@ -38,7 +38,13 @@ export function useMyBookingsDriver(
             const manifestRes = await fetchRideManifest(ride.ride_id, userId);
             const passengers = manifestRes.data?.passengers ?? [];
             const filteredPassengers = passengers
-              .filter((p) => p.status === 'pending_approval' || p.status === 'confirmed')
+              .filter((p) =>
+                p.status === 'pending_approval' ||
+                p.status === 'confirmed' ||
+                p.status === 'en_route' ||
+                p.status === 'arrived' ||
+                p.status === 'trip_in_progress'
+              )
               .map((p) => ({
                 bookingId: p.booking_id,
                 passengerName: p.passenger_name ?? 'נוסע',

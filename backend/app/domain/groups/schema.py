@@ -45,8 +45,7 @@ class GroupOut(BaseModel):
     def avatar_url(self) -> Optional[str]:
         return _group_avatar_url(self.avatar_key)
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 def group_to_out(group: Any, member_count: Optional[int] = None) -> "GroupOut":

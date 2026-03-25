@@ -4,6 +4,7 @@ export interface User {
   full_name?: string;
   first_name?: string;
   phone_number?: string;
+  is_admin?: boolean;
   is_verified?: boolean;
   avatar_key?: string | null;
   avatar_url?: string | null;
