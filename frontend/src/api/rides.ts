@@ -22,18 +22,23 @@ export function endRide(rideId: string) {
 }
 
 export type PreviewRoutesBody = {
-  driver_id: number;
+  driver_id: string;
   origin_name: string;
   destination_name: string;
   departure_time: string;
   available_seats: number;
+  group_id?: string;
 };
 
 export function previewRideRoutes(body: PreviewRoutesBody) {
   return api.post<RidePreviewResponse>('/rides/preview-routes', body);
 }
 
-export function createRideFromSession(body: { session_id: string; selected_route_index: number }) {
+export function createRideFromSession(body: {
+  session_id: string;
+  selected_route_index: number;
+  group_id?: string;
+}) {
   return api.post('/rides/', body);
 }
 

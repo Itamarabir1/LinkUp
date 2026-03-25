@@ -6,11 +6,14 @@ import { ArrowUpDown } from 'lucide-react';
 import ErrorBanner from '../components/ErrorBanner';
 import LoadingButton from '../components/LoadingButton';
 import RouteMapModal from '../components/RouteMapModal';
+import { useGroup } from '../context/GroupContext';
 import { useCreateRide } from './useCreateRide';
 import styles from './CreateRide.module.css';
 
 export default function CreateRide() {
+  const { myGroups } = useGroup();
   const {
+    groupId,
     originName,
     setOriginName,
     destinationName,
@@ -34,10 +37,20 @@ export default function CreateRide() {
     createRide,
   } = useCreateRide();
 
+  const activeGroupName = groupId
+    ? myGroups.find((g) => g.group_id === groupId)?.name
+    : null;
+
   return (
     <div className={styles.page}>
       <h1 className={styles.pageTitle}>הצע נסיעה</h1>
       <p className={styles.pageMeta}>מוצא, יעד, מושבים וזמן יציאה.</p>
+      {activeGroupName ? (
+        <div className={styles.groupBanner}>
+          <span>📌 יוצר נסיעה לקבוצה:</span>
+          <strong>{activeGroupName}</strong>
+        </div>
+      ) : null}
       <form onSubmit={requestPreview} className={styles.formBlock}>
         {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
         <div className={styles.formRowWithBtn}>

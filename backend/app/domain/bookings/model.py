@@ -8,6 +8,7 @@ from sqlalchemy import (
     Boolean,
     text,
     String,
+    inspect as sa_inspect,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM, UUID as PG_UUID
@@ -107,18 +108,38 @@ class Booking(Base):
 
     @property
     def passenger_name(self) -> str | None:
-        """שם הנוסע – למייל, להזמנות שלי ולבוקינג. מקור: passenger_request.user או passenger."""
-        if self.passenger_request and getattr(self.passenger_request, "user", None):
-            u = self.passenger_request.user
+        """
+        שם הנוסע לתצוגה.
+        נגישות ל-relationships רק אם כבר נטענו — בלי lazy load ב-async.
+        סדר עדיפות: passenger_request.user, אחר כך passenger.
+        """
+
+        def _name_from_user(u) -> str | None:
+            if not u:
+                return None
             name = getattr(u, "full_name", None) or getattr(u, "first_name", None)
             if name and str(name).strip():
                 return str(name).strip()
-        if self.passenger:
-            name = getattr(self.passenger, "full_name", None) or getattr(
-                self.passenger, "first_name", None
-            )
-            if name and str(name).strip():
-                return str(name).strip()
+            return None
+
+        try:
+            st = sa_inspect(self)
+            if "passenger_request" not in st.unloaded:
+                pr = self.__dict__.get("passenger_request")
+                if pr is not None:
+                    pr_st = sa_inspect(pr)
+                    if "user" not in pr_st.unloaded:
+                        u = pr.__dict__.get("user")
+                        n = _name_from_user(u)
+                        if n:
+                            return n
+            if "passenger" not in st.unloaded:
+                passenger = self.__dict__.get("passenger")
+                n = _name_from_user(passenger)
+                if n:
+                    return n
+        except Exception:
+            pass
         return None
 
     __table_args__ = (

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, Text
+from sqlalchemy import Column, String, Integer, DateTime, Boolean, Text, inspect as sa_inspect
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -85,13 +85,32 @@ class User(Base):
 
     @property
     def is_driver(self) -> bool:
-        """האם המשתמש העלה פעם נסיעה כנהג?"""
-        return len(self.rides_as_driver) > 0
+        """האם יש למשתמש נסיעות כנהג. בלי lazy load אם ה-relationship לא נטען."""
+        try:
+            if "rides_as_driver" not in sa_inspect(self).unloaded:
+                rides = self.__dict__.get("rides_as_driver")
+                return bool(rides)
+        except Exception:
+            pass
+        return False
 
     @property
     def active_bookings_count(self) -> int:
-        """כמה הזמנות פעילות יש למשתמש כרגע"""
-        return sum(1 for b in self.bookings if b.status == "confirmed")
+        """ספירת הזמנות שאינן cancelled/rejected — רק אם bookings נטען בזיכרון."""
+        try:
+            if "bookings" not in sa_inspect(self).unloaded:
+                bookings = self.__dict__.get("bookings", [])
+                return sum(
+                    1
+                    for b in bookings
+                    if (
+                        getattr(getattr(b, "status", None), "value", b.status)
+                        not in ("cancelled", "rejected")
+                    )
+                )
+        except Exception:
+            pass
+        return 0
 
     def to_event_payload(self) -> dict:
         """

@@ -12,6 +12,8 @@ from app.domain.groups.schema import (
     GroupMemberOut,
     GroupImageUploadResponse,
     GroupImageConfirmRequest,
+    group_to_out,
+    group_member_to_out,
 )
 from app.domain.users.model import User
 from app.domain.rides.service import ride_service
@@ -48,7 +50,7 @@ async def get_group_by_invite(
     if not group:
         raise HTTPException(status_code=404, detail="קבוצה לא נמצאה")
     count = await crud.get_member_count(db, group.group_id)
-    return GroupOut.model_validate({**group.__dict__, "member_count": count})
+    return group_to_out(group, count)
 
 
 @router.post("/join/{invite_code}", response_model=GroupOut)
@@ -69,7 +71,8 @@ async def get_members(
     membership = await crud.get_membership(db, group_id, current_user.user_id)
     if not membership:
         raise HTTPException(status_code=403, detail="אינך חבר בקבוצה")
-    return await crud.get_group_members(db, group_id)
+    members = await crud.get_group_members(db, group_id)
+    return [group_member_to_out(m) for m in members]
 
 
 @router.get("/{group_id}/rides", response_model=list[RideResponse])
@@ -123,7 +126,7 @@ async def confirm_group_image(
         raise HTTPException(status_code=400, detail="מפתח תמונה לא תקין")
     group = await crud.update_group_avatar_key(db, group, data.key)
     count = await crud.get_member_count(db, group_id)
-    return GroupOut.model_validate({**group.__dict__, "member_count": count})
+    return group_to_out(group, count)
 
 
 @router.delete("/{group_id}/image", response_model=GroupOut)
@@ -144,7 +147,7 @@ async def delete_group_image(
         pass  # ממשיכים לאפס ב-DB גם אם S3 נכשל
     group = await crud.update_group_avatar_key(db, group, None)
     count = await crud.get_member_count(db, group_id)
-    return GroupOut.model_validate({**group.__dict__, "member_count": count})
+    return group_to_out(group, count)
 
 
 @router.delete("/{group_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -170,7 +173,10 @@ async def promote_member(
     membership = await crud.get_membership(db, group_id, current_user.user_id)
     if not membership or membership.role != "admin":
         raise HTTPException(status_code=403, detail="רק אדמין יכול לקדם חברים")
-    return await crud.update_member_role(db, group_id, user_id, "admin")
+    member = await crud.update_member_role(db, group_id, user_id, "admin")
+    if not member:
+        raise HTTPException(status_code=404, detail="חבר לא נמצא")
+    return group_member_to_out(member)
 
 
 @router.delete("/{group_id}/leave", status_code=status.HTTP_204_NO_CONTENT)
@@ -213,4 +219,4 @@ async def update_group(
     if data.description is not None:
         group = await crud.update_group_description(db, group, data.description)
     count = await crud.get_member_count(db, group_id)
-    return GroupOut.model_validate({**group.__dict__, "member_count": count})
+    return group_to_out(group, count)

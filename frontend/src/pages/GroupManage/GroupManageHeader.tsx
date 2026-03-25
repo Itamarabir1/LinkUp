@@ -174,7 +174,7 @@ export default function GroupManageHeader({ vm, group }: GroupManageHeaderProps)
         <button
           type="button"
           className={styles.headerBtn}
-          onClick={() => navigate('/search')}
+          onClick={() => navigate(`/groups/${groupId}/rides/search`)}
           title="חפש בקבוצה"
         >
           <Search size={18} />
@@ -183,7 +183,7 @@ export default function GroupManageHeader({ vm, group }: GroupManageHeaderProps)
         <button
           type="button"
           className={styles.headerBtnPrimary}
-          onClick={() => navigate('/create-ride', { state: { groupId } })}
+          onClick={() => navigate(`/groups/${groupId}/rides/create`)}
           title="הצע נסיעה לקבוצה"
         >
           <Plus size={18} />

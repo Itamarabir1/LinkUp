@@ -1,7 +1,9 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, ConfigDict, computed_field
+
+from sqlalchemy import inspect as sa_inspect
 
 from app.core.config import settings
 
@@ -47,21 +49,55 @@ class GroupOut(BaseModel):
         from_attributes = True
 
 
+def group_to_out(group: Any, member_count: Optional[int] = None) -> "GroupOut":
+    """בניית GroupOut ממודל ORM — בלי group.__dict__."""
+    return GroupOut(
+        group_id=group.group_id,
+        name=group.name,
+        invite_code=group.invite_code,
+        admin_id=group.admin_id,
+        is_active=group.is_active,
+        max_members=group.max_members,
+        invite_expires_at=group.invite_expires_at,
+        created_at=group.created_at,
+        member_count=member_count,
+        avatar_key=group.avatar_key,
+        description=group.description,
+    )
+
+
 class GroupMemberOut(BaseModel):
     id: UUID
     group_id: UUID
     user_id: UUID
     role: str
     joined_at: datetime
+    full_name: Optional[str] = None
 
-    @computed_field
-    @property
-    def full_name(self) -> Optional[str]:
-        user = getattr(self, "user", None)
-        return getattr(user, "full_name", None) if user is not None else None
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
+
+def group_member_to_out(member: Any) -> GroupMemberOut:
+    """שם מלא מ-user רק אם נטען — בלי lazy load."""
+    full_name: Optional[str] = None
+    try:
+        st = sa_inspect(member)
+        if "user" not in st.unloaded:
+            u = member.__dict__.get("user")
+            if u is not None:
+                fn = getattr(u, "full_name", None)
+                if fn and str(fn).strip():
+                    full_name = str(fn).strip()
+    except Exception:
+        pass
+    return GroupMemberOut(
+        id=member.id,
+        group_id=member.group_id,
+        user_id=member.user_id,
+        role=member.role,
+        joined_at=member.joined_at,
+        full_name=full_name,
+    )
 
 
 class GroupImageUploadResponse(BaseModel):

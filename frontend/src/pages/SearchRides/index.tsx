@@ -1,4 +1,5 @@
 import { useAuth } from '../../context/AuthContext';
+import { useGroup } from '../../context/GroupContext';
 import { useSearchRides } from './useSearchRides';
 import { SearchRidesForm } from './SearchRidesForm';
 import { SearchRideCard } from './SearchRideCard';
@@ -6,7 +7,12 @@ import styles from './SearchRides.module.css';
 
 export default function SearchRides() {
   const { user } = useAuth();
+  const { myGroups } = useGroup();
   const s = useSearchRides();
+
+  const activeGroupName = s.groupId
+    ? myGroups.find((g) => g.group_id === s.groupId)?.name
+    : null;
 
   return (
     <div className={styles.page}>
@@ -14,6 +20,12 @@ export default function SearchRides() {
       <p className={styles.pageMeta}>
         מוצא, יעד, רדיוס חיפוש (מטרים) וזמן יציאה אופציונלי – כמו בבקאנד.
       </p>
+      {activeGroupName ? (
+        <div className={styles.groupBanner}>
+          <span>🔍 מחפש נסיעות בקבוצה:</span>
+          <strong>{activeGroupName}</strong>
+        </div>
+      ) : null}
       <SearchRidesForm
         error={s.error}
         pickup={s.pickup}

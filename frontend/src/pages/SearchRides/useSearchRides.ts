@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { fetchAddressFromCoords } from '../../api/geo';
 import {
   requestRideFromSearch,
@@ -16,6 +17,7 @@ function defaultDepartureDate(): Date {
 }
 
 export function useSearchRides() {
+  const { groupId } = useParams<{ groupId?: string }>();
   const [pickup, setPickup] = useState('');
   const [destination, setDestination] = useState('');
   const [searchRadius, setSearchRadius] = useState(1000);
@@ -75,6 +77,7 @@ export function useSearchRides() {
       limit: 20,
     };
     if (selectedDate) params.departure_time = selectedDate.toISOString();
+    if (groupId) params.group_id = groupId;
     return params;
   };
 
@@ -200,5 +203,6 @@ export function useSearchRides() {
     loadMoreResults,
     fetchDriverInfo,
     sendRequestToJoin,
+    groupId,
   };
 }

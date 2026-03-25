@@ -15,6 +15,24 @@
   margin-bottom: 1rem;
 }
 
+.groupBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--color-primary-subtle, #e8f4ff);
+  border-right: 4px solid var(--color-primary, #2563eb);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 0.95rem;
+  color: var(--color-text-primary, var(--text-primary));
+  direction: rtl;
+}
+
+.groupBanner strong {
+  color: var(--color-primary, #2563eb);
+}
+
 .pageError {
   color: var(--danger-text);
   margin-bottom: 1rem;

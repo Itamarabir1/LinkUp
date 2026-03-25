@@ -1,10 +1,13 @@
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from datetime import datetime
+
+from sqlalchemy import inspect as sa_inspect
 
 # מודלים ו-Enums
 from app.domain.rides.model import Ride
 from app.domain.rides.enum import RideStatus
+from app.domain.rides.schema import RideResponse
 from app.core.exceptions.ride import InvalidRouteError
 
 # לוגיקה ותשתיות
@@ -117,3 +120,52 @@ class RideMapper:
                 # ניסיון פורמט נוסף אם צריך או זריקת שגיאה
                 raise InvalidRouteError(detail="Invalid departure_time format")
         return departure_time
+
+    @staticmethod
+    def _resolve_group_name(ride: Ride, explicit: Optional[str]) -> Optional[str]:
+        """שם קבוצה מפורש או מ-relationship שכבר בזיכרון — בלי lazy load."""
+        if explicit is not None:
+            return explicit
+        if ride.group_id is None:
+            return None
+        state = sa_inspect(ride)
+        if "group" in state.unloaded:
+            return None
+        grp = ride.group
+        if grp is None:
+            return None
+        return getattr(grp, "name", None)
+
+    @staticmethod
+    def to_response(
+        ride: Ride,
+        group_name: Optional[str] = None,
+        user_booking_status: Optional[str] = None,
+    ) -> RideResponse:
+        """
+        ממיר Ride ORM ל-RideResponse — שדות מפורשים, בלי model_validate על ה-ORM.
+        group_name / user_booking_status אופציונליים מהשירות.
+        """
+        resolved_group_name = RideMapper._resolve_group_name(ride, group_name)
+        return RideResponse(
+            ride_id=ride.ride_id,
+            driver_id=ride.driver_id,
+            group_id=ride.group_id,
+            group_name=resolved_group_name,
+            origin_name=ride.origin_name or "",
+            destination_name=ride.destination_name or "",
+            departure_time=ride.departure_time,
+            estimated_arrival_time=ride.estimated_arrival_time,
+            available_seats=ride.available_seats,
+            price=float(ride.price) if ride.price is not None else 0.0,
+            status=ride.status,
+            created_at=ride.created_at,
+            user_booking_status=user_booking_status,
+            total_distance_km=float(ride.distance_km) if ride.distance_km is not None else 0.0,
+            total_duration_min=float(ride.duration_min) if ride.duration_min is not None else 0.0,
+            route_coords=ride.route_coords_list or [],
+            route_summary=ride.route_summary,
+        )
+
+
+to_response = RideMapper.to_response

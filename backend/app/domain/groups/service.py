@@ -3,7 +3,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.groups import crud
-from app.domain.groups.schema import GroupCreate, GroupOut
+from app.domain.groups.schema import GroupCreate, GroupOut, group_to_out
 
 
 async def create_group(db: AsyncSession, data: GroupCreate, user_id: UUID) -> GroupOut:
@@ -15,7 +15,7 @@ async def create_group(db: AsyncSession, data: GroupCreate, user_id: UUID) -> Gr
         description=data.description,
     )
     count = await crud.get_member_count(db, group.group_id)
-    return GroupOut.model_validate({**group.__dict__, "member_count": count})
+    return group_to_out(group, count)
 
 
 async def get_my_groups(db: AsyncSession, user_id: UUID) -> list[GroupOut]:
@@ -23,7 +23,7 @@ async def get_my_groups(db: AsyncSession, user_id: UUID) -> list[GroupOut]:
     result = []
     for g in groups:
         count = await crud.get_member_count(db, g.group_id)
-        result.append(GroupOut.model_validate({**g.__dict__, "member_count": count}))
+        result.append(group_to_out(g, count))
     return result
 
 
@@ -43,4 +43,4 @@ async def join_by_invite(db: AsyncSession, invite_code: str, user_id: UUID) -> G
 
     await crud.join_group(db, group.group_id, user_id)
     count = await crud.get_member_count(db, group.group_id)
-    return GroupOut.model_validate({**group.__dict__, "member_count": count})
+    return group_to_out(group, count)

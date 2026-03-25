@@ -70,6 +70,8 @@ function AppRoutes() {
           <Route path="profile" element={<Profile />} />
           <Route path="groups" element={<Groups />} />
           <Route path="groups/new" element={<CreateGroup />} />
+          <Route path="groups/:groupId/rides/search" element={<SearchRides />} />
+          <Route path="groups/:groupId/rides/create" element={<CreateRide />} />
           <Route path="groups/:groupId" element={<GroupManage />} />
           <Route path="join/:inviteCode" element={<JoinGroup />} />
           <Route path="rides/:rideId" element={<Navigate to="/my-bookings?tab=driver" replace />} />

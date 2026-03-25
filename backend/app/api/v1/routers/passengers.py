@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_current_user, get_current_user_optional
+from app.api.dependencies.group_membership import require_group_member
 from app.db.session import get_db
 from app.core.exceptions.booking import (
     BookingAlreadyExistsError,
@@ -166,6 +167,7 @@ async def search_available_rides(
     ),
     limit: int = Query(20, ge=1, le=50, description="כמות תוצאות"),
     after: Optional[UUID] = Query(None, description="cursor: ride_id להמשך"),
+    group_id: Optional[UUID] = Depends(require_group_member),
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
@@ -178,6 +180,7 @@ async def search_available_rides(
             departure_time=departure_time,
             limit=limit,
             after=after,
+            group_id=group_id,
         )
         result = await PassengerService.search_rides_for_passenger(db, search_data)
         return result

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_
+from sqlalchemy import Select, select, and_
 from sqlalchemy.orm import selectinload
 from app.domain.rides.enum import RideStatus
 
@@ -26,6 +26,18 @@ class CRUDRide:
     אחריות: ניהול הגישה למסד הנתונים (PostgreSQL) עבור ישות הנסיעה.
     Senior Tip: שימוש ב-db.flush() מאפשר לסרוויס לנהל את ה-Transaction (Atomic).
     """
+
+    @staticmethod
+    def _base_ride_stmt() -> Select:
+        """
+        מקור אמת יחיד לטעינת Rides לתצוגה.
+        כל query שמחזיר Rides ל-RideResponse חייב לעבור דרך כאן.
+        מבטיח ש-group ו-driver תמיד נטענים — אין MissingGreenlet.
+        """
+        return select(Ride).options(
+            selectinload(Ride.group),
+            selectinload(Ride.driver),
+        )
 
     def create(self, db: Session, *, obj_in: Dict[str, Any]) -> Ride:
         """
@@ -54,11 +66,7 @@ class CRUDRide:
     async def get_async(self, db: AsyncSession, ride_id: UUID) -> Optional[Ride]:
         """שליפה לפי מפתח ראשי ל-AsyncSession (לשימוש ב-read_ride ו-API אסינכרוני)."""
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
-        stmt = (
-            select(Ride)
-            .where(Ride.ride_id == rid)
-            .options(selectinload(Ride.group))
-        )
+        stmt = self._base_ride_stmt().where(Ride.ride_id == rid)
         result = await db.execute(stmt)
         return result.scalars().first()
 
@@ -108,11 +116,7 @@ class CRUDRide:
     ) -> List[Ride]:
         """שליפת נסיעות לפי נהג (למסך 'הנסיעות שלי')."""
         did = UUID(str(driver_id)) if isinstance(driver_id, str) else driver_id
-        stmt = (
-            select(Ride)
-            .where(Ride.driver_id == did)
-            .options(selectinload(Ride.group))
-        )
+        stmt = self._base_ride_stmt().where(Ride.driver_id == did)
         if status is not None:
             stmt = stmt.where(Ride.status == status)
         stmt = stmt.order_by(Ride.departure_time.desc())
@@ -127,7 +131,7 @@ class CRUDRide:
     ) -> List[Ride]:
         """שליפת נסיעות לפי קבוצה (לטאב נסיעות במסך קבוצה)."""
         gid = UUID(str(group_id)) if isinstance(group_id, str) else group_id
-        stmt = select(Ride).where(Ride.group_id == gid)
+        stmt = self._base_ride_stmt().where(Ride.group_id == gid)
         if exclude_cancelled:
             stmt = stmt.where(Ride.status != RideStatus.CANCELLED)
         stmt = stmt.order_by(Ride.departure_time.desc())
@@ -234,47 +238,24 @@ class CRUDRide:
     async def get_rides_needing_reminders(
         self, db: AsyncSession, start_window: datetime, end_window: datetime
     ) -> List[Ride]:
-        """
-        שליפת נסיעות שעומדות לצאת עבור תזכורת לנהג.
-
-        Senior Implementation Details:
-        1. selectinload: טעינה מקדימה של הנהג בצורה אסינכרונית בטוחה.
-        2. Explicit Execute: שימוש ב-db.execute כמתבקש ב-AsyncSession.
-        """
-
-        # בניית השאילתה (Statement)
-        stmt = (
-            select(Ride)
-            .options(
-                # טעינה מוקדמת של אובייקט הנהג (User)
-                selectinload(Ride.driver)
-            )
-            .where(
-                and_(
-                    Ride.status == RideStatus.OPEN,
-                    ~Ride.reminder_sent,
-                    Ride.departure_time >= start_window,
-                    Ride.departure_time <= end_window,
-                )
+        """שליפת נסיעות שעומדות לצאת עבור תזכורת לנהג."""
+        stmt = self._base_ride_stmt().where(
+            and_(
+                Ride.status == RideStatus.OPEN,
+                ~Ride.reminder_sent,
+                Ride.departure_time >= start_window,
+                Ride.departure_time <= end_window,
             )
         )
-
-        # הרצת השאילתה וקבלת התוצאות
         result = await db.execute(stmt)
-
-        # scalars() מחלץ את אובייקטי ה-Ride מתוך שורות ה-Result
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     async def get_for_notification(
         self, db: AsyncSession, ride_id: UUID
     ) -> Optional[Ride]:
         """שליפת נסיעה עם נהג (לבניית קונטקסט במייל/פוש)."""
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
-        stmt = (
-            select(Ride)
-            .options(selectinload(Ride.driver))
-            .where(Ride.ride_id == rid)
-        )
+        stmt = self._base_ride_stmt().where(Ride.ride_id == rid)
         result = await db.execute(stmt)
         return result.scalars().first()
 

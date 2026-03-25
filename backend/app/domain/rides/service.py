@@ -135,7 +135,7 @@ class RideService:
     def _build_ride_response(
         new_ride: Ride, cached_data: Dict[str, Any], ride_in: RideCreate
     ) -> RideResponse:
-        response = RideResponse.model_validate(new_ride)
+        response = RideMapper.to_response(new_ride)
         if not response.route_coords and cached_data.get("routes"):
             selected_route = cached_data["routes"][ride_in.selected_route_index]
             response = response.model_copy(
@@ -172,14 +172,14 @@ class RideService:
         """רשימת נסיעות של הנהג המחובר (הנסיעות שלי)."""
         status_enum = RideStatus(status) if status else None
         rides = await crud_ride.get_by_driver_id(db, driver_id, status_enum)
-        return [RideResponse.model_validate(r) for r in rides]
+        return [RideMapper.to_response(r) for r in rides]
 
     async def get_rides_by_group_id(
         self, db: AsyncSession, group_id: UUID
     ) -> List[RideResponse]:
         """רשימת נסיעות של קבוצה (לטאב נסיעות במסך קבוצה). לא בודק חברות – יש לקרוא רק אחרי אימות שהמשתמש חבר בקבוצה."""
         rides = await crud_ride.get_by_group_id(db, group_id, exclude_cancelled=True)
-        return [RideResponse.model_validate(r) for r in rides]
+        return [RideMapper.to_response(r) for r in rides]
 
     # --- Update (partial) ---
 
@@ -219,7 +219,7 @@ class RideService:
             await broadcast.publish(RIDES_LIST_CHANNEL, json.dumps(broadcast_payload))
         except Exception as e:
             logger.warning("Broadcast ride updated failed: %s", e)
-        return RideResponse.model_validate(ride)
+        return RideMapper.to_response(ride)
 
     # --- Start / End ride (GPS tracking) ---
 
@@ -253,7 +253,7 @@ class RideService:
             )
             await db.commit()
             await db.refresh(updated)
-            return RideResponse.model_validate(updated)
+            return RideMapper.to_response(updated)
         except Exception:
             await db.rollback()
             raise
@@ -281,7 +281,7 @@ class RideService:
             )
             await db.commit()
             await db.refresh(updated)
-            return RideResponse.model_validate(updated)
+            return RideMapper.to_response(updated)
         except Exception:
             await db.rollback()
             raise

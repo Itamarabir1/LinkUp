@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { fetchAddressFromCoords } from '../api/geo';
-import { createRideFromSession, previewRideRoutes } from '../api/rides';
+import { previewRideRoutes, createRideFromSession } from '../api/rides';
 import { useAuth } from '../context/AuthContext';
 import type { RidePreviewResponse } from '../types/api';
 import { getApiErrorMessage } from '../utils/apiError';
 import type { RouteMapData } from '../components/RouteMapModal';
 
 export function useCreateRide() {
+  const { groupId } = useParams<{ groupId?: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [originName, setOriginName] = useState('');
@@ -64,6 +65,10 @@ export function useCreateRide() {
 
   const requestPreview = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user?.user_id) {
+      setError('לא זוהה משתמש מחובר. התחבר/י מחדש ונסה/י שוב.');
+      return;
+    }
     if (!originName.trim() || !destinationName.trim()) {
       setError('נא למלא מוצא ויעד');
       return;
@@ -77,11 +82,12 @@ export function useCreateRide() {
     setPreview(null);
     try {
       const { data } = await previewRideRoutes({
-        driver_id: Number(user?.user_id) || 0,
+        driver_id: user.user_id,
         origin_name: originName.trim(),
         destination_name: destinationName.trim(),
         departure_time: selectedDate.toISOString(),
         available_seats: seats,
+        ...(groupId ? { group_id: groupId } : {}),
       });
       const routesList = Array.isArray(data.routes) ? data.routes : (data.routes ? [data.routes] : []);
       setPreview({ ...data, routes: routesList });
@@ -107,9 +113,10 @@ export function useCreateRide() {
       await createRideFromSession({
         session_id: preview.session_id,
         selected_route_index: indexToSend,
+        ...(groupId ? { group_id: groupId } : {}),
       });
       setPreview(null);
-      navigate('/my-rides', { replace: true });
+      navigate(groupId ? `/groups/${groupId}` : '/my-rides', { replace: true });
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'יצירת נסיעה נכשלה'));
     } finally {
@@ -139,5 +146,6 @@ export function useCreateRide() {
     handleSwap,
     requestPreview,
     createRide,
+    groupId,
   };
 }

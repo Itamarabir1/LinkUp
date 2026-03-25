@@ -115,6 +115,9 @@ class RideSearchRequest(BaseModel):
     )
     limit: int = Field(default=20, ge=1, le=50)
     after: Optional[UUID] = Field(None, description="cursor: ride_id אחרייו להמשיך")
+    group_id: Optional[UUID] = Field(
+        None, description="אם קיים — מסנן רק נסיעות של הקבוצה"
+    )
 
 
 class RideSearchResponse(BaseModel):

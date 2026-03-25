@@ -112,6 +112,7 @@ class CRUDPassenger:
         after_ride_id: Optional[UUID] = None,
         min_departure_time: Optional[datetime] = None,
         passenger_id: Optional[UUID] = None,
+        group_id: Optional[UUID] = None,
     ) -> tuple[List[tuple[Ride, Optional[str]]], bool]:
         """
         מנוע חיפוש נסיעות לפי קואורדינטות ורדיוס. מיון קבוע: departure_time.asc(), ride_id.asc().
@@ -122,6 +123,9 @@ class CRUDPassenger:
         filters = and_(
             Ride.status.in_([RideStatus.OPEN, RideStatus.FULL]),
             Ride.available_seats > 0,
+            Ride.group_id == group_id
+            if group_id is not None
+            else Ride.group_id.is_(None),
             func.ST_DWithin(
                 cast(Ride.route_coords, Geography),
                 cast(pickup_geo, Geography),

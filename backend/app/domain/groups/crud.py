@@ -83,17 +83,21 @@ async def remove_member(db: AsyncSession, group_id: UUID, user_id: UUID) -> None
     if not member:
         return
     group = await get_group_by_id(db, group_id)
-    if group and group.admin_id == user_id:
-        # מנהל יוצא — העבר מנהלות לחבר אחר אם יש
-        members = await get_group_members(db, group_id)
-        others = [m for m in members if m.user_id != user_id]
+    members = await get_group_members(db, group_id)
+    others = [m for m in members if m.user_id != user_id]
+
+    if group:
         if others:
-            # ממיין לפי joined_at, לוקח את הראשון
-            others.sort(key=lambda m: m.joined_at)
-            new_admin = others[0]
-            group.admin_id = new_admin.user_id
-            new_admin.role = "admin"
-            await db.commit()
+            # מנהל יוצא — העבר מנהלות לחבר אחר (הוותיק ביותר)
+            if group.admin_id == user_id:
+                others.sort(key=lambda m: m.joined_at)
+                new_admin = others[0]
+                group.admin_id = new_admin.user_id
+                new_admin.role = "admin"
+        else:
+            # אין חברים אחרי היציאה — כמו סגירת קבוצה (לא נשארת קבוצה "ריקה" פעילה)
+            group.is_active = False
+
     db.delete(member)
     await db.commit()
 

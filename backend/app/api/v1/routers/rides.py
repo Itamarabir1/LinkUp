@@ -24,6 +24,7 @@ from app.core.exceptions.ride import RideNotFoundError
 from app.infrastructure.redis.broadcast import broadcast
 from app.domain.users.model import User
 from app.api.dependencies.auth import get_current_user, get_current_user_ws
+from app.api.dependencies.group_membership import verify_group_membership
 from app.domain.rides.service import ride_service
 from app.services.location.location_service import PASSENGER_LOCATIONS_CHANNEL_SUFFIX
 
@@ -48,7 +49,8 @@ async def create_new_ride(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # הראוטר רק "מזמין" את הפעולה. הוא לא מנהל לוגיקה או שגיאות.
+    if ride_in.group_id is not None:
+        await verify_group_membership(db, ride_in.group_id, current_user.user_id)
     return await ride_service.create_ride(
         db=db, ride_in=ride_in, current_user_id=current_user.user_id
     )

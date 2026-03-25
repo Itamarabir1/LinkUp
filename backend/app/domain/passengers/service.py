@@ -20,6 +20,7 @@ from app.domain.passengers.schema import (
 )
 from app.domain.rides.crud import crud_ride
 from app.domain.rides.enum import RideStatus
+from app.domain.rides.mapper import RideMapper
 from app.domain.rides.schema import DriverInfoResponse
 from app.infrastructure.geo.client import geo_client
 
@@ -142,7 +143,6 @@ class PassengerService:
     ):
         """חיפוש נסיעות פעיל לפי קואורדינטות של כתובות. לא שומר בקשה ב-DB."""
         from app.domain.passengers.schema import RideSearchResponse
-        from app.domain.rides.schema import RideResponse
 
         try:
             p_lat, p_lon = await geo_client.fetch_coordinates(search_data.pickup_name)
@@ -168,13 +168,14 @@ class PassengerService:
                 after_ride_id=search_data.after,
                 min_departure_time=search_data.departure_time,
                 passenger_id=search_data.passenger_id,
+                group_id=search_data.group_id,
             )
 
             items = []
             for ride, booking_status in matches:
-                ride_response = RideResponse.model_validate(ride)
-                ride_response.user_booking_status = booking_status
-                items.append(ride_response)
+                items.append(
+                    RideMapper.to_response(ride, user_booking_status=booking_status)
+                )
             next_cursor = str(items[-1].ride_id) if has_more and items else None
             return RideSearchResponse(
                 items=items,
