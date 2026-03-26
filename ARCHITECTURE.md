@@ -71,6 +71,7 @@ outbox-worker
 - **Domain-Driven Design**: כל דומיין (users, rides, bookings, passengers, chat, groups, **admin**, auth, …) — model, schema, crud, service; ראוטרים תחת `backend/app/domain/*/router.py` ונרשמים ב־`api/v1/api_router.py`.
 - **Dependency Injection (FastAPI Depends)**: `RideService` ו-`AuthService` נוצרים דרך factories ב-`backend/app/api/dependencies/services.py`, והראוטרים מזריקים אותם עם `Depends(get_ride_service)` / `Depends(get_auth_service)` (במקום singletons גלובליים).
 - **JWT Auth**: Access Token (קצר) + Refresh Token (ארוך, נשמר ב-DB). אותו SECRET_KEY בין backend ל-chat-ws לאימות WebSocket.
+- **WebSocket auth (FastAPI)**: `get_current_user_ws` ב-`app/api/dependencies/auth.py` מאמת **רק JWT** (`decode_access_token`: חתימה, `exp`, base64 קנוני) ומחזיר `WsUser` עם `user_id` מה-`sub` — **בלי קריאת DB** בזמן חיבור, כדי לא להעמיס על ה-connection pool תחת עומס. HTTP (`get_current_user`) עדיין טוען `User` מ-DB ובודק `is_active`.
 - **Cursor-based Pagination**: נסיעות (חיפוש), הודעות צ'אט — `after` / `before` + `limit`, תגובה עם `next_cursor`, `has_more`.
 - **Page-based Pagination**: הזמנות שלי — `page`, `limit`, תגובה עם `total`, `has_more`.
 - **Pessimistic Locking**: `approve_booking`, `cancel_booking` — שליפת נסיעה עם `SELECT ... FOR UPDATE` כדי למנוע race.
@@ -93,7 +94,7 @@ outbox-worker
 
 ## Performance
 
-- **ASGI server**: Gunicorn with 4 workers (`uvicorn.workers.UvicornWorker`), bind `0.0.0.0:8000` (production / Docker). Local dev may use uvicorn with `--reload`.
+- **ASGI server (Docker Compose)**: `uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-1}` — מספר תהליכי worker נשלט מ-**`UVICORN_WORKERS`** ב-`backend/.env` (ראו `backend/.env.example`: **4** למכונות רב-ליבה; אם המשתנה לא מוגדר, ברירת המחדל בפקודת Compose היא **1**). **פיתוח לוקאלי** (ללא Docker): בדרך כלל `uvicorn ... --reload` — תהליך יחיד.
 - **Connection Pool** (`backend/app/db/session.py`): `pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle` מ-**config** (`DB_POOL_*` ב-`.env`; ברירות מחדל ב-`Settings`), `pool_pre_ping=True`.
 - **Indexes**: ראה `docs/DATABASE.md` — כולל 11 ה-indexes מ-migration 004 (rides, bookings, group_members, passenger_requests).
 - **Caching**: Redis לפי צורך — TTL וכו' לפי סוג (למשל OTP, broadcast channels).
@@ -118,6 +119,7 @@ outbox-worker
 ## Security
 
 - **JWT**: HS256, `SECRET_KEY` חובה בפרודקשן. Access/Refresh expiry מ-config.
+- **WebSocket (backend)**: אימות ב-`get_current_user_ws` מבוסס JWT בלבד — אין בדיקת `is_active` בזמן ה-handshake; משתמש מושבת עם טוקן תקף עדיין יכול להתחבר ל-WS עד פקיעת הטוקן (מול מניעת עומס על DB בחיבור).
 - **CORS**: `CORS_ORIGINS` או `FRONTEND_URL`; ב-DEBUG גם localhost regex.
 - **Rate Limiting**: Auth endpoints — חלון שניות + מקסימום בקשות ל-IP (`RATE_LIMIT_AUTH_*`); כולל **`POST /register`** לצד login/refresh וכו’.
 - **Password hashing**: bcrypt; חישוב/אימות סיסמה רץ ב-**thread pool** (`run_in_executor`) כדי לא לחסום את ה-event loop.

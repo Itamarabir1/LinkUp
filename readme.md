@@ -143,7 +143,8 @@ cd frontend && npm run dev
 - **אדמין (משתמש עם `is_admin`):** http://localhost:5173/admin — פירוט API ומבנה: [`ADMIN_DASHBOARD.md`](ADMIN_DASHBOARD.md)  
 - **בקאנד:** http://localhost:8000  
 - **Swagger:** http://localhost:8000/docs  
-- צ׳אט בפיתוח: WebSocket ל־`localhost:8081`; WS נסיעות ל־`localhost:8000/api/v1` — ראו [`frontend/src/config/env.ts`](frontend/src/config/env.ts).
+- **Backend בדוקר:** `uvicorn` עם מספר workers לפי **`UVICORN_WORKERS`** ב-`backend/.env` (`backend/.env.example` מגדיר **4**; ב-`docker-compose` ברירת המחדל אם המשתנה חסר היא **1**).  
+- צ׳אט בפיתוח: WebSocket ל־`localhost:8081`; WS נסיעות/התראות ל־`localhost:8000/api/v1` — ראו [`frontend/src/config/env.ts`](frontend/src/config/env.ts).
 
 ב־[`docker-compose.yml`](docker-compose.yml) שירותי **`frontend`** ו־**`nginx`** מוגדרים עם `profiles: ["prod"]` — לא עולים ב־`docker compose up -d` ללא הפרופיל.
 

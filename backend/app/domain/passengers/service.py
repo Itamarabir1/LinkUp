@@ -55,6 +55,7 @@ class PassengerService:
             new_request = await crud_passenger.create(
                 db, request_in, p_lat, p_lon, d_lat, d_lon, passenger_id=passenger_id
             )
+            await db.commit()
 
             # 3. מציאת נהגים רלוונטיים באופן מיידי (לא כולל נסיעות של המשתמש עצמו)
             matches, _ = await crud_passenger.find_rides_by_coordinates(
@@ -72,6 +73,7 @@ class PassengerService:
             return new_request
 
         except Exception as e:
+            await db.rollback()
             logger.error(f"Error in create_passenger_request: {e}")
             raise
 

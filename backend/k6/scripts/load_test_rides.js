@@ -92,8 +92,6 @@ export default function () {
 
   const rideId = createBody.ride_id;
   const passenger1 = registerAndLogin("p1");
-  // TEMP debug: remove after diagnosing passenger1 register/login
-  console.log(`passenger1 ok: ${passenger1.ok}, step: ${passenger1.step}`);
   if (!passenger1.ok) return;
 
   const searchRes = http.get(
@@ -124,8 +122,6 @@ export default function () {
     { headers: passenger1.authHeaders }
   );
   const req1Body = jsonOrNull(req1);
-  // TEMP debug: remove after diagnosing req1/join1
-  console.log(`req1 status: ${req1.status}, body: ${req1.body ? req1.body.slice(0, 200) : ""}`);
   if (req1.status !== 201 || !req1Body?.request_id) return;
 
   const join1 = http.post(
@@ -135,7 +131,6 @@ export default function () {
   );
   joinDuration.add(join1.timings.duration);
   const join1Body = jsonOrNull(join1);
-  console.log(`join1 status: ${join1.status}, body: ${join1.body ? join1.body.slice(0, 200) : ""}`);
   const join1Ok = check(join1, { "join #1 status 201": (r) => r.status === 201 });
   joinErrors.add(!join1Ok);
   if (!join1Ok || !join1Body?.booking_id) return;

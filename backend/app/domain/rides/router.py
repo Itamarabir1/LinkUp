@@ -23,7 +23,7 @@ from app.domain.rides.schema import (
 from app.core.exceptions.ride import RideNotFoundError
 from app.infrastructure.redis.broadcast import broadcast
 from app.domain.users.model import User
-from app.api.dependencies.auth import get_current_user, get_current_user_ws
+from app.api.dependencies.auth import get_current_user, get_current_user_ws, WsUser
 from app.api.dependencies.group_membership import verify_group_membership
 from app.api.dependencies.services import get_ride_service
 from app.domain.rides.service import RideService
@@ -177,7 +177,7 @@ async def ride_status_websocket(websocket: WebSocket, ride_id: UUID):
 async def ride_passengers_locations_websocket(
     websocket: WebSocket,
     ride_id: UUID,
-    user: Optional[User] = Depends(get_current_user_ws),
+    user: Optional[WsUser] = Depends(get_current_user_ws),
     db: AsyncSession = Depends(get_db),
     ride_svc: RideService = Depends(get_ride_service),
 ):

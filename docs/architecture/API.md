@@ -173,6 +173,6 @@ Authorization: Bearer <access_token>
 
 | Method | Path | Auth | תיאור |
 |--------|------|------|--------|
-| WS | /api/v1/notifications/ws | query token=JWT | WebSocket להתראות למשתמש. חיבור עם token ב-query. |
+| WS | /api/v1/notifications/ws | query token=JWT | WebSocket להתראות למשתמש. אימות: JWT בלבד (`get_current_user_ws` → `WsUser`, ללא DB ב-connect). |
 
-(ראוטר: `app/api/websockets/notifications.py` — prefix תלוי ברישום ב-main.)
+(ראוטר: `app/domain/notifications/router.py`, נרשם ב-`api/v1/api_router.py` תחת prefix `/notifications`.)

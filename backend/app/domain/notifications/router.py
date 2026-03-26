@@ -1,6 +1,9 @@
 import logging
+from typing import Optional
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, status
-from app.api.dependencies.auth import get_current_user_ws
+
+from app.api.dependencies.auth import get_current_user_ws, WsUser
 
 from app.domain.notifications.services.notification_streamer import notification_streamer
 
@@ -11,7 +14,7 @@ router = APIRouter()
 @router.websocket("/ws")
 async def websocket_endpoint(
     websocket: WebSocket,
-    user=Depends(get_current_user_ws),
+    user: Optional[WsUser] = Depends(get_current_user_ws),
 ):
     if not user:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)

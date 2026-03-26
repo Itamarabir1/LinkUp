@@ -12,7 +12,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from app.db.session import get_db
-from app.api.dependencies.auth import get_current_user, get_current_user_ws
+from app.api.dependencies.auth import get_current_user, get_current_user_ws, WsUser
 from app.domain.users.model import User
 from app.domain.bookings.service import BookingService
 from app.domain.bookings.crud import crud_booking
@@ -194,7 +194,7 @@ async def report_passenger_location(
 async def booking_location_websocket(
     websocket: WebSocket,
     booking_id: UUID,
-    user: Optional[User] = Depends(get_current_user_ws),
+    user: Optional[WsUser] = Depends(get_current_user_ws),
     db: AsyncSession = Depends(get_db),
 ):
     """

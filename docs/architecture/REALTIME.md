@@ -79,9 +79,9 @@ Client A (נהג)                Backend API                    Redis DB 1      
 
 ## Notifications WebSocket (Backend)
 
-- **Endpoint**: ראוטר ב-`app/api/websockets/notifications.py` — WebSocket `/ws` עם אימות JWT (get_current_user_ws).
-- **שימוש**: `notification_service.stream_user_notifications(websocket, user_id)` — stream של התראות למשתמש מחובר.
-- **רישום**: אם הראוטר רשום ב-app (למשל תחת prefix מסוים), הנתיב המלא תלוי ב-include_router.
+- **Endpoint**: `app/domain/notifications/router.py` — `@router.websocket("/ws")` תחת prefix `/notifications` → נתיב מלא **`GET /api/v1/notifications/ws?token=JWT`**.
+- **אימות**: `get_current_user_ws` ב-`app/api/dependencies/auth.py` — **רק JWT** (`decode_access_token`), מחזיר `WsUser` עם `user_id` מה-`sub` (**ללא קריאת DB** בזמן חיבור). מניעת עומס על connection pool; trade-off: אין בדיקת `is_active` ב-handshake (מול HTTP שכן טוען `User` מ-DB).
+- **שימוש**: `notification_streamer.stream_user_notifications(websocket, user_id)` — Redis Pub/Sub דרך `broadcaster`, ערוץ `user_{user_id}`.
 
 ---
 
@@ -91,7 +91,7 @@ Client A (נהג)                Backend API                    Redis DB 1      
 
 - **נהג → נוסעים**: נהג מדווח מיקום ב־POST /bookings/{booking_id}/location (body: lat, lng, heading?, speed?). Backend מפרסם לערוץ `booking_{booking_id}` לכל הבוקינגים המאושרים. נוסע מתחבר ל־WS `/bookings/ws/{booking_id}/location?token=JWT` ומקבל עדכונים.
 - **נוסעים → נהג**: נוסע מדווח מיקום ב־POST /bookings/{booking_id}/passenger-location. Backend מפרסם לערוץ `ride_{ride_id}:passenger_locations`. נהג מתחבר ל־WS `/rides/ws/{ride_id}/passengers?token=JWT` ומקבל עדכונים.
-- **אימות WebSocket**: `get_current_user_ws` ב־`app/api/dependencies/auth.py` — טוקן מ־query string, מחזיר User או None.
+- **אימות WebSocket**: `get_current_user_ws` ב־`app/api/dependencies/auth.py` — טוקן מ־query string, מאמת JWT, מחזיר `WsUser` או `None` (**ללא DB** בזמן connect).
 
 ---
 

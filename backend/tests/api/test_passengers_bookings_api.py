@@ -109,14 +109,6 @@ async def test_request_ride_from_search_then_approve_flow(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason=(
-        "Known regression: POST /passenger/passengers returns 201 but "
-        "subsequent POST /bookings/request-to-join may return BOOKING_REQUEST_NOT_FOUND "
-        "when request visibility/commit boundaries are broken."
-    ),
-    strict=False,
-)
 async def test_request_then_join_cross_request_regression_guard(
     seeded_users_and_ride,
     api_client_with_overrides,

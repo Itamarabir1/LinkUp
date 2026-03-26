@@ -180,7 +180,7 @@
 | **bcrypt ב-thread pool** | `get_password_hash` / `verify_password` — **async** עם `asyncio.get_running_loop().run_in_executor` — לא חוסמים את לולאת ה-ASGI תחת עומס סיסמאות. |
 | **Request ID** | `X-Request-ID` — מעקב בין לוגים לבקשה. |
 | **JSON logging בפרודקשן** | ingestion ל-ELK / CloudWatch בעתיד. |
-| **Gunicorn + מספר workers** | ניצול מספר cores ל-API. |
+| **Uvicorn + מספר workers** (`UVICORN_WORKERS` ב־Docker Compose; `backend/.env.example` מציין 4) | ניצול מספר cores ל-API. |
 | **Redis DB נפרד לצ’אט** | בידוד עומס pub/sub ומפתחות צ’אט מ-cache הכללי של ה-API. |
 
 ### 7ב. Defensive Programming (תכנות הגנתי) — כן, ממומש בפרויקט

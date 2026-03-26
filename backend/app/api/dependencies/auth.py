@@ -1,8 +1,11 @@
+from dataclasses import dataclass
 from typing import Optional
+
 from fastapi import Depends, HTTPException, status, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
+
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.domain.users.crud import crud_user
@@ -11,6 +14,15 @@ from app.domain.users.model import User
 # HTTPBearer מאפשר הזנת טוקן ישירה ב-Swagger (יותר נוח מ-OAuth2)
 bearer_scheme = HTTPBearer()
 bearer_scheme_optional = HTTPBearer(auto_error=False)
+
+
+@dataclass
+class WsUser:
+    id: UUID
+
+    @property
+    def user_id(self) -> UUID:
+        return self.id
 
 
 async def get_current_user(
@@ -71,11 +83,11 @@ async def get_current_user_optional(
 
 async def get_current_user_ws(
     token: Optional[str] = Query(None, alias="token"),
-    db: AsyncSession = Depends(get_db),
-) -> Optional[User]:
+) -> Optional[WsUser]:
     """
-    אימות למשתמש ב-WebSocket לפי טוקן ב-query string (?token=...).
-    מחזיר User אם הטוקן תקף, אחרת None. מתאים ל-/ws ול-/bookings/ws/{id}/location.
+    אימות WS לפי JWT בלבד (?token=...) — ללא קריאת DB.
+    decode_access_token מאמת חתימה, תוקף ו-base64 קנוני.
+    משתמש מושבת עדיין יכול להתחבר עד פקיעת הטוקן (trade-off מול עומס על ה-DB pool).
     """
     if not token:
         return None
@@ -85,10 +97,7 @@ async def get_current_user_ws(
     user_id = payload.get("sub")
     if not user_id:
         return None
-    user = await crud_user.get_by_id(db, id=UUID(str(user_id)))
-    if not user or not user.is_active:
-        return None
-    return user
+    return WsUser(id=UUID(str(user_id)))
 
 
 # ה-WebSocket Dependency נשאר כאן כי הוא קשור ל-API

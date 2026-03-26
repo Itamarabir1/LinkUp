@@ -25,6 +25,7 @@
 **תפקיד:** כל ה-API endpoints והלוגיקה העסקית
 
 **מה כן:**
+- ✅ WebSocket ב-FastAPI לנסיעות/בוקינגים/התראות (`/api/v1/rides/...`, `/api/v1/bookings/...`, `/api/v1/notifications/ws`) — אימות ב-`get_current_user_ws`: **JWT בלבד** (`WsUser`), בלי DB בזמן connect (פרטים: `ARCHITECTURE.md` בשורש, `docs/architecture/REALTIME.md`).
 - ✅ REST API endpoints
 - ✅ Calendar export (`GET /api/v1/chat/conversations/{id}/calendar.ics`)
 - ✅ AI analysis results (`GET /api/v1/chat/conversations/{id}/analysis`)
