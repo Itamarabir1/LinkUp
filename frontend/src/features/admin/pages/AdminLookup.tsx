@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { fetchAdminBooking, fetchAdminRide } from '../api/lookup';
+import page from '../styles/AdminPage.module.css';
+import styles from './AdminLookup.module.css';
 
 type Result = { status: 'idle' | 'loading' | 'ready' | 'error'; data?: unknown };
 
@@ -21,57 +23,54 @@ export default function AdminLookup() {
 
   return (
     <div>
-      <h3>Ride / Booking lookup</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <h2 className={page.pageTitle}>חיפוש לפי מזהה</h2>
+      <div className={styles.grid}>
         <div>
-          <h4 style={{ marginTop: 0 }}>Ride</h4>
+          <h3 className={styles.blockTitle}>נסיעה</h3>
           <input
+            className={styles.field}
             value={rideId}
             onChange={(e) => setRideId(e.target.value)}
             placeholder="ride_id (UUID)"
-            style={{ padding: 8, width: '100%' }}
           />
-          <div style={{ marginTop: 8 }}>
-            <button type="button" onClick={() => run('ride')} disabled={!rideId.trim()}>
-              Fetch ride
+          <div className={styles.rowActions}>
+            <button
+              type="button"
+              className={page.btnSmPrimary}
+              onClick={() => void run('ride')}
+              disabled={!rideId.trim()}
+            >
+              שליפה
             </button>
           </div>
         </div>
         <div>
-          <h4 style={{ marginTop: 0 }}>Booking</h4>
+          <h3 className={styles.blockTitle}>הזמנה</h3>
           <input
+            className={styles.field}
             value={bookingId}
             onChange={(e) => setBookingId(e.target.value)}
             placeholder="booking_id (UUID)"
-            style={{ padding: 8, width: '100%' }}
           />
-          <div style={{ marginTop: 8 }}>
-            <button type="button" onClick={() => run('booking')} disabled={!bookingId.trim()}>
-              Fetch booking
+          <div className={styles.rowActions}>
+            <button
+              type="button"
+              className={page.btnSmPrimary}
+              onClick={() => void run('booking')}
+              disabled={!bookingId.trim()}
+            >
+              שליפה
             </button>
           </div>
         </div>
       </div>
-      <div style={{ marginTop: 16 }}>
-        <h4>Result</h4>
-        {result.status === 'idle' && <p>Enter an id and fetch.</p>}
-        {result.status === 'loading' && <p>Loading…</p>}
-        {result.status === 'error' && <p>Not found / failed.</p>}
-        {result.status === 'ready' && (
-          <pre
-            style={{
-              background: '#111',
-              color: '#eee',
-              padding: 12,
-              borderRadius: 6,
-              overflowX: 'auto',
-              maxHeight: 460,
-            }}
-          >
-            {JSON.stringify(result.data, null, 2)}
-          </pre>
-        )}
-      </div>
+      <h3 className={styles.resultTitle}>תוצאה</h3>
+      {result.status === 'idle' && <p className={page.muted}>הזן מזהה ולחץ שליפה.</p>}
+      {result.status === 'loading' && <p className={page.muted}>טוען…</p>}
+      {result.status === 'error' && <p className={page.error}>לא נמצא או שגיאה.</p>}
+      {result.status === 'ready' && (
+        <pre className={page.preJson}>{JSON.stringify(result.data, null, 2)}</pre>
+      )}
     </div>
   );
 }

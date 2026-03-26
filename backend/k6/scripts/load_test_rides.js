@@ -2,6 +2,7 @@ import http from "k6/http";
 import { check, sleep } from "k6";
 import { Rate, Trend } from "k6/metrics";
 import { BASE_URL, registerAndLogin, jsonOrNull } from "../lib/helpers.js";
+import { buildOptions } from "../lib/options.js";
 
 const previewErrors = new Rate("preview_errors");
 const createErrors = new Rate("create_errors");
@@ -19,27 +20,31 @@ const approveDuration = new Trend("approve_duration", true);
 const rejectDuration = new Trend("reject_duration", true);
 const cancelRideDuration = new Trend("cancel_ride_duration", true);
 
-export const options = {
-  thresholds: {
-    preview_duration: ["p(95)<3000"],
-    create_duration: ["p(95)<3000"],
-    search_duration: ["p(95)<5000"],
-    join_duration: ["p(95)<3000"],
-    approve_duration: ["p(95)<3000"],
-    reject_duration: ["p(95)<3000"],
-    cancel_ride_duration: ["p(95)<3000"],
-    preview_errors: ["rate<0.05"],
-    create_errors: ["rate<0.05"],
-    search_errors: ["rate<0.10"],
-    join_errors: ["rate<0.10"],
-    approve_errors: ["rate<0.10"],
-    reject_errors: ["rate<0.10"],
-    cancel_ride_errors: ["rate<0.10"],
-  },
+const thresholds = {
+  preview_duration: ["p(95)<3000"],
+  create_duration: ["p(95)<3000"],
+  search_duration: ["p(95)<5000"],
+  join_duration: ["p(95)<3000"],
+  approve_duration: ["p(95)<3000"],
+  reject_duration: ["p(95)<3000"],
+  cancel_ride_duration: ["p(95)<3000"],
+  preview_errors: ["rate<0.05"],
+  create_errors: ["rate<0.05"],
+  search_errors: ["rate<0.10"],
+  join_errors: ["rate<0.10"],
+  approve_errors: ["rate<0.10"],
+  reject_errors: ["rate<0.10"],
+  cancel_ride_errors: ["rate<0.10"],
 };
 
-const ORIGIN = { lat: 32.0853, lon: 34.7818, name: "תל אביב, ישראל" };
-const DESTINATION = { lat: 31.7683, lon: 35.2137, name: "ירושלים, ישראל" };
+export const options = buildOptions(thresholds, [
+  { duration: "30s", target: 10 },
+  { duration: "1m", target: 20 },
+  { duration: "30s", target: 0 },
+]);
+
+const ORIGIN = { lat: 32.0853, lon: 34.7818, name: "Tel Aviv, Israel" };
+const DESTINATION = { lat: 31.7683, lon: 35.2137, name: "Jerusalem, Israel" };
 
 function departureTime() {
   return new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
@@ -87,10 +92,12 @@ export default function () {
 
   const rideId = createBody.ride_id;
   const passenger1 = registerAndLogin("p1");
+  // TEMP debug: remove after diagnosing passenger1 register/login
+  console.log(`passenger1 ok: ${passenger1.ok}, step: ${passenger1.step}`);
   if (!passenger1.ok) return;
 
   const searchRes = http.get(
-    `${BASE_URL}/passenger/passengers/search-rides?pickup_name=${encodeURIComponent("תל אביב")}&destination_name=${encodeURIComponent("ירושלים")}&search_radius=5000&limit=10`,
+    `${BASE_URL}/passenger/passengers/search-rides?pickup_name=${encodeURIComponent("Tel Aviv")}&destination_name=${encodeURIComponent("Jerusalem")}&search_radius=5000&limit=10`,
     { headers: passenger1.authHeaders }
   );
   searchDuration.add(searchRes.timings.duration);
@@ -117,6 +124,8 @@ export default function () {
     { headers: passenger1.authHeaders }
   );
   const req1Body = jsonOrNull(req1);
+  // TEMP debug: remove after diagnosing req1/join1
+  console.log(`req1 status: ${req1.status}, body: ${req1.body ? req1.body.slice(0, 200) : ""}`);
   if (req1.status !== 201 || !req1Body?.request_id) return;
 
   const join1 = http.post(
@@ -126,6 +135,7 @@ export default function () {
   );
   joinDuration.add(join1.timings.duration);
   const join1Body = jsonOrNull(join1);
+  console.log(`join1 status: ${join1.status}, body: ${join1.body ? join1.body.slice(0, 200) : ""}`);
   const join1Ok = check(join1, { "join #1 status 201": (r) => r.status === 201 });
   joinErrors.add(!join1Ok);
   if (!join1Ok || !join1Body?.booking_id) return;

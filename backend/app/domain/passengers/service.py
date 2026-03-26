@@ -21,7 +21,7 @@ from app.domain.passengers.schema import (
 from app.domain.rides.crud import crud_ride
 from app.domain.rides.enum import RideStatus
 from app.domain.rides.mapper import RideMapper
-from app.domain.rides.schema import DriverInfoResponse
+from app.domain.rides.schema import DriverInfoResponse, RideResponse
 from app.infrastructure.geo.geocode_cache import get_coordinates
 
 # הגדרת לוגר
@@ -62,8 +62,13 @@ class PassengerService:
                 passenger_id=passenger_id,
             )
 
-            # הוספת התוצאות לאובייקט החוזר
-            new_request.matching_rides = matches
+            # matching_rides חייב להיות List[RideResponse] — find_rides מחזיר tuples (Ride, booking_status)
+            new_request.matching_rides = [
+                RideResponse.model_validate(ride).model_copy(
+                    update={"user_booking_status": status}
+                )
+                for ride, status in matches
+            ]
             return new_request
 
         except Exception as e:

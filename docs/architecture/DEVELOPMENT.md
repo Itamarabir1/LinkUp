@@ -114,7 +114,7 @@ Wrappers נשמרו לתאימות:
 - [`backend/load_test_rides.js`](../../backend/load_test_rides.js)
 
 - **מה נבדק:** לכל איטרציה — `POST /api/v1/auth/register` ואז `POST /api/v1/auth/login`; מדדי משך ושגיאות; thresholds בקובץ.
-- **טלפונים:** מספרים בפורמט **`+972508…`** (טווח תקף לפי `phonenumbers`); ייחודיות גלובלית עם **`__VU`** ו־**`__ITER`**.
+- **טלפונים:** `k6/lib/helpers.js` — בלוקים **`+972534XXXXXX`** / **`+972544XXXXXX`** (סיומת 6 ספרות), מלח `BASE_TS` + **`__VU`** + מונה; תואם `phonenumbers` (IL).
 - **לפני ריצה:** ב־`backend/.env` (זמנית, לבדיקות בלבד) מומלץ `DEBUG=True` (דילוג אימות אימייל בפיתוח) והעלאת **`RATE_LIMIT_AUTH_MAX_REQUESTS`** (למשל `10000`) כדי להימנע מ־429; אחר כך **`docker compose up -d --force-recreate backend`**. אופציונלי: איפוס מוני rate limit ב-Redis (`FLUSHDB` על DB 0) — **שימו לב:** מוחק גם cache אחר ב-DB 0.
 - **הרצה:**
 
@@ -161,7 +161,7 @@ Linkup/
 │   │   ├── api/v1/          # Routers, api_router.py
 │   │   ├── core/            # config, lifespan, middleware, exceptions
 │   │   ├── db/              # session, base, models (imports domain)
-│   │   ├── domain/          # Domain-Driven: users, rides, bookings, passengers, chat, groups, auth, events
+│   │   ├── domain/          # Domain-Driven: users, rides, bookings, passengers, chat, groups, auth, events, admin
 │   │   ├── infrastructure/  # redis, rabbitmq, outbox, events publishers, S3
 │   │   ├── workers/         # main_worker, outbox_worker, tasks (notification, avatar, scheduled, chat_summary)
 │   │   └── admin/           # SQLAdmin setup
@@ -203,3 +203,4 @@ Linkup/
 - **Async refactor (passengers/bookings/rides):** רוב זרימות הליבה עברו ל-SQLAlchemy async (`AsyncSession`, `select/execute`) כדי לשפר throughput ולשמור שרשרת async נקייה בין router -> service -> crud.
 - **Selective sync retention:** `db.run_sync(...)` עדיין קיים במקומות שבהם נשאר CRUD סינכרוני נקודתית. **Bookings** עברו ל־async-only, כולל נעילות עם `select(...).with_for_update()` (ללא `db.run_sync`), כדי לשמור שרשרת async נקייה.
 - **Geocode cache (24h):** כתובות שחוזרות על עצמן נשמרות ב-Redis ל-24 שעות כדי לחסוך קריאות **Google Geocoding** ולשפר latency.
+- **Admin API + מסך אדמין:** `GET/PATCH … /api/v1/admin/*` דרך `get_current_admin_user`; ממשק React ב־`frontend/src/features/admin/` (`/admin`, lazy). פירוט: **`ADMIN_DASHBOARD.md`** בשורש ה-repo.

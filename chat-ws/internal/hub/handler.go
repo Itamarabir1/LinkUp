@@ -20,16 +20,31 @@ type clientIncoming struct {
 	FullName       string `json:"full_name,omitempty"`
 }
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true // allow same-origin or set your frontend origin
-	},
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
+func wsUpgrader(cfg config.Config) websocket.Upgrader {
+	return websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			if len(cfg.AllowedOrigins) == 0 {
+				return true
+			}
+			if origin == "" {
+				return true
+			}
+			for _, o := range cfg.AllowedOrigins {
+				if o == origin {
+					return true
+				}
+			}
+			return false
+		},
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
 }
 
 // HandleWS upgrades HTTP to WebSocket. Query: token=JWT. Validates token and registers connection.
 func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
+	upgrader := wsUpgrader(cfg)
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := r.URL.Query().Get("token")
 		if token == "" {

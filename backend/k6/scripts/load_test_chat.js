@@ -2,6 +2,7 @@ import http from "k6/http";
 import { check, sleep } from "k6";
 import { Rate, Trend } from "k6/metrics";
 import { BASE_URL, registerAndLogin, jsonOrNull } from "../lib/helpers.js";
+import { buildOptions } from "../lib/options.js";
 
 const conversationErrors = new Rate("chat_conversation_errors");
 const sendErrors = new Rate("chat_send_errors");
@@ -13,18 +14,22 @@ const sendDuration = new Trend("chat_send_duration", true);
 const historyDuration = new Trend("chat_history_duration", true);
 const summaryDuration = new Trend("chat_summary_duration", true);
 
-export const options = {
-  thresholds: {
-    chat_conversation_errors: ["rate<0.10"],
-    chat_send_errors: ["rate<0.10"],
-    chat_history_errors: ["rate<0.10"],
-    chat_summary_errors: ["rate<0.50"],
-    chat_conversation_duration: ["p(95)<2500"],
-    chat_send_duration: ["p(95)<2000"],
-    chat_history_duration: ["p(95)<2000"],
-    chat_summary_duration: ["p(95)<3000"],
-  },
+const thresholds = {
+  chat_conversation_errors: ["rate<0.10"],
+  chat_send_errors: ["rate<0.10"],
+  chat_history_errors: ["rate<0.10"],
+  chat_summary_errors: ["rate<0.50"],
+  chat_conversation_duration: ["p(95)<2500"],
+  chat_send_duration: ["p(95)<2000"],
+  chat_history_duration: ["p(95)<2000"],
+  chat_summary_duration: ["p(95)<3000"],
 };
+
+export const options = buildOptions(thresholds, [
+  { duration: "30s", target: 10 },
+  { duration: "1m", target: 20 },
+  { duration: "30s", target: 0 },
+]);
 
 export default function () {
   const userA = registerAndLogin("chat_a");

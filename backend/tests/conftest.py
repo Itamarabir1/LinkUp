@@ -26,6 +26,31 @@ def _require_test_db_url() -> str:
     return url
 
 
+@pytest.fixture(scope="session")
+def test_db_url() -> str:
+    return _require_test_db_url()
+
+
+@pytest_asyncio.fixture
+async def e2e_session_factory(test_db_url: str):
+    """
+    Session factory without commit monkeypatch.
+    Useful for API-like flows where each request should see real commit boundaries.
+    """
+    engine = create_async_engine(test_db_url, echo=False, pool_pre_ping=True)
+    factory = async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+    try:
+        yield factory
+    finally:
+        await engine.dispose()
+
+
 @pytest_asyncio.fixture
 async def db_session(monkeypatch: pytest.MonkeyPatch):
     """

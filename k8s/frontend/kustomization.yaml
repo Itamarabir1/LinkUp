@@ -4,6 +4,7 @@ kind: Kustomization
 namespace: linkup
 
 resources:
+  - nginx-configmap.yaml
   - deployment.yaml
   - service.yaml
 

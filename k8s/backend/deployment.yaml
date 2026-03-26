@@ -4,6 +4,8 @@ metadata:
   name: linkup-backend
   labels:
     app: linkup-backend
+  annotations:
+    app.kubernetes.io/version: "latest"
 spec:
   replicas: 1
   selector:
@@ -22,8 +24,12 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
+          # Non-secret app config: envFrom loads all keys from linkup-backend-config (see configmap.yaml).
+          # Secrets stay as explicit secretKeyRef below so rotation/ACL stay separate from ConfigMap.
+          envFrom:
+            - configMapRef:
+                name: linkup-backend-config
           env:
-            # --- Secrets ---
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -74,52 +80,6 @@ spec:
                 secretKeyRef:
                   name: linkup-backend-secret
                   key: FIREBASE_CREDENTIALS_JSON
-            # --- ConfigMap ---
-            - name: RABBITMQ_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: linkup-backend-config
-                  key: RABBITMQ_HOST
-            - name: RABBITMQ_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: linkup-backend-config
-                  key: RABBITMQ_PORT
-            - name: RABBITMQ_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: linkup-backend-config
-                  key: RABBITMQ_USER
-            - name: AWS_REGION
-              valueFrom:
-                configMapKeyRef:
-                  name: linkup-backend-config
-                  key: AWS_REGION
-            - name: S3_BUCKET_NAME
-              valueFrom:
-                configMapKeyRef:
-                  name: linkup-backend-config
-                  key: S3_BUCKET_NAME
-            - name: FRONTEND_URL
-              valueFrom:
-                configMapKeyRef:
-                  name: linkup-backend-config
-                  key: FRONTEND_URL
-            - name: LOG_LEVEL
-              valueFrom:
-                configMapKeyRef:
-                  name: linkup-backend-config
-                  key: LOG_LEVEL
-            - name: LOG_FORMAT
-              valueFrom:
-                configMapKeyRef:
-                  name: linkup-backend-config
-                  key: LOG_FORMAT
-            - name: WORKERS
-              valueFrom:
-                configMapKeyRef:
-                  name: linkup-backend-config
-                  key: WORKERS
           resources:
             requests:
               memory: "256Mi"

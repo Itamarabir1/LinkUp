@@ -2,6 +2,7 @@ import http from "k6/http";
 import { check, sleep } from "k6";
 import { Rate, Trend } from "k6/metrics";
 import { BASE_URL, registerAndLogin, jsonOrNull } from "../lib/helpers.js";
+import { buildOptions } from "../lib/options.js";
 
 const meErrors = new Rate("users_me_errors");
 const updateErrors = new Rate("users_update_errors");
@@ -13,18 +14,22 @@ const updateDuration = new Trend("users_update_duration", true);
 const avatarDuration = new Trend("users_avatar_duration", true);
 const publicDuration = new Trend("users_public_duration", true);
 
-export const options = {
-  thresholds: {
-    users_me_errors: ["rate<0.05"],
-    users_update_errors: ["rate<0.10"],
-    users_avatar_errors: ["rate<0.20"],
-    users_public_errors: ["rate<0.30"],
-    users_me_duration: ["p(95)<1500"],
-    users_update_duration: ["p(95)<2000"],
-    users_avatar_duration: ["p(95)<2500"],
-    users_public_duration: ["p(95)<1500"],
-  },
+const thresholds = {
+  users_me_errors: ["rate<0.05"],
+  users_update_errors: ["rate<0.10"],
+  users_avatar_errors: ["rate<0.20"],
+  users_public_errors: ["rate<0.30"],
+  users_me_duration: ["p(95)<1500"],
+  users_update_duration: ["p(95)<2000"],
+  users_avatar_duration: ["p(95)<2500"],
+  users_public_duration: ["p(95)<1500"],
 };
+
+export const options = buildOptions(thresholds, [
+  { duration: "30s", target: 10 },
+  { duration: "1m", target: 20 },
+  { duration: "30s", target: 0 },
+]);
 
 export default function () {
   const session = registerAndLogin("users");

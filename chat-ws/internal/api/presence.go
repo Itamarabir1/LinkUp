@@ -32,7 +32,7 @@ type lastSeenBackendBody struct {
 // last_seen: spec asks hold key first — hold currently stores JWT; if not ISO timestamp, falls back to backend.
 func HandlePresence(cfg config.Config, rdb *redisv9.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		allowCORS(w, r)
+		allowCORS(cfg, w, r)
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -132,11 +132,22 @@ func fetchLastSeenFromBackend(ctx context.Context, baseURL, userID, authorizatio
 	return out.LastSeen, nil
 }
 
-func allowCORS(w http.ResponseWriter, r *http.Request) {
+func allowCORS(cfg config.Config, w http.ResponseWriter, r *http.Request) {
 	origin := r.Header.Get("Origin")
 	if origin != "" {
-		w.Header().Set("Access-Control-Allow-Origin", origin)
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		allowed := len(cfg.AllowedOrigins) == 0
+		if !allowed {
+			for _, o := range cfg.AllowedOrigins {
+				if o == origin {
+					allowed = true
+					break
+				}
+			}
+		}
+		if allowed {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		}
 	} else {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 	}

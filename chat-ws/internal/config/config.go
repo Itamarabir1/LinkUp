@@ -3,15 +3,17 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config holds env-based configuration. Same SECRET_KEY and REDIS_URL as Python backend.
 type Config struct {
-	Port       int    // WS server port (default 8081)
-	RedisURL   string // e.g. redis://localhost:6379/0
-	SecretKey  string // JWT secret (same as Python SECRET_KEY)
-	JWTAlg     string // HS256
-	BackendURL string // e.g. http://localhost:8000
+	Port            int      // WS server port (default 8081)
+	RedisURL        string   // e.g. redis://localhost:6379/0
+	SecretKey       string   // JWT secret (same as Python SECRET_KEY)
+	JWTAlg          string   // HS256
+	BackendURL      string   // e.g. http://localhost:8000
+	AllowedOrigins  []string // from ALLOWED_ORIGINS (comma-separated); empty = allow any origin (dev)
 }
 
 func LoadConfig() Config {
@@ -38,11 +40,20 @@ func LoadConfig() Config {
 	if backendURL == "" {
 		backendURL = "http://localhost:8000"
 	}
+	var allowedOrigins []string
+	if raw := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS")); raw != "" {
+		for _, p := range strings.Split(raw, ",") {
+			if o := strings.TrimSpace(p); o != "" {
+				allowedOrigins = append(allowedOrigins, o)
+			}
+		}
+	}
 	return Config{
-		Port:      port,
-		RedisURL:  redisURL,
-		SecretKey: secret,
-		JWTAlg:    alg,
-		BackendURL: backendURL,
+		Port:           port,
+		RedisURL:       redisURL,
+		SecretKey:      secret,
+		JWTAlg:         alg,
+		BackendURL:     backendURL,
+		AllowedOrigins: allowedOrigins,
 	}
 }

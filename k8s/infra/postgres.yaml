@@ -4,6 +4,8 @@ metadata:
   name: linkup-db
   labels:
     app: linkup-db
+  annotations:
+    app.kubernetes.io/version: "latest"
 spec:
   replicas: 1
   selector:
@@ -60,6 +62,8 @@ spec:
           persistentVolumeClaim:
             claimName: linkup-db-pvc
 ---
+# PVC: only .spec.resources.requests.storage is standard; there is no limits field on PersistentVolumeClaim.
+# Size kept at 5Gi for now — raise when data growth requires it (e.g. 20Gi+ for production).
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:

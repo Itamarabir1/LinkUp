@@ -2,6 +2,7 @@ import http from "k6/http";
 import { check, sleep } from "k6";
 import { Rate, Trend } from "k6/metrics";
 import { BASE_URL, registerAndLogin, jsonOrNull } from "../lib/helpers.js";
+import { buildOptions } from "../lib/options.js";
 
 const mapsKeyErrors = new Rate("geo_maps_key_errors");
 const reverseErrors = new Rate("geo_reverse_errors");
@@ -13,18 +14,22 @@ const reverseDuration = new Trend("geo_reverse_duration", true);
 const geocodeDuration = new Trend("geo_geocode_duration", true);
 const distanceDuration = new Trend("geo_distance_duration", true);
 
-export const options = {
-  thresholds: {
-    geo_maps_key_errors: ["rate<0.10"],
-    geo_reverse_errors: ["rate<0.20"],
-    geo_geocode_errors: ["rate<0.25"],
-    geo_distance_errors: ["rate<0.25"],
-    geo_maps_key_duration: ["p(95)<1500"],
-    geo_reverse_duration: ["p(95)<3000"],
-    geo_geocode_duration: ["p(95)<3500"],
-    geo_distance_duration: ["p(95)<3500"],
-  },
+const thresholds = {
+  geo_maps_key_errors: ["rate<0.10"],
+  geo_reverse_errors: ["rate<0.20"],
+  geo_geocode_errors: ["rate<0.25"],
+  geo_distance_errors: ["rate<0.25"],
+  geo_maps_key_duration: ["p(95)<1500"],
+  geo_reverse_duration: ["p(95)<3000"],
+  geo_geocode_duration: ["p(95)<3500"],
+  geo_distance_duration: ["p(95)<3500"],
 };
+
+export const options = buildOptions(thresholds, [
+  { duration: "30s", target: 10 },
+  { duration: "1m", target: 20 },
+  { duration: "30s", target: 0 },
+]);
 
 export default function () {
   const session = registerAndLogin("geo");

@@ -33,3 +33,9 @@ export function fetchAdminOutbox(params?: {
 export function fetchAdminOutboxById(event_id: string) {
   return api.get<AdminOutboxDetail>(`/admin/outbox/${event_id}`);
 }
+
+export function postAdminOutboxRequeue(eventId: string) {
+  return api.post<{ ok: boolean; id: string; status: string }>(
+    `/admin/outbox/${eventId}/requeue`
+  );
+}

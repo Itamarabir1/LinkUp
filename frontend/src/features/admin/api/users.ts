@@ -21,3 +21,15 @@ export function fetchAdminUsers(params?: {
 }) {
   return api.get<AdminUserRow[]>('/admin/users', { params });
 }
+
+export function patchAdminUserActive(userId: string) {
+  return api.patch<{ user_id: string; is_active: boolean }>(
+    `/admin/users/${userId}/active`
+  );
+}
+
+export function patchAdminUserAdmin(userId: string) {
+  return api.patch<{ user_id: string; is_admin: boolean }>(
+    `/admin/users/${userId}/admin`
+  );
+}

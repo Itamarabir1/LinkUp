@@ -14,7 +14,8 @@ Linkup connects drivers and passengers for shared rides. Drivers publish trips w
 
 Single doc for **stack, scale patterns, real-time chat (disconnect / last-seen debounce), Outbox, ops, CI/CD, tests, k6 load testing, auth under concurrent load (sync vs async), phone validation, frontend refactor**: **[docs/ENGINEERING_HIGHLIGHTS.md](docs/ENGINEERING_HIGHLIGHTS.md)**.  
 פרונט — רשימת ריפקטור מפורטת: **[frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md](frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md)**.  
-**FCM (Web push — `data` map מהשרת; SW + Toast + צליל):** **[docs/FCM_SYSTEM_SUMMARY.md](docs/FCM_SYSTEM_SUMMARY.md)**.
+**FCM (Web push — `data` map מהשרת; SW + Toast + צליל):** **[docs/FCM_SYSTEM_SUMMARY.md](docs/FCM_SYSTEM_SUMMARY.md)**.  
+**מסך אדמין פנימי (React, `/admin`, lazy routes, סטטיסטיקות + משתמשים + נסיעות/קבוצות + Outbox + חיפוש):** **[ADMIN_DASHBOARD.md](ADMIN_DASHBOARD.md)**.
 
 ---
 
@@ -60,7 +61,7 @@ flowchart LR
 
 | Service   | Language        | Role |
 |----------|------------------|------|
-| backend  | Python (FastAPI) | REST API, auth, rides, bookings, chat CRUD, **groups**, passengers (requests/matches), AI summary (Celery), notifications, outbox worker |
+| backend  | Python (FastAPI) | REST API, auth, rides, bookings, chat CRUD, **groups**, passengers (requests/matches), **admin JSON API** (`/api/v1/admin/*`), AI summary (Celery), notifications, outbox worker |
 | chat-ws  | Go               | WebSocket server; real-time message delivery only (no business logic) |
 | frontend | React / TypeScript | Web app (Vite); Hebrew RTL |
 | mobile   | React Native / Expo | Mobile app (TypeScript) |
@@ -96,6 +97,7 @@ flowchart LR
 - ✅ **Group tags** on ride/booking cards (group name or "ציבורי"); RTL: route as destination ← origin; close button (×) top-left on cards
 - ✅ Profile and avatar upload (S3)
 - ✅ Outbox pattern for reliable event publishing to RabbitMQ
+- ✅ **Internal admin dashboard (web):** lazy-loaded routes under **`/admin`** — stats, health, users (toggle active/admin), rides (list + cancel), groups, outbox (inspect + requeue FAILED), ride/booking lookup; gated by **`user.is_admin`** with refresh hydration; mutations behind confirm + toasts; backend **`/api/v1/admin/*`** + `[admin_audit]` logging — see **[ADMIN_DASHBOARD.md](ADMIN_DASHBOARD.md)**
 - ✅ Kubernetes-ready (manifests in `k8s/`)
 
 ---
@@ -138,6 +140,7 @@ cd frontend && npm run dev
 ```
 
 - **פרונט:** http://localhost:5173  
+- **אדמין (משתמש עם `is_admin`):** http://localhost:5173/admin — פירוט API ומבנה: [`ADMIN_DASHBOARD.md`](ADMIN_DASHBOARD.md)  
 - **בקאנד:** http://localhost:8000  
 - **Swagger:** http://localhost:8000/docs  
 - צ׳אט בפיתוח: WebSocket ל־`localhost:8081`; WS נסיעות ל־`localhost:8000/api/v1` — ראו [`frontend/src/config/env.ts`](frontend/src/config/env.ts).
@@ -169,7 +172,7 @@ docker compose ps            # סטטוס
 |------------|-------------|
 | `backend/` | FastAPI app: API, domain logic, workers (outbox, notifications, chat completion listener), Alembic migrations |
 | `chat-ws/` | Go WebSocket server: Redis subscribe, JWT auth, message fan-out to clients |
-| `frontend/`| React (Vite) web app; Dockerfile + `nginx.conf` לתוך image סטטי |
+| `frontend/`| React (Vite) web app; Dockerfile + `nginx.conf` לתוך image סטטי; מודול אדמין ב־`src/features/admin/` (מסלולים `/admin/*`) |
 | `nginx/`   | קונפיג Nginx ל־Compose — reverse proxy (פורט 80): API, chat-ws, פרונט |
 | `mobile/`  | React Native (Expo) app |
 | `k8s/`     | Kubernetes base, backend, chat-ws, frontend, infra (Postgres, Redis, RabbitMQ) |

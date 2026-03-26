@@ -1,17 +1,40 @@
-from fastapi import APIRouter, Depends, Query, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, func
+import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
+from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy import select, or_, func, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from app.api.dependencies.admin import get_current_admin_user
+from app.api.dependencies.services import get_ride_service
 from app.db.session import get_db
+from app.domain.groups.model import Group, GroupMember
+from app.domain.rides.crud import crud_ride
+from app.domain.rides.enum import RideStatus
+from app.domain.rides.model import Ride
+from app.domain.rides.service import RideService
+from app.domain.users.crud import crud_user
 from app.domain.users.model import User
 from app.infrastructure.health.health_service import check_health
 from app.infrastructure.outbox.model import OutboxEvent
-from app.domain.rides.model import Ride
 from app.domain.bookings.model import Booking
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(tags=["Admin"])
+
+
+def _audit(actor: User, action: str, detail: str) -> None:
+    logger.info(
+        "[admin_audit] actor_id=%s email=%s action=%s detail=%s ts=%s",
+        actor.user_id,
+        actor.email,
+        action,
+        detail,
+        datetime.now(timezone.utc).isoformat(),
+    )
 
 
 @router.get("/me")
@@ -19,7 +42,6 @@ async def admin_me(
     current_user: User = Depends(get_current_admin_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # db kept for symmetry/future extension
     return {
         "user_id": str(current_user.user_id),
         "email": current_user.email,
@@ -31,6 +53,36 @@ async def admin_me(
 @router.get("/health")
 async def admin_health(current_user: User = Depends(get_current_admin_user)):
     return await check_health()
+
+
+@router.get("/stats")
+async def admin_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    """Aggregates for admin dashboard (single round-trip)."""
+    users_total = await db.scalar(select(func.count()).select_from(User))
+    rides_active = await db.scalar(
+        select(func.count())
+        .select_from(Ride)
+        .where(
+            Ride.status.in_(
+                [RideStatus.OPEN, RideStatus.FULL, RideStatus.ACTIVE]
+            )
+        )
+    )
+    bookings_total = await db.scalar(select(func.count()).select_from(Booking))
+    outbox_pending = await db.scalar(
+        select(func.count())
+        .select_from(OutboxEvent)
+        .where(OutboxEvent.status == "PENDING")
+    )
+    return {
+        "users_total": int(users_total or 0),
+        "rides_active": int(rides_active or 0),
+        "bookings_total": int(bookings_total or 0),
+        "outbox_pending": int(outbox_pending or 0),
+    }
 
 
 @router.get("/users")
@@ -77,6 +129,153 @@ async def admin_users(
         }
         for u in users
     ]
+
+
+@router.patch("/users/{user_id}/active")
+async def admin_toggle_user_active(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    u = await crud_user.get_by_id(db, user_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    u.is_active = not bool(u.is_active)
+    await db.commit()
+    await db.refresh(u)
+    _audit(
+        current_user,
+        "toggle_user_active",
+        f"target={user_id} is_active={u.is_active}",
+    )
+    return {"user_id": str(u.user_id), "is_active": bool(u.is_active)}
+
+
+@router.patch("/users/{user_id}/admin")
+async def admin_toggle_user_admin(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    u = await crud_user.get_by_id(db, user_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    u.is_admin = not bool(u.is_admin)
+    await db.commit()
+    await db.refresh(u)
+    _audit(
+        current_user,
+        "toggle_user_admin",
+        f"target={user_id} is_admin={u.is_admin}",
+    )
+    return {"user_id": str(u.user_id), "is_admin": bool(u.is_admin)}
+
+
+@router.get("/rides")
+async def admin_rides(
+    status: str | None = Query(
+        default=None,
+        description="Filter: active | completed | cancelled (omit = all recent)",
+    ),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    stmt = crud_ride._base_ride_stmt()
+    if status == "active":
+        stmt = stmt.where(
+            Ride.status.in_([RideStatus.OPEN, RideStatus.FULL, RideStatus.ACTIVE])
+        )
+    elif status == "completed":
+        stmt = stmt.where(Ride.status == RideStatus.COMPLETED)
+    elif status == "cancelled":
+        stmt = stmt.where(Ride.status == RideStatus.CANCELLED)
+    stmt = stmt.order_by(Ride.departure_time.desc()).limit(limit)
+    result = await db.execute(stmt)
+    rides = list(result.scalars().all())
+    out = []
+    for r in rides:
+        st = getattr(r.status, "value", None) or str(r.status)
+        driver_name = ""
+        if r.driver:
+            driver_name = r.driver.full_name or ""
+        out.append(
+            {
+                "ride_id": str(r.ride_id),
+                "driver_id": str(r.driver_id),
+                "driver_name": driver_name,
+                "origin_name": r.origin_name,
+                "destination_name": r.destination_name,
+                "departure_time": r.departure_time.isoformat()
+                if r.departure_time
+                else None,
+                "status": st,
+                "available_seats": r.available_seats,
+                "group_id": str(r.group_id) if r.group_id else None,
+            }
+        )
+    return out
+
+
+@router.post("/rides/{ride_id}/cancel")
+async def admin_cancel_ride(
+    ride_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    ride_svc: RideService = Depends(get_ride_service),
+):
+    ride = await crud_ride.get_async(db, ride_id)
+    if not ride:
+        raise HTTPException(status_code=404, detail="Ride not found")
+    await ride_svc.cancel_ride_by_driver(db, ride_id, ride.driver_id)
+    _audit(current_user, "cancel_ride", f"ride_id={ride_id}")
+    return {"ok": True, "ride_id": str(ride_id)}
+
+
+@router.get("/groups")
+async def admin_groups(
+    limit: int = Query(default=200, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    member_sq = (
+        select(
+            GroupMember.group_id.label("group_id"),
+            func.count(GroupMember.id).label("member_count"),
+        )
+        .group_by(GroupMember.group_id)
+        .subquery()
+    )
+    stmt = (
+        select(Group, member_sq.c.member_count)
+        .outerjoin(member_sq, Group.group_id == member_sq.c.group_id)
+        .options(selectinload(Group.admin))
+        .order_by(Group.created_at.desc())
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+    items = []
+    for row in rows:
+        g, mc = row[0], row[1]
+        admin_name = ""
+        admin_email = None
+        if g.admin:
+            admin_name = g.admin.full_name or ""
+            admin_email = g.admin.email
+        items.append(
+            {
+                "group_id": str(g.group_id),
+                "name": g.name,
+                "member_count": int(mc or 0),
+                "admin_id": str(g.admin_id),
+                "admin_name": admin_name,
+                "admin_email": admin_email,
+                "is_active": bool(g.is_active),
+                "created_at": g.created_at.isoformat() if g.created_at else None,
+            }
+        )
+    return items
 
 
 @router.get("/outbox")
@@ -131,6 +330,35 @@ async def admin_outbox_by_id(
         "created_at": e.created_at.isoformat() if e.created_at else None,
         "processed_at": e.processed_at.isoformat() if e.processed_at else None,
     }
+
+
+@router.post("/outbox/{event_id}/requeue")
+async def admin_outbox_requeue(
+    event_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    stmt = select(OutboxEvent).where(OutboxEvent.id == event_id)
+    result = await db.execute(stmt)
+    e = result.scalars().first()
+    if not e:
+        raise HTTPException(status_code=404, detail="Outbox event not found")
+    if e.status != "FAILED":
+        raise HTTPException(
+            status_code=400, detail="Only FAILED events can be requeued"
+        )
+    await db.execute(
+        update(OutboxEvent)
+        .where(OutboxEvent.id == event_id)
+        .values(
+            status="PENDING",
+            last_error=None,
+            processed_at=None,
+        )
+    )
+    await db.commit()
+    _audit(current_user, "outbox_requeue", f"event_id={event_id}")
+    return {"ok": True, "id": str(event_id), "status": "PENDING"}
 
 
 @router.get("/rides/{ride_id}")
@@ -188,4 +416,3 @@ async def admin_booking_by_id(
         "created_at": b.created_at.isoformat() if b.created_at else None,
         "updated_at": b.updated_at.isoformat() if b.updated_at else None,
     }
-

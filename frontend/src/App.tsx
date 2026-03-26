@@ -35,6 +35,8 @@ const AdminHealth = lazy(() => import('./features/admin/pages/AdminHealth'));
 const AdminUsers = lazy(() => import('./features/admin/pages/AdminUsers'));
 const AdminOutbox = lazy(() => import('./features/admin/pages/AdminOutbox'));
 const AdminLookup = lazy(() => import('./features/admin/pages/AdminLookup'));
+const AdminRides = lazy(() => import('./features/admin/pages/AdminRides'));
+const AdminGroups = lazy(() => import('./features/admin/pages/AdminGroups'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -70,6 +72,8 @@ function AppRoutes() {
             <Route index element={<AdminHome />} />
             <Route path="health" element={<AdminHealth />} />
             <Route path="users" element={<AdminUsers />} />
+            <Route path="rides" element={<AdminRides />} />
+            <Route path="groups" element={<AdminGroups />} />
             <Route path="outbox" element={<AdminOutbox />} />
             <Route path="lookup" element={<AdminLookup />} />
           </Route>

@@ -1,6 +1,6 @@
 # Linkup — Architecture Overview
 
-תיעוד רמה גבוהה של המערכת. לעדכונים מפורטים: `docs/DATABASE.md`, `docs/API.md`, `docs/EVENTS.md`, `docs/architecture/REALTIME.md`, `docs/DEVELOPMENT.md`. **להצגת הפרויקט (פיצ’רים, סקייל, טריקים):** `docs/ENGINEERING_HIGHLIGHTS.md`.
+תיעוד רמה גבוהה של המערכת. לעדכונים מפורטים: `docs/DATABASE.md`, `docs/API.md`, `docs/EVENTS.md`, `docs/architecture/REALTIME.md`, `docs/DEVELOPMENT.md`. **להצגת הפרויקט (פיצ’רים, סקייל, טריקים):** `docs/ENGINEERING_HIGHLIGHTS.md`. **מסך אדמין + מפת API:** `ADMIN_DASHBOARD.md` (בשורש).
 
 ---
 
@@ -8,7 +8,7 @@
 
 | Service | Path | Language | Port | Purpose |
 |---------|------|----------|------|---------|
-| backend | backend/ | Python / FastAPI | 8000 | REST API, auth, rides, bookings, chat, groups, geo |
+| backend | backend/ | Python / FastAPI | 8000 | REST API, auth, rides, bookings, chat, groups, geo, **admin JSON API** |
 | outbox-worker | backend/ (same image) | Python | — | Outbox → RabbitMQ, notifications, avatar tasks, scheduled, chat completion |
 | chat-ws | chat-ws/ | Go | 8081 | WebSocket server for real-time chat (JWT, Redis Pub/Sub) |
 | db | Docker | PostgreSQL 15 + PostGIS | 5432 | Primary data store |
@@ -61,13 +61,14 @@ outbox-worker
 - **GPS Tracking**: מיקום נהג ונוסעים בזמן אמת במהלך נסיעה פעילה. נהג: **התחל/סיים נסיעה** מטאב "אני נהג" ב־My Bookings (דורש לפחות הזמנה אחת מאושרת), שידור מיקום ל־POST /bookings/{id}/location; נוסעים מקבלים עדכונים ב־WebSocket /bookings/ws/{id}/location. נוסעים יכולים לשתף מיקום ל־POST /bookings/{id}/passenger-location; נהג מאזין ב־WebSocket /rides/ws/{id}/passengers. ערוצי Redis: `booking_{booking_id}` (מיקום נהג), `ride_{ride_id}:passenger_locations` (מיקום נוסעים). ראה `docs/architecture/REALTIME.md` ו־`docs/architecture/API.md`.
 - **Ride preview cache**: תצוגת מקדימה לנסיעה (3 מסלולים) נשמרת ב־Redis 24 שעות; סריאליזציה עם `driver_id` כ־string. תג קבוצה בכרטיסיות (group_name או "ציבורי") מ־RideResponse (כולל group).
 - **Geocode cache (24h)**: תוצאות כתובת→קואורדינטות נשמרות ב־Redis ל־24 שעות כדי לצמצם קריאות חוזרות ל־**Google Geocoding** עבור אותן כתובות. המימוש fail-open כדי לא לחסום flow אם Redis לא זמין.
+- **Admin (תפעול):** REST תחת **`/api/v1/admin/*`** — רק משתמש עם `users.is_admin`; dependency ב־`app/api/dependencies/admin.py` (`get_current_admin_user`). ראוטר דומיין: `backend/app/domain/admin/router.py` (סטטיסטיקות, בריאות, משתמשים, נסיעות, קבוצות, Outbox, lookup); פעולות רגישות עם לוג **`[admin_audit]`**. במקביל נשאר **SQLAdmin** (`app/admin/setup.py`) לדפדפן ניהול DB קלאסי. **ממשק React** למפעילים: `frontend/src/features/admin/` — מסלולים `/admin`, `/admin/health`, `/admin/users`, `/admin/rides`, `/admin/groups`, `/admin/outbox`, `/admin/lookup` (טעינה עצלה, RTL). מקור אמת למסך ול־API: **`ADMIN_DASHBOARD.md`**.
 
 ---
 
 ## Key Patterns
 
 - **Outbox Pattern**: אירועים נכתבים ל-`outbox_events` ב-DB; ה-worker קורא ומפרסם ל-RabbitMQ. מבטיח at-least-once ולא מאבד אירועים.
-- **Domain-Driven Design**: כל דומיין (users, rides, bookings, passengers, chat, groups) — model, schema, crud, service.
+- **Domain-Driven Design**: כל דומיין (users, rides, bookings, passengers, chat, groups, **admin**, auth, …) — model, schema, crud, service; ראוטרים תחת `backend/app/domain/*/router.py` ונרשמים ב־`api/v1/api_router.py`.
 - **Dependency Injection (FastAPI Depends)**: `RideService` ו-`AuthService` נוצרים דרך factories ב-`backend/app/api/dependencies/services.py`, והראוטרים מזריקים אותם עם `Depends(get_ride_service)` / `Depends(get_auth_service)` (במקום singletons גלובליים).
 - **JWT Auth**: Access Token (קצר) + Refresh Token (ארוך, נשמר ב-DB). אותו SECRET_KEY בין backend ל-chat-ws לאימות WebSocket.
 - **Cursor-based Pagination**: נסיעות (חיפוש), הודעות צ'אט — `after` / `before` + `limit`, תגובה עם `next_cursor`, `has_more`.

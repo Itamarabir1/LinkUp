@@ -5,7 +5,18 @@ Central location for backend load/performance tests.
 ## Structure
 
 - `scripts/` - scenario files by layer
-- `lib/` - shared helpers
+- `lib/` - shared helpers (`helpers.js`, `options.js`)
+
+## Scenario options (`lib/options.js`)
+
+All scripts use `buildOptions(thresholds, defaultStages)`:
+
+- **Stages (default):** `k6 run …/load_test_*.js` — ramp from each script’s `defaultStages` (auth uses a heavier ramp than the others).
+- **Flat load:** set **both** `VUS` and `DURATION` via env, e.g.  
+  `k6 run -e VUS=50 -e DURATION=1m backend/k6/scripts/load_test_groups.js`  
+  (`BASE_URL` etc. still work the same.)
+
+You can still use k6 CLI flags such as `--vus` / `--duration` where they apply; they may override parts of `export const options` depending on your k6 version.
 
 ## Layers
 

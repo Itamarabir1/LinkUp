@@ -25,6 +25,11 @@ Copy `.env.example` to `.env` and set your values. See root README for full setu
 
 Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 
+## Admin API (`/api/v1/admin`)
+
+Endpoints for operators only: FastAPI dependency **`get_current_admin_user`** (`app/api/dependencies/admin.py`) requires `User.is_admin`. Router: **`app/domain/admin/router.py`**, mounted in **`app/api/v1/api_router.py`** with prefix **`/admin`**. Includes stats, health, user list + PATCH (active/admin flag), rides/groups lists and ride cancel, outbox list/detail + requeue for FAILED events, ride/booking lookup; sensitive actions log with **`[admin_audit]`**.  
+**Web UI** lives in the main frontend: **`frontend/src/features/admin/`** → routes under **`/admin`** — see root **`ADMIN_DASHBOARD.md`**.
+
 ## Async architecture updates (rides / bookings / passengers)
 
 - Core flows in passenger requests, bookings, and rides were refactored to SQLAlchemy 2.0 async patterns:
@@ -61,7 +66,7 @@ Legacy wrappers kept for compatibility:
 
 **Prerequisites:** API up (e.g. `docker compose up -d`); Swagger register works.
 
-**Phone numbers:** Valid Israeli-style **`+972508…`** range; uniqueness across VUs via k6 globals **`__VU`** and **`__ITER`** (see script).
+**Phone numbers:** `uniquePhone()` in `k6/lib/helpers.js` — blocks **`+972534XXXXXX`** and **`+972544XXXXXX`** (6-digit suffix, `phonenumbers`-friendly), salted with **`BASE_TS` / `__VU` / `userCounter`**.
 
 **Before a load run (local/Docker):**
 

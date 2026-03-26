@@ -3,6 +3,10 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
+  - ../infra
+  - ../backend
+  - ../frontend
+  - ../chat-ws
   - ../worker
 
 commonLabels:

@@ -4,6 +4,8 @@ metadata:
   name: linkup-redis
   labels:
     app: linkup-redis
+  annotations:
+    app.kubernetes.io/version: "latest"
 spec:
   replicas: 1
   selector:
@@ -29,6 +31,9 @@ spec:
                   key: password
           ports:
             - containerPort: 6379
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
           livenessProbe:
             exec:
               command: ["sh", "-c", "redis-cli -a $REDIS_PASSWORD ping"]
@@ -46,6 +51,23 @@ spec:
             limits:
               memory: "256Mi"
               cpu: "200m"
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: linkup-redis-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: linkup-redis-pvc
+  labels:
+    app: linkup-redis
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
 ---
 apiVersion: v1
 kind: Service

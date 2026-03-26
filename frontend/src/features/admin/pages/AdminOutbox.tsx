@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import ConfirmModal from '../../../components/ConfirmModal/ConfirmModal';
+import { triggerNotificationToast } from '../../../components/NotificationToast/notificationToast.utils';
 import {
   fetchAdminOutbox,
   fetchAdminOutboxById,
+  postAdminOutboxRequeue,
   type AdminOutboxDetail,
   type AdminOutboxRow,
 } from '../api/outbox';
+import page from '../styles/AdminPage.module.css';
 
 type ListState =
   | { status: 'loading' }
@@ -22,26 +26,24 @@ export default function AdminOutbox() {
   const [list, setList] = useState<ListState>({ status: 'loading' });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailState>({ status: 'idle' });
+  const [requeueId, setRequeueId] = useState<string | null>(null);
+  const [requeueLoading, setRequeueLoading] = useState(false);
 
   const params = useMemo(() => ({ limit: 100, status: statusFilter || undefined }), [statusFilter]);
 
-  useEffect(() => {
-    let mounted = true;
+  const loadList = useCallback(async () => {
     setList({ status: 'loading' });
-    (async () => {
-      try {
-        const { data } = await fetchAdminOutbox(params);
-        if (!mounted) return;
-        setList({ status: 'ready', items: Array.isArray(data) ? data : [] });
-      } catch {
-        if (!mounted) return;
-        setList({ status: 'error' });
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
+    try {
+      const { data } = await fetchAdminOutbox(params);
+      setList({ status: 'ready', items: Array.isArray(data) ? data : [] });
+    } catch {
+      setList({ status: 'error' });
+    }
   }, [params]);
+
+  useEffect(() => {
+    void loadList();
+  }, [loadList]);
 
   useEffect(() => {
     let mounted = true;
@@ -67,90 +69,113 @@ export default function AdminOutbox() {
     };
   }, [selectedId]);
 
+  async function confirmRequeue() {
+    if (!requeueId) return;
+    setRequeueLoading(true);
+    try {
+      await postAdminOutboxRequeue(requeueId);
+      triggerNotificationToast({ title: 'בוצע', body: 'האירוע הוחזר לתור.' });
+      setRequeueId(null);
+      if (selectedId === requeueId) setSelectedId(null);
+      await loadList();
+    } catch {
+      triggerNotificationToast({ title: 'שגיאה', body: 'לא ניתן להחזיר לתור.' });
+    } finally {
+      setRequeueLoading(false);
+    }
+  }
+
+  const canRequeueDetail = detail.status === 'ready' && detail.item.status === 'FAILED';
+
   return (
     <div>
-      <h3>Outbox</h3>
-      <div style={{ marginBottom: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
-        <label>
-          Status:{' '}
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">(any)</option>
+      <h2 className={page.pageTitle}>Outbox</h2>
+      <div className={page.toolbar}>
+        <label className={page.muted}>
+          סטטוס:{' '}
+          <select
+            className={page.select}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+          >
+            <option value="">הכל</option>
             <option value="PENDING">PENDING</option>
             <option value="PROCESSED">PROCESSED</option>
             <option value="FAILED">FAILED</option>
           </select>
         </label>
         {selectedId && (
-          <button onClick={() => setSelectedId(null)} type="button">
-            Clear selection
+          <button type="button" className={page.btnSm} onClick={() => setSelectedId(null)}>
+            נקה בחירה
           </button>
         )}
       </div>
 
-      {list.status === 'loading' && <p>Loading…</p>}
-      {list.status === 'error' && <p>Failed to load outbox.</p>}
+      {list.status === 'loading' && <p className={page.muted}>טוען…</p>}
+      {list.status === 'error' && <p className={page.error}>שגיאה בטעינה.</p>}
       {list.status === 'ready' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+        <div className={page.grid2}>
+          <div className={page.tableWrap}>
+            <table className={page.table}>
               <thead>
                 <tr>
-                  {['created_at', 'event_name', 'status', 'retries'].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        textAlign: 'left',
-                        borderBottom: '1px solid #ddd',
-                        padding: '8px 6px',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
+                  <th>נוצר</th>
+                  <th>אירוע</th>
+                  <th>סטטוס</th>
+                  <th>ניסיונות</th>
                 </tr>
               </thead>
               <tbody>
                 {list.items.map((e) => (
                   <tr
                     key={e.id}
+                    className={`${page.rowClick} ${selectedId === e.id ? page.rowSelected : ''}`}
                     onClick={() => setSelectedId(e.id)}
-                    style={{
-                      cursor: 'pointer',
-                      background: selectedId === e.id ? '#f5f5f5' : 'transparent',
-                    }}
                   >
-                    <td style={{ padding: '8px 6px', whiteSpace: 'nowrap' }}>{e.created_at}</td>
-                    <td style={{ padding: '8px 6px', whiteSpace: 'nowrap' }}>{e.event_name}</td>
-                    <td style={{ padding: '8px 6px' }}>{e.status}</td>
-                    <td style={{ padding: '8px 6px' }}>{e.retry_count}</td>
+                    <td>{e.created_at}</td>
+                    <td>{e.event_name}</td>
+                    <td>{e.status}</td>
+                    <td>{e.retry_count}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <div>
-            <h4 style={{ marginTop: 0 }}>Details</h4>
-            {detail.status === 'idle' && <p>Select an event.</p>}
-            {detail.status === 'loading' && <p>Loading details…</p>}
-            {detail.status === 'error' && <p>Failed to load details.</p>}
+            <h3 className={page.subheading}>פרטים</h3>
+            {detail.status === 'idle' && <p className={page.muted}>בחר שורה מהטבלה.</p>}
+            {detail.status === 'loading' && <p className={page.muted}>טוען…</p>}
+            {detail.status === 'error' && <p className={page.error}>שגיאה בטעינת פרטים.</p>}
             {detail.status === 'ready' && (
-              <pre
-                style={{
-                  background: '#111',
-                  color: '#eee',
-                  padding: 12,
-                  borderRadius: 6,
-                  overflowX: 'auto',
-                  maxHeight: 460,
-                }}
-              >
-                {JSON.stringify(detail.item, null, 2)}
-              </pre>
+              <>
+                {canRequeueDetail && (
+                  <div className={page.toolbar}>
+                    <button
+                      type="button"
+                      className={page.btnSmPrimary}
+                      onClick={() => setRequeueId(detail.item.id)}
+                    >
+                      החזר לתור (requeue)
+                    </button>
+                  </div>
+                )}
+                <pre className={page.preJson}>{JSON.stringify(detail.item, null, 2)}</pre>
+              </>
             )}
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={requeueId !== null}
+        onClose={() => !requeueLoading && setRequeueId(null)}
+        title="החזרת אירוע לתור"
+        description="לאשר החזרת אירוע שנכשל לסטטוס PENDING?"
+        confirmLabel="אישור"
+        variant="primary"
+        loading={requeueLoading}
+        onConfirm={confirmRequeue}
+      />
     </div>
   );
 }

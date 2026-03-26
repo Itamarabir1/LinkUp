@@ -122,8 +122,9 @@ services:
       target: development
     container_name: linkup_backend
     restart: unless-stopped
+    # $$ → $ after compose parse, so the shell inside the container expands ${UVICORN_WORKERS:-1} from backend/.env
     command: >
-      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers $${UVICORN_WORKERS:-1}"
     env_file:
       - ./backend/.env
     environment:

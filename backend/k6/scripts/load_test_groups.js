@@ -2,29 +2,33 @@ import http from "k6/http";
 import { check, sleep } from "k6";
 import { Rate, Trend } from "k6/metrics";
 import { BASE_URL, registerAndLogin, jsonOrNull } from "../lib/helpers.js";
+import { buildOptions } from "../lib/options.js";
 
 const createErrors = new Rate("groups_create_errors");
 const joinErrors = new Rate("groups_join_errors");
 const membersErrors = new Rate("groups_members_errors");
 const leaveErrors = new Rate("groups_leave_errors");
-
 const createDuration = new Trend("groups_create_duration", true);
 const joinDuration = new Trend("groups_join_duration", true);
 const membersDuration = new Trend("groups_members_duration", true);
 const leaveDuration = new Trend("groups_leave_duration", true);
 
-export const options = {
-  thresholds: {
-    groups_create_errors: ["rate<0.10"],
-    groups_join_errors: ["rate<0.10"],
-    groups_members_errors: ["rate<0.10"],
-    groups_leave_errors: ["rate<0.10"],
-    groups_create_duration: ["p(95)<2500"],
-    groups_join_duration: ["p(95)<2500"],
-    groups_members_duration: ["p(95)<2000"],
-    groups_leave_duration: ["p(95)<2000"],
-  },
+const thresholds = {
+  groups_create_errors: ["rate<0.10"],
+  groups_join_errors: ["rate<0.10"],
+  groups_members_errors: ["rate<0.10"],
+  groups_leave_errors: ["rate<0.10"],
+  groups_create_duration: ["p(95)<2500"],
+  groups_join_duration: ["p(95)<2500"],
+  groups_members_duration: ["p(95)<2000"],
+  groups_leave_duration: ["p(95)<2000"],
 };
+
+export const options = buildOptions(thresholds, [
+  { duration: "30s", target: 10 },
+  { duration: "1m", target: 20 },
+  { duration: "30s", target: 0 },
+]);
 
 export default function () {
   const owner = registerAndLogin("group_owner");
@@ -83,4 +87,23 @@ export default function () {
   leaveErrors.add(!leaveOk);
 
   sleep(1);
+}
+
+export function handleSummary(data) {
+  const m = data.metrics;
+  const VUS = parseInt(__ENV.VUS) || null;
+  const DURATION = __ENV.DURATION || null;
+  console.log("\n=== GROUPS LOAD TEST SUMMARY ===");
+  console.log(
+    VUS && DURATION ? `Mode: Manual — VUs=${VUS}, Duration=${DURATION}` : "Mode: Stages — full ramp-up test"
+  );
+  if (m.groups_create_duration) console.log(`/groups create  p95: ${m.groups_create_duration.values["p(95)"]?.toFixed(0)}ms`);
+  if (m.groups_join_duration) console.log(`/groups join    p95: ${m.groups_join_duration.values["p(95)"]?.toFixed(0)}ms`);
+  if (m.groups_members_duration) console.log(`/groups members p95: ${m.groups_members_duration.values["p(95)"]?.toFixed(0)}ms`);
+  if (m.groups_leave_duration) console.log(`/groups leave   p95: ${m.groups_leave_duration.values["p(95)"]?.toFixed(0)}ms`);
+  if (m.http_req_failed) {
+    const rate = (m.http_req_failed.values.rate * 100).toFixed(2);
+    console.log(`Error rate: ${rate}% ${m.http_req_failed.values.rate < 0.05 ? "✓ OK" : "✗ HIGH"}`);
+  }
+  return {};
 }

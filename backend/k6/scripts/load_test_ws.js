@@ -3,19 +3,24 @@ import ws from "k6/ws";
 import { check, sleep } from "k6";
 import { Rate, Trend, Counter } from "k6/metrics";
 import { BASE_URL, registerAndLogin } from "../lib/helpers.js";
+import { buildOptions } from "../lib/options.js";
 
 const wsConnectErrors = new Rate("ws_connect_errors");
 const wsMessageErrors = new Rate("ws_message_errors");
 const wsConnectDuration = new Trend("ws_connect_duration", true);
 const wsMessages = new Counter("ws_messages_total");
 
-export const options = {
-  thresholds: {
-    ws_connect_errors: ["rate<0.15"],
-    ws_message_errors: ["rate<0.25"],
-    ws_connect_duration: ["p(95)<3000"],
-  },
+const thresholds = {
+  ws_connect_errors: ["rate<0.15"],
+  ws_message_errors: ["rate<0.25"],
+  ws_connect_duration: ["p(95)<3000"],
 };
+
+export const options = buildOptions(thresholds, [
+  { duration: "30s", target: 10 },
+  { duration: "1m", target: 20 },
+  { duration: "30s", target: 0 },
+]);
 
 function baseHost() {
   const configured = __ENV.WS_URL || "ws://localhost:8081/ws";

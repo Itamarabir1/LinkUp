@@ -3,7 +3,7 @@
 **שם הקובץ:** `docs/ENGINEERING_HIGHLIGHTS.md` (בשורש הפרויקט, תחת `docs/`).
 
 מסמך זה אוסף **במקום אחד** את הפיצ’רים, הטכנולוגיות, הדפוסים וההחלטות שמיועדות ל**סקייל, אמינות ותחזוקה** — כדי להציג את הפרויקט ברמת מומחה.  
-*זה סיכום “להצגה”, לא מיפוי כל שורה בקוד; אחרי סקירה מול ה-repo הוכנסו גם workers, AI, FCM, Brevo, Google, **חיזוק auth ועומס מקבילי**, **k6**, **ריפקטור async משמעותי ב-passengers/bookings/rides**, ו**ריפקטור ארגון בפרונט**.*
+*זה סיכום “להצגה”, לא מיפוי כל שורה בקוד; אחרי סקירה מול ה-repo הוכנסו גם workers, AI, FCM, Brevo, Google, **חיזוק auth ועומס מקבילי**, **k6**, **ריפקטור async משמעותי ב-passengers/bookings/rides**, **ריפקטור ארגון בפרונט**, ו**מסך אדמין פנימי (React + `/api/v1/admin`)**.*
 
 לפרטים טכניים עמוקים יותר: `../ARCHITECTURE.md`, `architecture/REALTIME.md`, `architecture/EVENTS.md`, `architecture/DATABASE.md`, `architecture/API.md`, `backend/docs/GOOGLE_OAUTH.md`.
 
@@ -19,7 +19,8 @@
 | **קבוצות** | יצירה, **קוד הזמנה** (`invite_code`), הצטרפות בקישור, ניהול admin |
 | **AI** | סיום שיחה → ניתוח (Groq) → שמירה + התראות |
 | **התראות** | מייל (**Brevo**), Push (**FCM** — מהשרת רק מפת `data` ב־FCM, בלי שדה `notification` של Firebase; בחזית **Toast קופץ + צליל**, ברקע התראת מערכת דרך SW), in-app |
-| **משתמשים** | JWT + Refresh ב-DB, **כניסה עם Google** (OAuth / `id_token`), אווטאר (S3 + worker) |
+| **משתמשים** | JWT + Refresh ב-DB, **כניסה עם Google** (OAuth / `id_token`), אווטאר (S3 + worker); שדה **`is_admin`** לגישה ל־`/api/v1/admin/*` |
+| **אדמין / תפעול** | ממשק ווב **`/admin`** (מודול `features/admin`): סטטיסטיקות, בריאות, משתמשים (הפעלה/הרשאת אדמין), נסיעות (ביטול), קבוצות, Outbox (requeue), lookup; **lazy routes**, אישור לפני מוטציות, toasts; בקאנד **`get_current_admin_user`** + לוג `[admin_audit]` — **`ADMIN_DASHBOARD.md`** |
 | **מפות** | Google: **Geocoding**, **Directions**, **Distance Matrix**, **Maps JS**; geocoding הוא **Google-only** עם cache ב-Redis (24h) |
 | **GPS בזמן אמת** | מיקום נהג לנוסעים, מיקום נוסעים לנהג (ערוצי Redis נפרדים + WS) |
 
@@ -355,7 +356,8 @@
 | **Unread צ’אט** | Backend מפרסם ל-Redis `chat:notification:{recipient_id}`; **chat-ws** מעביר ל-WebSocket של הנמען → עדכון badge / `unread_count` בלי רענון מלא. |
 | **פולינג presence** | **30s** ל-`GET /presence/{id}` ב-chat-ws כ**גיבוי**; `user_offline` ב-WS = עדכון **מיידי**. |
 | **קבוצות + הזמנה** | `invite_code` ייחודי, תפוגה אופציונלית, endpoint הצטרפות; העברת admin בקבוצה. |
-| **SQLAdmin** | ממשק **ניהול פנימי** (FastAPI-SQLAdmin): משתמשים, נסיעות, הזמנות, בקשות — תפעול ודיבוג. |
+| **SQLAdmin** | ממשק **ניהול DB** (FastAPI-SQLAdmin): משתמשים, נסיעות, הזמנות, בקשות — תפעול ודיבוג (נפרד ממסך האדמין ב־React). |
+| **מסך אדמין מותאם (React)** | דשבורד אופרטיבי בפרונט הראשי — לא אפליקציית Vite נפרדת; אותו JWT, שער `AdminRoute`, והידרציה של `is_admin` אחרי לוגין. |
 | **UUID כמפתחות** | `user_id`, `booking_id`, `ride_id` וכו’ — מניעת התנגשויות ומוכנות לפיצ’ול אופקי. |
 | **RTL / עברית** | פרונט ווב מותאם **ימין-לשמאל**; Google Directions עם `language=he`. |
 | **אגרגציה ב-WS (Go)** | Write pump מאחד כמה הודעות ל-**frame אחד** מופרד ב-`\n` — פחות overhead; הפרונט מפרק שורות ב-`onmessage`. |
@@ -372,7 +374,7 @@
 |-----|--------|
 | **שכבת API** | כל קריאת HTTP דרך `src/api/<תחום>.ts` — לא ייבוא ישיר של `api` מ־`client` בקומפוננטות (חריגים מתועדים: `AuthContext`, `presence.ts`). |
 | **שגיאות** | `getApiErrorMessage` / `getApiStatus` / `isTimeoutOrAbortError` ב־`utils/apiError.ts` + **Vitest** (`apiError.test.ts`). |
-| **Code splitting** | **`React.lazy` + `Suspense`** לדפים (טעינה עצלה), מסכי טעינה עקביים. |
+| **Code splitting** | **`React.lazy` + `Suspense`** לדפים (טעינה עצלה), מסכי טעינה עקביים; **מסלולי `/admin/*`** נטענים עצלנית דרך מודול `features/admin`. |
 | **State גלובלי** | **`ChatContext`** + `chatReducer`; **`GroupContext`** — רשימת קבוצות, `activeChipId` משותף ל־**MyRides** / **MyRequests** (פילטר צ’יפים); איפוס צ’יפ אחרי leave/close קבוצה בזרימות ניהול. |
 | **התראות צ’אט** | **`useChatNotificationsFeed`** — טעינת פיד התראות מסונכרנת עם מצב הצ’אט (פחות רענונים מיותרים). |
 | **בקשות נוסע** | הוק **`useMyRequests`** — לוגיקת MyRequests מרוכזת. |
@@ -383,4 +385,4 @@
 
 ---
 
-*עודכן כחלק מתיעוד הפרויקט — כולל מאגר DB ניתן להגדרה, **auth בעומס** (bcrypt ב-executor, pool, rate limit, outbox), חיזוק OTP, מניעת user enumeration בלוגין (OWASP), **pytest + GitHub Actions + GHCR**, **Vitest + ריפקטור ארגון בפרונט** (`FRONTEND_REFACTOR_AND_QUALITY.md`), **k6** עם דוגמת תוצאות, **phonenumbers==8.13.48**, ו-**Docker Compose** (`.env` בשורש + `backend/.env`, recreate לקונטיינר אחרי שינוי env).*
+*עודכן כחלק מתיעוד הפרויקט — כולל מאגר DB ניתן להגדרה, **auth בעומס** (bcrypt ב-executor, pool, rate limit, outbox), חיזוק OTP, מניעת user enumeration בלוגין (OWASP), **pytest + GitHub Actions + GHCR**, **Vitest + ריפקטור ארגון בפרונט** (`FRONTEND_REFACTOR_AND_QUALITY.md`), **מסך אדמין** (`ADMIN_DASHBOARD.md`, `/admin` + `/api/v1/admin`), **k6** עם דוגמת תוצאות, **phonenumbers==8.13.48**, ו-**Docker Compose** (`.env` בשורש + `backend/.env`, recreate לקונטיינר אחרי שינוי env).*

@@ -1,88 +1,159 @@
-import { useEffect, useMemo, useState } from 'react';
-import { fetchAdminUsers, type AdminUserRow } from '../api/users';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import ConfirmModal from '../../../components/ConfirmModal/ConfirmModal';
+import { triggerNotificationToast } from '../../../components/NotificationToast/notificationToast.utils';
+import {
+  fetchAdminUsers,
+  patchAdminUserActive,
+  patchAdminUserAdmin,
+  type AdminUserRow,
+} from '../api/users';
+import page from '../styles/AdminPage.module.css';
 
 type State =
   | { status: 'loading' }
   | { status: 'ready'; items: AdminUserRow[] }
   | { status: 'error' };
 
+type PendingModal =
+  | { kind: 'active'; user: AdminUserRow }
+  | { kind: 'admin'; user: AdminUserRow }
+  | null;
+
 export default function AdminUsers() {
   const [q, setQ] = useState('');
   const [state, setState] = useState<State>({ status: 'loading' });
+  const [modal, setModal] = useState<PendingModal>(null);
+  const [mutatingId, setMutatingId] = useState<string | null>(null);
 
   const queryParams = useMemo(() => {
     const qq = q.trim();
     return qq ? { q: qq, limit: 50 } : { limit: 50 };
   }, [q]);
 
-  useEffect(() => {
-    let mounted = true;
+  const load = useCallback(async () => {
     setState({ status: 'loading' });
-    (async () => {
-      try {
-        const { data } = await fetchAdminUsers(queryParams);
-        if (!mounted) return;
-        setState({ status: 'ready', items: Array.isArray(data) ? data : [] });
-      } catch {
-        if (!mounted) return;
-        setState({ status: 'error' });
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
+    try {
+      const { data } = await fetchAdminUsers(queryParams);
+      setState({ status: 'ready', items: Array.isArray(data) ? data : [] });
+    } catch {
+      setState({ status: 'error' });
+    }
   }, [queryParams]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function runMutation() {
+    if (!modal) return;
+    const uid = modal.user.user_id;
+    setMutatingId(uid);
+    try {
+      if (modal.kind === 'active') {
+        await patchAdminUserActive(uid);
+        triggerNotificationToast({
+          title: 'עודכן',
+          body: 'סטטוס פעילות המשתמש עודכן.',
+        });
+      } else {
+        await patchAdminUserAdmin(uid);
+        triggerNotificationToast({
+          title: 'עודכן',
+          body: 'סטטוס אדמין עודכן.',
+        });
+      }
+      setModal(null);
+      await load();
+    } catch {
+      triggerNotificationToast({
+        title: 'שגיאה',
+        body: 'הפעולה נכשלה.',
+      });
+    } finally {
+      setMutatingId(null);
+    }
+  }
 
   return (
     <div>
-      <h3>Users</h3>
-      <div style={{ marginBottom: 12 }}>
+      <h2 className={page.pageTitle}>משתמשים</h2>
+      <div className={page.toolbar}>
         <input
+          className={page.searchInput}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search email / phone / name"
-          style={{ padding: 8, width: 320, maxWidth: '100%' }}
+          placeholder="חיפוש אימייל / טלפון / שם"
+          type="search"
         />
       </div>
 
-      {state.status === 'loading' && <p>Loading…</p>}
-      {state.status === 'error' && <p>Failed to load users.</p>}
+      {state.status === 'loading' && <p className={page.muted}>טוען…</p>}
+      {state.status === 'error' && <p className={page.error}>שגיאה בטעינה.</p>}
       {state.status === 'ready' && (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+        <div className={page.tableWrap}>
+          <table className={page.table}>
             <thead>
               <tr>
-                {['name', 'email', 'phone', 'active', 'admin', 'verified', 'last_login'].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      textAlign: 'left',
-                      borderBottom: '1px solid #ddd',
-                      padding: '8px 6px',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
+                <th>שם</th>
+                <th>אימייל</th>
+                <th>טלפון</th>
+                <th>פעיל</th>
+                <th>אדמין</th>
+                <th>מאומת</th>
+                <th>התחברות אחרונה</th>
+                <th>פעולות</th>
               </tr>
             </thead>
             <tbody>
               {state.items.map((u) => (
                 <tr key={u.user_id}>
-                  <td style={{ padding: '8px 6px', whiteSpace: 'nowrap' }}>{u.full_name}</td>
-                  <td style={{ padding: '8px 6px', whiteSpace: 'nowrap' }}>{u.email ?? '—'}</td>
-                  <td style={{ padding: '8px 6px', whiteSpace: 'nowrap' }}>{u.phone_number}</td>
-                  <td style={{ padding: '8px 6px' }}>{u.is_active ? 'yes' : 'no'}</td>
-                  <td style={{ padding: '8px 6px' }}>{u.is_admin ? 'yes' : 'no'}</td>
-                  <td style={{ padding: '8px 6px' }}>{u.is_verified ? 'yes' : 'no'}</td>
-                  <td style={{ padding: '8px 6px', whiteSpace: 'nowrap' }}>{u.last_login ?? '—'}</td>
+                  <td>{u.full_name}</td>
+                  <td>{u.email ?? '—'}</td>
+                  <td>{u.phone_number}</td>
+                  <td>{u.is_active ? 'כן' : 'לא'}</td>
+                  <td>{u.is_admin ? 'כן' : 'לא'}</td>
+                  <td>{u.is_verified ? 'כן' : 'לא'}</td>
+                  <td>{u.last_login ?? '—'}</td>
+                  <td className={page.actionsCell}>
+                    <button
+                      type="button"
+                      className={page.btnSm}
+                      disabled={mutatingId === u.user_id}
+                      onClick={() => setModal({ kind: 'active', user: u })}
+                    >
+                      {u.is_active ? 'השבת' : 'הפעל'}
+                    </button>
+                    <button
+                      type="button"
+                      className={page.btnSm}
+                      disabled={mutatingId === u.user_id}
+                      onClick={() => setModal({ kind: 'admin', user: u })}
+                    >
+                      {u.is_admin ? 'הסר אדמין' : 'הפוך לאדמין'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      <ConfirmModal
+        open={modal !== null}
+        onClose={() => !mutatingId && setModal(null)}
+        title={modal?.kind === 'active' ? 'שינוי פעילות משתמש' : 'שינוי הרשאת אדמין'}
+        description={
+          modal
+            ? `האם לבצע את השינוי עבור ${modal.user.full_name} (${modal.user.email ?? modal.user.phone_number})?`
+            : undefined
+        }
+        confirmLabel="אישור"
+        cancelLabel="ביטול"
+        variant="primary"
+        loading={mutatingId !== null}
+        onConfirm={runMutation}
+      />
     </div>
   );
 }

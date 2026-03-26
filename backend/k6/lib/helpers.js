@@ -4,11 +4,15 @@ export const BASE_URL = __ENV.BASE_URL || "http://localhost:8000/api/v1";
 export const HEADERS = { "Content-Type": "application/json" };
 
 let userCounter = 0;
+// Per-run salt so repeat k6 runs don't collide with DB rows from earlier runs.
+const BASE_TS = Date.now() % 10000000;
 
 export function uniquePhone() {
   userCounter++;
-  const suffix = String(8000000 + __VU * 10000 + userCounter).padStart(7, "0");
-  return `+97250${suffix}`;
+  // Two trusted IL E.164 blocks: +972534XXXXXX and +972544XXXXXX (6-digit suffix each); BASE_TS/VU spread across runs.
+  const suffix = String((BASE_TS + __VU * 10000 + userCounter) % 1000000).padStart(6, "0");
+  const prefix = userCounter % 2 === 0 ? "534" : "544";
+  return `+972${prefix}${suffix}`;
 }
 
 export function uniqueUser(role = "user") {

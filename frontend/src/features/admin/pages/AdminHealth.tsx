@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchAdminHealth, type AdminHealthResponse } from '../api/health';
+import page from '../styles/AdminPage.module.css';
 
 type State =
   | { status: 'loading' }
@@ -26,18 +27,34 @@ export default function AdminHealth() {
     };
   }, []);
 
-  if (state.status === 'loading') return <p>Loading health…</p>;
-  if (state.status === 'error') return <p>Failed to load health.</p>;
+  if (state.status === 'loading') return <p className={page.muted}>טוען…</p>;
+  if (state.status === 'error') return <p className={page.error}>שגיאה בטעינת בריאות.</p>;
 
   const { data } = state;
   return (
     <div>
-      <h3>System health: {data.status}</h3>
-      <ul>
-        <li>database: {data.database}</li>
-        <li>redis: {data.redis}</li>
-        <li>rabbitmq: {data.rabbitmq}</li>
-      </ul>
+      <h2 className={page.pageTitle}>בריאות מערכת</h2>
+      <p className={page.muted}>
+        סטטוס כללי: <strong>{data.status}</strong>
+      </p>
+      <div className={page.tableWrap}>
+        <table className={page.table}>
+          <tbody>
+            <tr>
+              <td>מסד נתונים</td>
+              <td>{data.database}</td>
+            </tr>
+            <tr>
+              <td>Redis</td>
+              <td>{data.redis}</td>
+            </tr>
+            <tr>
+              <td>RabbitMQ</td>
+              <td>{data.rabbitmq}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

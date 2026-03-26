@@ -1,0 +1,43 @@
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 700px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.blockTitle {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.field {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: #fff;
+  color: inherit;
+}
+
+:global([data-theme='dark']) .field {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.rowActions {
+  margin-top: 0.5rem;
+}
+
+.resultTitle {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}

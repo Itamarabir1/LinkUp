@@ -4,6 +4,8 @@ metadata:
   name: linkup-chat-ws
   labels:
     app: linkup-chat-ws
+  annotations:
+    app.kubernetes.io/version: "latest"
 spec:
   replicas: 1
   selector:
@@ -25,6 +27,8 @@ spec:
           env:
             - name: PORT
               value: "8081"
+            - name: ALLOWED_ORIGINS
+              value: "https://linkup.co.il"
             - name: REDIS_URL
               valueFrom:
                 secretKeyRef:
