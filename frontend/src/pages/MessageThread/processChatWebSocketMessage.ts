@@ -2,6 +2,7 @@ import type { MutableRefObject } from 'react';
 import { markConversationRead } from '../../api/chat';
 import type { PartnerPresence } from '../../api/presence';
 import type { MessageResponse } from '../../types/api';
+import { ChatPresenceEventSchema } from '../../types/wsEvents';
 import { TYPING_DISPLAY_TIMEOUT_MS } from './messageThread.constants';
 
 export interface ChatWebSocketProcessContext {
@@ -23,64 +24,71 @@ export function processChatWebSocketMessage(
   data: Record<string, unknown>,
   ctx: ChatWebSocketProcessContext
 ): void {
-  const {
-    cid,
-    userId,
-    refreshUnread,
-    partnerIdRef,
-    setMessages,
-    setPartnerTyping,
-    setPartnerTypingName,
-    setPartnerPresence,
-    typingHideTimeoutRef,
-  } = ctx;
+  const presenceResult = ChatPresenceEventSchema.safeParse(data);
 
-  if (data?.type === 'user_offline') {
-    const uid = String(data.user_id ?? '');
-    if (uid && uid === partnerIdRef.current) {
-      setPartnerPresence((prev) => ({
-        online: false,
-        last_seen: prev?.last_seen ?? null,
-      }));
+  if (presenceResult.success) {
+    const event = presenceResult.data;
+
+    if (event.type === 'user_online') {
+      if (event.user_id === ctx.partnerIdRef.current) {
+        ctx.setPartnerPresence((prev) => ({
+          online: true,
+          last_seen: prev?.last_seen ?? null,
+        }));
+      }
+      return;
     }
-    return;
-  }
-  if (data?.type === 'unread_count') {
-    void refreshUnread();
-    return;
-  }
-  if (typeof data?.message_id === 'number' && data?.conversation_id === cid) {
-    void markConversationRead(cid)
-      .then(() => refreshUnread())
-      .catch(() => {});
-  }
-  if (data?.type === 'typing_start' && data?.user_id !== userId) {
-    setPartnerTyping(true);
-    setPartnerTypingName((data.full_name as string) || null);
-    if (typingHideTimeoutRef.current) clearTimeout(typingHideTimeoutRef.current);
-    typingHideTimeoutRef.current = setTimeout(() => {
-      setPartnerTyping(false);
-      setPartnerTypingName(null);
-      typingHideTimeoutRef.current = null;
-    }, TYPING_DISPLAY_TIMEOUT_MS);
-    return;
-  }
-  if (
-    data?.type === 'typing_stop' &&
-    data?.conversation_id === cid &&
-    data?.user_id !== userId
-  ) {
-    setPartnerTyping(false);
-    setPartnerTypingName(null);
-    if (typingHideTimeoutRef.current) {
-      clearTimeout(typingHideTimeoutRef.current);
-      typingHideTimeoutRef.current = null;
+
+    if (event.type === 'user_offline') {
+      if (event.user_id === ctx.partnerIdRef.current) {
+        ctx.setPartnerPresence((prev) => ({
+          online: false,
+          last_seen: prev?.last_seen ?? null,
+        }));
+      }
+      return;
     }
-    return;
+
+    if (event.type === 'unread_count') {
+      void ctx.refreshUnread();
+      return;
+    }
+
+    if (event.type === 'typing_start' && event.user_id !== ctx.userId) {
+      ctx.setPartnerTyping(true);
+      ctx.setPartnerTypingName(event.full_name ?? null);
+      if (ctx.typingHideTimeoutRef.current) clearTimeout(ctx.typingHideTimeoutRef.current);
+      ctx.typingHideTimeoutRef.current = setTimeout(() => {
+        ctx.setPartnerTyping(false);
+        ctx.setPartnerTypingName(null);
+        ctx.typingHideTimeoutRef.current = null;
+      }, TYPING_DISPLAY_TIMEOUT_MS);
+      return;
+    }
+
+    if (
+      event.type === 'typing_stop' &&
+      event.user_id !== ctx.userId &&
+      event.conversation_id === ctx.cid
+    ) {
+      ctx.setPartnerTyping(false);
+      ctx.setPartnerTypingName(null);
+      if (ctx.typingHideTimeoutRef.current) {
+        clearTimeout(ctx.typingHideTimeoutRef.current);
+        ctx.typingHideTimeoutRef.current = null;
+      }
+      return;
+    }
   }
+
   if (typeof (data as unknown as MessageResponse).message_id === 'number') {
     const msg = data as unknown as MessageResponse;
-    setMessages((prev) => [...prev, msg]);
-    if (msg.sender_id !== userId) setPartnerTyping(false);
+    if (msg.conversation_id === ctx.cid) {
+      void markConversationRead(ctx.cid)
+        .then(() => ctx.refreshUnread())
+        .catch(() => {});
+    }
+    ctx.setMessages((prev) => [...prev, msg]);
+    if (msg.sender_id !== ctx.userId) ctx.setPartnerTyping(false);
   }
 }

@@ -25,6 +25,7 @@ from app.core.exceptions.auth import (
     InvalidResetCodeError,
     InvalidRefreshTokenError,
     InvalidPasswordError,
+    GoogleAuthFailed,
 )
 from app.core.exceptions.user import (
     UserNotFoundError,
@@ -273,13 +274,13 @@ class AuthService:
         # 1. אימות ה-ID token עם Google
         try:
             google_user = verify_google_id_token(id_token)
-        except ValueError as e:
-            logger.error(f"Google ID token verification failed: {e}")
-            raise InvalidCredentialsError()
+        except GoogleAuthFailed:
+            raise
 
         email = google_user.get("email")
         if not email:
-            raise ValueError("Google ID token missing email")
+            logger.error("Google ID token missing email claim")
+            raise InvalidCredentialsError()
 
         # נרמול email (lowercase)
         email = normalize_email_for_auth(email)

@@ -1,6 +1,6 @@
 # Linkup — Architecture Overview
 
-תיעוד רמה גבוהה של המערכת. לעדכונים מפורטים: `docs/DATABASE.md`, `docs/API.md`, `docs/EVENTS.md`, `docs/architecture/REALTIME.md`, `docs/DEVELOPMENT.md`. **להצגת הפרויקט (פיצ’רים, סקייל, טריקים):** `docs/ENGINEERING_HIGHLIGHTS.md`. **מסך אדמין + מפת API:** `ADMIN_DASHBOARD.md` (בשורש).
+תיעוד רמה גבוהה של המערכת. לעדכונים מפורטים: `docs/DATABASE.md`, `docs/API.md`, `docs/EVENTS.md`, `docs/architecture/REALTIME.md`, `docs/DEVELOPMENT.md`. **שגיאות API אחידות (JSON, trace_id, Sentry):** [`docs/ERRORS.md`](docs/ERRORS.md). **להצגת הפרויקט (פיצ’רים, סקייל, טריקים):** `docs/ENGINEERING_HIGHLIGHTS.md`. **מסך אדמין + מפת API:** `ADMIN_DASHBOARD.md` (בשורש).
 
 ---
 
@@ -12,7 +12,7 @@
 | outbox-worker | backend/ (same image) | Python | — | Outbox → RabbitMQ, notifications, avatar tasks, scheduled, chat completion |
 | chat-ws | chat-ws/ | Go | 8081 | WebSocket server for real-time chat (JWT, Redis Pub/Sub) |
 | db | Docker | PostgreSQL 15 + PostGIS | 5432 | Primary data store |
-| redis | Docker | Redis Stack 7.2 | 6379 | **שרת Redis אחד** — DB 0: backend/worker; DB 1: chat-ws (צ'אט, presence, `user:offline`, completion) |
+| redis | Docker | Redis Stack 7.2 | 6379 | **שרת Redis אחד** — DB 0: backend/worker; DB 1: chat-ws (צ'אט, presence, `user:online` / `user:offline`, completion) |
 | rabbitmq | Docker | RabbitMQ 3 + Management | 5672, 15672 | Message broker (events, tasks) |
 
 ---
@@ -24,7 +24,7 @@
 | Database | PostgreSQL + PostGIS | 15-3.3 | טבלאות, גיאומטריה, חיפוש מרחבי |
 | Cache / Pub-Sub | Redis | 7.2.0-v10 | Broadcast (ride updates), chat channels, chat completion, OTP |
 | Message Broker | RabbitMQ | 3-management | אירועים (Outbox), תורי משימות (notifications, avatar, scheduled) |
-| Runtime | Docker Compose | — | פיתוח: db, redis, rabbitmq, backend (**8000** ל-host), outbox-worker, chat-ws; פרוד מקומי: **frontend** סטטי + **nginx** (80) מאותו `docker-compose.yml` + `--profile prod` |
+| Runtime | Docker Compose | — | פיתוח: db, redis, rabbitmq, **migrate** (Alembic פעם אחת), backend (**8000** ל-host; uvicorn בלבד, בלי alembic בפקודת ההרצה), outbox-worker, chat-ws; פרוד מקומי: **frontend** סטטי + **nginx** (80) מאותו `docker-compose.yml` + `--profile prod` — nginx אחרי **backend healthy** |
 
 ---
 
@@ -58,7 +58,7 @@ outbox-worker
 
 ## Features
 
-- **GPS Tracking**: מיקום נהג ונוסעים בזמן אמת במהלך נסיעה פעילה. נהג: **התחל/סיים נסיעה** מטאב "אני נהג" ב־My Bookings (דורש לפחות הזמנה אחת מאושרת), שידור מיקום ל־POST /bookings/{id}/location; נוסעים מקבלים עדכונים ב־WebSocket /bookings/ws/{id}/location. נוסעים יכולים לשתף מיקום ל־POST /bookings/{id}/passenger-location; נהג מאזין ב־WebSocket /rides/ws/{id}/passengers. ערוצי Redis: `booking_{booking_id}` (מיקום נהג), `ride_{ride_id}:passenger_locations` (מיקום נוסעים). ראה `docs/architecture/REALTIME.md` ו־`docs/architecture/API.md`.
+- **GPS Tracking**: מיקום נהג ונוסעים בזמן אמת במהלך נסיעה פעילה. נהג: **התחל/סיים נסיעה** מטאב "אני נהג" ב־My Bookings (דורש לפחות הזמנה אחת מאושרת), שידור מיקום ל־POST /bookings/{id}/location; נוסעים מקבלים עדכונים ב־WebSocket /bookings/ws/{id}/location. נוסעים יכולים לשתף מיקום ל־POST /bookings/{id}/passenger-location; נהג מאזין ב־WebSocket /rides/ws/{id}/passengers. ערוצי Redis: `booking_{booking_id}` (מיקום נהג), `ride_{ride_id}:passenger_locations` (מיקום נוסעים) — שמות מרוכזים ב־`app/infrastructure/redis/keys.py`. **עדכוני סטטוס נסיעה** ללקוח: `publish_ride_event` ב־`app/domain/rides/broadcast.py`. **פרונט:** throttle לשידור ~1.5s, `maximumAge: 0` לשידור, `useMapMarker` (יצירה מול עדכון), reconnect ב־`useDriverLocation` / `usePassengerLocations` / `useRideWebSocket`, אימות JSON בכניסה עם **Zod** ב־`frontend/src/types/wsEvents.ts` — פירוט ב־`docs/architecture/REALTIME.md` (סעיף GPS, “פרונט”) ו־`docs/ENGINEERING_HIGHLIGHTS.md` (סעיף 5). ראה גם `docs/architecture/API.md`.
 - **Ride preview cache**: תצוגת מקדימה לנסיעה (3 מסלולים) נשמרת ב־Redis 24 שעות; סריאליזציה עם `driver_id` כ־string. תג קבוצה בכרטיסיות (group_name או "ציבורי") מ־RideResponse (כולל group).
 - **Geocode cache (24h)**: תוצאות כתובת→קואורדינטות נשמרות ב־Redis ל־24 שעות כדי לצמצם קריאות חוזרות ל־**Google Geocoding** עבור אותן כתובות. המימוש fail-open כדי לא לחסום flow אם Redis לא זמין.
 - **Admin (תפעול):** REST תחת **`/api/v1/admin/*`** — רק משתמש עם `users.is_admin`; dependency ב־`app/api/dependencies/admin.py` (`get_current_admin_user`). ראוטר דומיין: `backend/app/domain/admin/router.py` (סטטיסטיקות, בריאות, משתמשים, נסיעות, קבוצות, Outbox, lookup); פעולות רגישות עם לוג **`[admin_audit]`**. במקביל נשאר **SQLAdmin** (`app/admin/setup.py`) לדפדפן ניהול DB קלאסי. **ממשק React** למפעילים: `frontend/src/features/admin/` — מסלולים `/admin`, `/admin/health`, `/admin/users`, `/admin/rides`, `/admin/groups`, `/admin/outbox`, `/admin/lookup` (טעינה עצלה, RTL). מקור אמת למסך ול־API: **`ADMIN_DASHBOARD.md`**.
@@ -94,7 +94,7 @@ outbox-worker
 
 ## Performance
 
-- **ASGI server (Docker Compose)**: `uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-1}` — מספר תהליכי worker נשלט מ-**`UVICORN_WORKERS`** ב-`backend/.env` (ראו `backend/.env.example`: **4** למכונות רב-ליבה; אם המשתנה לא מוגדר, ברירת המחדל בפקודת Compose היא **1**). **פיתוח לוקאלי** (ללא Docker): בדרך כלל `uvicorn ... --reload` — תהליך יחיד.
+- **ASGI server (Docker Compose)**: `uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-1}` — מספר תהליכי worker נשלט מ-**`UVICORN_WORKERS`** ב-`backend/.env` (ראו `backend/.env.example`: **4** למכונות רב-ליבה; אם המשתנה לא מוגדר, ברירת המחדל בפקודת Compose היא **1**). **מיגרציות** רצות בשירות נפרד **`migrate`** לפני עליית ה-backend. **Healthcheck** על המיכל: `GET /api/v1/health`. **פיתוח לוקאלי** (ללא Docker): בדרך כלל `uvicorn ... --reload` — תהליך יחיד; מיגרציה ידנית (`alembic upgrade head`) לפני הרצה.
 - **Connection Pool** (`backend/app/db/session.py`): `pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle` מ-**config** (`DB_POOL_*` ב-`.env`; ברירות מחדל ב-`Settings`), `pool_pre_ping=True`.
 - **Indexes**: ראה `docs/DATABASE.md` — כולל 11 ה-indexes מ-migration 004 (rides, bookings, group_members, passenger_requests).
 - **Caching**: Redis לפי צורך — TTL וכו' לפי סוג (למשל OTP, broadcast channels).

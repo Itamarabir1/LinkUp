@@ -1411,7 +1411,7 @@ requires-dist = [
     { name = "pytest-asyncio", specifier = ">=0.21.0" },
     { name = "python-dotenv" },
     { name = "python-jose", extras = ["cryptography"], specifier = "==3.3.0" },
-    { name = "python-json-logger", specifier = ">=2.0.0" },
+    { name = "python-json-logger", specifier = ">=3.0" },
     { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "redis", specifier = ">=5.0.0" },
     { name = "ruff", specifier = "==0.15.5" },

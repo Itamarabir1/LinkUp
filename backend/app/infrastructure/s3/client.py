@@ -10,7 +10,11 @@ import logging
 from urllib.parse import quote
 from aioboto3 import Session
 from app.core.config import settings
-from app.core.exceptions.infrastructure import StorageServiceError
+from app.core.exceptions.infrastructure import (
+    ExternalServiceError,
+    S3DeleteFailed,
+    S3UploadFailed,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +48,7 @@ class S3Client:
             return self._public_url(key)
         except Exception as e:
             logger.error("S3 upload failed: %s", e, exc_info=True)
-            raise StorageServiceError(payload={"detail": str(e)}) from e
+            raise S3UploadFailed() from e
 
     async def copy_object(self, source_key: str, dest_key: str) -> str:
         """העתקה בתוך אותו bucket (למשל staging → final). שומר content-type של המקור."""
@@ -59,7 +63,7 @@ class S3Client:
             return self._public_url(dest_key)
         except Exception as e:
             logger.error("S3 copy failed: %s", e, exc_info=True)
-            raise StorageServiceError(payload={"detail": str(e)}) from e
+            raise S3UploadFailed() from e
 
     async def delete_object(self, key: str) -> None:
         """מחיקה לפי key."""
@@ -75,7 +79,7 @@ class S3Client:
                 e,
                 exc_info=True,
             )
-            raise
+            raise S3DeleteFailed() from e
 
     async def get_object_bytes(self, key: str) -> bytes:
         """מוריד אובייקט כ-bytes (לעיבוד תמונה ב-worker)."""
@@ -86,7 +90,7 @@ class S3Client:
                 return body
         except Exception as e:
             logger.error("S3 get_object failed key=%s: %s", key, e, exc_info=True)
-            raise StorageServiceError(payload={"detail": str(e)}) from e
+            raise ExternalServiceError() from e
 
     async def list_objects_by_prefix(self, prefix: str) -> list[str]:
         """מחזיר רשימת keys עם prefix נתון."""
@@ -105,7 +109,7 @@ class S3Client:
             logger.error(
                 "S3 list_objects failed prefix=%s: %s", prefix, e, exc_info=True
             )
-            raise
+            raise ExternalServiceError() from e
         return keys
 
     async def generate_presigned_upload_url(
@@ -138,9 +142,7 @@ class S3Client:
             logger.error(
                 "Failed to generate presigned URL for key=%s: %s", key, e, exc_info=True
             )
-            raise StorageServiceError(
-                payload={"detail": f"Failed to generate presigned URL: {str(e)}"}
-            ) from e
+            raise S3UploadFailed() from e
 
 
 s3_client = S3Client()

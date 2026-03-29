@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getWsBaseUrl } from '../config/env';
+import { DriverLocationEventSchema } from '../types/wsEvents';
 
 export interface DriverLocationUpdate {
   lat: number;
@@ -34,43 +35,54 @@ export function useDriverLocation(bookingId: string | null) {
       return;
     }
 
-    const url = getBookingLocationWsUrl(bookingId);
-    const ws = new WebSocket(url);
+    let cancelled = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let ws: WebSocket | null = null;
 
-    ws.onopen = () => {
-      setError(null);
-      setConnected(true);
-    };
-    ws.onclose = () => setConnected(false);
-    ws.onerror = () => setError('שגיאת חיבור לעדכון מיקום הנהג');
+    const connect = () => {
+      if (cancelled) return;
+      ws = new WebSocket(getBookingLocationWsUrl(bookingId));
 
-    ws.onmessage = (ev) => {
-      try {
-        const payload = JSON.parse(ev.data as string) as {
-          type?: string;
-          lat?: number;
-          lng?: number;
-          heading?: number;
-          speed?: number;
-          timestamp?: string;
-          ride_id?: string;
-        };
-        if (payload.lat == null || payload.lng == null) return;
-        setPosition({
-          lat: payload.lat,
-          lng: payload.lng,
-          heading: payload.heading,
-          speed: payload.speed,
-          timestamp: payload.timestamp ?? new Date().toISOString(),
-          ride_id: payload.ride_id,
-        });
-      } catch {
-        // ignore invalid JSON
-      }
+      ws.onopen = () => {
+        setError(null);
+        setConnected(true);
+      };
+      ws.onclose = () => {
+        setConnected(false);
+        ws = null;
+        if (!cancelled) reconnectTimer = setTimeout(connect, 3000);
+      };
+      ws.onerror = () => setError('שגיאת חיבור לעדכון מיקום הנהג');
+
+      ws.onmessage = (ev) => {
+        try {
+          const raw = JSON.parse(ev.data as string);
+          const result = DriverLocationEventSchema.safeParse(raw);
+          if (!result.success) {
+            console.warn('[useDriverLocation] unexpected payload:', raw);
+            return;
+          }
+          const payload = result.data;
+          setPosition({
+            lat: payload.lat,
+            lng: payload.lng,
+            heading: payload.heading,
+            speed: payload.speed,
+            timestamp: payload.timestamp ?? new Date().toISOString(),
+            ride_id: payload.ride_id,
+          });
+        } catch {
+          /* ignore */
+        }
+      };
     };
+
+    connect();
 
     return () => {
-      ws.close();
+      cancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      ws?.close();
       setPosition(null);
     };
   }, [bookingId]);

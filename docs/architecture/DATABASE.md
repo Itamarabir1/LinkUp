@@ -46,7 +46,8 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | fcm_token | TEXT | Firebase push |
 | refresh_token | TEXT | JWT refresh |
 | last_location | GEOGRAPHY(POINT) | PostGIS |
-| last_login | TIMESTAMPTZ | |
+| last_login | TIMESTAMPTZ | התחברות אחרונה |
+| last_active_at | TIMESTAMPTZ | פעילות אחרונה (צ'אט / PATCH last-seen מ-chat-ws); אינדקס; מיגרציה **007** |
 | created_at | TIMESTAMPTZ | |
 | updated_at | TIMESTAMPTZ | |
 

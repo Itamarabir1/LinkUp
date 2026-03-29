@@ -44,7 +44,12 @@ class ReminderScheduler:
                 booking.reminder_sent = True
                 await db.flush()
             except Exception as e:
-                logger.error(f"❌ Failed passenger reminder {booking.booking_id}: {e}")
+                logger.error(
+                    "Failed passenger reminder %s: %s",
+                    booking.booking_id,
+                    e,
+                    exc_info=True,
+                )
 
         await self._safe_commit(db, "Passenger Reminders")
 
@@ -70,7 +75,12 @@ class ReminderScheduler:
                 await db.flush()
 
             except Exception as e:
-                logger.error(f"❌ Failed driver reminder {ride.ride_id}: {e}")
+                logger.error(
+                    "Failed driver reminder %s: %s",
+                    ride.ride_id,
+                    e,
+                    exc_info=True,
+                )
 
         # 5. ביצוע Commit סופי
         await self._safe_commit(db, "Driver Reminders")
@@ -81,7 +91,9 @@ class ReminderScheduler:
             logger.info(f"✅ Committed {context}")
         except Exception as e:
             await db.rollback()
-            logger.critical(f"🔥 Database Error in {context}: {e}")
+            logger.critical(
+                "Database error in %s: %s", context, e, exc_info=True
+            )
 
 
 # המופע שייובא ב-Celery/Cron task

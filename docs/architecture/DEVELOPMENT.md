@@ -21,14 +21,14 @@
    - `chat-ws/.env` — העתק מ־`chat-ws/.env.example` (כולל `REDIS_URL`, `JWT_SECRET` זהה ל־`SECRET_KEY` בבקאנד).
 
 2. **הרצה עם Docker**
-   - `docker-compose.yml`: ל־`db`, `redis`, `rabbitmq`, `outbox-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **backend** עם **`8000:8000`** ל־host. **`frontend`** ו־**`nginx`** מוגדרים באותו קובץ עם `profiles: ["prod"]` — עולים רק עם `docker compose --profile prod`.
-   - **פיתוח:** `docker compose up -d` → תשתית + worker + backend (**8000**) + chat-ws (**8081**). פרונט: **`npm run dev`** בתיקיית `frontend`, לא קונטיינר.
+   - `docker-compose.yml`: ל־`db`, `redis`, `rabbitmq`, **`migrate`**, `outbox-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **`migrate`** מריץ `alembic upgrade head` פעם אחת ויוצא (`restart: "no"`); **backend** ו־**outbox-worker** תלויים ב־`service_completed_successfully:migrate`. **backend** עם **`8000:8000`** ל־host, **healthcheck** על `/api/v1/health`. **`frontend`** ו־**`nginx`** מוגדרים באותו קובץ עם `profiles: ["prod"]` — עולים רק עם `docker compose --profile prod`; **nginx** תלוי ב־**backend** ב־`service_healthy`.
+   - **פיתוח:** `docker compose up -d` → תשתית + **migrate** + worker + backend (**8000**) + chat-ws (**8081**). פרונט: **`npm run dev`** בתיקיית `frontend`, לא קונטיינר.
    - **סטאק מלא מאחורי Nginx (פורט 80):** `docker compose --profile prod up -d --build`.
    - **FCM:** `firebase-credentials.json` ממופה read-only ל־**backend** ול־**outbox-worker** (נתיב בקונטיינר: `/app/infrastructure/firebase_core/firebase-credentials.json`); `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env` חייב להתאים (הקובץ לא נכנס ל־image בגלל `.dockerignore`).
    - **שינוי `backend/.env`:** משתני הסביבה של מיכל ה-backend נטענים בעת **יצירת** הקונטיינר. אחרי עריכת הקובץ הרץ `docker compose up -d --force-recreate backend` (לא מספיק `docker compose restart backend`).
 
 3. **הרצה לוקאלית (בלי Docker ל-backend / frontend)**
-   - תשתיות + worker: `docker compose up -d` (או לפחות `db`, `redis`, `rabbitmq`, `chat-ws`; אם `outbox-worker` כבר רץ ב־Compose — **אל** תריץ במקביל `python -m app.workers.main_worker` מקומית).
+   - תשתיות + worker: `docker compose up -d` (או לפחות `db`, `redis`, `rabbitmq`, `chat-ws`; אם `outbox-worker` כבר רץ ב־Compose — **אל** תריץ במקביל `python -m app.workers.main_worker` מקומית). אם **לא** מרימים את שירות **`migrate`** בדוקר — להריץ ידנית `alembic upgrade head` לפני הבקאנד המקומי.
    - מתוך `backend/`: `alembic upgrade head`, ואז `uvicorn app.main:app --reload` (פורט 8000 — מתאים ל־`frontend` ב־dev, ראו `frontend/src/config/env.ts`).
    - Worker מקומי: רק אם **אין** `outbox-worker` בדוקר — `python -m app.workers.main_worker`.
 

@@ -9,7 +9,7 @@ class RideNotFoundError(LinkupError):
     status_code = 404
     error_code = "RIDE_NOT_FOUND"
 
-    def __init__(self, ride_id: int):
+    def __init__(self, ride_id: Union[int, str, UUID]):
         super().__init__(
             message=f"נסיעה {ride_id} לא נמצאה",
             status_code=self.status_code,

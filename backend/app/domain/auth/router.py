@@ -1,6 +1,9 @@
 import logging
 
 from fastapi import APIRouter, Depends, status, Query, Request, HTTPException
+
+from app.core.exceptions.base import LinkupError
+from app.core.exceptions.auth import GoogleAuthFailed
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -269,19 +272,13 @@ async def google_signin(
         # בדיקה שה-GOOGLE_CLIENT_ID מוגדר
         if not settings.GOOGLE_CLIENT_ID:
             logger.error("GOOGLE_CLIENT_ID not configured in settings")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Google OAuth not configured. Please set GOOGLE_CLIENT_ID in backend/.env",
-            )
+            raise GoogleAuthFailed(message="שירות Google לא מוגדר בשרת")
 
         return await auth_svc.authenticate_with_google(
             db=db, id_token=data.id_token
         )
-    except HTTPException:
+    except LinkupError:
         raise
     except Exception as e:
-        logger.exception(f"Error in google_signin endpoint: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Google sign-in failed: {str(e)}",
-        )
+        logger.exception("Error in google_signin endpoint: %s", e)
+        raise GoogleAuthFailed() from e

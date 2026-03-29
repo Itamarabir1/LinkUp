@@ -28,6 +28,8 @@ const Groups = lazy(() => import('./pages/Groups'));
 const GroupManage = lazy(() => import('./pages/GroupManage'));
 const JoinGroup = lazy(() => import('./pages/JoinGroup'));
 const FCMCheck = lazy(() => import('./pages/FCMCheck'));
+const PostLoginHub = lazy(() => import('./pages/PostLoginHub'));
+const Sablat = lazy(() => import('./pages/Sablat'));
 
 const AdminLayout = lazy(() => import('./features/admin/pages/AdminLayout'));
 const AdminHome = lazy(() => import('./features/admin/pages/AdminHome'));
@@ -87,6 +89,8 @@ function AppRoutes() {
             }
           >
             <Route index element={<Navigate to="/my-rides" replace />} />
+            <Route path="choose-destination" element={<PostLoginHub />} />
+            <Route path="sablat" element={<Sablat />} />
             <Route path="my-rides" element={<MyRides />} />
             <Route path="create-ride" element={<CreateRide />} />
             <Route path="search" element={<SearchRides />} />

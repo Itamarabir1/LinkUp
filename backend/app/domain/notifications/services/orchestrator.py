@@ -29,4 +29,9 @@ class NotificationOrchestrator:
                 },
             )
         except Exception as e:
-            raise NotificationError(f"Failed to dispatch cancellation: {str(e)}")
+            logger.exception(
+                "Failed to dispatch ride.cancelled notification: %s", e
+            )
+            raise NotificationError(
+                f"Failed to dispatch cancellation: {str(e)}"
+            ) from e

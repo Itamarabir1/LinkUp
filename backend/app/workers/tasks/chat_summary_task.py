@@ -12,6 +12,7 @@ import redis.asyncio as redis
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.domain.chat.completion.service import handle_conversation_completion
+from app.core.exceptions.infrastructure import WorkerTaskFailed
 
 logger = logging.getLogger(__name__)
 
@@ -25,22 +26,32 @@ async def _process_completion_message(payload_str: str) -> None:
         conversation_id = data.get("conversation_id")
         trigger_user_id = data.get("trigger_user_id")
         if conversation_id is None or trigger_user_id is None:
-            logger.warning(
+            logger.error(
                 "chat completion event missing conversation_id or trigger_user_id: %s",
                 data,
             )
-            return
+            raise WorkerTaskFailed(
+                message="אירוע סיום צ'אט חסר conversation_id או trigger_user_id"
+            )
         cid = UUID(str(conversation_id))
         uid = UUID(str(trigger_user_id))
         async with SessionLocal() as db:
             try:
                 await handle_conversation_completion(db, cid, uid)
                 await db.commit()
-            except Exception:
+            except Exception as e:
                 await db.rollback()
-                raise
+                logger.exception(
+                    "chat completion DB handler failed conversation_id=%s: %s",
+                    cid,
+                    e,
+                )
+                raise WorkerTaskFailed() from e
+    except WorkerTaskFailed:
+        raise
     except Exception as e:
         logger.error("Error processing chat completion event: %s", e, exc_info=True)
+        raise WorkerTaskFailed() from e
 
 
 async def run_chat_completion_redis_listener(stop_event: asyncio.Event) -> None:

@@ -32,6 +32,7 @@ from app.infrastructure.location.location_service import (
     broadcast_location_to_participants,
     broadcast_passenger_location_to_driver,
 )
+from app.infrastructure.redis.keys import get_booking_channel
 from app.infrastructure.redis.broadcast import broadcast
 from app.core.exceptions.booking import ForbiddenRideActionError
 
@@ -212,7 +213,7 @@ async def booking_location_websocket(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
     await websocket.accept()
-    channel_name = f"booking_{booking_id}"
+    channel_name = get_booking_channel(booking_id)
     try:
         async with broadcast.subscribe(channel=channel_name) as subscriber:
             async for event in subscriber:

@@ -3,7 +3,7 @@ package hub
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -16,6 +16,9 @@ import (
 
 // ChannelUserOffline — publish payload = user_id (string); כל מופעי chat-ws מקבלים ומשדרים WS ללקוחות.
 const ChannelUserOffline = "user:offline"
+
+// ChannelUserOnline — payload = user_id (string); broadcast WS user_online לכל המחוברים.
+const ChannelUserOnline = "user:online"
 
 // Hub maps user_id (UUID string) -> list of connections (one user can have multiple devices).
 type Hub struct {
@@ -62,7 +65,7 @@ func (h *Hub) PublishTyping(ctx context.Context, conversationID string, payload 
 	}
 	channel := "chat:typing:" + conversationID
 	if err := h.redisClient.Publish(ctx, channel, payload).Err(); err != nil {
-		return // log optional
+		slog.Error("redis publish typing failed", "component", "hub", "op", "PublishTyping", "error_code", "REDIS_PUBLISH_FAILED", "err", err)
 	}
 }
 
@@ -71,7 +74,9 @@ func (h *Hub) SetPresence(ctx context.Context, userID string) {
 	if h.redisClient == nil {
 		return
 	}
-	_ = h.redisClient.Set(ctx, "presence:"+userID, "1", 60*time.Second).Err()
+	if err := h.redisClient.Set(ctx, "presence:"+userID, "1", 60*time.Second).Err(); err != nil {
+		slog.Error("redis SetPresence failed", "component", "hub", "op", "SetPresence", "error_code", "REDIS_SET_FAILED", "err", err)
+	}
 }
 
 // RefreshPresence extends TTL for user's presence key.
@@ -79,7 +84,9 @@ func (h *Hub) RefreshPresence(ctx context.Context, userID string) {
 	if h.redisClient == nil {
 		return
 	}
-	_ = h.redisClient.Expire(ctx, "presence:"+userID, 60*time.Second).Err()
+	if err := h.redisClient.Expire(ctx, "presence:"+userID, 60*time.Second).Err(); err != nil {
+		slog.Error("redis RefreshPresence failed", "component", "hub", "op", "RefreshPresence", "error_code", "REDIS_EXPIRE_FAILED", "err", err)
+	}
 }
 
 // ClearPresence removes user's presence key.
@@ -87,12 +94,15 @@ func (h *Hub) ClearPresence(ctx context.Context, userID string) {
 	if h.redisClient == nil {
 		return
 	}
-	_ = h.redisClient.Del(ctx, "presence:"+userID).Err()
+	if err := h.redisClient.Del(ctx, "presence:"+userID).Err(); err != nil {
+		slog.Error("redis ClearPresence failed", "component", "hub", "op", "ClearPresence", "error_code", "REDIS_DEL_FAILED", "err", err)
+	}
 }
 
 const (
 	debounceLastSeenKeyPrefix = "debounce:last_seen:"
 	lastSeenHoldKeyPrefix     = "last_seen:hold:"
+	lastSeenTokenKeyPrefix    = "last_seen:token:"
 )
 
 // ClearLastSeenDebounce removes debounce keys on (re)connect so a quick reconnect cancels pending PATCH.
@@ -100,7 +110,14 @@ func (h *Hub) ClearLastSeenDebounce(ctx context.Context, userID string) {
 	if h.redisClient == nil {
 		return
 	}
-	_ = h.redisClient.Del(ctx, debounceLastSeenKeyPrefix+userID, lastSeenHoldKeyPrefix+userID).Err()
+	if err := h.redisClient.Del(
+		ctx,
+		debounceLastSeenKeyPrefix+userID,
+		lastSeenHoldKeyPrefix+userID,
+		lastSeenTokenKeyPrefix+userID,
+	).Err(); err != nil {
+		slog.Error("redis ClearLastSeenDebounce failed", "component", "hub", "op", "ClearLastSeenDebounce", "error_code", "REDIS_DEL_FAILED", "err", err)
+	}
 }
 
 // ScheduleLastSeenDebounce stores token in Redis: debounce key EX 10s; hold key keeps token until worker PATCH.
@@ -108,8 +125,15 @@ func (h *Hub) ScheduleLastSeenDebounce(ctx context.Context, userID, token string
 	if h.redisClient == nil || token == "" {
 		return
 	}
-	_ = h.redisClient.Set(ctx, debounceLastSeenKeyPrefix+userID, token, 10*time.Second).Err()
-	_ = h.redisClient.Set(ctx, lastSeenHoldKeyPrefix+userID, token, 25*time.Second).Err()
+	if err := h.redisClient.Set(ctx, debounceLastSeenKeyPrefix+userID, token, 10*time.Second).Err(); err != nil {
+		slog.Error("redis ScheduleLastSeenDebounce debounce failed", "component", "hub", "op", "ScheduleLastSeenDebounce", "error_code", "REDIS_SET_FAILED", "err", err)
+	}
+	if err := h.redisClient.Set(ctx, lastSeenHoldKeyPrefix+userID, token, 25*time.Second).Err(); err != nil {
+		slog.Error("redis ScheduleLastSeenDebounce hold failed", "component", "hub", "op", "ScheduleLastSeenDebounce", "error_code", "REDIS_SET_FAILED", "err", err)
+	}
+	if err := h.redisClient.Set(ctx, lastSeenTokenKeyPrefix+userID, token, 25*time.Second).Err(); err != nil {
+		slog.Error("redis ScheduleLastSeenDebounce token failed", "component", "hub", "op", "ScheduleLastSeenDebounce", "error_code", "REDIS_SET_FAILED", "err", err)
+	}
 }
 
 // RunLastSeenDebounceWorker every 5s: for each last_seen:hold:*, if debounce key is gone, PATCH backend and DEL hold.
@@ -137,6 +161,7 @@ func (h *Hub) flushDueLastSeen(ctx context.Context, cfg config.Config) {
 	for {
 		keys, next, err := h.redisClient.Scan(ctx, cursor, lastSeenHoldKeyPrefix+"*", 64).Result()
 		if err != nil {
+			slog.Error("redis flushDueLastSeen Scan failed", "component", "hub", "op", "flushDueLastSeen", "error_code", "REDIS_SCAN_FAILED", "err", err)
 			return
 		}
 		for _, key := range keys {
@@ -148,9 +173,15 @@ func (h *Hub) flushDueLastSeen(ctx context.Context, cfg config.Config) {
 			if err != nil || n > 0 {
 				continue
 			}
-			token, err := h.redisClient.Get(ctx, key).Result()
+			tokenKey := lastSeenTokenKeyPrefix + userID
+			token, err := h.redisClient.Get(ctx, tokenKey).Result()
 			if err != nil || token == "" {
-				_, _ = h.redisClient.Del(ctx, key).Result()
+				token, err = h.redisClient.Get(ctx, key).Result()
+			}
+			if err != nil || token == "" {
+				if _, delErr := h.redisClient.Del(ctx, key, tokenKey).Result(); delErr != nil {
+					slog.Error("redis flushDueLastSeen Del stale failed", "component", "hub", "op", "flushDueLastSeen", "error_code", "REDIS_DEL_FAILED", "err", delErr)
+				}
 				continue
 			}
 			reqCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -158,16 +189,27 @@ func (h *Hub) flushDueLastSeen(ctx context.Context, cfg config.Config) {
 			req, err := http.NewRequestWithContext(reqCtx, http.MethodPatch, endpoint, nil)
 			if err != nil {
 				cancel()
+				slog.Error("flushDueLastSeen NewRequest failed", "component", "hub", "op", "flushDueLastSeen", "error_code", "HTTP_REQUEST_BUILD_FAILED", "err", err)
 				continue
 			}
 			req.Header.Set("Authorization", "Bearer "+token)
 			client := &http.Client{Timeout: 2 * time.Second}
 			resp, err := client.Do(req)
+			if err != nil {
+				slog.Error("flushDueLastSeen PATCH last-seen failed", "component", "hub", "op", "flushDueLastSeen", "error_code", "BACKEND_PATCH_FAILED", "err", err)
+			}
+			ok := err == nil && resp != nil && resp.StatusCode >= 200 && resp.StatusCode < 300
 			if resp != nil && resp.Body != nil {
-				_ = resp.Body.Close()
+				if closeErr := resp.Body.Close(); closeErr != nil {
+					slog.Error("flushDueLastSeen body close failed", "component", "hub", "op", "flushDueLastSeen", "error_code", "HTTP_BODY_CLOSE_FAILED", "err", closeErr)
+				}
 			}
 			cancel()
-			_, _ = h.redisClient.Del(ctx, key).Result()
+			if ok {
+				if _, delErr := h.redisClient.Del(ctx, key, tokenKey).Result(); delErr != nil {
+					slog.Error("redis flushDueLastSeen Del after ok failed", "component", "hub", "op", "flushDueLastSeen", "error_code", "REDIS_DEL_FAILED", "err", delErr)
+				}
+			}
 		}
 		cursor = next
 		if cursor == 0 {
@@ -180,7 +222,7 @@ func (h *Hub) flushDueLastSeen(ctx context.Context, cfg config.Config) {
 func (h *Hub) PublishTypingMessage(payload []byte) {
 	var msg TypingPayload
 	if err := json.Unmarshal(payload, &msg); err != nil {
-		log.Printf("redis typing payload unmarshal: %v", err)
+		slog.Error("redis typing payload unmarshal failed", "component", "hub", "op", "PublishTypingMessage", "error_code", "REDIS_TYPING_PAYLOAD_INVALID", "err", err)
 		return
 	}
 	h.SendToUser(msg.RecipientID, payload)
@@ -214,12 +256,65 @@ func (h *Hub) RunUserOfflineSubscriber(ctx context.Context, subClient *redis.Cli
 	}
 }
 
+func (h *Hub) RunUserOnlineSubscriber(ctx context.Context, subClient *redis.Client) {
+	if subClient == nil {
+		return
+	}
+	pubsub := subClient.Subscribe(ctx, ChannelUserOnline)
+	defer pubsub.Close()
+	ch := pubsub.Channel()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-ch:
+			if !ok {
+				return
+			}
+			if msg == nil {
+				continue
+			}
+			uid := strings.TrimSpace(msg.Payload)
+			if uid == "" {
+				continue
+			}
+			h.broadcastOnline(uid)
+		}
+	}
+}
+
+func (h *Hub) broadcastOnline(onlineUserID string) {
+	payload, err := json.Marshal(map[string]string{
+		"type":    "user_online",
+		"user_id": onlineUserID,
+	})
+	if err != nil {
+		slog.Error("broadcastOnline marshal failed", "component", "hub", "op", "broadcastOnline", "error_code", "JSON_MARSHAL_FAILED", "err", err)
+		return
+	}
+	h.mu.RLock()
+	var conns []*Conn
+	for _, list := range h.users {
+		for _, c := range list {
+			conns = append(conns, c)
+		}
+	}
+	h.mu.RUnlock()
+	for _, c := range conns {
+		select {
+		case c.Send <- payload:
+		default:
+		}
+	}
+}
+
 func (h *Hub) broadcastOffline(offlineUserID string) {
 	payload, err := json.Marshal(map[string]string{
 		"type":    "user_offline",
 		"user_id": offlineUserID,
 	})
 	if err != nil {
+		slog.Error("broadcastOffline marshal failed", "component", "hub", "op", "broadcastOffline", "error_code", "JSON_MARSHAL_FAILED", "err", err)
 		return
 	}
 	h.mu.RLock()

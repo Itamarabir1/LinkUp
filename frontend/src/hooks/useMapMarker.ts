@@ -12,10 +12,11 @@ export function useMapMarker(
 ) {
   const markerRef = useRef<google.maps.Marker | null>(null);
 
+  // יצירה חד-פעמית — רק כש-map או אופציות משתנים
   useEffect(() => {
     if (!map || !window.google?.maps) return;
 
-    markerRef.current = new window.google.maps.Marker({
+    const marker = new window.google.maps.Marker({
       map,
       title: options.title,
       icon: {
@@ -27,18 +28,23 @@ export function useMapMarker(
         strokeWeight: options.strokeWeight ?? 3,
       },
     });
+    marker.setVisible(false);
+    markerRef.current = marker;
 
+    return () => {
+      markerRef.current?.setMap(null);
+      markerRef.current = null;
+    };
+  }, [map, options.title, options.color, options.scale, options.strokeWeight]);
+
+  // עדכון מיקום בלבד — ללא יצירה מחדש
+  useEffect(() => {
+    if (!markerRef.current) return;
     if (position) {
       markerRef.current.setPosition(position);
       markerRef.current.setVisible(true);
     } else {
       markerRef.current.setVisible(false);
     }
-
-    return () => {
-      markerRef.current?.setMap(null);
-      markerRef.current = null;
-    };
-  }, [map, options.title, options.color, options.scale, options.strokeWeight, position]);
+  }, [position]);
 }
-

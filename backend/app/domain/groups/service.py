@@ -1,7 +1,7 @@
 from uuid import UUID
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions.base import LinkupError
 from app.domain.groups import crud
 from app.domain.groups.schema import GroupCreate, GroupOut, group_to_out
 
@@ -30,16 +30,28 @@ async def get_my_groups(db: AsyncSession, user_id: UUID) -> list[GroupOut]:
 async def join_by_invite(db: AsyncSession, invite_code: str, user_id: UUID) -> GroupOut:
     group = await crud.get_group_by_invite_code(db, invite_code)
     if not group or not group.is_active:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="קבוצה לא נמצאה")
+        raise LinkupError(
+            message="קבוצה לא נמצאה",
+            status_code=404,
+            error_code="GROUP_NOT_FOUND",
+        )
 
     existing = await crud.get_membership(db, group.group_id, user_id)
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="כבר חבר בקבוצה")
+        raise LinkupError(
+            message="כבר חבר בקבוצה",
+            status_code=409,
+            error_code="GROUP_ALREADY_MEMBER",
+        )
 
     if group.max_members:
         count = await crud.get_member_count(db, group.group_id)
         if count >= group.max_members:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="הקבוצה מלאה")
+            raise LinkupError(
+                message="הקבוצה מלאה",
+                status_code=400,
+                error_code="GROUP_FULL",
+            )
 
     await crud.join_group(db, group.group_id, user_id)
     count = await crud.get_member_count(db, group.group_id)

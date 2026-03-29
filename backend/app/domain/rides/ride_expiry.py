@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.domain.rides.crud import crud_ride
 from app.domain.bookings.crud import crud_booking
 from app.domain.rides.enum import RideStatus
-from app.domain.rides.broadcast import publish_ride_update
+from app.domain.rides.broadcast import publish_ride_event
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +30,10 @@ async def cleanup_expired_rides(db: Session) -> int:
         crud_booking.complete_bookings_by_ride_ids(db, ride_ids)
 
         for ride_id in ride_ids:
-            await publish_ride_update(
+            await publish_ride_event(
                 ride_id,
-                {
-                    "status": RideStatus.COMPLETED.value,
-                    "event": "RIDE_FINISHED",
-                },
+                "RIDE_FINISHED",
+                {"status": RideStatus.COMPLETED.value},
             )
 
         db.commit()

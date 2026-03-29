@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
 
+from app.core.exceptions.base import LinkupError
 from app.domain.groups.schema import GroupCreate
 from app.domain.groups.service import create_group, join_by_invite
 
@@ -98,7 +98,8 @@ async def test_join_full_group_raises_error():
         mock_crud.get_membership = AsyncMock(return_value=None)
         mock_crud.get_member_count = AsyncMock(return_value=5)
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(LinkupError) as exc_info:
             await join_by_invite(None, "FULL123", user_id)
 
         assert exc_info.value.status_code == 400
+        assert exc_info.value.error_code == "GROUP_FULL"

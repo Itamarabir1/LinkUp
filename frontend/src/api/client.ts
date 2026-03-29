@@ -114,6 +114,22 @@ api.interceptors.response.use(
   }
 );
 
+api.interceptors.response.use(
+  (res) => res,
+  (err: AxiosError) => {
+    if (err.response?.status !== 401) {
+      // TODO: Sentry.captureException(err) — להפעיל כשמחברים Sentry
+      console.error('[Linkup] API Error:', {
+        error_code: (err.response?.data as { error_code?: string } | undefined)?.error_code,
+        message: (err.response?.data as { message?: string } | undefined)?.message,
+        trace_id: (err.response?.data as { trace_id?: string } | undefined)?.trace_id,
+        status: err.response?.status,
+      });
+    }
+    return Promise.reject(err);
+  }
+);
+
 /** בקשות HTTP ל-chat-ws (presence) — לא ל-backend */
 export const chatWsApi = axios.create({
   baseURL: '',

@@ -2,9 +2,10 @@
 Rate limiting ל-endpoints רגישים (login, refresh, password-reset) – הגבלה לפי IP.
 """
 
-from fastapi import Request, HTTPException, status
+from fastapi import Request
 
 from app.core.config import settings
+from app.core.exceptions.infrastructure import RateLimitExceeded
 from app.infrastructure.redis.client import redis_client
 
 
@@ -30,7 +31,4 @@ async def rate_limit_auth(request: Request) -> None:
         key, window_seconds=window, max_count=max_req
     )
     if not allowed:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many requests. Try again later.",
-        )
+        raise RateLimitExceeded(retry_after=window)

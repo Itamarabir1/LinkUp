@@ -4,7 +4,10 @@
 """
 
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from fastapi import APIRouter, Depends, status, Query, Response
+
+from app.core.exceptions.base import LinkupError
+from app.core.exceptions.chat import ChatRoomNotFound
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -27,6 +30,7 @@ from app.domain.chat.schema import (
     PaginatedMessagesResponse,
 )
 from app.domain.chat import crud as chat_crud
+from app.domain.users.crud import crud_user
 
 router = APIRouter(tags=["Chat"])
 
@@ -46,27 +50,11 @@ async def create_or_get_conversation(
     מזהה או יוצר שיחת 1:1 עם other_user_id.
     מחזיר conversation_id + פרטי הצד השני.
     """
-    try:
-        return await get_or_create_conversation(
-            db,
-            current_user_id=current_user.user_id,
-            other_user_id=data.other_user_id,
-        )
-    except ValueError as e:
-        if "yourself" in str(e).lower() or "self" in str(e).lower():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="לא ניתן לפתוח שיחה עם עצמך",
-            )
-        if "not found" in str(e).lower():
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="המשתמש לא נמצא",
-            )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+    return await get_or_create_conversation(
+        db,
+        current_user_id=current_user.user_id,
+        other_user_id=data.other_user_id,
+    )
 
 
 @router.post(
@@ -85,33 +73,11 @@ async def create_or_get_conversation_by_booking(
     רק נהג או נוסע של ה-booking יכולים לפתוח שיחה,
     ורק אם הסטטוס הוא pending_approval או confirmed.
     """
-    try:
-        return await get_or_create_conversation_by_booking(
-            db,
-            booking_id=booking_id,
-            current_user_id=current_user.user_id,
-        )
-    except ValueError as e:
-        error_msg = str(e).lower()
-        if "not found" in error_msg:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="ההזמנה לא נמצאה",
-            )
-        if "can only chat" in error_msg or "status" in error_msg:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=str(e),
-            )
-        if "yourself" in error_msg:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="לא ניתן לפתוח שיחה עם עצמך",
-            )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
+    return await get_or_create_conversation_by_booking(
+        db,
+        booking_id=booking_id,
+        current_user_id=current_user.user_id,
+    )
 
 
 @router.get(
@@ -138,15 +104,9 @@ async def get_conversation(
     current_user: User = Depends(get_current_user),
 ):
     """פרטי שיחה אחת – רק אם המשתמש participant."""
-    detail = await get_conversation_detail(
+    return await get_conversation_detail(
         db, conversation_id=conversation_id, current_user_id=current_user.user_id
     )
-    if not detail:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="השיחה לא נמצאה או שאין לך גישה אליה",
-        )
-    return detail
 
 
 @router.post(
@@ -168,11 +128,7 @@ async def post_message(
         sender_id=current_user.user_id,
         body=data.body,
     )
-    if not msg:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="השיחה לא נמצאה או שאין לך גישה אליה",
-        )
+    await crud_user.update_last_active(db, user_id=current_user.user_id)
     return msg
 
 
@@ -189,19 +145,13 @@ async def list_conversation_messages(
     current_user: User = Depends(get_current_user),
 ):
     """הודעות בשיחה (cursor-based pagination). רק participant יכול לצפות."""
-    result = await get_messages(
+    return await get_messages(
         db,
         conversation_id=conversation_id,
         current_user_id=current_user.user_id,
         limit=limit,
         before_message_id=before,
     )
-    if result is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="השיחה לא נמצאה או שאין לך גישה אליה",
-        )
-    return result
 
 
 @router.get(
@@ -225,10 +175,7 @@ async def export_conversation_calendar(
         db, conversation_id, current_user.user_id
     )
     if not conv_data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="השיחה לא נמצאה או שאין לך גישה אליה",
-        )
+        raise ChatRoomNotFound()
 
     # TODO: כאן צריך לנתח את השיחה או להשתמש בתוצאות קיימות
     # כרגע - placeholder - צריך לשלב עם AI analyzer
@@ -238,9 +185,10 @@ async def export_conversation_calendar(
     # ride = RideSummary(...)
     # ical_bytes = export_rides_to_ical_bytes([ride])
 
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="ייצוא ללוח שנה דורש ניתוח AI - עדיין לא מומש",
+    raise LinkupError(
+        message="ייצוא ללוח שנה דורש ניתוח AI - עדיין לא מומש",
+        status_code=501,
+        error_code="CHAT_CALENDAR_NOT_IMPLEMENTED",
     )
 
 

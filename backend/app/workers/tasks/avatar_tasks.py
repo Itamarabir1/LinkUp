@@ -12,6 +12,7 @@ from app.domain.users.crud import crud_user
 from app.infrastructure.s3.client import s3_client
 from app.infrastructure.s3.image_processor import process_and_save_avatar
 from app.infrastructure.s3.service import storage_service
+from app.core.exceptions.infrastructure import WorkerTaskFailed
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ async def _handle_avatar_upload(data: Dict[str, Any]) -> None:
             user_id,
             staging_key,
         )
-        raise ValueError("user_id and staging_key required")
+        raise WorkerTaskFailed(message="חסרים user_id או staging_key")
 
     user_id = UUID(str(user_id))
     uid_str = str(user_id)
@@ -56,7 +57,7 @@ async def _handle_avatar_upload(data: Dict[str, Any]) -> None:
             user = await crud_user.get_by_id(db, id=user_id)
             if not user:
                 logger.error("User not found for avatar finalize: user_id=%s", user_id)
-                raise ValueError(f"User not found: {user_id}")
+                raise WorkerTaskFailed(message=f"משתמש לא נמצא: {user_id}")
 
             avatar_key = await process_and_save_avatar(
                 staging_key=staging_key,
@@ -71,10 +72,10 @@ async def _handle_avatar_upload(data: Dict[str, Any]) -> None:
             await db.refresh(user)
             logger.info("Avatar processed for user %s: avatar_key=%s", user_id, avatar_key)
 
-        except Exception:
+        except Exception as e:
             await db.rollback()
             logger.exception("Avatar upload processing failed: user_id=%s", user_id)
-            raise
+            raise WorkerTaskFailed() from e
 
 
 async def _handle_avatar_remove(data: Dict[str, Any]) -> None:
@@ -86,7 +87,7 @@ async def _handle_avatar_remove(data: Dict[str, Any]) -> None:
     user_id = data.get("user_id")
     if user_id is None:
         logger.error("Invalid avatar_remove payload: user_id=%s", user_id)
-        raise ValueError("user_id required")
+        raise WorkerTaskFailed(message="חסר user_id ב-payload")
 
     user_id = UUID(str(user_id))
 
@@ -95,12 +96,12 @@ async def _handle_avatar_remove(data: Dict[str, Any]) -> None:
             user = await crud_user.get_by_id(db, id=user_id)
             if not user:
                 logger.error("User not found for avatar removal: user_id=%s", user_id)
-                raise ValueError(f"User not found: {user_id}")
+                raise WorkerTaskFailed(message=f"משתמש לא נמצא: {user_id}")
 
             await storage_service.delete_user_avatar_folder(user_id)
 
             logger.info("Avatar removed from S3 for user %s", user_id)
 
-        except Exception:
+        except Exception as e:
             logger.exception("Avatar removal processing failed: user_id=%s", user_id)
-            raise
+            raise WorkerTaskFailed() from e

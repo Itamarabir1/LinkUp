@@ -1,7 +1,7 @@
 package hub
 
 import (
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -67,7 +67,7 @@ func (c *Conn) RunWritePump() {
 		case <-ticker.C:
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				log.Printf("websocket ping error for user %s: %v", c.UserID, err)
+				slog.Error("websocket ping failed", "component", "hub", "op", "WritePump", "error_code", "WS_PING_FAILED", "user_id", c.UserID, "err", err)
 				return
 			}
 		}

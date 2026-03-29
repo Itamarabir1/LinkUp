@@ -9,6 +9,7 @@ import logging
 from typing import Optional, Union
 from uuid import UUID
 
+from app.core.exceptions.infrastructure import S3DeleteFailed
 from app.infrastructure.s3.client import s3_client
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ class StorageService:
                 logger.info("S3 deleted: key=%s", key)
             except Exception as e:
                 logger.error("S3 delete failed for key=%s: %s", key, e, exc_info=True)
-                raise
+                raise S3DeleteFailed() from e
 
     async def delete_user_avatar_folder(self, user_id: Union[UUID, str]) -> None:
         """מוחק את כל תוכן התיקייה avatars/{user_id}/."""
@@ -90,7 +91,8 @@ class StorageService:
             if key:
                 await self.client.delete_object(key)
         except Exception as e:
-            logger.warning("Failed to delete file %s: %s", file_url, e)
+            logger.error("Failed to delete file %s: %s", file_url, e, exc_info=True)
+            raise S3DeleteFailed() from e
 
 
 storage_service = StorageService()

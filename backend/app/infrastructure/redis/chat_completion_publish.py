@@ -8,6 +8,7 @@ import logging
 import redis.asyncio as redis
 
 from app.core.config import settings
+from app.core.exceptions.infrastructure import RedisUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +34,13 @@ async def publish_chat_completion_event(
         )
         return n
     except Exception as e:
-        logger.warning("Failed to publish chat completion event to %s: %s", channel, e)
-        return 0
+        logger.error(
+            "Failed to publish chat completion event to %s: %s",
+            channel,
+            e,
+            exc_info=True,
+        )
+        raise RedisUnavailable() from e
     finally:
         if client:
             await client.close()

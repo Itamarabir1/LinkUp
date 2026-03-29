@@ -1,5 +1,4 @@
 from typing import List, Optional
-from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -38,11 +37,9 @@ async def update_last_seen(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    user = await crud_user.get_by_id(db, current_user.user_id)
-    if not user:
+    ok = await crud_user.update_last_active(db, user_id=current_user.user_id)
+    if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    user.last_login = datetime.now(timezone.utc)
-    await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -56,8 +53,9 @@ async def get_user_last_seen(
     user = await crud_user.get_by_id(db, user_id)
     if not user:
         return {"last_seen": None}
+    ts = user.last_active_at or user.last_login
     return {
-        "last_seen": user.last_login.isoformat() if user.last_login else None,
+        "last_seen": ts.isoformat() if ts else None,
     }
 
 
@@ -148,15 +146,7 @@ async def confirm_avatar_upload(
     מאשר העלאה לאחר שהלקוח העלה ישירות ל-S3. מעדכן avatar_key ב-DB מיידית ודוחף אירוע לתור.
     העיבוד (resize ל-3 גדלים) מתבצע ברקע. staging_key חייב להתחיל ב-avatars/staging/{user_id}_.
     """
-    try:
-        await user_service.confirm_avatar_upload(db, current_user, data.staging_key)
-    except ValueError as e:
-        if "staging_key" in str(e).lower() or "current user" in str(e).lower():
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid or unauthorized staging_key",
-            ) from e
-        raise
+    await user_service.confirm_avatar_upload(db, current_user, data.staging_key)
     return AvatarUploadAcceptedResponse()
 
 

@@ -26,7 +26,7 @@ class NotificationContextFacade:
 
         try:
             # הפעלת ה-build (שנשען על ה-BaseBuilder המצוין שלך)
-            return builder.build(processed_data, event_key)
+            return builder.build(processed_data, str(event_key))
         except Exception as e:
             logger.error(f"❌ Builder failed for {event_key}: {e}", exc_info=True)
             raise LinkupError(f"Context construction failed for {event_key}")

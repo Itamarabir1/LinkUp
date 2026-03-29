@@ -36,8 +36,11 @@ export default function Login() {
         return;
       }
       const fromState = state?.from;
-      const path = fromState ? `${fromState.pathname}${fromState.search ?? ''}` : '/';
-      navigate(path, { replace: true });
+      if (fromState) {
+        navigate(`${fromState.pathname}${fromState.search ?? ''}`, { replace: true });
+        return;
+      }
+      navigate('/choose-destination', { replace: true });
     } catch (err: unknown) {
       if (isTimeoutOrAbortError(err)) {
         setError(ERROR_MESSAGES.BACKEND_TIMEOUT);

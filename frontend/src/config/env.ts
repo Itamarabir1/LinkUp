@@ -17,3 +17,8 @@ export function getWsBaseUrl(): string {
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${proto}//${window.location.host}/api/v1`;
 }
+
+export function getRideWebSocketUrl(rideId: string, token: string): string {
+  const base = getWsBaseUrl();
+  return `${base}/rides/ws/${rideId}?token=${encodeURIComponent(token)}`;
+}

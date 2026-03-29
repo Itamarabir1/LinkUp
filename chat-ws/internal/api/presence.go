@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -28,8 +29,8 @@ type lastSeenBackendBody struct {
 	LastSeen *string `json:"last_seen"`
 }
 
-// HandlePresence serves GET /presence/{userID}. Online from Redis DB (same as hub).
-// last_seen: spec asks hold key first — hold currently stores JWT; if not ISO timestamp, falls back to backend.
+// HandlePresence serves GET /presence/{userID}. Online from Redis key presence:{id}.
+// last_seen: אם ערך ב-last_seen:hold: הוא חותמת ISO — משתמשים בו; אחרת GET ל-backend (last_active_at או last_login).
 func HandlePresence(cfg config.Config, rdb *redisv9.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		allowCORS(cfg, w, r)
@@ -38,25 +39,25 @@ func HandlePresence(cfg config.Config, rdb *redisv9.Client) http.HandlerFunc {
 			return
 		}
 		if r.Method != http.MethodGet {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			WriteAPIError(w, r, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "שיטה לא נתמכת")
 			return
 		}
 
 		authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			http.Error(w, "missing bearer token", http.StatusUnauthorized)
+			WriteAPIError(w, r, http.StatusUnauthorized, "UNAUTHORIZED", "חסר אסימון הרשאה")
 			return
 		}
 		token := strings.TrimSpace(parts[1])
 		if _, err := auth.ValidateToken(token, cfg.SecretKey, cfg.JWTAlg); err != nil {
-			http.Error(w, "invalid token", http.StatusUnauthorized)
+			WriteAPIError(w, r, http.StatusUnauthorized, "INVALID_TOKEN", "אסימון לא תקף")
 			return
 		}
 
 		rest := strings.TrimPrefix(r.URL.Path, "/presence/")
 		if rest == "" || strings.Contains(rest, "/") {
-			http.Error(w, "missing or invalid user id", http.StatusBadRequest)
+			WriteAPIError(w, r, http.StatusBadRequest, "BAD_REQUEST", "מזהה משתמש חסר או לא תקין")
 			return
 		}
 		userID := rest
@@ -64,30 +65,37 @@ func HandlePresence(cfg config.Config, rdb *redisv9.Client) http.HandlerFunc {
 		ctx := r.Context()
 		n, err := rdb.Exists(ctx, "presence:"+userID).Result()
 		if err != nil {
-			http.Error(w, "redis error", http.StatusInternalServerError)
+			WriteAPIError(w, r, http.StatusServiceUnavailable, "REDIS_UNAVAILABLE", "שירות זמינות לא זמין")
 			return
 		}
 		online := n > 0
 
 		var lastSeen *string
-		holdVal, _ := rdb.Get(ctx, lastSeenHoldKeyPrefix+userID).Result()
+		holdVal, holdErr := rdb.Get(ctx, lastSeenHoldKeyPrefix+userID).Result()
+		if holdErr != nil && holdErr != redisv9.Nil {
+			slog.Error("presence redis Get hold failed", "component", "presence", "op", "HandlePresence", "error_code", "REDIS_GET_FAILED", "err", holdErr)
+		}
 		if holdVal != "" {
 			if ts, ok := parseAsLastSeen(holdVal); ok {
 				lastSeen = &ts
 			}
 		}
 		if lastSeen == nil {
-			ls, err := fetchLastSeenFromBackend(ctx, cfg.BackendURL, userID, authHeader)
-			if err == nil {
+			ls, fetchErr := fetchLastSeenFromBackend(ctx, cfg.BackendURL, userID, authHeader)
+			if fetchErr != nil {
+				slog.Error("presence fetchLastSeenFromBackend failed", "component", "presence", "op", "HandlePresence", "error_code", "BACKEND_LAST_SEEN_FAILED", "err", fetchErr)
+			} else {
 				lastSeen = ls
 			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(presenceResponse{
+		if encErr := json.NewEncoder(w).Encode(presenceResponse{
 			Online:   online,
 			LastSeen: lastSeen,
-		})
+		}); encErr != nil {
+			slog.Error("presence encode response failed", "component", "presence", "op", "HandlePresence", "error_code", "JSON_ENCODE_FAILED", "err", encErr)
+		}
 	}
 }
 
@@ -112,22 +120,25 @@ func fetchLastSeenFromBackend(ctx context.Context, baseURL, userID, authorizatio
 	url := strings.TrimRight(baseURL, "/") + "/api/v1/users/" + userID + "/last-seen"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("last-seen request: %w", err)
 	}
 	req.Header.Set("Authorization", authorization)
 	client := &http.Client{Timeout: 8 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("last-seen do: %w", err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		return nil, fmt.Errorf("last-seen read body: %w", readErr)
+	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("backend %d", resp.StatusCode)
+		return nil, fmt.Errorf("backend status %d", resp.StatusCode)
 	}
 	var out lastSeenBackendBody
 	if err := json.Unmarshal(body, &out); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("last-seen json: %w", err)
 	}
 	return out.LastSeen, nil
 }

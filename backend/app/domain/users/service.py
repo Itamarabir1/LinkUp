@@ -3,6 +3,8 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # 1. Core, Security & Exceptions
+from app.core.exceptions.auth import PermissionDeniedError
+from app.core.exceptions.infrastructure import S3DeleteFailed
 from app.core.exceptions.user import (
     UserNotFoundError,
     EmailAlreadyRegisteredError,
@@ -66,8 +68,8 @@ class UserService:
                 staging_key,
                 expected_prefix,
             )
-            raise ValueError(
-                "staging_key does not belong to current user; possible abuse attempt"
+            raise PermissionDeniedError(
+                message="מפתח העלאה לא תואם למשתמש המחובר"
             )
 
         # עדכון מיידי ב-DB (אופטימי — הפרונט יכול להציג תמונה מ-staging עד שה-worker יסיים)
@@ -99,8 +101,10 @@ class UserService:
 
         try:
             await self.s3.delete_user_avatar_folder(user.user_id)
-        except Exception as e:
-            logger.warning("Could not delete avatar folder for user %s: %s", user_id, e)
+        except S3DeleteFailed as e:
+            logger.warning(
+                "Could not delete avatar folder for user %s: %s", user_id, e.message
+            )
 
         await self.crud.update(db, db_obj=user, obj_in={"avatar_key": None})
         await db.commit()

@@ -9,6 +9,20 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.core.exceptions.base import LinkupError
+from app.core.exceptions.infrastructure import RedisUnavailable
+from app.core.exceptions.booking import (
+    BookingNotFoundError,
+    ForbiddenRideActionError,
+)
+from app.core.exceptions.chat import (
+    ChatRoomNotFound,
+    MessageSendFailed,
+    UnauthorizedChatAccess,
+)
+from app.core.exceptions.ride import RideNotFoundError
+from app.core.exceptions.user import UserNotFoundError
+
 from app.domain.chat import crud as chat_crud
 from app.domain.chat.schema import (
     ConversationListItem,
@@ -28,42 +42,32 @@ from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 logger = logging.getLogger(__name__)
 
 
-async def can_chat_about_booking(
+async def _require_booking_and_ride_for_chat(
     db: AsyncSession, booking_id: UUID, current_user_id: UUID
-) -> tuple[bool, Booking | None]:
-    """
-    בודק אם המשתמש הנוכחי יכול לדבר על booking זה.
-    מחזיר (is_allowed, booking) - רק אם המשתמש הוא הנהג או הנוסע של ה-booking
-    והסטטוס הוא pending_approval או confirmed.
-    """
+) -> tuple[Booking, Ride]:
+    """טוען הזמנה ונסיעה; זורק שגיאת דומיין אם אין הרשאה לצ'אט."""
     bid = UUID(str(booking_id)) if isinstance(booking_id, str) else booking_id
-    result = await db.execute(
-        select(Booking)
-        .where(Booking.booking_id == bid)
-    )
+    result = await db.execute(select(Booking).where(Booking.booking_id == bid))
     booking = result.scalars().first()
     if not booking:
-        return False, None
+        raise BookingNotFoundError(booking_id=str(bid))
 
-    # Load ride to get driver_id
     ride_result = await db.execute(select(Ride).where(Ride.ride_id == booking.ride_id))
     ride = ride_result.scalars().first()
     if not ride:
-        return False, None
+        raise RideNotFoundError(booking.ride_id)
 
-    # Check if current user is driver or passenger
     is_driver = ride.driver_id == current_user_id
     is_passenger = booking.passenger_id == current_user_id
-
     if not (is_driver or is_passenger):
-        return False, None
+        raise UnauthorizedChatAccess()
 
-    # Check status: only pending_approval or confirmed allow chat
     allowed_statuses = {BookingStatus.PENDING, BookingStatus.CONFIRMED}
     if booking.status not in allowed_statuses:
-        return False, booking
-
-    return True, booking
+        raise ForbiddenRideActionError(
+            "ניתן לשוחח רק כשסטטוס ההזמנה ממתין לאישור או מאושר"
+        )
+    return booking, ride
 
 
 async def get_or_create_conversation(
@@ -74,10 +78,14 @@ async def get_or_create_conversation(
     מחזיר ConversationDetail (לשימוש בראוטר).
     """
     if other_user_id == current_user_id:
-        raise ValueError("Cannot start conversation with yourself")
+        raise LinkupError(
+            message="לא ניתן לפתוח שיחה עם עצמך",
+            status_code=400,
+            error_code="CHAT_INVALID_SELF_CONVERSATION",
+        )
     other = await crud_user.get_by_id(db, id=other_user_id)
     if not other:
-        raise ValueError("User not found")
+        raise UserNotFoundError(user_id=other_user_id)
     conv = await chat_crud.get_or_create_conversation(
         db, current_user_id, other_user_id
     )
@@ -101,33 +109,24 @@ async def get_or_create_conversation_by_booking(
     בודק הרשאות: רק נהג או נוסע של ה-booking יכולים לפתוח שיחה,
     ורק אם הסטטוס הוא pending_approval או confirmed.
     """
-    is_allowed, booking = await can_chat_about_booking(db, booking_id, current_user_id)
-    if not is_allowed:
-        if booking is None:
-            raise ValueError("Booking not found")
-        raise ValueError(
-            "You can only chat with the driver/passenger of a booking "
-            "if the booking status is pending_approval or confirmed"
-        )
-
-    # Get the other user (driver if current is passenger, passenger if current is driver)
-    ride_result = await db.execute(select(Ride).where(Ride.ride_id == booking.ride_id))
-    ride = ride_result.scalars().first()
-    if not ride:
-        raise ValueError("Ride not found")
+    booking, ride = await _require_booking_and_ride_for_chat(
+        db, booking_id, current_user_id
+    )
 
     driver_id = ride.driver_id
     passenger_id = booking.passenger_id
-
-    # Determine the other user
     other_user_id = driver_id if current_user_id == passenger_id else passenger_id
 
     if other_user_id == current_user_id:
-        raise ValueError("Cannot start conversation with yourself")
+        raise LinkupError(
+            message="לא ניתן לפתוח שיחה עם עצמך",
+            status_code=400,
+            error_code="CHAT_INVALID_SELF_CONVERSATION",
+        )
 
     other = await crud_user.get_by_id(db, id=other_user_id)
     if not other:
-        raise ValueError("Other user not found")
+        raise UserNotFoundError(user_id=other_user_id)
 
     conv = await chat_crud.get_or_create_conversation(
         db, current_user_id, other_user_id
@@ -192,13 +191,13 @@ async def list_my_conversations(
 
 async def get_conversation_detail(
     db: AsyncSession, conversation_id: UUID, current_user_id: UUID
-) -> ConversationDetail | None:
+) -> ConversationDetail:
     """
     פרטי שיחה אחת – רק אם המשתמש participant.
     """
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
     if not conv:
-        return None
+        raise ChatRoomNotFound()
     partner = _partner_from_conversation(conv, current_user_id)
     return ConversationDetail(
         conversation_id=conv.conversation_id,
@@ -212,11 +211,10 @@ async def send_message(
     conversation_id: UUID,
     sender_id: UUID,
     body: str,
-) -> MessageResponse | None:
+) -> MessageResponse:
     """
     שולח הודעה בשיחה: שמירה ב-DB + פרסום ל-Redis (שרת ה-WS ב-Go מאזין).
     אם ההודעה היא הודעת סיום — מפרסם אירוע ל-Redis DB=1; worker יטפל בניתוח AI.
-    מחזיר MessageResponse אם המשתמש participant והשיחה קיימת.
     """
     from app.domain.chat.completion.detector import is_conversation_completion_message
     from app.infrastructure.redis.chat_completion_publish import (
@@ -225,7 +223,7 @@ async def send_message(
 
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, sender_id)
     if not conv:
-        return None
+        raise ChatRoomNotFound()
     msg = await chat_crud.create_message(
         db, conversation_id=conversation_id, sender_id=sender_id, body=body
     )
@@ -248,14 +246,19 @@ async def send_message(
             json.dumps({"type": "unread_count", "count": unread}),
         )
     except Exception as e:
-        logger.debug("Publish unread_count failed: %s", e)
+        logger.warning("Publish unread_count failed: %s", e, exc_info=True)
 
     # בדיקה אם זו הודעת סיום — מפרסם ל-Redis DB=1; worker יטפל בניתוח AI
     if is_conversation_completion_message(body):
         try:
             await publish_chat_completion_event(conversation_id, sender_id)
+        except RedisUnavailable:
+            raise
         except Exception as e:
-            logger.error("Error publishing chat completion event: %s", e, exc_info=True)
+            logger.error(
+                "Error publishing chat completion event: %s", e, exc_info=True
+            )
+            raise MessageSendFailed() from e
 
     return MessageResponse(
         message_id=msg.message_id,
@@ -272,13 +275,13 @@ async def get_messages(
     current_user_id: UUID,
     limit: int = 50,
     before_message_id: int | None = None,
-) -> PaginatedMessagesResponse | None:
+) -> PaginatedMessagesResponse:
     """
-    היסטוריית הודעות בשיחה (pagination). None אם המשתמש לא participant.
+    היסטוריית הודעות בשיחה (pagination).
     """
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
     if not conv:
-        return None
+        raise ChatRoomNotFound()
     messages, has_more = await chat_crud.get_messages(
         db,
         conversation_id=conversation_id,

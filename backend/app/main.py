@@ -4,13 +4,21 @@ import uuid
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import FastAPI, Request, HTTPException, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.core.config import settings
 from app.core.logging import setup_logging, request_id_ctx
 from app.core.lifespan import lifespan
-from app.core.exceptions.handlers import LinkupError, linkup_exception_handler
+from app.core.exceptions.base import LinkupError
+from app.core.exceptions.handlers import (
+    linkup_exception_handler,
+    request_validation_exception_handler,
+    integrity_error_handler,
+    sqlalchemy_error_handler,
+)
 from app.core.middleware import HTTPSRedirectMiddleware, SecurityHeadersMiddleware
 from app.db.session import engine
 from app.api.v1.api_router import api_router
@@ -104,8 +112,13 @@ app.add_middleware(SecurityHeadersMiddleware)
 if getattr(settings, "FORCE_HTTPS_REDIRECT", False):
     app.add_middleware(HTTPSRedirectMiddleware)
 
-# רישום ה-Admin וה-Exception Handlers
+# רישום ה-Admin וה-Exception Handlers (סדר: ספציפי → כללי)
 setup_admin(app, engine)
+app.add_exception_handler(
+    RequestValidationError, request_validation_exception_handler
+)
+app.add_exception_handler(IntegrityError, integrity_error_handler)
+app.add_exception_handler(SQLAlchemyError, sqlalchemy_error_handler)
 app.add_exception_handler(LinkupError, linkup_exception_handler)
 
 

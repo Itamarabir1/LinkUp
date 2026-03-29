@@ -2,7 +2,7 @@ import redis.asyncio as redis
 import json
 import logging
 from app.core.config import settings
-from app.core.exceptions.infrastructure import InfrastructureError
+from app.core.exceptions.infrastructure import RedisUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,8 @@ class RedisClient:
             val = json.dumps(data) if isinstance(data, (dict, list)) else str(data)
             await self.client.setex(key, expire, val)
         except Exception as e:
-            raise InfrastructureError(f"Redis SAVE failed: {key}", detail=str(e))
+            logger.error("Redis SAVE failed key=%s: %s", key, e, exc_info=True)
+            raise RedisUnavailable() from e
 
     async def get(self, key: str):
         try:
@@ -42,10 +43,14 @@ class RedisClient:
                 return None
             try:
                 return json.loads(data)
-            except Exception:
+            except Exception as parse_err:
+                logger.warning(
+                    "Redis GET value is not JSON key=%s: %s", key, parse_err
+                )
                 return data
         except Exception as e:
-            raise InfrastructureError(f"Redis GET failed: {key}", detail=str(e))
+            logger.error("Redis GET failed key=%s: %s", key, e, exc_info=True)
+            raise RedisUnavailable() from e
 
     async def close(self):
         if self.client:
@@ -63,7 +68,8 @@ class RedisClient:
             logger.debug("Redis DELETE: %s (Result: %s)", key, result)
             return bool(result)
         except Exception as e:
-            raise InfrastructureError(f"Redis DELETE failed: {key}", detail=str(e))
+            logger.error("Redis DELETE failed key=%s: %s", key, e, exc_info=True)
+            raise RedisUnavailable() from e
 
     async def rate_limit_check(
         self, key: str, window_seconds: int, max_count: int

@@ -17,6 +17,7 @@ from .auth import (
     PasswordsDoNotMatchError,
     NewPasswordSameAsOldError,
     VerificationCodeExpiredError,
+    GoogleAuthFailed,
 )
 
 # User
@@ -73,7 +74,16 @@ from .infrastructure import (
     RouteNotFoundError,
     GeocodingError,
     InfrastructureError,
+    RateLimitExceeded,
+    S3UploadFailed,
+    S3DeleteFailed,
+    RedisUnavailable,
+    WorkerTaskFailed,
+    ExternalServiceError,
 )
+
+# Chat
+from .chat import ChatRoomNotFound, UnauthorizedChatAccess, MessageSendFailed
 
 # Notification
 from .notification import (
@@ -96,6 +106,7 @@ __all__ = [
     "PasswordsDoNotMatchError",
     "NewPasswordSameAsOldError",
     "VerificationCodeExpiredError",
+    "GoogleAuthFailed",
     "UserNotFoundError",
     "PhoneAlreadyRegisteredError",
     "EmailAlreadyRegisteredError",
@@ -128,6 +139,15 @@ __all__ = [
     "RouteNotFoundError",
     "GeocodingError",
     "InfrastructureError",
+    "RateLimitExceeded",
+    "S3UploadFailed",
+    "S3DeleteFailed",
+    "RedisUnavailable",
+    "WorkerTaskFailed",
+    "ExternalServiceError",
+    "ChatRoomNotFound",
+    "UnauthorizedChatAccess",
+    "MessageSendFailed",
     "NotificationError",
     "RecipientResolverError",
     "ContextBuilderError",

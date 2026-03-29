@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_db, get_current_user
-from app.core.exceptions import StorageServiceError
 from app.domain.groups import crud, service
 from app.domain.groups.schema import (
     GroupCreate,
@@ -102,11 +101,7 @@ async def get_group_image_upload_url(
         raise HTTPException(status_code=404, detail="קבוצה לא נמצאה")
     if group.admin_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="רק אדמין יכול להעלות תמונת קבוצה")
-    try:
-        upload_url, key = await storage_service.generate_group_image_upload_url(group_id)
-    except StorageServiceError as e:
-        detail = e.payload.get("detail", "שגיאה בהכנת העלאת תמונה (ייתכן ש-S3 לא מוגדר)")
-        raise HTTPException(status_code=503, detail=detail)
+    upload_url, key = await storage_service.generate_group_image_upload_url(group_id)
     return GroupImageUploadResponse(upload_url=upload_url, key=key)
 
 

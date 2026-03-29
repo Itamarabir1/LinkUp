@@ -28,7 +28,7 @@ chat-ws/
 
 ### דרישות מוקדמות
 
-1. **Redis** — **אותו שרת** כמו ה-backend; בדרך כלל **DB 1** לצ'אט (pub/sub, `presence`, ערוץ `user:offline`). DB 0 משמש את ה-API לדברים אחרים.
+1. **Redis** — **אותו שרת** כמו ה-backend; בדרך כלל **DB 1** לצ'אט (pub/sub, `presence:*`, ערוצים **`user:online`** / **`user:offline`**). DB 0 משמש את ה-API לדברים אחרים.
 2. **משתני סביבה** (אותם כמו ב־backend, או ב־`.env` בשורש):
    - `SECRET_KEY` – אותו סוד כמו ב־Python (לאימות JWT).
    - `REDIS_URL` – למשל `redis://localhost:6379/1` (DB 1 לצ'אט).
@@ -75,6 +75,12 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 2. **שרת Go** מקבל מ-Redis → שולח ל-WebSocket (מיידי).
 3. **שירות Python AI** (נפרד) מקבל מ-Redis → שומר הודעה ב-cache → מנתח את כל השיחה → מפרסם תוצאה ל-Redis (`chat:analysis:{conversation_id}`).
 4. (אופציונלי) שרת Go יכול להאזין ל-`chat:analysis:*` → לשלוח תוצאות ניתוח ל-WebSocket.
+
+## Presence ו-last seen (תקציר)
+
+- בחיבור WS: `SET presence:{user_id}` (TTL ~60s), **`PUBLISH user:online`** (payload = `user_id`) → כל מופעי chat-ws משדרים ללקוחות `{"type":"user_online","user_id":"..."}`.
+- בניתוק: מחיקת `presence`, **`PUBLISH user:offline`** → `user_offline` ב-WS; debounce + מפתחות Redis (`debounce:last_seen:*`, `last_seen:hold:*`, `last_seen:token:*`) ואז **PATCH** ל-backend `/api/v1/users/me/last-seen` → עדכון **`users.last_active_at`** (לא `last_login`).
+- **HTTP** `GET /presence/{user_id}` — `online` מ-Redis; `last_seen` מה-backend (`last_active_at` עם fallback ל-`last_login`). פירוט: `docs/architecture/REALTIME.md`, `chat-ws/ARCHITECTURE.md`.
 
 ## ערוצי Redis
 

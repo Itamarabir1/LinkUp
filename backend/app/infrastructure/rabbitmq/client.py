@@ -4,6 +4,7 @@ import logging
 import asyncio
 from typing import Dict, Optional
 from app.core.config import settings
+from app.core.exceptions.infrastructure import QueueServiceError
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +20,15 @@ class RabbitMQClient:
         """חיבור ראשוני - נקרא מה-Lifespan"""
         async with self._lock:
             if self._connection is None or self._connection.is_closed:
-                self._connection = await aio_pika.connect_robust(
-                    settings.RABBITMQ_URL, timeout=10
-                )
-                self._channel = await self._connection.channel()
-                logger.info("✅ RabbitMQ Client connected")
+                try:
+                    self._connection = await aio_pika.connect_robust(
+                        settings.RABBITMQ_URL, timeout=10
+                    )
+                    self._channel = await self._connection.channel()
+                    logger.info("✅ RabbitMQ Client connected")
+                except Exception as e:
+                    logger.exception("RabbitMQ connect failed: %s", e)
+                    raise QueueServiceError() from e
 
     async def get_channel(self) -> aio_pika.abc.AbstractChannel:
         if not self._channel or self._channel.is_closed:
@@ -31,25 +36,34 @@ class RabbitMQClient:
         return self._channel
 
     async def publish(self, message: dict, routing_key: str, exchange_name: str = ""):
-        channel = await self.get_channel()
+        try:
+            channel = await self.get_channel()
 
-        if exchange_name:
-            if exchange_name not in self._exchanges:
-                self._exchanges[exchange_name] = await channel.declare_exchange(
-                    exchange_name, aio_pika.ExchangeType.TOPIC, durable=True
-                )
-            target = self._exchanges[exchange_name]
-        else:
-            target = channel.default_exchange
+            if exchange_name:
+                if exchange_name not in self._exchanges:
+                    self._exchanges[exchange_name] = await channel.declare_exchange(
+                        exchange_name, aio_pika.ExchangeType.TOPIC, durable=True
+                    )
+                target = self._exchanges[exchange_name]
+            else:
+                target = channel.default_exchange
 
-        await target.publish(
-            aio_pika.Message(
-                body=json.dumps(message).encode(),
-                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-                content_type="application/json",
-            ),
-            routing_key=routing_key,
-        )
+            await target.publish(
+                aio_pika.Message(
+                    body=json.dumps(message).encode(),
+                    delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+                    content_type="application/json",
+                ),
+                routing_key=routing_key,
+            )
+        except Exception as e:
+            logger.exception(
+                "RabbitMQ publish failed routing_key=%s exchange=%s: %s",
+                routing_key,
+                exchange_name,
+                e,
+            )
+            raise QueueServiceError() from e
 
     async def close(self):
         async with self._lock:
@@ -63,7 +77,8 @@ class RabbitMQClient:
             return False
         try:
             return not self._connection.is_closed
-        except Exception:
+        except Exception as e:
+            logger.warning("RabbitMQ is_connected check failed: %s", e)
             return False
 
 

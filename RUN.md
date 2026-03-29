@@ -100,8 +100,8 @@ docker stop linkup_backend
   `pip install -r requirements.txt`
 
 - **שגיאה על DB / Redis / RabbitMQ / chat-ws / worker** – להריץ את התשתית (למשל עם Docker) משורש הפרויקט (`Linkup`):  
-  `docker compose up -d` — מרים `db`, `redis`, `rabbitmq`, `chat-ws`, `outbox-worker`, `backend` וכו׳ (ללא **nginx** אלא אם מריצים `docker compose --profile prod up -d`).  
-  אפשר גם במפורש: `docker compose up -d db redis rabbitmq chat-ws` אם צריך רק חלק מהשירותים.
+  `docker compose up -d` — מרים `db`, `redis`, `rabbitmq`, שירות **`migrate`** (מיגרציה אוטומטית), `chat-ws`, `outbox-worker`, `backend` וכו׳ (ללא **nginx** אלא אם מריצים `docker compose --profile prod up -d`). אם **`migrate`** נכשל — לבדוק `docker compose logs migrate`; **backend** לא יעלה עד שהמיגרציה מצליחה.  
+  אפשר גם במפורש: `docker compose up -d db redis rabbitmq chat-ws` אם צריך רק חלק מהשירותים (אז מיגרציה ידנית: `cd backend && alembic upgrade head`).
 
 ---
 

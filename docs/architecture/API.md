@@ -73,8 +73,8 @@ Authorization: Bearer <access_token>
 | POST | /{ride_id}/end | כן | סיום נסיעה — מעביר לסטטוס COMPLETED. נסיעה חייבת להיות ACTIVE. מחזיר RideResponse. |
 | DELETE | /{ride_id}/cancel | כן | ביטול נסיעה (רק נהג) (204). |
 | GET | /{ride_id} | לא | פרטי נסיעה. |
-| WS | /ws/{ride_id} | — | WebSocket לעדכוני סטטוס נסיעה (Redis channel ride_{id}). |
-| WS | /ws/{ride_id}/passengers | query token=JWT | WebSocket לעדכוני מיקום נוסעים (רק נהג). ערוץ Redis: ride_{id}:passenger_locations. |
+| WS | /ws/{ride_id} | query token=JWT | WebSocket לעדכוני סטטוס נסיעה. ערוץ Redis: `ride_{id}` (מקור שמות: `app/infrastructure/redis/keys.py`). הודעות JSON דרך `publish_ride_event` (למשל `RIDE_STARTED`, `RIDE_ENDED`, `RIDE_CANCELLED`). **שדות ללקוח:** ראו [REALTIME.md](REALTIME.md) (Broadcast). |
+| WS | /ws/{ride_id}/passengers | query token=JWT | WebSocket לעדכוני מיקום נוסעים (רק נהג). ערוץ Redis: ride_{id}:passenger_locations. **שדות:** [REALTIME.md](REALTIME.md) (WebSocket JSON — מיקום). |
 
 ---
 
@@ -107,7 +107,7 @@ Authorization: Bearer <access_token>
 | GET | /ride/{ride_id}/manifest | לא (query) | query: ride_id, driver_id. מניפסט נסיעה. |
 | GET | /ride/{ride_id}/pending | לא (query) | query: ride_id, driver_id. בקשות ממתינות. |
 | GET | /{booking_id} | לא | פרטי הזמנה. |
-| WS | /ws/{booking_id}/location | query token=JWT | WebSocket לעדכוני מיקום נהג (רק נוסע הבוקינג). ערוץ Redis: booking_{booking_id}. |
+| WS | /ws/{booking_id}/location | query token=JWT | WebSocket לעדכוני מיקום נהג (רק נוסע הבוקינג). ערוץ Redis: booking_{booking_id}. **שדות:** [REALTIME.md](REALTIME.md) (WebSocket JSON — מיקום). |
 
 ---
 

@@ -64,6 +64,15 @@ describe('processChatWebSocketMessage', () => {
     expect(ctx.setPartnerPresence).not.toHaveBeenCalled();
   });
 
+  it('handles user_online for partner', () => {
+    const setPartnerPresence = vi.fn() as Dispatch<SetStateAction<PartnerPresence | null>>;
+    processChatWebSocketMessage(
+      { type: 'user_online', user_id: 'partner-123' },
+      { ...makeCtx(), partnerIdRef: { current: 'partner-123' }, setPartnerPresence }
+    );
+    expect(setPartnerPresence).toHaveBeenCalledWith(expect.any(Function));
+  });
+
   it('marks conversation read and refreshes unread when message targets this conversation', async () => {
     const ctx = makeCtx();
     processChatWebSocketMessage(
@@ -116,7 +125,13 @@ describe('processChatWebSocketMessage', () => {
   it('typing_start from other user sets typing and clears after timeout', () => {
     const ctx = makeCtx();
     processChatWebSocketMessage(
-      { type: 'typing_start', user_id: 'partner-1', full_name: 'Bob' },
+      {
+        type: 'typing_start',
+        user_id: 'partner-1',
+        full_name: 'Bob',
+        conversation_id: 'conv-1',
+        recipient_id: 'recipient-123',
+      },
       ctx
     );
     expect(ctx.setPartnerTyping).toHaveBeenCalledWith(true);
@@ -129,7 +144,13 @@ describe('processChatWebSocketMessage', () => {
   it('typing_stop clears typing and pending timeout', () => {
     const ctx = makeCtx();
     processChatWebSocketMessage(
-      { type: 'typing_start', user_id: 'partner-1', full_name: 'Bob' },
+      {
+        type: 'typing_start',
+        user_id: 'partner-1',
+        full_name: 'Bob',
+        conversation_id: 'conv-1',
+        recipient_id: 'recipient-123',
+      },
       ctx
     );
     vi.clearAllMocks();
@@ -137,6 +158,7 @@ describe('processChatWebSocketMessage', () => {
       {
         type: 'typing_stop',
         conversation_id: 'conv-1',
+        recipient_id: 'recipient-123',
         user_id: 'partner-1',
       },
       ctx

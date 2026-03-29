@@ -3,11 +3,13 @@ package hub
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 
+	"linkup/chat-ws/internal/api"
 	"linkup/chat-ws/internal/auth"
 	"linkup/chat-ws/internal/config"
 )
@@ -42,35 +44,48 @@ func wsUpgrader(cfg config.Config) websocket.Upgrader {
 	}
 }
 
+func closeWS(conn *websocket.Conn, code int, reason string) {
+	deadline := time.Now().Add(2 * time.Second)
+	msg := websocket.FormatCloseMessage(code, reason)
+	_ = conn.WriteControl(websocket.CloseMessage, msg, deadline)
+}
+
 // HandleWS upgrades HTTP to WebSocket. Query: token=JWT. Validates token and registers connection.
 func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
 	upgrader := wsUpgrader(cfg)
 	return func(w http.ResponseWriter, r *http.Request) {
 		token := r.URL.Query().Get("token")
 		if token == "" {
-			http.Error(w, "missing token", http.StatusUnauthorized)
+			api.WriteAPIError(w, r, http.StatusUnauthorized, "UNAUTHORIZED", "חסר אסימון")
 			return
 		}
 		userID, err := auth.ValidateToken(token, cfg.SecretKey, cfg.JWTAlg)
 		if err != nil {
-			http.Error(w, "invalid token", http.StatusUnauthorized)
+			api.WriteAPIError(w, r, http.StatusUnauthorized, "INVALID_TOKEN", "אסימון לא תקף")
 			return
 		}
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Printf("ws upgrade: %v", err)
+			slog.Error("ws upgrade failed", "component", "hub", "op", "Upgrade", "error_code", "WS_UPGRADE_FAILED", "err", err)
 			return
 		}
 		c := &Conn{UserID: userID, Conn: conn, Send: make(chan []byte, 256)}
 		h.Register(userID, c)
 		h.SetPresence(context.Background(), userID)
 		h.ClearLastSeenDebounce(context.Background(), userID)
+		if h.redisClient != nil {
+			if pubErr := h.redisClient.Publish(context.Background(), ChannelUserOnline, userID).Err(); pubErr != nil {
+				slog.Error("redis publish user online failed", "component", "hub", "op", "PublishUserOnline", "error_code", "REDIS_PUBLISH_FAILED", "err", pubErr)
+			}
+		}
 
 		defer func() {
 			ctx := context.Background()
 			h.ClearPresence(ctx, userID)
 			if h.redisClient != nil {
-				_ = h.redisClient.Publish(ctx, ChannelUserOffline, userID).Err()
+				if pubErr := h.redisClient.Publish(ctx, ChannelUserOffline, userID).Err(); pubErr != nil {
+					slog.Error("redis publish user offline failed", "component", "hub", "op", "PublishUserOffline", "error_code", "REDIS_PUBLISH_FAILED", "err", pubErr)
+				}
 			}
 			h.ScheduleLastSeenDebounce(ctx, userID, token)
 			h.Unregister(userID, c)
@@ -85,7 +100,9 @@ func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
 			}
 			var in clientIncoming
 			if err := json.Unmarshal(raw, &in); err != nil {
-				continue // ignore malformed
+				slog.Error("ws client json invalid", "component", "hub", "op", "ReadLoop", "error_code", "WS_INVALID_PAYLOAD", "err", err)
+				closeWS(conn, websocket.ClosePolicyViolation, "invalid json")
+				return
 			}
 			if in.Type == "ping" {
 				h.RefreshPresence(context.Background(), userID)
@@ -97,24 +114,34 @@ func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
 			}
 			if in.Type == "typing_start" && in.ConversationID != "" && in.RecipientID != "" {
 				payload := TypingPayload{
-					Type:            "typing_start",
-					UserID:          userID,
-					ConversationID:  in.ConversationID,
-					RecipientID:     in.RecipientID,
-					FullName:        in.FullName,
+					Type:           "typing_start",
+					UserID:         userID,
+					ConversationID: in.ConversationID,
+					RecipientID:    in.RecipientID,
+					FullName:       in.FullName,
 				}
-				body, _ := json.Marshal(payload)
+				body, mErr := json.Marshal(payload)
+				if mErr != nil {
+					slog.Error("ws typing_start marshal failed", "component", "hub", "op", "MarshalTyping", "error_code", "WS_INTERNAL_ERROR", "err", mErr)
+					closeWS(conn, websocket.CloseInternalServerErr, "marshal failed")
+					return
+				}
 				h.PublishTyping(context.Background(), in.ConversationID, body)
 			}
 			if in.Type == "typing_stop" && in.ConversationID != "" && in.RecipientID != "" {
 				payload := TypingPayload{
-					Type:            "typing_stop",
-					UserID:          userID,
-					ConversationID:  in.ConversationID,
-					RecipientID:     in.RecipientID,
-					FullName:        in.FullName,
+					Type:           "typing_stop",
+					UserID:         userID,
+					ConversationID: in.ConversationID,
+					RecipientID:    in.RecipientID,
+					FullName:       in.FullName,
 				}
-				body, _ := json.Marshal(payload)
+				body, mErr := json.Marshal(payload)
+				if mErr != nil {
+					slog.Error("ws typing_stop marshal failed", "component", "hub", "op", "MarshalTyping", "error_code", "WS_INTERNAL_ERROR", "err", mErr)
+					closeWS(conn, websocket.CloseInternalServerErr, "marshal failed")
+					return
+				}
 				h.PublishTyping(context.Background(), in.ConversationID, body)
 			}
 		}
@@ -125,7 +152,7 @@ func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
 func (h *Hub) PublishChatMessage(payload []byte) {
 	var msg ChatMessage
 	if err := json.Unmarshal(payload, &msg); err != nil {
-		log.Printf("redis chat payload unmarshal: %v", err)
+		slog.Error("redis chat payload unmarshal failed", "component", "hub", "op", "PublishChatMessage", "error_code", "REDIS_CHAT_PAYLOAD_INVALID", "err", err)
 		return
 	}
 	// Send to recipient (1:1). Optionally also echo to sender if needed.

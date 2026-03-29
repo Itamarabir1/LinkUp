@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { cancelPassengerBooking, fetchMyBookings } from '../../api/bookings';
 import { fetchPassengerDriverInfo, fetchRideById } from '../../api/rides';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { useRideWebSocket } from '../../hooks/useRideWebSocket';
+import type { RideEvent } from '../../types/wsEvents';
 import type { BookingRow, PassengerBookingItem } from './myBookings.types';
 
 /** טעינה וביטול הזמנות במצב נוסע */
@@ -71,6 +73,31 @@ export function useMyBookingsPassenger(
   useEffect(() => {
     void fetchPassengerBookings();
   }, [fetchPassengerBookings]);
+
+  const watchedRideId =
+    passengerList.find(
+      (item) =>
+        item.bookingStatus === 'confirmed' && item.ride.status !== 'active'
+    )?.ride.ride_id ?? null;
+
+  const onRideStatusMessage = useCallback(
+    (msg: RideEvent) => {
+      if (
+        msg.event === 'RIDE_STARTED' ||
+        msg.event === 'RIDE_CANCELLED' ||
+        msg.event === 'RIDE_ENDED'
+      ) {
+        void fetchPassengerBookings();
+      }
+    },
+    [fetchPassengerBookings]
+  );
+
+  useRideWebSocket({
+    rideId: watchedRideId,
+    enabled: !!watchedRideId,
+    onMessage: onRideStatusMessage,
+  });
 
   const confirmCancelBooking = useCallback(async () => {
     if (bookingToCancel == null) return;

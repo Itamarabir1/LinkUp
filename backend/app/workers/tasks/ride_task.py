@@ -8,6 +8,7 @@ from app.domain.rides.crud import crud_ride
 # TODO: dispatch function does not exist — EventDispatcher.dispatch is a method, not a module-level function
 from app.infrastructure.events.dispatcher.dispatcher import dispatch
 from app.core.exceptions import InfrastructureError
+from app.core.exceptions.infrastructure import WorkerTaskFailed
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +31,8 @@ async def calculate_ride_route_task(data: Dict[str, Any]):
     destination = data.get("destination")
 
     if not all([ride_id_raw, origin, destination]):
-        logger.error(f"❌ Missing data for route calculation: {data}")
-        return
+        logger.error("Missing data for route calculation: %s", data)
+        raise WorkerTaskFailed(message="חסרים נתונים לחישוב מסלול")
 
     ride_id = UUID(str(ride_id_raw))
     logger.info(f"🗺️ Calculating route for Ride {ride_id}...")
@@ -65,5 +66,5 @@ async def calculate_ride_route_task(data: Dict[str, Any]):
             raise  # גורם ל-RabbitMQ לנסות שוב (Retry) בעוד כמה דקות
 
         except Exception as e:
-            logger.error(f"🔥 Unexpected error in ride task: {str(e)}", exc_info=True)
-            # בשגיאת קוד לא עושים Retry אוטומטי כדי לא להיכנס ללופ
+            logger.error("Unexpected error in ride task: %s", e, exc_info=True)
+            raise WorkerTaskFailed() from e

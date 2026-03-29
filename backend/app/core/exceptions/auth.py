@@ -125,3 +125,11 @@ class VerificationCodeExpiredError(LinkupError):
             status_code=self.status_code,
             error_code=self.error_code,
         )
+
+
+class GoogleAuthFailed(LinkupError):
+    """כשל באימות מול Google — שירות חיצוני, לא אשמת המשתמש."""
+
+    status_code = 502
+    error_code = "AUTH_GOOGLE_FAILED"
+    message = "אימות Google נכשל, נסה שוב מאוחר יותר"

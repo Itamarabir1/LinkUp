@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ERROR_MESSAGES } from '../../config/constants';
 import { useAuth } from '../../context/AuthContext';
 import { getApiErrorMessage } from '../../utils/apiError';
@@ -14,6 +14,7 @@ export function useGoogleSignIn({ onError, disabled }: UseGoogleSignInOptions) {
   const [loading, setLoading] = useState(false);
   const { signInWithGoogle } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const buttonRef = useRef<HTMLDivElement>(null);
   const credentialRef = useRef<((response: { credential: string }) => Promise<void>) | null>(null);
 
@@ -24,7 +25,13 @@ export function useGoogleSignIn({ onError, disabled }: UseGoogleSignInOptions) {
       setLoading(true);
       try {
         await signInWithGoogle(response.credential);
-        navigate('/', { replace: true });
+        const searchParams = new URLSearchParams(location.search);
+        const fromQuery = searchParams.get('from');
+        if (fromQuery) {
+          navigate(decodeURIComponent(fromQuery), { replace: true });
+        } else {
+          navigate('/choose-destination', { replace: true });
+        }
       } catch (err: unknown) {
         const e = err as { code?: string; message?: string };
         if ((e.code === 'ECONNABORTED' || (e.message && e.message.includes('timeout'))) && onError) {
@@ -36,7 +43,7 @@ export function useGoogleSignIn({ onError, disabled }: UseGoogleSignInOptions) {
         setLoading(false);
       }
     };
-  }, [signInWithGoogle, navigate, onError]);
+  }, [signInWithGoogle, navigate, location.search, onError]);
 
   useEffect(() => {
     if (!scriptLoaded || !initialized || !buttonRef.current || disabled) return;

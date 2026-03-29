@@ -7,8 +7,10 @@ from geoalchemy2.shape import to_shape
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions.base import LinkupError
 from app.core.exceptions.booking import PassengerRequestNotFoundError
 from app.core.exceptions.infrastructure import GeocodingError
+from app.core.exceptions.ride import InvalidRideStatusError, RideNotFoundError
 from app.domain.passengers.crud import crud_passenger
 from app.domain.bookings.crud import crud_booking
 from app.domain.bookings.model import Booking
@@ -209,12 +211,17 @@ class PassengerService:
         """פרטי נהג של נסיעה – רק לנסיעות פתוחות (OPEN/FULL). מחזיר 404 אם לא נמצא או לא רלוונטי."""
         ride = await crud_ride.get_with_driver(db, ride_id)
         if not ride:
-            raise ValueError("נסיעה לא נמצאה")
+            raise RideNotFoundError(ride_id)
         if ride.status not in (RideStatus.OPEN, RideStatus.FULL, RideStatus.ACTIVE):
-            raise ValueError("הנסיעה אינה פתוחה להצטרפות")
+            raise InvalidRideStatusError(ride.status.value, action="driver_info")
         driver = ride.driver
         if not driver:
-            raise ValueError("פרטי נהג לא זמינים")
+            logger.error("Ride %s has no driver relation loaded", ride_id)
+            raise LinkupError(
+                message="פרטי נהג לא זמינים לנסיעה זו",
+                status_code=500,
+                error_code="RIDE_DRIVER_MISSING",
+            )
         return DriverInfoResponse(
             full_name=driver.full_name or "נהג",
             phone_number=getattr(driver, "phone_number", None),

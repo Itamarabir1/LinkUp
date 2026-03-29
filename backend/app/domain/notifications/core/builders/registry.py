@@ -1,13 +1,33 @@
-from .ride_builder import RideContextBuilder
-from .booking_builder import BookingContextBuilder
+from .ride_builder import RideBuilder
+from .booking_builder import BookingBuilder
 
 CONTEXT_MAP = {
-    # אירועי נסיעה - כולם משתמשים ב-RideContextBuilder כי הם מקבלים אובייקט Ride
-    "ride_cancelled": RideContextBuilder(),
-    "ride_started": RideContextBuilder(),
-    # אירועי הזמנה ובקשת הצטרפות - מקור הנתונים הוא Booking (המייל לנהג משתמש ב-action_url → הזמנות שלי)
-    "new_ride_request": BookingContextBuilder(),
-    "booking_confirmed": BookingContextBuilder(),
-    "booking_rejected": BookingContextBuilder(),
-    "booking_reminder": BookingContextBuilder(),
+    "ride.cancelled_by_driver": {
+        "builder": RideBuilder(),
+        "schema": None,
+    },
+    "ride.created_for_passengers": {
+        "builder": RideBuilder(),
+        "schema": None,
+    },
+    "booking.passenger_join_request": {
+        "builder": BookingBuilder(),
+        "schema": None,
+    },
+    "booking.approved_by_driver": {
+        "builder": BookingBuilder(),
+        "schema": None,
+    },
+    "booking.rejected_by_driver": {
+        "builder": BookingBuilder(),
+        "schema": None,
+    },
+    "PICKUP_REMINDER_PASSENGER": {
+        "builder": BookingBuilder(),
+        "schema": None,
+    },
+    "RIDE_START_DRIVER": {
+        "builder": RideBuilder(),
+        "schema": None,
+    },
 }

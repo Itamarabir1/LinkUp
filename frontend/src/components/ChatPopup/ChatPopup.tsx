@@ -1,4 +1,5 @@
 import { MapPin, Maximize2, X, Send } from 'lucide-react';
+import ChatErrorBoundary from '../ChatErrorBoundary/ChatErrorBoundary';
 import { formatDateTimeNoSeconds } from '../../utils/date';
 import { useChatPopup } from './useChatPopup';
 import styles from './ChatPopup.module.css';
@@ -7,7 +8,7 @@ interface ChatPopupProps {
   conversationId: string;
 }
 
-export default function ChatPopup({ conversationId }: ChatPopupProps) {
+function ChatPopupContent({ conversationId }: ChatPopupProps) {
   const {
     user,
     closeChat,
@@ -144,5 +145,13 @@ export default function ChatPopup({ conversationId }: ChatPopupProps) {
         </div>
       </form>
     </div>
+  );
+}
+
+export default function ChatPopup(props: ChatPopupProps) {
+  return (
+    <ChatErrorBoundary>
+      <ChatPopupContent {...props} />
+    </ChatErrorBoundary>
   );
 }

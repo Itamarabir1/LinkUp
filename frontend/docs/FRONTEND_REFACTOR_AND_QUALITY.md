@@ -18,12 +18,12 @@
 | חיפוש נסיעות | `passengers` + `rides` + `geo` ב־`useSearchRides` | ✅ |
 | צ'אט (REST) | `api/chat.ts` ← MessageThread, ChatPopup, Messages, `useMyBookings` | ✅ |
 | התראות / unread | `users.fetchMyNotifications` + `chat.fetchUnreadMessageCount` ב־`ChatContext` | ✅ |
-| מיקום | `bookings.postDriverBookingLocation` / `postPassengerBookingLocation` + `fetchRideManifest` | ✅ |
+| מיקום | `bookings.postDriverBookingLocation` / `postPassengerBookingLocation` + `fetchRideManifest`; הוקים `useLocationBroadcast`, `usePassengerLocationBroadcast`, `useLocationWatcher` (throttle 1.5s, `maximumAge: 0`); WS `useDriverLocation`, `usePassengerLocations`; `useMapMarker` + `LiveMapModal` / `LiveRideMapModal` | ✅ |
 | WebSocket read | `chat.markConversationRead` (כולל `useChatWebSocket`) | ✅ |
 | מפתח מפות | `geo.fetchMapsKey` ב־`useGoogleMapsKey` (וב־`RouteMapModal`) | ✅ |
 | FCM | `users.patchFcmToken` ← `fcm.ts`, `useFCMCheck` | ✅ |
 | Auth / טוקנים | `api/auth.ts` + `users.fetchCurrentUser`; `setTokens`/`clearTokens` מ־`client` ב־`AuthContext` | ✅ |
-| נוכחות שותף | `api/presence.ts` (`chatWsApi`) ← `usePartnerPresencePolling` | ✅ |
+| נוכחות שותף | `api/presence.ts` — טעינה חד־פעמית ב־`useMessageThread` + WS `user_online`/`user_offline` | ✅ |
 
 **חריגים מותרים ל־`client`:** קבצים תחת `src/api/*`, `AuthContext` (טוקנים בלבד), `api/presence.ts` (מופע `chatWsApi`).
 
@@ -64,7 +64,7 @@
 
 | אזור | סטטוס |
 |------|--------|
-| CreateRide / Profile / Notifications / FCMCheck / Layout / ChatPopup / MessageThread / GroupManage / MyBookings נהג / **MyRequests + `useMyRequests`** / GoogleSignIn | ✅ |
+| CreateRide / Profile / Notifications / FCMCheck / Layout / ChatPopup / MessageThread / GroupManage / MyBookings נהג (כולל מפה חיה + GPS) / **MyRequests + `useMyRequests`** / GoogleSignIn | ✅ |
 
 ---
 

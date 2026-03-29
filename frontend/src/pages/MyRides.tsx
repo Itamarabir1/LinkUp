@@ -4,7 +4,8 @@ import { Car, Plus } from 'lucide-react';
 import { cancelRide, fetchMyRides } from '../api/rides';
 import type { Ride } from '../types/api';
 import { formatDateTimeNoSeconds } from '../utils/date';
-import { getWsBaseUrl } from '../config/env';
+import { getRideWebSocketUrl } from '../config/env';
+import { RideEventSchema } from '../types/wsEvents';
 import { useGroup } from '../context/GroupContext';
 import Chips, { type ChipItem } from '../components/Chips/Chips';
 import RideCard from '../components/RideCard/RideCard';
@@ -13,9 +14,6 @@ import ErrorBanner from '../components/ErrorBanner';
 import { getApiErrorMessage } from '../utils/apiError';
 import { getRideSourceLabel } from '../utils/rideDisplay';
 import styles from './MyRides.module.css';
-
-const getRideWsUrl = (rideId: string): string =>
-  `${getWsBaseUrl()}/rides/ws/${rideId}`;
 
 function getStatusLabel(r: Ride): string {
   if (r.status === 'cancelled') return 'בוטלה';
@@ -35,6 +33,8 @@ export default function MyRides() {
   const [rideToCancel, setRideToCancel] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const wsRefs = useRef<Map<string, WebSocket>>(new Map());
+  const ridesRef = useRef<Ride[]>([]);
+  ridesRef.current = rides;
 
   const chipItems: ChipItem[] = [
     { id: 'all', label: 'הכל' },
@@ -70,34 +70,57 @@ export default function MyRides() {
   useEffect(() => {
     const rideIds = rides.map((r) => r.ride_id);
     const currentIds = new Set(rideIds);
-    rideIds.forEach((rideId) => {
-      if (wsRefs.current.has(rideId)) return;
-      const url = getRideWsUrl(rideId);
+    const token = localStorage.getItem('linkup_access_token');
+    if (!token) return;
+
+    const handleMessage = (_rideId: string, ev: MessageEvent) => {
       try {
-        const ws = new WebSocket(url);
+        const raw = JSON.parse(ev.data as string);
+        const result = RideEventSchema.safeParse(raw);
+        if (!result.success) return;
+        const { event } = result.data;
+        if (
+          event === 'RIDE_CANCELLED' ||
+          event === 'RIDE_ENDED' ||
+          event === 'RIDE_STARTED'
+        ) {
+          void fetchRides();
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+
+    const openWs = (rideId: string) => {
+      if (wsRefs.current.has(rideId)) return;
+      try {
+        const ws = new WebSocket(getRideWebSocketUrl(rideId, token));
         wsRefs.current.set(rideId, ws);
-        ws.onmessage = (ev) => {
-          try {
-            const payload = JSON.parse(ev.data as string) as { event?: string };
-            if (payload.event === 'RIDE_CANCELLED') {
-              setRides((prev) => prev.filter((r) => r.ride_id !== rideId));
-            }
-          } catch {
-            // ignore
+        ws.onmessage = (ev) => handleMessage(rideId, ev);
+        ws.onclose = () => {
+          wsRefs.current.delete(rideId);
+          if (ridesRef.current.some((r) => r.ride_id === rideId)) {
+            setTimeout(() => {
+              if (wsRefs.current.has(rideId)) return;
+              if (!ridesRef.current.some((r) => r.ride_id === rideId)) return;
+              openWs(rideId);
+            }, 3000);
           }
         };
-        ws.onclose = () => wsRefs.current.delete(rideId);
+        ws.onerror = () => ws.close();
       } catch {
         wsRefs.current.delete(rideId);
       }
-    });
+    };
+
+    rideIds.forEach((rideId) => openWs(rideId));
     wsRefs.current.forEach((sock, id) => {
       if (!currentIds.has(id)) {
         sock.close();
         wsRefs.current.delete(id);
       }
     });
-  }, [rides]);
+  }, [rides, fetchRides]);
 
   useEffect(() => {
     const refs = wsRefs.current;

@@ -144,7 +144,7 @@ export function useLocationBroadcast(options: UseLocationBroadcastOptions) {
         });
     },
     onError: (msg) => setError(msg),
-    throttleMs: 3000,
+    throttleMs: 1500,
   });
 
   return { error, bookingId, isActive: enabled && !!bookingId };

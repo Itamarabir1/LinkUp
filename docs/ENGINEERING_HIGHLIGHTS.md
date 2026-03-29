@@ -22,7 +22,7 @@
 | **משתמשים** | JWT + Refresh ב-DB, **כניסה עם Google** (OAuth / `id_token`), אווטאר (S3 + worker); שדה **`is_admin`** לגישה ל־`/api/v1/admin/*` |
 | **אדמין / תפעול** | ממשק ווב **`/admin`** (מודול `features/admin`): סטטיסטיקות, בריאות, משתמשים (הפעלה/הרשאת אדמין), נסיעות (ביטול), קבוצות, Outbox (requeue), lookup; **lazy routes**, אישור לפני מוטציות, toasts; בקאנד **`get_current_admin_user`** + לוג `[admin_audit]` — **`ADMIN_DASHBOARD.md`** |
 | **מפות** | Google: **Geocoding**, **Directions**, **Distance Matrix**, **Maps JS**; geocoding הוא **Google-only** עם cache ב-Redis (24h) |
-| **GPS בזמן אמת** | מיקום נהג לנוסעים, מיקום נוסעים לנהג (ערוצי Redis נפרדים + WS) |
+| **GPS בזמן אמת** | מיקום נהג לנוסעים, מיקום נוסעים לנהג (ערוצי Redis נפרדים + WS). **פרונט:** POST מותאם ב־throttle (~1.5s), `maximumAge: 0` לשידור, `useMapMarker` — יצירת marker פעם אחת ועדכון מיקום בלבד (בלי ריצוד), מפת Google. **Zod** על פריימי WS בכניסה — `frontend/src/types/wsEvents.ts`. פירוט: `docs/architecture/REALTIME.md`. |
 
 ---
 
@@ -32,7 +32,7 @@
 |------|-----------|
 | API | **Python 3**, **FastAPI**, async SQLAlchemy, **Alembic** |
 | Real-time chat WS | **Go** — שרת WebSocket ייעודי (`chat-ws`) |
-| Frontend | **React**, **Vite**, TypeScript |
+| Frontend | **React**, **Vite**, TypeScript, **Zod** (אימות JSON מ-WebSocket בפרונט) |
 | DB | **PostgreSQL 15** + **PostGIS** (גיאומטריה, מרחקים) |
 | Cache / Pub-Sub | **Redis** — **הפרדה ל-DB 0 (API) ו-DB 1 (צ’אט + completion)** |
 | Broker | **RabbitMQ** — תורים לאירועים ומשימות כבדות |
@@ -113,26 +113,30 @@
 |--------|----------------|
 | **Typing** | הלקוח שולח `typing_start` / `typing_stop` → Redis `chat:typing:*` → Go מעביר לצד השני. |
 | **Online (presence)** | בחיבור: `SET presence:{user_id}` עם TTL (~60s). **Ping** מהלקוח מרענן TTL. |
-| **Disconnect** | **מחיקת** `presence` + **`PUBLISH user:offline`** → WS `user_offline` לכל הלקוחות (שותף רואה “לא מחובר” מיד); **debounce** ל-last-seen ב-DB. **Redis:** שרת אחד, **DB0** backend / **DB1** צ’אט+presence. |
-| **Last seen (debounce)** | מפתחות Redis: `debounce:last_seen:{user}` (קצר), `last_seen:hold:{user}` (מחזיק JWT עד אחרי ה-debounce). Worker ב-Go בודק כל כמה שניות: אם debounce פג אבל hold קיים → **PATCH** ל-API `users/me/last-seen` → עדכון `users.last_login`. **חיבור מחדש** מבטל את ה-debounce (מוחק מפתחות) כדי שלא יעדכן “offline” בטעות. |
+| **Connect** | **`PUBLISH user:online`** → WS `user_online` לכל הלקוחות (שותף רואה “מחובר” מיד). |
+| **Disconnect** | **מחיקת** `presence` + **`PUBLISH user:offline`** → WS `user_offline`; **debounce** ל-last-seen ב-DB. **Redis:** שרת אחד, **DB0** backend / **DB1** צ’אט+presence. |
+| **Last seen (debounce)** | מפתחות Redis: `debounce:last_seen:{user}`, **`last_seen:hold:{user}`** (ערך **timestamp**, לא JWT), **`last_seen:token:{user}`** (Bearer; מחיקה רק אחרי PATCH מוצלח). Worker ב-Go: אם debounce פג → **PATCH** `users/me/last-seen` → עדכון **`users.last_active_at`** (**נפרד מ־`last_login`**; שליחת הודעה בצ’אט מעדכנת גם כן). **חיבור מחדש** מנקה את כל המפתחות. |
+| **UI — last seen** | בפרונט: **`formatChatLastSeen`** מגן מפני **Invalid Date**. |
 | **אימות** | אותו **JWT** כמו ה-API (`SECRET_KEY` משותף). |
 
-פירוט ערוצים ומפתחות: `architecture/REALTIME.md`. **Online**: הפרונט קורא `GET` ל-**chat-ws** `/presence/{id}` (אותו Redis DB1 כמו ה-WS).
+פירוט ערוצים ומפתחות: `architecture/REALTIME.md`. **Presence ב-UI**: טעינה חד־פעמית של `GET` ל-**chat-ws** `/presence/{id}` + עדכון בזמן אמת מ-WS `user_online` / `user_offline`.
 
 ### מקליד · מחובר · התנתקות — איך זה עובד (להצגה בראיון)
 
 | מה רואים במוצר | מה קורה בטכנולוגיה |
 |----------------|---------------------|
 | **משתמש מקליד** | הפרונט שולח ב-WebSocket `typing_start` (בדרך כלל עם throttle). כשמפסיקים — `typing_stop` (למשל אחרי שליחה או blur). **chat-ws** מפרסם ל-Redis `chat:typing:*` והמנוי מעביר לאותו conversation לצד השני — **בלי** לגעת ב-DB. זה **אפhemeral** ומתאים למאות אלפי אירועים קצרים. |
-| **משתמש מחובר** | בפתיחת WS: Go שם `presence:{user_id}` ב-Redis. **Polling כל ~30 שניות** ל-**chat-ws** `GET /presence/{partner_id}` (Bearer) — `online` מ-Redis DB1; **user_offline** ב-WS מעדכן מיד בלי לחכות לפולינג. |
-| **התנתקות (Disconnect)** | Go **מפרסם** `user:offline` ב-Redis; המנוי ב-chat-ws משדר **`user_offline`** ב-WebSocket — **בלי לחכות לפולינג**. במקביל debounce ל-PATCH last-seen. פולינג ל-`/presence/{id}` נשאר גיבוי. |
+| **משתמש מחובר** | בפתיחת WS: Go שם `presence:{user_id}` ומפרסם **`user:online`** → **`user_online`** ב-WS. בכניסה לשיחה: **קריאה אחת** ל-`GET /presence/{partner_id}` לטעינת מצב ראשוני. |
+| **התנתקות (Disconnect)** | Go **מפרסם** `user:offline` → **`user_offline`** ב-WebSocket. במקביל debounce ל-PATCH last-seen (`last_active_at`). |
 
 ---
 
 ## 5. Real-time נוסף (לא צ’אט)
 
-- **עדכוני נסיעה**: WS ב-FastAPI + Redis broadcast (`ride_{id}`).
+- **עדכוני נסיעה**: WS ב-FastAPI + Redis Pub/Sub; **מקור אמת לשמות ערוצים** — `app/infrastructure/redis/keys.py` (`get_ride_channel` וכו'). **נקודת כניסה אחת לשידור** — `publish_ride_event` ב-`app/domain/rides/broadcast.py` (אירועים כמו `RIDE_STARTED` / `RIDE_ENDED` / `RIDE_CANCELLED`). חיבור ל-`/rides/ws/{ride_id}` דורש `?token=JWT` (כמו שאר ה-WS ב-backend).
 - **מיקום נהג / נוסעים**: ערוצים נפרדים (`booking_*`, `ride_*:passenger_locations`) + WS ייעודיים — הפרדת עומס ולוגיקה.
+- **פרונט (WS)**: **`useRideWebSocket`** — hook גנרי עם reconnect; **`useDriverLocation`** / **`usePassengerLocations`** — reconnect אוטומטי אחרי ניתוק; **`MyRides.tsx`** — מאזינים לערוץ נסיעה עם אותו חוזה JSON. כשנהג לוחץ **התחל נסיעה**, הנוסע רואה מיד את אפשרות **שתף מיקום** (רענון רשימה דרך אירועי סטטוס).
+- **אימות JSON (Zod)**: סכימות מרוכזות ב-**`frontend/src/types/wsEvents.ts`** — `RideEventSchema`, `DriverLocationEventSchema`, `PassengerLocationEventSchema`, **`ChatPresenceEventSchema`** (discriminated union: `user_online` / `user_offline` / `typing_*` / `unread_count`). ב-`onmessage` משתמשים ב-**`safeParse`**; פריימים לא צפויים → `console.warn` ודילוג (בלי לשבור את הלולאה). שימוש ב-**`useRideWebSocket`**, **`useDriverLocation`**, **`usePassengerLocations`**, **`MyRides`**, **`processChatWebSocketMessage`**.
 
 ---
 
@@ -192,9 +196,9 @@
 | **עסקי / DB** | בדיקות `if not ride` / בעלות לפני פעולה; **pessimistic lock** על הזמנות; **Outbox** כדי שלא יאבדו אירועים אחרי commit. |
 | **רשת / חיצוני** | **Timeouts** ל-Google Geocoding / Directions; טיפול ב-**429** (rate limit) עם הודעה למשתמש; debounce **last-seen** + ביטול ב-reconnect — לא מציפים DB ולא מעדכנים “offline” בטעות. |
 | **תשתית** | **`pool_pre_ping`**, **`pool_timeout`**, **`pool_recycle`** — מאגר DB עמיד יותר; **rate limit** על register + login/refresh; **FCM** — טוקן לא תקף מטופל (איפוס / דילוג). |
-| **chat-ws (Go)** | `if redisClient == nil` לפני פעולות; **select default** על ערוץ Send — לא חוסם לנצח אם buffer מלא; לקוח Redis נפרד ל-`user:offline` שלא ייתקע עם PSubscribe. |
+| **chat-ws (Go)** | `if redisClient == nil` לפני פעולות; **select default** על ערוץ Send; לקוחות Redis נפרדים ל-`user:offline` ול-`user:online` שלא ייתקעו עם `PSubscribe` של הצ’אט. |
 | **API / HTTP** | **LinkupError** + handlers מרוכזים; **CORS** גם על תגובות שגיאה; אימות JWT לפני WS ולפני `/presence`. |
-| **פרונט** | `try/catch` על טעינת presence / WS; **פיצול הודעות WS לפי `\n`**; `user_offline` עם **ref** ל-partner כדי לא לאבד עדכון אחרי טעינה אסינכרונית. |
+| **פרונט** | `try/catch` על טעינת presence / WS; **פיצול הודעות WS לפי `\n`**; `user_online` / `user_offline` עם **ref** ל-partner. |
 | **איכות** | טסטים ל-**JWT** (פג תוקף, חתימה שגויה) — מגנים על נקודות כשל אימות. |
 
 זה לא “פריימוורק” בשם אלא **שילוב דפוסים**; בריאיון אפשר לומר: *“יש אצלי defensive layers — locks, outbox, timeouts, debounce, ו-validation לפני שינויי מצב.”*
@@ -246,7 +250,7 @@
 
 ## 9. DevOps ופריסה
 
-- **Docker Compose**: healthchecks, סיסמת Redis, volumes ל-RabbitMQ ו-Postgres; שירותי פיתוח (`db`, `redis`, `rabbitmq`, `outbox-worker`, `backend` עם **8000 ל-host**, `chat-ws`) ב־`docker compose up -d`; **frontend** סטטי + **nginx** באותו `docker-compose.yml` עם `profiles: ["prod"]` — סטאק מלא על פורט 80 עם `docker compose --profile prod up -d --build`. קובץ שירות Firebase נטען מ־host ל־**backend** ול־**outbox-worker** (volume read-only; `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env`) — נדרש ל־FCM מה־worker.
+- **Docker Compose**: healthchecks (כולל **backend** על `/api/v1/health`), סיסמת Redis, volumes ל-RabbitMQ ו-Postgres; שירות **`migrate`** (`alembic upgrade head`, `restart: no`) לפני **backend** ו־**outbox-worker**; שירותי פיתוח (`db`, `redis`, `rabbitmq`, `migrate`, `outbox-worker`, `backend` עם **8000 ל-host**, `chat-ws`) ב־`docker compose up -d`; **frontend** סטטי + **nginx** באותו `docker-compose.yml` עם `profiles: ["prod"]` — סטאק מלא על פורט 80 עם `docker compose --profile prod up -d --build`, **nginx** אחרי **backend** ב־`service_healthy`. קובץ שירות Firebase נטען מ־host ל־**backend** ול־**outbox-worker** (volume read-only; `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env`) — נדרש ל־FCM מה־worker. **פריסה בלי Compose** (למשל image בלבד / K8s): להריץ מיגרציה כ־Job או שלב init נפרד — לא מוטמע ב־`CMD` של image ה-production.
 - **`.env` כפול לפי תפקיד:** `.env` **בשורש** (מ־`.env.example`) — רק credentials ש־Compose צורך להקמת Postgres / Redis / RabbitMQ; **`backend/.env`** — כל הגדרות הבקאנד. חייב **יישור** (סיסמאות DB/Redis/RabbitMQ) בין הקבצים. אחרי **שינוי `backend/.env`** — לרענן משתנים בקונטיינר: `docker compose up -d --force-recreate backend` (**לא** מספיק `restart` בלבד — ה-env נצרך בעת יצירת הקונטיינר).
 - **גרסאות תמונות קבועות** (לא `latest` בשירותים קריטיים) — builds חוזרים.
 - **K8s**: deployment ל-`chat-ws` עם env (למשל `BACKEND_URL`) ל-worker של last-seen.
@@ -256,7 +260,7 @@
 ## 10. איך להשתמש במסמך הזה בפורטפוליו
 
 - בקורות חיים / לינקדאין: “Real-time chat (מקליד / מחובר / disconnect עם debounce), Go + Redis, Outbox+RabbitMQ, סינכרון מול אסינכרון, PostGIS”.
-- בראיון: **סעיף 4** + **6** + **7ג** (auth בעומס) + **7ב** (defensive) + **12** + **13** + **14** (פרונט).
+- בראיון: **סעיף 4** + **5** (real-time נסיעות + Zod) + **6** + **7ג** (auth בעומס) + **7ב** (defensive) + **12** + **13** + **14** (פרונט).
 
 ---
 
@@ -273,6 +277,7 @@
 | כניסה עם Google | סעיפים 1, 2, 7א |
 | אבטחה + rate limit + OTP + מאגר DB + enumeration + auth בעומס | סעיפים 3, 7, 7א, **7ג**, 7ב, 12 |
 | ריפקטור פרונט (API, context, lazy, בדיקות) | **סעיף 14** + `frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md` |
+| Zod, WebSocket (נסיעות/מיקום/צ’אט), reconnect, `publish_ride_event` / `keys.py` | **סעיפים 1, 5, 14** + `frontend/src/types/wsEvents.ts` |
 | Google Maps (Directions + Distance Matrix) | **סעיף 2** (טבלת APIs) + סעיף 12 |
 | CI/CD, GHCR, S3, מובייל, pytest, Vitest מקומי, k6, phonenumbers | **סעיפים 9, 12** |
 | Unread WS, קבוצות, SQLAdmin, UUID, RTL, EIA | **סעיף 13** |
@@ -293,7 +298,7 @@
 | **uv ב-CI** | התקנת תלויות backend מהירה (`uv pip install`); **`uv.lock`** + **`pyproject.toml`** — כולל נעילת **`phonenumbers==8.13.48`** לאימות מספרים ישראליים עקבי. |
 | **בדיקות אבטחה JWT** | `backend/tests/test_security.py` — טוקן תקין, פג תוקף, חתימה שגויה (מקרים קריטיים ל-auth). |
 | **בדיקות auth + OWASP enumeration** | `backend/tests/test_auth.py` (דורש `TEST_DATABASE_URL`) — רישום, אימייל כפול, סיסמה שגויה ואימייל לא קיים → אותה שגיאת לוגין. |
-| **בדיקות יחידה בפרונט (מקומי)** | Vitest — לדוגמה `frontend/src/utils/apiError.test.ts` (`npm run test`); לא חובה ב-CI כרגע (ה-workflow מריץ lint + build). |
+| **בדיקות יחידה בפרונט (מקומי)** | Vitest — לדוגמה `frontend/src/utils/apiError.test.ts`, **`frontend/src/pages/MessageThread/processChatWebSocketMessage.test.ts`** (אירועי WS / Zod) (`npm run test`); לא חובה ב-CI כרגע (ה-workflow מריץ lint + build). |
 
 ### העלאות קבצים — לא דרך ה-API
 
@@ -354,7 +359,7 @@
 | דגש | פירוט קצר |
 |-----|-----------|
 | **Unread צ’אט** | Backend מפרסם ל-Redis `chat:notification:{recipient_id}`; **chat-ws** מעביר ל-WebSocket של הנמען → עדכון badge / `unread_count` בלי רענון מלא. |
-| **פולינג presence** | **30s** ל-`GET /presence/{id}` ב-chat-ws כ**גיבוי**; `user_offline` ב-WS = עדכון **מיידי**. |
+| **Presence בצ’אט** | טעינה חד־פעמית ל-`GET /presence/{id}`; **`user_online` / `user_offline`** ב-WS לעדכון מיידי. |
 | **קבוצות + הזמנה** | `invite_code` ייחודי, תפוגה אופציונלית, endpoint הצטרפות; העברת admin בקבוצה. |
 | **SQLAdmin** | ממשק **ניהול DB** (FastAPI-SQLAdmin): משתמשים, נסיעות, הזמנות, בקשות — תפעול ודיבוג (נפרד ממסך האדמין ב־React). |
 | **מסך אדמין מותאם (React)** | דשבורד אופרטיבי בפרונט הראשי — לא אפליקציית Vite נפרדת; אותו JWT, שער `AdminRoute`, והידרציה של `is_admin` אחרי לוגין. |
@@ -380,9 +385,10 @@
 | **בקשות נוסע** | הוק **`useMyRequests`** — לוגיקת MyRequests מרוכזת. |
 | **עיצוב** | **`tokens.css`**, `ThemeContext`, מצב כהה — פחות אינליין CSS בדפי auth. |
 | **איכות** | בדיקות יחידה ל־reducer / נוטיפיקציות (`chatReducer`, `notifications.utils`) לפי המסמך. |
+| **Zod + WebSocket** | סכימות ב־**`src/types/wsEvents.ts`**; אימות בכניסה ב־hooks וב־**`processChatWebSocketMessage`** — ראו **סעיף 5**. |
 
 *בראיון:* “פרדתי שכבת API, פיצלתי דפים כבדים להוקים, ואיחדתי פילטר קבוצות ב-context כדי שלא יישבר בין מסכים.”
 
 ---
 
-*עודכן כחלק מתיעוד הפרויקט — כולל מאגר DB ניתן להגדרה, **auth בעומס** (bcrypt ב-executor, pool, rate limit, outbox), חיזוק OTP, מניעת user enumeration בלוגין (OWASP), **pytest + GitHub Actions + GHCR**, **Vitest + ריפקטור ארגון בפרונט** (`FRONTEND_REFACTOR_AND_QUALITY.md`), **מסך אדמין** (`ADMIN_DASHBOARD.md`, `/admin` + `/api/v1/admin`), **k6** עם דוגמת תוצאות, **phonenumbers==8.13.48**, ו-**Docker Compose** (`.env` בשורש + `backend/.env`, recreate לקונטיינר אחרי שינוי env).*
+*עודכן כחלק מתיעוד הפרויקט — כולל מאגר DB ניתן להגדרה, **auth בעומס** (bcrypt ב-executor, pool, rate limit, outbox), חיזוק OTP, מניעת user enumeration בלוגין (OWASP), **pytest + GitHub Actions + GHCR**, **Vitest + ריפקטור ארגון בפרונט** (`FRONTEND_REFACTOR_AND_QUALITY.md`), **Zod לאימות WebSocket** (`frontend/src/types/wsEvents.ts`), **מסך אדמין** (`ADMIN_DASHBOARD.md`, `/admin` + `/api/v1/admin`), **k6** עם דוגמת תוצאות, **phonenumbers==8.13.48**, ו-**Docker Compose** (שירות **migrate**, healthcheck ל-backend, `.env` בשורש + `backend/.env`, recreate לקונטיינר אחרי שינוי env).*

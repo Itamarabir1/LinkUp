@@ -28,7 +28,7 @@ export function usePassengerLocationBroadcast(bookingId: string | null, enabled:
         });
     },
     onError: (msg) => setError(msg),
-    throttleMs: 3000,
+    throttleMs: 1500,
   });
 
   return { error, isActive: enabled && !!bookingId };

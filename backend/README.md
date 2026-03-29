@@ -29,6 +29,8 @@ Copy `.env.example` to `.env` and set your values. See root README for full setu
 
 Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 
+**Error responses (JSON, `error_code`, `trace_id`, handlers):** [`docs/ERRORS.md`](../docs/ERRORS.md).
+
 ## Admin API (`/api/v1/admin`)
 
 Endpoints for operators only: FastAPI dependency **`get_current_admin_user`** (`app/api/dependencies/admin.py`) requires `User.is_admin`. Router: **`app/domain/admin/router.py`**, mounted in **`app/api/v1/api_router.py`** with prefix **`/admin`**. Includes stats, health, user list + PATCH (active/admin flag), rides/groups lists and ride cancel, outbox list/detail + requeue for FAILED events, ride/booking lookup; sensitive actions log with **`[admin_audit]`**.  
@@ -51,6 +53,10 @@ Alembic is in `alembic/`. Run migrations with:
 ```bash
 alembic upgrade head
 ```
+
+With **Docker Compose** at the repo root, the **`migrate`** service runs `alembic upgrade head` once before **backend** and **outbox-worker** start; the production **Dockerfile** does **not** run migrations in `CMD` (only `gunicorn` / `uvicorn`). If you deploy **without** Compose (e.g. raw image or Kubernetes), run migrations as a one-off Job, init container, or CI step — do not rely on the API container entrypoint alone.
+
+**Recent:** revision **`007_last_active_at`** adds `users.last_active_at` (chat activity / last-seen from chat-ws debounce), distinct from `last_login`. See `docs/architecture/DATABASE.md` and `docs/architecture/REALTIME.md`.
 
 ## Load testing (k6)
 

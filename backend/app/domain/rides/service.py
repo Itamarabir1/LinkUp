@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions.base import LinkupError
 from app.core.exceptions.ride import (
     RideNotFoundError,
     RideAlreadyCancelledError,
@@ -31,6 +32,7 @@ from app.domain.rides.enum import RideStatus, RideBroadcastAction
 from app.domain.rides.broadcast import (
     RideNotificationFactory,
     RIDES_LIST_CHANNEL,
+    publish_ride_event,
     publish_ride_update,
 )
 from app.domain.geo import processor as geo_proc
@@ -197,8 +199,10 @@ class RideService:
         if payload.available_seats is not None:
             update_dict["available_seats"] = payload.available_seats
         if not update_dict:
-            raise ValueError(
-                "נדרש לפחות שדה אחד לעדכון (departure_time או available_seats)"
+            raise LinkupError(
+                message="נדרש לפחות שדה אחד לעדכון (departure_time או available_seats)",
+                status_code=400,
+                error_code="RIDE_UPDATE_EMPTY_FIELDS",
             )
         ride = await crud_ride.update_partial(db, ride_id, driver_id, **update_dict)
         if not ride:
@@ -241,10 +245,16 @@ class RideService:
             updated = await crud_ride.update_status(db, ride_id, RideStatus.ACTIVE)
             await db.commit()
             await db.refresh(updated)
-            return RideMapper.to_response(updated)
         except Exception:
             await db.rollback()
             raise
+
+        await publish_ride_event(
+            ride_id,
+            "RIDE_STARTED",
+            {"status": RideStatus.ACTIVE.value},
+        )
+        return RideMapper.to_response(updated)
 
     async def end_ride(
         self, db: AsyncSession, ride_id: UUID, driver_id: UUID
@@ -265,10 +275,16 @@ class RideService:
             )
             await db.commit()
             await db.refresh(updated)
-            return RideMapper.to_response(updated)
         except Exception:
             await db.rollback()
             raise
+
+        await publish_ride_event(
+            ride_id,
+            "RIDE_ENDED",
+            {"status": RideStatus.COMPLETED.value},
+        )
+        return RideMapper.to_response(updated)
 
     # --- Cancel ---
 
@@ -297,24 +313,21 @@ class RideService:
         except Exception:
             await db.rollback()
             raise
-        # WebSocket: עדכון מיידי – ערוץ הנסיעה + רשימת נסיעות (ללא שימוש ב-session אחרי commit)
-        try:
-            await publish_ride_update(
-                ride_id,
-                {"status": RideStatus.CANCELLED.value, "event": "RIDE_CANCELLED"},
-            )
-        except Exception as e:
-            logger.warning("publish_ride_update (Redis) failed after cancel: %s", e)
+        await publish_ride_event(
+            ride_id,
+            "RIDE_CANCELLED",
+            {"status": RideStatus.CANCELLED.value},
+        )
         try:
             payload = {
                 "event": "RIDE_CANCELLED",
                 "ride_id": str(ride_id),
                 "status": RideStatus.CANCELLED.value,
                 "color": "red",
-                "message": f"הנסיעה בוטלה על ידי הנהג (מ-{origin_name} ל-{destination_name})",
+                "message": f"הנסיעה בוטלה (מ-{origin_name} ל-{destination_name})",
             }
             await broadcast.publish(RIDES_LIST_CHANNEL, json.dumps(payload))
         except Exception as e:
-            logger.warning("Broadcast ride cancelled failed: %s", e)
+            logger.warning("Broadcast rides list failed after cancel: %s", e)
 
 

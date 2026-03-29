@@ -1,6 +1,10 @@
-from app.infrastructure.websocket_bus import ws_infra
-from app.domain.notifications.core.builders.facade import NotificationContext
+import logging
+
+from app.domain.notifications.core.builders.ride_builder import RideBuilder
+from app.domain.rides.broadcast import publish_ride_event
 from app.domain.rides.model import Ride
+
+logger = logging.getLogger(__name__)
 
 
 class RideActions:
@@ -16,8 +20,12 @@ class RideActions:
     @staticmethod
     async def handle_cancellation(ride: Ride) -> None:
         """שליחה ל-WebSocket בלבד. אירועי Outbox מטופלים בשירות הביטול."""
-        context = NotificationContext.ride(ride, event_key="RIDE_CANCELLED")
-        await ws_infra.publish(
-            f"ride_{ride.ride_id}",
-            {"type": "RIDE_CANCELLED", "data": context},
-        )
+        try:
+            context = RideBuilder().build(ride, event_key="ride_cancelled")
+            await publish_ride_event(
+                ride.ride_id,
+                "RIDE_CANCELLED",
+                {"data": context},
+            )
+        except Exception as e:
+            logger.warning("handle_cancellation WS failed: %s", e)

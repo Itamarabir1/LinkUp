@@ -5,20 +5,12 @@ from uuid import UUID
 
 from app.infrastructure.redis.broadcast import broadcast
 from app.domain.rides.enum import RideStatus, RideBroadcastAction
+from app.infrastructure.redis.keys import RIDES_LIST_CHANNEL, get_ride_channel
 
 logger = logging.getLogger(__name__)
 
-# ערוץ Redis לרשימת נסיעות – כל המנויים (כולל שרת WS) מקבלים עדכוני נסיעות חדשות/עודכנות
-RIDES_LIST_CHANNEL = "rides:list"
-
 
 class RideNotificationFactory:
-    """
-    Utility Class האחראי על פורמט ההודעות לכל ערוצי ההפצה (WebSocket, Push, וכו').
-    מרכז את כל ה"צבעים" והטקסטים במקום אחד. צבע יצירה = ירוק (נסיעה חדשה).
-    """
-
-    # מפת קונפיגורציה: RideBroadcastAction (שידור) + RideStatus (ביטול/השלמה)
     _CONFIG = {
         RideBroadcastAction.CREATED.value: {
             "color": "green",
@@ -44,7 +36,6 @@ class RideNotificationFactory:
 
     @classmethod
     def create_broadcast_payload(cls, ride, action: str) -> Dict[str, Any]:
-        """מייצר Payload אחיד לשידור WebSocket (event, ride_id, status, color, message)."""
         config = cls._CONFIG.get(
             action,
             {
@@ -64,10 +55,46 @@ class RideNotificationFactory:
         }
 
 
+async def publish_ride_event(
+    ride_id: UUID,
+    event: str,
+    extra: dict | None = None,
+) -> None:
+    """
+    נקודת הכניסה היחידה לשידור אירועי סטטוס נסיעה.
+    כל שינוי סטטוס עובר דרך כאן בלבד.
+    """
+    payload = {
+        "event": event,
+        "ride_id": str(ride_id),
+        **(extra or {}),
+    }
+    try:
+        await broadcast.publish(
+            get_ride_channel(ride_id),
+            json.dumps(payload),
+        )
+    except Exception as e:
+        logger.warning("publish_ride_event failed [%s]: %s", event, e)
+
+
 async def publish_ride_update(ride_id: UUID, message_data: dict) -> None:
-    """פרסום עדכונים לערוץ ה-Realtime של הנסיעה (WebSocket)."""
-    channel_name = f"ride_{ride_id}"
-    payload = (
-        json.dumps(message_data) if isinstance(message_data, dict) else message_data
-    )
-    await broadcast.publish(channel_name, payload)
+    """Deprecated — השתמש ב-publish_ride_event."""
+    event = message_data.get("event", "RIDE_UPDATED")
+    extra = {k: v for k, v in message_data.items() if k != "event"}
+    await publish_ride_event(ride_id, event, extra)
+
+
+# TTL ו-key builders (נשארים לתאימות לאחור)
+RIDE_PREVIEW_TTL = 86400
+
+
+def get_ride_preview_key(session_id: str) -> str:
+    return f"ride_preview:{session_id}"
+
+
+OTP_VERIFICATION_TTL = 600
+
+
+def get_otp_verification_key(user_id: str, event_name: str) -> str:
+    return f"otp:{event_name}:{user_id}"

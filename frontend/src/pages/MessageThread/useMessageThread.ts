@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { useConversationMessages } from './useConversationMessages';
 import { useChatWebSocket } from './useChatWebSocket';
-import { usePartnerPresencePolling, type PartnerPresence } from './usePartnerPresencePolling';
+import { fetchPartnerPresence, type PartnerPresence } from '../../api/presence';
 
 export function useMessageThread(conversationIdOverride?: string) {
   const { conversationId: paramId } = useParams<{ conversationId: string }>();
@@ -58,7 +58,18 @@ export function useMessageThread(conversationIdOverride?: string) {
     }
   }, [cid]);
 
-  usePartnerPresencePolling(partnerId, setPartnerPresence);
+  useEffect(() => {
+    if (!partnerId) return;
+    let cancelled = false;
+    fetchPartnerPresence(partnerId)
+      .then((res) => {
+        if (!cancelled && res.data) setPartnerPresence(res.data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [partnerId]);
 
   const { sendTypingIfNeeded, sendTypingStop } = useChatWebSocket({
     cid,

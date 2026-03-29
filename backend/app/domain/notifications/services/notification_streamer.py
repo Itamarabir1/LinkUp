@@ -42,15 +42,21 @@ class NotificationStreamer:
                         break
 
                     except Exception as send_error:
-                        # שגיאה בלתי צפויה בשליחה
                         logger.error(
-                            f"⚠️ Failed to push message to user {user_id}: {send_error}"
+                            "Failed to push WebSocket message to user %s: %s",
+                            user_id,
+                            send_error,
+                            exc_info=True,
                         )
                         break
 
         except Exception as e:
-            # שגיאה קריטית בתשתית (למשל ה-Broker נפל)
-            logger.error(f"❌ Critical Streamer error for user {user_id}: {str(e)}")
+            logger.error(
+                "Critical notification streamer error for user %s: %s",
+                user_id,
+                e,
+                exc_info=True,
+            )
 
         finally:
             # שלב 3: ניקוי משאבים תמיד קורה כאן

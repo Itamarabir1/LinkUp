@@ -25,8 +25,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload
 FROM base AS production
 ENV WORKERS=2
 CMD ["sh", "-c", \
-     "alembic upgrade head && \
-      gunicorn app.main:app \
+     "gunicorn app.main:app \
       --workers ${WORKERS} \
       --worker-class uvicorn.workers.UvicornWorker \
       --bind 0.0.0.0:8000 \

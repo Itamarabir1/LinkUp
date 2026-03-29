@@ -4,7 +4,6 @@ from uuid import UUID
 from fastapi import (
     APIRouter,
     Depends,
-    HTTPException,
     status,
     Query,
     WebSocket,
@@ -27,7 +26,7 @@ from app.api.dependencies.auth import get_current_user, get_current_user_ws, WsU
 from app.api.dependencies.group_membership import verify_group_membership
 from app.api.dependencies.services import get_ride_service
 from app.domain.rides.service import RideService
-from app.infrastructure.location.location_service import PASSENGER_LOCATIONS_CHANNEL_SUFFIX
+from app.infrastructure.redis.keys import get_ride_channel, get_ride_passengers_channel
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -82,14 +81,9 @@ async def update_ride(
     ride_svc: RideService = Depends(get_ride_service),
 ):
     """עדכון חלקי לנסיעה – זמן יציאה ו/או מספר מושבים (רק הנהג בעלים)."""
-    try:
-        return await ride_svc.update_ride(
-            db, ride_id, current_user.user_id, payload
-        )
-    except RideNotFoundError:
-        raise HTTPException(status_code=404, detail="נסיעה לא נמצאה או שאין הרשאה")
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return await ride_svc.update_ride(
+        db, ride_id, current_user.user_id, payload
+    )
 
 
 @router.post("/{ride_id}/start", response_model=RideResponse)
@@ -100,12 +94,9 @@ async def start_ride(
     ride_svc: RideService = Depends(get_ride_service),
 ):
     """התחל נסיעה — מעביר לסטטוס ACTIVE. דורש לפחות נוסע מאושר אחד."""
-    try:
-        return await ride_svc.start_ride(
-            db, ride_id=ride_id, driver_id=current_user.user_id
-        )
-    except RideNotFoundError:
-        raise HTTPException(status_code=404, detail="נסיעה לא נמצאה או שאין הרשאה")
+    return await ride_svc.start_ride(
+        db, ride_id=ride_id, driver_id=current_user.user_id
+    )
 
 
 @router.post("/{ride_id}/end", response_model=RideResponse)
@@ -116,12 +107,9 @@ async def end_ride(
     ride_svc: RideService = Depends(get_ride_service),
 ):
     """סיים נסיעה — מעביר לסטטוס COMPLETED."""
-    try:
-        return await ride_svc.end_ride(
-            db, ride_id=ride_id, driver_id=current_user.user_id
-        )
-    except RideNotFoundError:
-        raise HTTPException(status_code=404, detail="נסיעה לא נמצאה או שאין הרשאה")
+    return await ride_svc.end_ride(
+        db, ride_id=ride_id, driver_id=current_user.user_id
+    )
 
 
 @router.delete("/{ride_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)
@@ -146,7 +134,7 @@ async def read_ride(
 ):
     ride = await ride_svc.get_ride_by_id(db, ride_id)
     if not ride:
-        raise HTTPException(status_code=404, detail="נסיעה לא נמצאה")
+        raise RideNotFoundError(ride_id)
     return ride
 
 
@@ -154,23 +142,25 @@ async def read_ride(
 
 
 @router.websocket("/ws/{ride_id}")
-async def ride_status_websocket(websocket: WebSocket, ride_id: UUID):
-    """
-    כאן קורה הקסם: הדפדפן מתחבר לכתובת הזו ונשאר בהאזנה.
-    """
+async def ride_status_websocket(
+    websocket: WebSocket,
+    ride_id: UUID,
+    user: Optional[WsUser] = Depends(get_current_user_ws),
+):
+    if not user:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
     await websocket.accept()
-    channel_name = f"ride_{ride_id}"
-    logger.info(f"Client connected to WebSocket for ride: {ride_id}")
+    channel_name = get_ride_channel(ride_id)
+    logger.info("Client connected to WebSocket for ride: %s", ride_id)
 
     try:
-        # הראוטר נכנס להאזנה לרדיס על הערוץ הספציפי של הנסיעה
         async with broadcast.subscribe(channel=channel_name) as subscriber:
             async for event in subscriber:
-                # כשמגיעה הודעה (כמו color: red), היא נשלחת מיד לדפדפן
                 await websocket.send_text(event.message)
 
     except WebSocketDisconnect:
-        logger.info(f"Client disconnected from ride {ride_id}")
+        logger.info("Client disconnected from ride %s", ride_id)
 
 
 @router.websocket("/ws/{ride_id}/passengers")
@@ -205,7 +195,7 @@ async def ride_passengers_locations_websocket(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
     await websocket.accept()
-    channel_name = f"ride_{ride_id}{PASSENGER_LOCATIONS_CHANNEL_SUFFIX}"
+    channel_name = get_ride_passengers_channel(ride_id)
     try:
         async with broadcast.subscribe(channel=channel_name) as subscriber:
             async for event in subscriber:

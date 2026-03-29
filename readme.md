@@ -53,7 +53,7 @@ flowchart LR
 
 - **Frontend / Mobile** → REST to backend, WebSocket to chat-ws.  
 - **Backend** → PostgreSQL (data), Redis DB=0 (cache, rate limit, outbox worker), Redis DB=1 (chat completion events), RabbitMQ (async tasks, notifications).  
-- **chat-ws** → Redis DB=1 only (subscribe to chat channels, fan out to connected clients).
+- **chat-ws** → Redis DB=1 only (subscribe to chat channels, presence, **`user:online` / `user:offline`** Pub/Sub, fan out to connected clients).
 
 ---
 
@@ -62,7 +62,7 @@ flowchart LR
 | Service   | Language        | Role |
 |----------|------------------|------|
 | backend  | Python (FastAPI) | REST API, auth, rides, bookings, chat CRUD, **groups**, passengers (requests/matches), **admin JSON API** (`/api/v1/admin/*`), AI summary (Celery), notifications, outbox worker |
-| chat-ws  | Go               | WebSocket server; real-time message delivery only (no business logic) |
+| chat-ws  | Go               | WebSocket server; chat + typing + presence; Redis Pub/Sub including **`user:online` / `user:offline`** for instant partner status in UI |
 | frontend | React / TypeScript | Web app (Vite); Hebrew RTL |
 | mobile   | React Native / Expo | Mobile app (TypeScript) |
 
@@ -88,12 +88,12 @@ flowchart LR
 - ✅ **Async core flow refactor (Passenger/Booking/Ride):** core passenger-request, booking, and ride flows were migrated to SQLAlchemy 2.0 async patterns (`AsyncSession`, `select/execute`). **Bookings** are now async-only (no `db.run_sync`) and use `select(...).with_for_update()` where needed for race safety.
 - ✅ **Passenger requests (בקשות טרמפ):** create request from search, cancel request, view matches; optional link from booking to request
 - ✅ **Groups:** create group, join by invite code, manage members (remove, promote to admin), group rides and search; group avatar & description (S3); leave group / close group (admin)
-- ✅ Real-time chat (WebSocket) between driver and passenger
+- ✅ Real-time chat (WebSocket) between driver and passenger; **presence**: `users.last_active_at` + debounced PATCH on disconnect; **WS** `user_online` / `user_offline` for immediate header status (see `docs/architecture/REALTIME.md`)
 - ✅ AI conversation summary (Groq / Llama) and email on chat end
 - ✅ Push (**FCM**): מהשרת נשלחת רק מפת **`data`** ב־FCM (ללא בלוק `notification` של Firebase) — בחזית **חלונית Toast קופצת** + צליל, ברקע התראת מערכת דרך Service Worker (`push`); מייל (**Brevo**) והתראות in-app
 - ✅ Google OAuth and email/password auth with JWT + refresh
 - ✅ Geo: distance, route display, PostGIS-backed queries; **ride preview cache** (Redis, 24h) for route options + **geocode cache** (Redis, 24h, Google Geocoding) for address→coords reuse to reduce repeated external API calls
-- ✅ **GPS live tracking:** driver and passengers share location during active rides (WebSocket)
+- ✅ **GPS live tracking:** driver and passengers share location during active rides (REST → Redis Pub/Sub → WebSocket); the web app throttles location POSTs (~1.5s) and updates map markers in place — see [`docs/architecture/REALTIME.md`](docs/architecture/REALTIME.md) (GPS Tracking, frontend subsection).
 - ✅ **Group tags** on ride/booking cards (group name or "ציבורי"); RTL: route as destination ← origin; close button (×) top-left on cards
 - ✅ Profile and avatar upload (S3)
 - ✅ Outbox pattern for reliable event publishing to RabbitMQ
@@ -127,7 +127,7 @@ cp frontend/.env.example frontend/.env
 - **`chat-ws/.env`** — כולל `REDIS_URL` (לדוקר: `redis://:<סיסמה>@redis:6379/1`) ו־`JWT_SECRET` זהה ל־`SECRET_KEY` ב־`backend/.env`.
 - **FCM בדוקר:** `firebase-credentials.json` ממופה read-only ל־**backend** ול־**outbox-worker**; ב־`backend/.env` הגדר `FIREBASE_SERVICE_ACCOUNT_PATH` (נתיב בקונטיינר: `/app/infrastructure/firebase_core/firebase-credentials.json`).
 
-מיגרציות (פעם ראשונה / אחרי שינוי סכימה): `cd backend && alembic upgrade head` (עם `db/schema.sql` כעזר).
+**מיגרציות:** ב־**Docker Compose** שירות **`migrate`** מריץ `alembic upgrade head` פעם אחת לפני **backend** ו־**outbox-worker** (קונטיינר `linkup_migrate` יוצא עם `Exited (0)`); אם המיגרציה נכשלת ה־API וה־worker לא יעלו. **לוקאלי בלי Compose:** `cd backend && alembic upgrade head` (עם `db/schema.sql` כעזר) לפני `uvicorn`.
 
 ### פיתוח יומיומי
 
@@ -143,10 +143,10 @@ cd frontend && npm run dev
 - **אדמין (משתמש עם `is_admin`):** http://localhost:5173/admin — פירוט API ומבנה: [`ADMIN_DASHBOARD.md`](ADMIN_DASHBOARD.md)  
 - **בקאנד:** http://localhost:8000  
 - **Swagger:** http://localhost:8000/docs  
-- **Backend בדוקר:** `uvicorn` עם מספר workers לפי **`UVICORN_WORKERS`** ב-`backend/.env` (`backend/.env.example` מגדיר **4**; ב-`docker-compose` ברירת המחדל אם המשתנה חסר היא **1**).  
+- **Backend בדוקר:** `uvicorn` בלבד (בלי `alembic` באותה שורת פקודה); מספר workers לפי **`UVICORN_WORKERS`** ב-`backend/.env` (`backend/.env.example` מגדיר **4**; ב-`docker-compose` ברירת המחדל אם המשתנה חסר היא **1**). **Healthcheck** על המיכל בודק `GET /api/v1/health` דרך `python` (מופיע כ־`healthy` ב־`docker compose ps` אחרי `start_period`).  
 - צ׳אט בפיתוח: WebSocket ל־`localhost:8081`; WS נסיעות/התראות ל־`localhost:8000/api/v1` — ראו [`frontend/src/config/env.ts`](frontend/src/config/env.ts).
 
-ב־[`docker-compose.yml`](docker-compose.yml) שירותי **`frontend`** ו־**`nginx`** מוגדרים עם `profiles: ["prod"]` — לא עולים ב־`docker compose up -d` ללא הפרופיל.
+ב־[`docker-compose.yml`](docker-compose.yml) שירותי **`frontend`** ו־**`nginx`** מוגדרים עם `profiles: ["prod"]` — לא עולים ב־`docker compose up -d` ללא הפרופיל. בפרופיל prod, **nginx** תלוי ב־**backend** במצב **`service_healthy`** (לא רק `started`).
 
 ### בדיקת פרודקשן
 
@@ -161,8 +161,9 @@ docker compose --profile prod up -d --build
 ```bash
 docker compose down          # עצור
 docker compose down -v       # עצור + איפוס volumes (DB וכו׳)
+docker compose logs migrate  # לוג מיגרציה (אם נכשל — לבדוק כאן)
 docker compose logs backend  # לוגים
-docker compose ps            # סטטוס
+docker compose ps            # סטטוס (backend: healthy / ממתין)
 ```
 
 ---
@@ -173,7 +174,7 @@ docker compose ps            # סטטוס
 |------------|-------------|
 | `backend/` | FastAPI app: API, domain logic, workers (outbox, notifications, chat completion listener), Alembic migrations |
 | `chat-ws/` | Go WebSocket server: Redis subscribe, JWT auth, message fan-out to clients |
-| `frontend/`| React (Vite) web app; Dockerfile + `nginx.conf` לתוך image סטטי; מודול אדמין ב־`src/features/admin/` (מסלולים `/admin/*`) |
+| `frontend/`| React (Vite) web app; Dockerfile + `nginx.conf` לתוך image סטטי; מודול אדמין ב־`src/features/admin/` (מסלולים `/admin/*`); WebSocket — [`frontend/README.md`](frontend/README.md), חוזי JSON ב־[`docs/architecture/REALTIME.md`](docs/architecture/REALTIME.md) |
 | `nginx/`   | קונפיג Nginx ל־Compose — reverse proxy (פורט 80): API, chat-ws, פרונט |
 | `mobile/`  | React Native (Expo) app |
 | `k8s/`     | Kubernetes base, backend, chat-ws, frontend, infra (Postgres, Redis, RabbitMQ) |

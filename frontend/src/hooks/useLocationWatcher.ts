@@ -52,7 +52,7 @@ export function useLocationWatcher({
         });
       },
       (err) => onErrorRef.current?.(`שגיאת מיקום: ${err.message || 'גאולוקציה לא זמינה'}`),
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     );
 
     watchIdRef.current = watchId;

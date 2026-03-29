@@ -79,3 +79,49 @@ class InfrastructureError(LinkupError):
         super().__init__(
             message=message, error_code=error_code or self.error_code, payload=payload
         )
+
+
+class RateLimitExceeded(LinkupError):
+    """יותר מדי בקשות — לקוח יכול לקרוא retry_after מ-details."""
+
+    status_code = 429
+    error_code = "RATE_LIMIT_EXCEEDED"
+    message = "יותר מדי בקשות, נסה שוב מאוחר יותר"
+
+    def __init__(self, retry_after: Optional[int] = None):
+        payload: Optional[Dict[str, Any]] = None
+        if retry_after is not None:
+            payload = {"retry_after": retry_after}
+        super().__init__(payload=payload)
+
+
+class S3UploadFailed(LinkupError):
+    status_code = 502
+    error_code = "S3_UPLOAD_FAILED"
+    message = "העלאת הקובץ לשירות האחסון נכשלה"
+
+
+class S3DeleteFailed(LinkupError):
+    status_code = 502
+    error_code = "S3_DELETE_FAILED"
+    message = "מחיקת הקובץ מהאחסון נכשלה"
+
+
+class RedisUnavailable(LinkupError):
+    status_code = 503
+    error_code = "REDIS_UNAVAILABLE"
+    message = "שירות הזיכרון (Redis) אינו זמין כרגע"
+
+
+class WorkerTaskFailed(LinkupError):
+    status_code = 500
+    error_code = "WORKER_TASK_FAILED"
+    message = "משימת רקע נכשלה"
+
+
+class ExternalServiceError(LinkupError):
+    """כשל בקריאה לשירות חיצוני (מייל, מפות, OAuth provider, וכו')."""
+
+    status_code = 502
+    error_code = "EXTERNAL_SERVICE_ERROR"
+    message = "שירות חיצוני אינו זמין או החזיר שגיאה"

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Optional, Any, Dict, Union
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -136,6 +137,16 @@ class CRUDUser:
         await db.commit()
         await db.refresh(user)
         return user
+
+    async def update_last_active(self, db: AsyncSession, *, user_id: Union[UUID, str]) -> bool:
+        """עדכון זמן פעילות אחרונה (צ'אט וכו') — לא משנה last_login."""
+        user = await self.get_by_id(db, user_id)
+        if not user:
+            return False
+        user.last_active_at = datetime.now(timezone.utc)
+        db.add(user)
+        await db.commit()
+        return True
 
 
 # יצירת מופע יחיד (Singleton) שישמש את ה-Services

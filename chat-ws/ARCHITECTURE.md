@@ -8,7 +8,7 @@
 **מה כן:**
 - ✅ WebSocket connections management
 - ✅ JWT authentication (WS + HTTP presence)
-- ✅ Subscribe ל-Redis (`chat:conversation:*`, `chat:typing:*`, … + **`user:offline`**) — בניתוק מפרסמים `user:offline` וכל המופעים משדרים WS `user_offline` ללקוחות (עדכון מיידי ב-UI; פולינג נשאר גיבוי)
+- ✅ Subscribe ל-Redis (`chat:conversation:*`, `chat:typing:*`, … + **`user:offline`** + **`user:online`**) — בחיבור: `PUBLISH user:online` → WS `user_online`; בניתוק: `user:offline` → `user_offline` (עדכון מיידי ב-UI). לקוחות Redis נפרדים ל-subscribe כדי לא לחסום עם `PSubscribe` של הצ'אט
 - ✅ Forward messages ל-clients
 - ✅ Typing events (`typing_start` / `typing_stop`) דרך Redis (`chat:typing:*`)
 - ✅ **HTTP `GET /presence/{user_id}`** — `online` מ-Redis; `last_seen` מ-backend (`GET /api/v1/users/{id}/last-seen`) כשצריך
@@ -73,6 +73,7 @@ Client → POST /api/v1/chat/conversations/{id}/messages (backend)
        → Backend שומר ב-DB
        → Backend מפרסם ל-Redis (chat:conversation:{id})
        → chat-ws מקבל מ-Redis → שולח ל-WebSocket
+       → לאחר שליחה: backend מעדכן גם **`users.last_active_at`**
        → אם הודעת סיום: Backend מפרסם ל-Redis DB 1 (chat:completion:{id})
        → outbox-worker מאזין → מנתח (AI) → שומר תוצאה + outbox
 ```

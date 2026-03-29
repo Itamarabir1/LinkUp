@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -33,6 +34,8 @@ func main() {
 	defer redisClient.Close()
 	redisOfflineSub := redisv9.NewClient(opt)
 	defer redisOfflineSub.Close()
+	redisOnlineSub := redisv9.NewClient(opt)
+	defer redisOnlineSub.Close()
 
 	h := hub.NewHub(redisClient)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -40,12 +43,13 @@ func main() {
 
 	go redis.RunSubscriber(ctx, redisClient, h)
 	go h.RunUserOfflineSubscriber(ctx, redisOfflineSub)
+	go h.RunUserOnlineSubscriber(ctx, redisOnlineSub)
 	go h.RunLastSeenDebounceWorker(ctx, cfg)
 
 	http.HandleFunc("/ws", h.HandleWS(cfg))
 	http.HandleFunc("/presence/", api.HandlePresence(cfg, redisClient))
 	addr := ":" + strconv.Itoa(cfg.Port)
-	log.Printf("chat-ws listening on %s (WS /ws, HTTP GET /presence/{userID})", addr)
+	slog.Info("chat-ws listening", "component", "server", "addr", addr, "ws", "/ws", "presence", "/presence/{userID}")
 
 	go func() {
 		if err := http.ListenAndServe(addr, nil); err != nil && err != http.ErrServerClosed {
@@ -56,6 +60,6 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("shutting down...")
+	slog.Info("shutting down", "component", "server")
 	cancel()
 }
