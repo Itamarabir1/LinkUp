@@ -59,12 +59,8 @@ class RideMapper:
                 departure_time=departure_time,
                 estimated_arrival_time=estimated_arrival,
                 # המרות גיאוגרפיות (PostGIS)
-                origin_geom=to_geo_point(
-                    cached_data["origin_lat"], cached_data["origin_lon"]
-                ),
-                destination_geom=to_geo_point(
-                    cached_data["dest_lat"], cached_data["dest_lon"]
-                ),
+                origin_geom=to_geo_point(cached_data["origin_lat"], cached_data["origin_lon"]),
+                destination_geom=to_geo_point(cached_data["dest_lat"], cached_data["dest_lon"]),
                 route_coords=to_geo_line(route.get("coords", [])),
                 route_summary=(route.get("summary") or "").strip() or None,
                 # נתוני מסלול – מהמסלול שנבחר בלבד (נכנסים לטבלה)
@@ -106,9 +102,7 @@ class RideMapper:
         selected_route = routes[idx]
         for field in ("duration_min", "distance_km"):
             if field not in selected_route:
-                raise InvalidRouteError(
-                    detail=f"Missing route field for selected route: {field}"
-                )
+                raise InvalidRouteError(detail=f"Missing route field for selected route: {field}")
 
     @staticmethod
     def _parse_time(departure_time: Any) -> datetime:

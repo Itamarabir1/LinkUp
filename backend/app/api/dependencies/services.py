@@ -16,4 +16,3 @@ def get_ride_service() -> RideService:
 def get_auth_service() -> AuthService:
     """Factory ל-AuthService."""
     return AuthService()
-

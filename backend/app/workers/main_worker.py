@@ -76,9 +76,7 @@ async def main():
 
         # 3. הזרקת תלויות (Dependency Injection)
         rmq_publisher = RabbitMQPublisher(rabbit_client=rabbit_client)
-        dispatcher = DispatcherFactory.create_standard_dispatcher(
-            publishers=[rmq_publisher]
-        )
+        dispatcher = DispatcherFactory.create_standard_dispatcher(publishers=[rmq_publisher])
 
         notifications_consumer = RabbitMQConsumer(
             rabbit_client,
@@ -98,15 +96,9 @@ async def main():
 
         # 4. הגדרת המשימות כ-Tasks עצמאיים (כולל משימות מתוזמנות דרך התור)
         tasks = [
-            asyncio.create_task(
-                notifications_consumer.consume(callback=handle_notification_event)
-            ),
-            asyncio.create_task(
-                avatar_upload_consumer.consume(callback=handle_avatar_upload_event)
-            ),
-            asyncio.create_task(
-                scheduled_tasks_consumer.consume(callback=handle_scheduled_task)
-            ),
+            asyncio.create_task(notifications_consumer.consume(callback=handle_notification_event)),
+            asyncio.create_task(avatar_upload_consumer.consume(callback=handle_avatar_upload_event)),
+            asyncio.create_task(scheduled_tasks_consumer.consume(callback=handle_scheduled_task)),
             asyncio.create_task(run_scheduled_tasks_publisher()),
             asyncio.create_task(run_outbox_worker(dispatcher=dispatcher)),
             asyncio.create_task(run_chat_completion_redis_listener(stop_event)),

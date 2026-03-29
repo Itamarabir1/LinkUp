@@ -104,9 +104,7 @@ async def get_conversation(
     current_user: User = Depends(get_current_user),
 ):
     """פרטי שיחה אחת – רק אם המשתמש participant."""
-    return await get_conversation_detail(
-        db, conversation_id=conversation_id, current_user_id=current_user.user_id
-    )
+    return await get_conversation_detail(db, conversation_id=conversation_id, current_user_id=current_user.user_id)
 
 
 @router.post(
@@ -171,9 +169,7 @@ async def export_conversation_calendar(
     from app.domain.chat.calendar_export import get_conversation_for_calendar_export
 
     # איסוף נתוני שיחה
-    conv_data = await get_conversation_for_calendar_export(
-        db, conversation_id, current_user.user_id
-    )
+    conv_data = await get_conversation_for_calendar_export(db, conversation_id, current_user.user_id)
     if not conv_data:
         raise ChatRoomNotFound()
 

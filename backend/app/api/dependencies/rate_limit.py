@@ -27,8 +27,6 @@ async def rate_limit_auth(request: Request) -> None:
     window = getattr(settings, "RATE_LIMIT_AUTH_WINDOW_SECONDS", 60)
     max_req = getattr(settings, "RATE_LIMIT_AUTH_MAX_REQUESTS", 10)
 
-    allowed = await redis_client.rate_limit_check(
-        key, window_seconds=window, max_count=max_req
-    )
+    allowed = await redis_client.rate_limit_check(key, window_seconds=window, max_count=max_req)
     if not allowed:
         raise RateLimitExceeded(retry_after=window)

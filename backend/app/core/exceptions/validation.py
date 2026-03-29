@@ -37,9 +37,7 @@ class PasswordTooWeakError(LinkupError):
     message = "הסיסמה חלשה מדי"
 
     def __init__(self, details: str = None):
-        description = (
-            details or "על הסיסמה להכיל לפחות 8 תווים, אות גדולה, קטנה, מספר ותו מיוחד"
-        )
+        description = details or "על הסיסמה להכיל לפחות 8 תווים, אות גדולה, קטנה, מספר ותו מיוחד"
         super().__init__(
             message=f"{self.message}: {description}",
             status_code=self.status_code,

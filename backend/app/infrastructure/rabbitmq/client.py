@@ -21,9 +21,7 @@ class RabbitMQClient:
         async with self._lock:
             if self._connection is None or self._connection.is_closed:
                 try:
-                    self._connection = await aio_pika.connect_robust(
-                        settings.RABBITMQ_URL, timeout=10
-                    )
+                    self._connection = await aio_pika.connect_robust(settings.RABBITMQ_URL, timeout=10)
                     self._channel = await self._connection.channel()
                     logger.info("✅ RabbitMQ Client connected")
                 except Exception as e:
@@ -41,9 +39,7 @@ class RabbitMQClient:
 
             if exchange_name:
                 if exchange_name not in self._exchanges:
-                    self._exchanges[exchange_name] = await channel.declare_exchange(
-                        exchange_name, aio_pika.ExchangeType.TOPIC, durable=True
-                    )
+                    self._exchanges[exchange_name] = await channel.declare_exchange(exchange_name, aio_pika.ExchangeType.TOPIC, durable=True)
                 target = self._exchanges[exchange_name]
             else:
                 target = channel.default_exchange

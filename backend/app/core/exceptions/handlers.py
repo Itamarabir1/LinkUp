@@ -73,9 +73,7 @@ async def linkup_exception_handler(request: Request, exc: LinkupError):
     return response
 
 
-async def request_validation_exception_handler(
-    request: Request, exc: RequestValidationError
-):
+async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
     request_id = getattr(request.state, "request_id", None) or ""
     fields: List[dict] = []
     for err in exc.errors():

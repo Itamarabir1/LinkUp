@@ -13,12 +13,8 @@ class GeoLocationMixin:
     dest_lon = Column(Float, nullable=False)
 
     # השדות האלו קריטיים לשאילתות מרחק (Spatial Queries)
-    origin_geom = Column(
-        Geometry(geometry_type="POINT", srid=4326), index=True, nullable=False
-    )
-    destination_geom = Column(
-        Geometry(geometry_type="POINT", srid=4326), index=True, nullable=False
-    )
+    origin_geom = Column(Geometry(geometry_type="POINT", srid=4326), index=True, nullable=False)
+    destination_geom = Column(Geometry(geometry_type="POINT", srid=4326), index=True, nullable=False)
 
     @staticmethod
     def create_point(lat: float, lon: float):

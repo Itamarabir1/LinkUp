@@ -57,9 +57,7 @@ class InvalidResetCodeError(LinkupError):
     message = "קוד שחזור הסיסמה שגוי או פג תוקף"
 
     def __init__(self, email: Optional[str] = None):
-        super().__init__(
-            message=self.message, payload={"email": email} if email else None
-        )
+        super().__init__(message=self.message, payload={"email": email} if email else None)
 
 
 class InvalidRefreshTokenError(LinkupError):
@@ -86,9 +84,7 @@ class InvalidPasswordError(LinkupError):
 
 class PasswordTooWeakError(LinkupError):
     def __init__(self, details: str = None):
-        description = (
-            details or "על הסיסמה להכיל לפחות 8 תווים, אות גדולה, קטנה, מספר ותו מיוחד"
-        )
+        description = details or "על הסיסמה להכיל לפחות 8 תווים, אות גדולה, קטנה, מספר ותו מיוחד"
         super().__init__(
             message=f"הסיסמה חלשה מדי: {description}",
             status_code=status.HTTP_400_BAD_REQUEST,

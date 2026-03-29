@@ -63,20 +63,14 @@ async def request_to_join(
 
 
 @router.patch("/{booking_id}/approve", response_model=BookingResponse)
-async def approve_booking(
-    booking_id: UUID, driver_id: UUID, db: AsyncSession = Depends(get_db)
-):
+async def approve_booking(booking_id: UUID, driver_id: UUID, db: AsyncSession = Depends(get_db)):
     return await BookingService.approve_booking(db, booking_id, driver_id)
 
 
 @router.patch("/{booking_id}/reject", response_model=BookingResponse)
-async def reject_booking(
-    booking_id: UUID, driver_id: UUID, db: AsyncSession = Depends(get_db)
-):
+async def reject_booking(booking_id: UUID, driver_id: UUID, db: AsyncSession = Depends(get_db)):
     try:
-        return await BookingService.reject_booking(
-            db, booking_id=booking_id, driver_id=driver_id
-        )
+        return await BookingService.reject_booking(db, booking_id=booking_id, driver_id=driver_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -96,23 +90,17 @@ async def get_user_bookings(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await BookingService.get_user_bookings(
-        db, user_id=current_user.user_id, status=status, page=1, limit=50
-    )
+    result = await BookingService.get_user_bookings(db, user_id=current_user.user_id, status=status, page=1, limit=50)
     return result.items
 
 
 @router.get("/ride/{ride_id}/manifest", response_model=RideManifestResponse)
-async def get_ride_manifest(
-    ride_id: UUID, driver_id: UUID, db: AsyncSession = Depends(get_db)
-):
+async def get_ride_manifest(ride_id: UUID, driver_id: UUID, db: AsyncSession = Depends(get_db)):
     return await BookingService.get_ride_manifest(db, ride_id, driver_id)
 
 
 @router.get("/ride/{ride_id}/pending", response_model=List[BookingResponse])
-async def get_pending_requests(
-    ride_id: UUID, driver_id: UUID, db: AsyncSession = Depends(get_db)
-):
+async def get_pending_requests(ride_id: UUID, driver_id: UUID, db: AsyncSession = Depends(get_db)):
     return await BookingService.get_pending_requests(db, ride_id, driver_id)
 
 
@@ -134,9 +122,7 @@ async def report_driver_location(
     """
     booking = await BookingService.get_booking(db, booking_id)
     if not booking or not booking.ride:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
     if str(booking.ride.driver_id) != str(current_user.user_id):
         raise ForbiddenRideActionError("גישה חסומה – רק נהג הנסיעה יכול לדווח מיקום")
     if booking.ride.status != RideStatus.ACTIVE:
@@ -144,9 +130,7 @@ async def report_driver_location(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="ניתן לדווח מיקום רק בנסיעה פעילה (active)",
         )
-    confirmed = await crud_booking.get_ride_bookings_by_status_async(
-        db, booking.ride_id, BookingStatus.CONFIRMED
-    )
+    confirmed = await crud_booking.get_ride_bookings_by_status_async(db, booking.ride_id, BookingStatus.CONFIRMED)
     involved = [b.booking_id for b in confirmed]
     location_in = LocationUpdate(
         booking_id=0,
@@ -172,13 +156,9 @@ async def report_passenger_location(
     """
     booking = await BookingService.get_booking(db, booking_id)
     if not booking or not booking.ride:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
     if str(booking.passenger_id) != str(current_user.user_id):
-        raise ForbiddenRideActionError(
-            "גישה חסומה – רק הנוסע של ההזמנה יכול לדווח מיקום"
-        )
+        raise ForbiddenRideActionError("גישה חסומה – רק הנוסע של ההזמנה יכול לדווח מיקום")
     await broadcast_passenger_location_to_driver(
         ride_id=booking.ride_id,
         booking_id=booking.booking_id,

@@ -23,9 +23,7 @@ class WebSocketInfrastructure:
             # אנחנו מחזירים את ה-Context Manager עצמו
             return broadcast.subscribe(channel=channel_name)
         except Exception as e:
-            logger.error(
-                f"❌ Failed to create subscriber for channel {channel_name}: {e}"
-            )
+            logger.error(f"❌ Failed to create subscriber for channel {channel_name}: {e}")
             # כאן המקום להשתמש ב-LinkupError שלך אם תרצה לעטוף שגיאות תשתית
             raise
 

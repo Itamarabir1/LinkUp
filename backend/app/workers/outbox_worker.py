@@ -20,9 +20,7 @@ async def run_outbox_worker(dispatcher: EventDispatcher, interval: float = 2.0):
             if _poll_count % 30 == 0:
                 n = len(events) if events else 0
                 print(f"[NOTIF] Worker: poll #{_poll_count} -> {n} pending", flush=True)
-                logger.info(
-                    "[NOTIF] Outbox: poll #%s -> %s pending events", _poll_count, n
-                )
+                logger.info("[NOTIF] Outbox: poll #%s -> %s pending events", _poll_count, n)
             if events:
                 logger.info("[NOTIF] Outbox: fetched %s pending event(s)", len(events))
                 for e in events:

@@ -13,24 +13,16 @@ from app.domain.rides.schema import RideResponse
 class Passenger(BaseModel):
     """השרת ממלא passenger_id מהמשתמש המחובר – לא מהגוף."""
 
-    passenger_id: Optional[UUID] = Field(
-        None, description="ממולא בשרת מהטוקן; התעלם בקליינט"
-    )
+    passenger_id: Optional[UUID] = Field(None, description="ממולא בשרת מהטוקן; התעלם בקליינט")
     num_passengers: int = Field(default=1, ge=1)
-    pickup_name: str = Field(
-        ..., min_length=1, description="שם מקום איסוף (טקסט או ממיקום נוכחי)"
-    )
+    pickup_name: str = Field(..., min_length=1, description="שם מקום איסוף (טקסט או ממיקום נוכחי)")
     destination_name: str = Field(..., min_length=1)
     requested_departure_time: Optional[datetime] = Field(
         None,
         description="אופציונלי – אם ריק יחפש 'מעכשיו'",
     )
-    search_radius: int = Field(
-        default=1000, ge=100, description="רדיוס חיפוש במטרים (אחיד עם חיפוש)"
-    )
-    is_notification_active: bool = Field(
-        default=True, description="התראות מייל ופוש לבקשה זו"
-    )
+    search_radius: int = Field(default=1000, ge=100, description="רדיוס חיפוש במטרים (אחיד עם חיפוש)")
+    is_notification_active: bool = Field(default=True, description="התראות מייל ופוש לבקשה זו")
     pickup_lat: Optional[float] = Field(None, ge=-90, le=90)
     pickup_lon: Optional[float] = Field(None, ge=-180, le=180)
 
@@ -49,9 +41,7 @@ class Passenger(BaseModel):
 
 
 class PassengerRequestCreate(Passenger):
-    is_auto_generated: bool = Field(
-        default=False, description="האם נוצר מחיפוש אוטומטי"
-    )
+    is_auto_generated: bool = Field(default=False, description="האם נוצר מחיפוש אוטומטי")
     group_id: Optional[UUID] = None
 
 
@@ -83,9 +73,7 @@ class PassengerRequestWithMatches(PassengerRequestResponse):
     יורשת אוטומטית את is_notification_active מ-PassengerRequestResponse.
     """
 
-    matching_rides: List[RideResponse] = Field(
-        default=[], description="רשימת נהגים רלוונטיים שנמצאו מיד"
-    )
+    matching_rides: List[RideResponse] = Field(default=[], description="רשימת נהגים רלוונטיים שנמצאו מיד")
 
 
 # --- 2. סכמות לעדכון (Partial Update) ---
@@ -106,18 +94,14 @@ class RideSearchRequest(BaseModel):
     passenger_id: Optional[UUID] = Field(None, description="ממולא בשרת כשמשתמש מחובר")
     pickup_name: str = Field(..., min_length=2)
     destination_name: str = Field(..., min_length=2)
-    search_radius: int = Field(
-        default=1000, ge=100, description="רדיוס חיפוש במטרים (אחיד)"
-    )
+    search_radius: int = Field(default=1000, ge=100, description="רדיוס חיפוש במטרים (אחיד)")
     departure_time: Optional[datetime] = Field(
         None,
         description="מתי הנוסע צריך לצאת (אם ריק – יחפש מעכשיו)",
     )
     limit: int = Field(default=20, ge=1, le=50)
     after: Optional[UUID] = Field(None, description="cursor: ride_id אחרייו להמשיך")
-    group_id: Optional[UUID] = Field(
-        None, description="אם קיים — מסנן רק נסיעות של הקבוצה"
-    )
+    group_id: Optional[UUID] = Field(None, description="אם קיים — מסנן רק נסיעות של הקבוצה")
 
 
 class RideSearchResponse(BaseModel):

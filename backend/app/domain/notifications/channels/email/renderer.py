@@ -28,9 +28,7 @@ def render_email_template(template_name: str, **context) -> str:
 
     except TemplateNotFound:
         # סניור נותן לוג מפורט שיעזור לו ב-3 בלילה להבין מה חסר
-        logger.error(
-            f"❌ Template not found: {template_name} | Searched in: {TEMPLATE_DIR}"
-        )
+        logger.error(f"❌ Template not found: {template_name} | Searched in: {TEMPLATE_DIR}")
         return ""  # במייל עדיף להחזיר ריק או שגיאה ברורה כדי לא לשלוח ג'יבריש ללקוח
 
     except Exception as e:

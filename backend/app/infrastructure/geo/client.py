@@ -62,9 +62,7 @@ class GeoClient:
 
         self.geolocator = _GeoLocator()
 
-    async def fetch_coordinates(
-        self, address: str
-    ) -> Tuple[Optional[float], Optional[float]]:
+    async def fetch_coordinates(self, address: str) -> Tuple[Optional[float], Optional[float]]:
         """
         הופך כתובת לקואורדינטות (Geocoding) — עם Redis cache.
 
@@ -85,9 +83,7 @@ class GeoClient:
         # אם הוזרק geolocator בבדיקות/מונקי-פאצ׳ינג, השתמש בו.
         try:
             loc = self.geolocator.geocode(address)
-            if loc and getattr(loc, "latitude", None) is not None and getattr(
-                loc, "longitude", None
-            ) is not None:
+            if loc and getattr(loc, "latitude", None) is not None and getattr(loc, "longitude", None) is not None:
                 await set_cached_coords(address, float(loc.latitude), float(loc.longitude))
                 return float(loc.latitude), float(loc.longitude)
         except Exception as e:
@@ -101,9 +97,7 @@ class GeoClient:
         await set_cached_coords(address, lat, lon)
         return lat, lon
 
-    async def fetch_distance_matrix(
-        self, start: Tuple[float, float], end: Tuple[float, float]
-    ) -> Optional[Tuple[int, int]]:
+    async def fetch_distance_matrix(self, start: Tuple[float, float], end: Tuple[float, float]) -> Optional[Tuple[int, int]]:
         """
         קריאה ל-Google Distance Matrix API לזמן נסיעה ומרחק (מטרים) בין מוצא ליעד.
         מחזיר (duration_sec, distance_m) או None אם נכשל.
@@ -196,12 +190,8 @@ class GeoClient:
                 out: List[Dict] = []
                 for i, r in enumerate(routes_raw):
                     legs = r.get("legs", [])
-                    duration_sec = sum(
-                        leg.get("duration", {}).get("value", 0) for leg in legs
-                    )
-                    distance_m = sum(
-                        leg.get("distance", {}).get("value", 0) for leg in legs
-                    )
+                    duration_sec = sum(leg.get("duration", {}).get("value", 0) for leg in legs)
+                    distance_m = sum(leg.get("distance", {}).get("value", 0) for leg in legs)
                     poly = r.get("overview_polyline", {}).get("points", "")
                     coords = _decode_polyline(poly) if poly else []
                     summary = r.get("summary") or f"מסלול {i + 1}"
@@ -220,12 +210,8 @@ class GeoClient:
                     for route in out:
                         route["duration"] = duration_dm
                         route["distance"] = distance_dm
-                    logger.info(
-                        f"Distance Matrix: duration={duration_dm}s, distance={distance_dm}m applied to {len(out)} routes"
-                    )
-                logger.info(
-                    f"Google Directions: {len(out)} routes for {origin} -> {destination}"
-                )
+                    logger.info(f"Distance Matrix: duration={duration_dm}s, distance={distance_dm}m applied to {len(out)} routes")
+                logger.info(f"Google Directions: {len(out)} routes for {origin} -> {destination}")
                 return out
             except Exception as e:
                 logger.error(f"Google Directions error: {e}", exc_info=True)

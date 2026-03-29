@@ -14,9 +14,7 @@ from app.domain.chat.model import Conversation, Message, ConversationParticipant
 # --- Conversations ---
 
 
-async def get_or_create_conversation(
-    db: AsyncSession, user_id_a: UUID, user_id_b: UUID
-) -> Conversation:
+async def get_or_create_conversation(db: AsyncSession, user_id_a: UUID, user_id_b: UUID) -> Conversation:
     """
     מחזיר שיחה קיימת בין שני המשתמשים, או יוצר חדשה.
     user_id_1 < user_id_2 תמיד.
@@ -44,9 +42,7 @@ async def get_or_create_conversation(
     return conv
 
 
-async def get_conversation_by_id(
-    db: AsyncSession, conversation_id: UUID, participant_user_id: UUID
-) -> Conversation | None:
+async def get_conversation_by_id(db: AsyncSession, conversation_id: UUID, participant_user_id: UUID) -> Conversation | None:
     """
     מחזיר שיחה לפי ID רק אם המשתמש הוא participant (user_id_1 או user_id_2).
     """
@@ -69,9 +65,7 @@ async def get_conversation_by_id(
     return result.scalars().first()
 
 
-async def list_conversations_for_user(
-    db: AsyncSession, user_id: UUID
-) -> list[Conversation]:
+async def list_conversations_for_user(db: AsyncSession, user_id: UUID) -> list[Conversation]:
     """
     רשימת כל השיחות של המשתמש (כשותף).
     """
@@ -130,9 +124,7 @@ async def get_conversations_with_timeout(
             selectinload(Conversation.user_2),
         )
         .join(subquery, Conversation.conversation_id == subquery.c.conversation_id)
-        .outerjoin(
-            ChatAnalysis, Conversation.conversation_id == ChatAnalysis.conversation_id
-        )
+        .outerjoin(ChatAnalysis, Conversation.conversation_id == ChatAnalysis.conversation_id)
         .where(ChatAnalysis.conversation_id.is_(None))  # אין ניתוח קיים
     )
     return list(result.scalars().unique().all())
@@ -172,12 +164,7 @@ async def get_messages(
     מחזיר (רשימה בסדר כרונולוגי ישן→חדש, has_more).
     """
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
-    q = (
-        select(Message)
-        .where(Message.conversation_id == cid)
-        .order_by(desc(Message.created_at))
-        .limit(limit + 1)
-    )
+    q = select(Message).where(Message.conversation_id == cid).order_by(desc(Message.created_at)).limit(limit + 1)
     if before_message_id is not None:
         sub = select(Message.created_at).where(Message.message_id == before_message_id)
         q = q.where(Message.created_at < sub.scalar_subquery())
@@ -195,11 +182,7 @@ async def get_all_messages_for_conversation(
 ) -> list[Message]:
     """שליפת כל ההודעות בשיחה (לשימוש פנימי: calendar export, AI analysis). בסדר כרונולוגי."""
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
-    q = (
-        select(Message)
-        .where(Message.conversation_id == cid)
-        .order_by(Message.created_at.asc())
-    )
+    q = select(Message).where(Message.conversation_id == cid).order_by(Message.created_at.asc())
     if limit is not None:
         q = q.limit(limit)
     result = await db.execute(q)
@@ -209,12 +192,7 @@ async def get_all_messages_for_conversation(
 async def get_last_message(db: AsyncSession, conversation_id: UUID) -> Message | None:
     """הודעה אחרונה בשיחה (להרשימה)."""
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
-    result = await db.execute(
-        select(Message)
-        .where(Message.conversation_id == cid)
-        .order_by(desc(Message.created_at))
-        .limit(1)
-    )
+    result = await db.execute(select(Message).where(Message.conversation_id == cid).order_by(desc(Message.created_at)).limit(1))
     return result.scalars().first()
 
 
@@ -288,12 +266,9 @@ async def has_unread_messages(db: AsyncSession, conversation_id: UUID, user_id: 
     )
     last_read_at = part_res.scalar_one_or_none()
 
-    msg_q = (
-        select(func.max(Message.created_at))
-        .where(
-            Message.conversation_id == cid,
-            Message.sender_id != uid,
-        )
+    msg_q = select(func.max(Message.created_at)).where(
+        Message.conversation_id == cid,
+        Message.sender_id != uid,
     )
     msg_res = await db.execute(msg_q)
     last_other_msg_at = msg_res.scalar_one_or_none()

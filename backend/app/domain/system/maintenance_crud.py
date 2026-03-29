@@ -15,9 +15,7 @@ logger = logging.getLogger(__name__)
 def _table_missing(exc: BaseException) -> bool:
     """בודק אם השגיאה היא טבלה/relation לא קיימת (schema לא הורץ)."""
     msg = str(exc).lower()
-    return (
-        "does not exist" in msg or "undefinedtable" in msg or "undefined_table" in msg
-    )
+    return "does not exist" in msg or "undefinedtable" in msg or "undefined_table" in msg
 
 
 class MaintenanceCRUD:
@@ -59,16 +57,13 @@ class MaintenanceCRUD:
                 return 0
             raise
 
-    async def _update_expired_passenger_requests(
-        self, db: AsyncSession, now: datetime
-    ) -> int:
+    async def _update_expired_passenger_requests(self, db: AsyncSession, now: datetime) -> int:
         try:
             stmt = (
                 update(PassengerRequest)
                 .where(
                     PassengerRequest.requested_departure_time <= now,
-                    PassengerRequest.status
-                    == text("'active'::passenger_request_status"),
+                    PassengerRequest.status == text("'active'::passenger_request_status"),
                 )
                 .values(status=text("'expired'::passenger_request_status"))
             )
@@ -84,16 +79,13 @@ class MaintenanceCRUD:
                 return 0
             raise
 
-    async def _update_completed_passenger_requests(
-        self, db: AsyncSession, now: datetime
-    ) -> int:
+    async def _update_completed_passenger_requests(self, db: AsyncSession, now: datetime) -> int:
         try:
             stmt = (
                 update(PassengerRequest)
                 .where(
                     PassengerRequest.requested_departure_time <= now,
-                    PassengerRequest.status
-                    == text("'matched'::passenger_request_status"),
+                    PassengerRequest.status == text("'matched'::passenger_request_status"),
                 )
                 .values(status=text("'cancelled'::passenger_request_status"))
             )
@@ -121,9 +113,7 @@ class MaintenanceCRUD:
         except ProgrammingError as e:
             if _table_missing(e):
                 await db.rollback()
-                logger.warning(
-                    "Maintenance: table bookings missing – run db/schema.sql. %s", e
-                )
+                logger.warning("Maintenance: table bookings missing – run db/schema.sql. %s", e)
                 return 0
             raise
 

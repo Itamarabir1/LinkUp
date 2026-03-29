@@ -32,9 +32,7 @@ class CRUDPassenger:
 
     # --- שליפה ---
 
-    async def get_by_id(
-        self, db: AsyncSession, request_id: UUID
-    ) -> Optional[PassengerRequest]:
+    async def get_by_id(self, db: AsyncSession, request_id: UUID) -> Optional[PassengerRequest]:
         """שליפת בקשה לפי request_id (AsyncSession)."""
         rid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
         return await db.get(PassengerRequest, rid)
@@ -51,9 +49,7 @@ class CRUDPassenger:
     ) -> List[PassengerRequest]:
         """שליפת בקשות לפי נוסע (למסך 'הבקשות שלי')."""
         pid = UUID(str(passenger_id)) if isinstance(passenger_id, str) else passenger_id
-        stmt = select(PassengerRequest).where(
-            PassengerRequest.passenger_id == pid
-        )
+        stmt = select(PassengerRequest).where(PassengerRequest.passenger_id == pid)
         if status is not None:
             stmt = stmt.where(PassengerRequest.status == status)
         stmt = stmt.order_by(PassengerRequest.requested_departure_time.desc())
@@ -123,9 +119,7 @@ class CRUDPassenger:
         filters = and_(
             Ride.status.in_([RideStatus.OPEN, RideStatus.FULL]),
             Ride.available_seats > 0,
-            Ride.group_id == group_id
-            if group_id is not None
-            else Ride.group_id.is_(None),
+            Ride.group_id == group_id if group_id is not None else Ride.group_id.is_(None),
             func.ST_DWithin(
                 cast(Ride.route_coords, Geography),
                 cast(pickup_geo, Geography),
@@ -136,15 +130,12 @@ class CRUDPassenger:
                 cast(dest_geo, Geography),
                 radius,
             ),
-            func.ST_LineLocatePoint(
-                cast(Ride.route_coords, Geometry), cast(pickup_geo, Geometry)
-            )
-            < func.ST_LineLocatePoint(
-                cast(Ride.route_coords, Geometry), cast(dest_geo, Geometry)
-            ),
+            func.ST_LineLocatePoint(cast(Ride.route_coords, Geometry), cast(pickup_geo, Geometry))
+            < func.ST_LineLocatePoint(cast(Ride.route_coords, Geometry), cast(dest_geo, Geometry)),
         )
         if min_departure_time is not None:
             from datetime import timedelta
+
             FLEXIBILITY_HOURS = 2
             earliest = min_departure_time - timedelta(hours=FLEXIBILITY_HOURS)
             latest = min_departure_time + timedelta(hours=FLEXIBILITY_HOURS)
@@ -154,18 +145,13 @@ class CRUDPassenger:
                 Ride.departure_time <= latest,
             )
         if after_ride_id is not None:
-            after_ride = (
-                await db.execute(select(Ride).where(Ride.ride_id == after_ride_id))
-            ).scalars().first()
+            after_ride = (await db.execute(select(Ride).where(Ride.ride_id == after_ride_id))).scalars().first()
             if after_ride is not None:
                 filters = and_(
                     filters,
                     (
                         (Ride.departure_time > after_ride.departure_time)
-                        | (
-                            (Ride.departure_time == after_ride.departure_time)
-                            & (Ride.ride_id > after_ride_id)
-                        )
+                        | ((Ride.departure_time == after_ride.departure_time) & (Ride.ride_id > after_ride_id))
                     ),
                 )
         stmt = (
@@ -176,9 +162,7 @@ class CRUDPassenger:
                     Booking.ride_id == Ride.ride_id,
                     # אם passenger_id=None → join condition לא יתאים → status יהיה NULL
                     Booking.passenger_id == passenger_id,
-                    Booking.status.notin_(
-                        [BookingStatus.CANCELLED, BookingStatus.REJECTED]
-                    ),
+                    Booking.status.notin_([BookingStatus.CANCELLED, BookingStatus.REJECTED]),
                 ),
             )
             .where(filters)
@@ -221,18 +205,15 @@ class CRUDPassenger:
         try:
             line = LineString([(p[1], p[0]) for p in route_coords])
             route_geom = from_shape(line, srid=4326)
-            stmt = (
-                select(PassengerRequest)
-                .where(
-                    and_(
-                        PassengerRequest.status == PassengerStatus.ACTIVE,
-                        PassengerRequest.requested_departure_time > now,
-                        func.ST_DWithin(
-                            cast(PassengerRequest.pickup_geom, Geography),
-                            cast(route_geom, Geography),
-                            radius_meters,
-                        ),
-                    )
+            stmt = select(PassengerRequest).where(
+                and_(
+                    PassengerRequest.status == PassengerStatus.ACTIVE,
+                    PassengerRequest.requested_departure_time > now,
+                    func.ST_DWithin(
+                        cast(PassengerRequest.pickup_geom, Geography),
+                        cast(route_geom, Geography),
+                        radius_meters,
+                    ),
                 )
             )
             return list((await db.execute(stmt)).scalars().all())
@@ -253,23 +234,20 @@ class CRUDPassenger:
         now = datetime.now()
         driver_origin = func.ST_SetSRID(func.ST_MakePoint(origin_lon, origin_lat), 4326)
         driver_dest = func.ST_SetSRID(func.ST_MakePoint(dest_lon, dest_lat), 4326)
-        stmt = (
-            select(PassengerRequest)
-            .where(
-                and_(
-                    PassengerRequest.status == PassengerStatus.ACTIVE,
-                    PassengerRequest.requested_departure_time > now,
-                    func.ST_DWithin(
-                        cast(PassengerRequest.pickup_geom, Geography),
-                        cast(driver_origin, Geography),
-                        radius,
-                    ),
-                    func.ST_DWithin(
-                        cast(PassengerRequest.destination_geom, Geography),
-                        cast(driver_dest, Geography),
-                        radius,
-                    ),
-                )
+        stmt = select(PassengerRequest).where(
+            and_(
+                PassengerRequest.status == PassengerStatus.ACTIVE,
+                PassengerRequest.requested_departure_time > now,
+                func.ST_DWithin(
+                    cast(PassengerRequest.pickup_geom, Geography),
+                    cast(driver_origin, Geography),
+                    radius,
+                ),
+                func.ST_DWithin(
+                    cast(PassengerRequest.destination_geom, Geography),
+                    cast(driver_dest, Geography),
+                    radius,
+                ),
             )
         )
         return list((await db.execute(stmt)).scalars().all())
@@ -287,11 +265,7 @@ class CRUDPassenger:
         סדר פילטרים: סטטוס+זמן (אינדקס) → לא הנהג → אופט-אין → יעד 5km → מוצא על המסלול.
         """
         now = datetime.now()
-        ride_date = (
-            ride.departure_time.date()
-            if getattr(ride, "departure_time", None)
-            else None
-        )
+        ride_date = ride.departure_time.date() if getattr(ride, "departure_time", None) else None
         if not ride_date:
             logger.warning(
                 "find_passengers_for_ride_notification: no ride_date for ride_id=%s",

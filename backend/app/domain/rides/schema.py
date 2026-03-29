@@ -30,9 +30,7 @@ class RidePreviewCreate(BaseModel):
     """יצירת תצוגה מקדימה לנסיעה. מוצא: טקסט (origin_name) או מיקום נוכחי (origin_lat/origin_lon) – כמו אצל נוסע."""
 
     driver_id: UUID
-    origin_name: Optional[str] = (
-        None  # טקסט או ריק כשנשלחים origin_lat/origin_lon (מיקום נוכחי)
-    )
+    origin_name: Optional[str] = None  # טקסט או ריק כשנשלחים origin_lat/origin_lon (מיקום נוכחי)
     destination_name: str
     departure_time: datetime
     available_seats: int = Field(default=4, ge=1)

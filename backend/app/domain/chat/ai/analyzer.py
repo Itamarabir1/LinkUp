@@ -51,9 +51,7 @@ def _call_api_with_retry(messages, model, response_format, temperature):
     return completion
 
 
-def analyze_conversation(
-    chat_text: str, temperature: float = 0.2
-) -> RideSummary | None:
+def analyze_conversation(chat_text: str, temperature: float = 0.2) -> RideSummary | None:
     """
     מנתח שיחת טרמפ ומחזיר RideSummary.
 

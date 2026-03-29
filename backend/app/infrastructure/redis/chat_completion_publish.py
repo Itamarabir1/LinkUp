@@ -13,9 +13,7 @@ from app.core.exceptions.infrastructure import RedisUnavailable
 logger = logging.getLogger(__name__)
 
 
-async def publish_chat_completion_event(
-    conversation_id: int, trigger_user_id: int
-) -> int:
+async def publish_chat_completion_event(conversation_id: int, trigger_user_id: int) -> int:
     """
     מפרסם אירוע סיום שיחה ל-Redis DB=1 לערוץ chat:completion:{conversation_id}.
     ה-worker מאזין ומפעיל ניתוח AI (Celery/async).
@@ -29,9 +27,7 @@ async def publish_chat_completion_event(
             decode_responses=True,
         )
         n = await client.publish(channel, json.dumps(payload))
-        logger.debug(
-            "Published chat completion event to %s (%d subscriber(s))", channel, n
-        )
+        logger.debug("Published chat completion event to %s (%d subscriber(s))", channel, n)
         return n
     except Exception as e:
         logger.error(

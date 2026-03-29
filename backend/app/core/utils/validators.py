@@ -38,12 +38,9 @@ def normalize_email_for_auth(value: str) -> str:
 
 # --- Password ---
 
-PASSWORD_REGEX = re.compile(
-    r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
-)
+PASSWORD_REGEX = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$")
 PASSWORD_ERROR = (
-    "Password must be at least 8 characters long, include an uppercase letter, "
-    "a lowercase letter, a number, and a special character (@$!%*?&)."
+    "Password must be at least 8 characters long, include an uppercase letter, a lowercase letter, a number, and a special character (@$!%*?&)."
 )
 
 
@@ -138,9 +135,7 @@ def validate_avatar_file(file: "UploadFile") -> None:
     actual_size = getattr(file, "size", 0) or 0
     if actual_size > max_bytes:
         current_mb = round(actual_size / (1024 * 1024), 2)
-        raise FileTooLargeError(
-            max_size_mb=MAX_AVATAR_SIZE_MB, current_size_mb=current_mb
-        )
+        raise FileTooLargeError(max_size_mb=MAX_AVATAR_SIZE_MB, current_size_mb=current_mb)
 
 
 def slugify_for_avatar(name: str | None) -> str:

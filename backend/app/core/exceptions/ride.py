@@ -57,9 +57,7 @@ class InvalidDateTimeError(LinkupError):
     error_code = "RIDE_INVALID_DATETIME"
     message = "זמן הנסיעה שנבחר אינו תקין"
 
-    def __init__(
-        self, provided_dt: Optional[str] = None, details: Optional[str] = None
-    ):
+    def __init__(self, provided_dt: Optional[str] = None, details: Optional[str] = None):
         msg = details if details else self.message
         super().__init__(
             message=msg,
@@ -92,14 +90,8 @@ class RideFullError(LinkupError):
     message = "הנסיעה מלאה, לא ניתן להוסיף נוסעים נוספים"
 
     def __init__(self, ride_id: Optional[int] = None):
-        msg = (
-            f"נסיעה {ride_id} לא נמצאה"
-            if ride_id is not None
-            else "הנסיעה לא נמצאה או שאינך מורשה לבצע פעולה זו"
-        )
-        super().__init__(
-            message=msg, payload={"ride_id": ride_id} if ride_id is not None else None
-        )
+        msg = f"נסיעה {ride_id} לא נמצאה" if ride_id is not None else "הנסיעה לא נמצאה או שאינך מורשה לבצע פעולה זו"
+        super().__init__(message=msg, payload={"ride_id": ride_id} if ride_id is not None else None)
 
 
 class SessionExpiredError(LinkupError):
@@ -111,9 +103,7 @@ class SessionExpiredError(LinkupError):
 
     def __init__(self, session_id: Optional[str] = None):
         msg = f"הסשן {session_id} פג תוקף או אינו קיים." if session_id else self.message
-        super().__init__(
-            message=msg, payload={"session_id": session_id} if session_id else None
-        )
+        super().__init__(message=msg, payload={"session_id": session_id} if session_id else None)
 
 
 class RideAlreadyCancelledError(LinkupError):

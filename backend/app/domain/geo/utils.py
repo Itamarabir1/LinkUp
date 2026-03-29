@@ -27,9 +27,7 @@ def convert_db_route_to_list(route_geom) -> List[List[float]]:
         return []
 
 
-def calculate_eta(
-    start_time: datetime, duration_seconds: float, buffer_percent: float = 0.15
-) -> str:
+def calculate_eta(start_time: datetime, duration_seconds: float, buffer_percent: float = 0.15) -> str:
     """חישוב שעת הגעה משוערת עם בופר."""
     total_seconds = duration_seconds * (1 + buffer_percent)
     eta_datetime = start_time + timedelta(seconds=total_seconds)

@@ -51,9 +51,7 @@ class RideService:
 
     # --- Preview ---
 
-    async def get_ride_preview(
-        self, preview_in: RidePreviewCreate
-    ) -> RidePreviewResponse:
+    async def get_ride_preview(self, preview_in: RidePreviewCreate) -> RidePreviewResponse:
         """שלב 1: יצירת תצוגה מקדימה של מסלולים אפשריים ושמירתם ב-Cache."""
         self._validate_preview_input(preview_in)
         origin_address = await geo_proc.resolve_origin_address(
@@ -67,9 +65,7 @@ class RideService:
             preview_in.departure_time,
         )
         if not geo_data:
-            raise RouteNotFoundError(
-                origin=origin_address, destination=preview_in.destination_name
-            )
+            raise RouteNotFoundError(origin=origin_address, destination=preview_in.destination_name)
         preview_res = RidePreviewResponse.from_processor(
             geo_data=geo_data,
             preview_in=preview_in,
@@ -80,17 +76,12 @@ class RideService:
 
     @staticmethod
     def _validate_preview_input(preview_in: RidePreviewCreate) -> None:
-        if (
-            preview_in.origin_name
-            and preview_in.origin_name == preview_in.destination_name
-        ):
+        if preview_in.origin_name and preview_in.origin_name == preview_in.destination_name:
             raise SameOriginDestinationError(location_name=preview_in.origin_name)
 
     # --- Create ride ---
 
-    async def create_ride(
-        self, db: AsyncSession, ride_in: RideCreate, current_user_id: UUID
-    ) -> RideResponse:
+    async def create_ride(self, db: AsyncSession, ride_in: RideCreate, current_user_id: UUID) -> RideResponse:
         """שלב 2: אישור סופי של הנסיעה והעברתה מה-Cache ל-PostgreSQL."""
         cached_data = await self._validate_and_get_cached_ride(ride_in)
         cached_data["driver_id"] = current_user_id
@@ -111,17 +102,13 @@ class RideService:
             logger.error("Failed to save ride to DB: %s", e)
             raise
 
-    async def _validate_and_get_cached_ride(
-        self, ride_in: RideCreate
-    ) -> Dict[str, Any]:
+    async def _validate_and_get_cached_ride(self, ride_in: RideCreate) -> Dict[str, Any]:
         if not (ride_in.session_id and str(ride_in.session_id).strip()):
             logger.warning("create_ride called with empty session_id")
             raise SessionExpiredError(session_id=ride_in.session_id or "")
         cached_data = await self.cache.get_preview(ride_in.session_id)
         if not cached_data:
-            logger.warning(
-                "create_ride: no preview in cache for session_id=%s", ride_in.session_id
-            )
+            logger.warning("create_ride: no preview in cache for session_id=%s", ride_in.session_id)
             raise SessionExpiredError(session_id=ride_in.session_id)
         return cached_data
 
@@ -134,25 +121,17 @@ class RideService:
         await db.refresh(new_ride)
 
     @staticmethod
-    def _build_ride_response(
-        new_ride: Ride, cached_data: Dict[str, Any], ride_in: RideCreate
-    ) -> RideResponse:
+    def _build_ride_response(new_ride: Ride, cached_data: Dict[str, Any], ride_in: RideCreate) -> RideResponse:
         response = RideMapper.to_response(new_ride)
         if not response.route_coords and cached_data.get("routes"):
             selected_route = cached_data["routes"][ride_in.selected_route_index]
-            response = response.model_copy(
-                update={"route_coords": selected_route.get("coords", [])}
-            )
+            response = response.model_copy(update={"route_coords": selected_route.get("coords", [])})
         return response
 
-    async def _after_ride_created(
-        self, response: RideResponse, new_ride: Ride, session_id: str
-    ) -> None:
+    async def _after_ride_created(self, response: RideResponse, new_ride: Ride, session_id: str) -> None:
         await self.cache.delete_preview(session_id)
         try:
-            payload = RideNotificationFactory.create_broadcast_payload(
-                new_ride, RideBroadcastAction.CREATED.value
-            )
+            payload = RideNotificationFactory.create_broadcast_payload(new_ride, RideBroadcastAction.CREATED.value)
             payload["ride"] = response.model_dump(mode="json")
             await broadcast.publish(RIDES_LIST_CHANNEL, json.dumps(payload))
         except Exception as e:
@@ -176,9 +155,7 @@ class RideService:
         rides = await crud_ride.get_by_driver_id(db, driver_id, status_enum)
         return [RideMapper.to_response(r) for r in rides]
 
-    async def get_rides_by_group_id(
-        self, db: AsyncSession, group_id: UUID
-    ) -> List[RideResponse]:
+    async def get_rides_by_group_id(self, db: AsyncSession, group_id: UUID) -> List[RideResponse]:
         """רשימת נסיעות של קבוצה (לטאב נסיעות במסך קבוצה). לא בודק חברות – יש לקרוא רק אחרי אימות שהמשתמש חבר בקבוצה."""
         rides = await crud_ride.get_by_group_id(db, group_id, exclude_cancelled=True)
         return [RideMapper.to_response(r) for r in rides]
@@ -212,9 +189,7 @@ class RideService:
             {"status": ride.status.value, "event": "RIDE_UPDATED"},
         )
         try:
-            broadcast_payload = RideNotificationFactory.create_broadcast_payload(
-                ride, RideBroadcastAction.UPDATED.value
-            )
+            broadcast_payload = RideNotificationFactory.create_broadcast_payload(ride, RideBroadcastAction.UPDATED.value)
             broadcast_payload["ride_id"] = str(ride_id)
             await broadcast.publish(RIDES_LIST_CHANNEL, json.dumps(broadcast_payload))
         except Exception as e:
@@ -223,23 +198,15 @@ class RideService:
 
     # --- Start / End ride (GPS tracking) ---
 
-    async def start_ride(
-        self, db: AsyncSession, ride_id: UUID, driver_id: UUID
-    ) -> RideResponse:
+    async def start_ride(self, db: AsyncSession, ride_id: UUID, driver_id: UUID) -> RideResponse:
         """מעביר נסיעה לסטטוס ACTIVE. דורש לפחות הזמנה אחת מאושרת."""
         try:
-            ride = await crud_ride.get_for_update(
-                db, ride_id=ride_id, driver_id=driver_id
-            )
+            ride = await crud_ride.get_for_update(db, ride_id=ride_id, driver_id=driver_id)
             if not ride:
                 raise RideNotFoundError(ride_id)
             if ride.status not in (RideStatus.OPEN, RideStatus.FULL):
-                raise InvalidRideStatusError(
-                    ride.status.value, action="start_ride"
-                )
-            confirmed = await crud_booking.get_ride_bookings_by_status_async(
-                db, ride_id, BookingStatus.CONFIRMED.value
-            )
+                raise InvalidRideStatusError(ride.status.value, action="start_ride")
+            confirmed = await crud_booking.get_ride_bookings_by_status_async(db, ride_id, BookingStatus.CONFIRMED.value)
             if not confirmed:
                 raise NoConfirmedBookingsError(ride_id=ride_id)
             updated = await crud_ride.update_status(db, ride_id, RideStatus.ACTIVE)
@@ -256,23 +223,15 @@ class RideService:
         )
         return RideMapper.to_response(updated)
 
-    async def end_ride(
-        self, db: AsyncSession, ride_id: UUID, driver_id: UUID
-    ) -> RideResponse:
+    async def end_ride(self, db: AsyncSession, ride_id: UUID, driver_id: UUID) -> RideResponse:
         """מעביר נסיעה לסטטוס COMPLETED."""
         try:
-            ride = await crud_ride.get_for_update(
-                db, ride_id=ride_id, driver_id=driver_id
-            )
+            ride = await crud_ride.get_for_update(db, ride_id=ride_id, driver_id=driver_id)
             if not ride:
                 raise RideNotFoundError(ride_id)
             if ride.status != RideStatus.ACTIVE:
-                raise InvalidRideStatusError(
-                    ride.status.value, action="end_ride"
-                )
-            updated = await crud_ride.update_status(
-                db, ride_id, RideStatus.COMPLETED
-            )
+                raise InvalidRideStatusError(ride.status.value, action="end_ride")
+            updated = await crud_ride.update_status(db, ride_id, RideStatus.COMPLETED)
             await db.commit()
             await db.refresh(updated)
         except Exception:
@@ -288,13 +247,9 @@ class RideService:
 
     # --- Cancel ---
 
-    async def cancel_ride_by_driver(
-        self, db: AsyncSession, ride_id: UUID, driver_id: UUID
-    ) -> None:
+    async def cancel_ride_by_driver(self, db: AsyncSession, ride_id: UUID, driver_id: UUID) -> None:
         """ביטול נסיעה על ידי הנהג. לוגיקה ב-crud, Outbox נשאר כאן."""
-        ride = await crud_ride.get_for_update(
-            db, ride_id=ride_id, driver_id=driver_id
-        )
+        ride = await crud_ride.get_for_update(db, ride_id=ride_id, driver_id=driver_id)
         if not ride:
             raise RideNotFoundError(ride_id)
         if ride.status == RideStatus.CANCELLED:
@@ -329,5 +284,3 @@ class RideService:
             await broadcast.publish(RIDES_LIST_CHANNEL, json.dumps(payload))
         except Exception as e:
             logger.warning("Broadcast rides list failed after cancel: %s", e)
-
-

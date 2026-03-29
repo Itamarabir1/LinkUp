@@ -14,9 +14,7 @@ class RedisClient:
 
     async def connect(self):
         if not self.client:
-            self.pool = redis.ConnectionPool.from_url(
-                settings.REDIS_URL, decode_responses=True, max_connections=20
-            )
+            self.pool = redis.ConnectionPool.from_url(settings.REDIS_URL, decode_responses=True, max_connections=20)
             self.client = redis.Redis(connection_pool=self.pool)
             logger.info("✅ Redis Client (Caching) initialized.")
 
@@ -44,9 +42,7 @@ class RedisClient:
             try:
                 return json.loads(data)
             except Exception as parse_err:
-                logger.warning(
-                    "Redis GET value is not JSON key=%s: %s", key, parse_err
-                )
+                logger.warning("Redis GET value is not JSON key=%s: %s", key, parse_err)
                 return data
         except Exception as e:
             logger.error("Redis GET failed key=%s: %s", key, e, exc_info=True)
@@ -71,9 +67,7 @@ class RedisClient:
             logger.error("Redis DELETE failed key=%s: %s", key, e, exc_info=True)
             raise RedisUnavailable() from e
 
-    async def rate_limit_check(
-        self, key: str, window_seconds: int, max_count: int
-    ) -> bool:
+    async def rate_limit_check(self, key: str, window_seconds: int, max_count: int) -> bool:
         """
         בודק rate limit: מגדיל מונה ב-Redis, מחזיר True אם מותר, False אם חרג.
         אם Redis לא מחובר או שגיאה – מחזיר True (fail open).

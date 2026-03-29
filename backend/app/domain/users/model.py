@@ -41,9 +41,7 @@ class User(Base):
     last_login = Column(DateTime(timezone=True), nullable=True)
     last_active_at = Column(DateTime(timezone=True), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # --- Relationships (The "Glue" of the System) ---
 
@@ -101,14 +99,7 @@ class User(Base):
         try:
             if "bookings" not in sa_inspect(self).unloaded:
                 bookings = self.__dict__.get("bookings", [])
-                return sum(
-                    1
-                    for b in bookings
-                    if (
-                        getattr(getattr(b, "status", None), "value", b.status)
-                        not in ("cancelled", "rejected")
-                    )
-                )
+                return sum(1 for b in bookings if (getattr(getattr(b, "status", None), "value", b.status) not in ("cancelled", "rejected")))
         except Exception:
             pass
         return 0

@@ -10,9 +10,7 @@ from app.core.exceptions.validation import InvalidLocationError
 logger = logging.getLogger(__name__)
 
 
-async def resolve_origin_address(
-    name: Optional[str], lat: Optional[float], lon: Optional[float]
-) -> str:
+async def resolve_origin_address(name: Optional[str], lat: Optional[float], lon: Optional[float]) -> str:
     """
     מבצע 'החלטה' גיאוגרפית: שם מקום או GPS.
     מחזיר כתובת טקסטואלית או זורק שגיאה אם אין כלום.
@@ -48,9 +46,7 @@ async def get_full_routing_data(
         return None
 
     # 2. שליפת עד 3 מסלולים מ-Google Directions API (GeoClient) – מחזיר כמה שגוגל מחזירה (1–3)
-    raw_routes = await geo_client.fetch_raw_routes(
-        (lat_o, lon_o), (lat_d, lon_d), departure_time
-    )
+    raw_routes = await geo_client.fetch_raw_routes((lat_o, lon_o), (lat_d, lon_d), departure_time)
 
     if not raw_routes:
         logger.error(f"No routes found between {origin_name} and {dest_name}")
@@ -60,9 +56,7 @@ async def get_full_routing_data(
     if not isinstance(raw_routes, list):
         raw_routes = [raw_routes] if raw_routes else []
 
-    logger.info(
-        f"Passing {len(raw_routes)} route(s) to preview for {origin_name} -> {dest_name}"
-    )
+    logger.info(f"Passing {len(raw_routes)} route(s) to preview for {origin_name} -> {dest_name}")
 
     # 3. טרנספורמציה לסכימות Pydantic (פורמט מ-Directions: duration שניות, distance מטרים, coords [lat,lon])
     processed_routes = [

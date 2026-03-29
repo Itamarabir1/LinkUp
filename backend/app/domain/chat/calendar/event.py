@@ -11,9 +11,7 @@ from ..ai.schema import RideSummary
 from .time_parser import parse_hebrew_time
 
 
-def create_calendar_event(
-    ride: RideSummary, base_date: Optional[datetime] = None
-) -> Optional[Event]:
+def create_calendar_event(ride: RideSummary, base_date: Optional[datetime] = None) -> Optional[Event]:
     """
     יוצר אירוע לוח שנה מטרמפ.
 

@@ -24,9 +24,7 @@ def get_coords_from_address(address: str) -> Tuple[Optional[float], Optional[flo
             import concurrent.futures
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                result = pool.submit(asyncio.run, get_coordinates(address)).result(
-                    timeout=10
-                )
+                result = pool.submit(asyncio.run, get_coordinates(address)).result(timeout=10)
         else:
             result = loop.run_until_complete(get_coordinates(address))
 

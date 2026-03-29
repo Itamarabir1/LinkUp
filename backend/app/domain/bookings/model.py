@@ -34,9 +34,7 @@ class BookingStatusEnumType(PG_ENUM):
         try:
             return BookingStatus[elem]
         except KeyError:
-            raise LookupError(
-                f"'{elem}' is not among the defined enum values. Enum name: booking_status."
-            ) from None
+            raise LookupError(f"'{elem}' is not among the defined enum values. Enum name: booking_status.") from None
 
 
 class Booking(Base):
@@ -50,15 +48,11 @@ class Booking(Base):
     booking_id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # 1. הקשר לנסיעה
-    ride_id = Column(
-        PG_UUID(as_uuid=True), ForeignKey("rides.ride_id", ondelete="CASCADE"), nullable=False
-    )
+    ride_id = Column(PG_UUID(as_uuid=True), ForeignKey("rides.ride_id", ondelete="CASCADE"), nullable=False)
 
     # 2. הקשר הישיר לנוסע (התיקון הקריטי!)
     # ב-SQL שלך העמודה הזו קיימת, עכשיו היא קיימת גם כאן
-    passenger_id = Column(
-        PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
-    )
+    passenger_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
 
     # 3. הקשר לבקשה המקורית (אופציונלי - ON DELETE SET NULL)
     request_id = Column(
@@ -74,9 +68,7 @@ class Booking(Base):
     pickup_time = Column(DateTime(timezone=True), nullable=True)
 
     # ניהול תזכורות (Celery)
-    reminder_sent = Column(
-        Boolean, default=False, server_default="false", nullable=False
-    )
+    reminder_sent = Column(Boolean, default=False, server_default="false", nullable=False)
 
     # BookingStatusEnumType: result accepts both value and name from DB
     status = Column(

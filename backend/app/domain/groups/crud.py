@@ -47,26 +47,18 @@ async def get_group_by_invite_code(db: AsyncSession, invite_code: str) -> Option
 
 async def get_user_groups(db: AsyncSession, user_id: UUID) -> list[Group]:
     result = await db.execute(
-        select(Group)
-        .join(GroupMember, Group.group_id == GroupMember.group_id)
-        .where(GroupMember.user_id == user_id, Group.is_active.is_(True))
+        select(Group).join(GroupMember, Group.group_id == GroupMember.group_id).where(GroupMember.user_id == user_id, Group.is_active.is_(True))
     )
     return list(result.scalars().all())
 
 
 async def get_group_members(db: AsyncSession, group_id: UUID) -> list[GroupMember]:
-    result = await db.execute(
-        select(GroupMember)
-        .where(GroupMember.group_id == group_id)
-        .options(selectinload(GroupMember.user))
-    )
+    result = await db.execute(select(GroupMember).where(GroupMember.group_id == group_id).options(selectinload(GroupMember.user)))
     return list(result.scalars().all())
 
 
 async def get_membership(db: AsyncSession, group_id: UUID, user_id: UUID) -> Optional[GroupMember]:
-    result = await db.execute(
-        select(GroupMember).where(GroupMember.group_id == group_id, GroupMember.user_id == user_id)
-    )
+    result = await db.execute(select(GroupMember).where(GroupMember.group_id == group_id, GroupMember.user_id == user_id))
     return result.scalars().first()
 
 
@@ -141,7 +133,5 @@ async def close_group(db: AsyncSession, group: Group) -> Group:
 
 
 async def get_member_count(db: AsyncSession, group_id: UUID) -> int:
-    result = await db.execute(
-        select(func.count()).select_from(GroupMember).where(GroupMember.group_id == group_id)
-    )
+    result = await db.execute(select(func.count()).select_from(GroupMember).where(GroupMember.group_id == group_id))
     return result.scalar_one()

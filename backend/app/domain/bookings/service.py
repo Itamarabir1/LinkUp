@@ -52,32 +52,22 @@ class BookingService:
             if not ride or ride.status != RideStatus.OPEN:
                 raise RideNotAvailableError(ride_id=str(ride_id))
             if await crud_booking.get_existing_booking_async(db, ride_id, request_id):
-                raise BookingAlreadyExistsError(
-                    ride_id=str(ride_id), request_id=str(request_id)
-                )
+                raise BookingAlreadyExistsError(ride_id=str(ride_id), request_id=str(request_id))
             p_req = await db.get(PassengerRequest, request_id)
             if not p_req:
                 raise PassengerRequestNotFoundError(request_id=str(request_id))
             if p_req.passenger_id != current_user_id:
                 raise ForbiddenRideActionError("הבקשה אינה שייכת למשתמש המחובר")
-            existing = await crud_booking.get_booking_by_ride_and_passenger_async(
-                db, ride_id, p_req.passenger_id
-            )
+            existing = await crud_booking.get_booking_by_ride_and_passenger_async(db, ride_id, p_req.passenger_id)
             if existing:
                 if existing.status in (BookingStatus.CANCELLED, BookingStatus.REJECTED):
-                    new_booking = (
-                        await crud_booking.reuse_booking_after_rejection_or_cancellation(
-                            db, ride_id, p_req.passenger_id, request_id, num_seats
-                        )
+                    new_booking = await crud_booking.reuse_booking_after_rejection_or_cancellation(
+                        db, ride_id, p_req.passenger_id, request_id, num_seats
                     )
                 else:
-                    raise BookingAlreadyExistsError(
-                        ride_id=str(ride_id), request_id=str(request_id)
-                    )
+                    raise BookingAlreadyExistsError(ride_id=str(ride_id), request_id=str(request_id))
             else:
-                new_booking = await crud_booking.create_booking_entry_async(
-                    db, ride_id, request_id, p_req.passenger_id, num_seats
-                )
+                new_booking = await crud_booking.create_booking_entry_async(db, ride_id, request_id, p_req.passenger_id, num_seats)
             await db.flush()
             await publish_to_outbox(
                 db,
@@ -95,9 +85,7 @@ class BookingService:
             )
             await db.commit()
             # Reload booking with relationships loaded for proper serialization
-            booking_with_relations = await crud_booking.get_async(
-                db, new_booking.booking_id
-            )
+            booking_with_relations = await crud_booking.get_async(db, new_booking.booking_id)
             return booking_with_relations or new_booking
         except (
             RideNotAvailableError,
@@ -113,9 +101,7 @@ class BookingService:
             raise
 
     @staticmethod
-    async def cancel_ride_and_all_bookings(
-        db: AsyncSession, ride_id: UUID, driver_id: UUID
-    ) -> None:
+    async def cancel_ride_and_all_bookings(db: AsyncSession, ride_id: UUID, driver_id: UUID) -> None:
         """
         לוגיקה עסקית לביטול נסיעה שלמה על ידי נהג.
         חשוב: לא מפרסם Outbox. ה-caller אחראי על אירועים.
@@ -132,9 +118,7 @@ class BookingService:
             raise
 
     @staticmethod
-    async def get_ride_manifest(
-        db: AsyncSession, ride_id: UUID, driver_id: UUID
-    ) -> RideManifestResponse:
+    async def get_ride_manifest(db: AsyncSession, ride_id: UUID, driver_id: UUID) -> RideManifestResponse:
         """הפקת רשימת נוסעים עבור הנהג (כולל pending_approval + confirmed)."""
         ride = await db.get(Ride, ride_id)
         if not ride or ride.driver_id != driver_id:
@@ -142,14 +126,10 @@ class BookingService:
 
         stmt = (
             select(Booking)
-            .options(
-                joinedload(Booking.passenger_request).joinedload(PassengerRequest.user)
-            )
+            .options(joinedload(Booking.passenger_request).joinedload(PassengerRequest.user))
             .where(
                 Booking.ride_id == ride_id,
-                Booking.status.in_(
-                    [BookingStatus.PENDING.value, BookingStatus.CONFIRMED.value]
-                ),
+                Booking.status.in_([BookingStatus.PENDING.value, BookingStatus.CONFIRMED.value]),
             )
             .order_by(Booking.created_at.desc())
         )
@@ -176,9 +156,7 @@ class BookingService:
                     "reminder_sent": b.reminder_sent,
                     "pickup_name": b.pickup_name,
                     "pickup_time": b.pickup_time,
-                    "destination_name": (
-                        b.passenger_request.destination_name if b.passenger_request else None
-                    ),
+                    "destination_name": (b.passenger_request.destination_name if b.passenger_request else None),
                 }
             )
 
@@ -209,9 +187,7 @@ class BookingService:
         return booking
 
     @staticmethod
-    async def approve_booking(
-        db: AsyncSession, booking_id: UUID, driver_id: UUID
-    ) -> Booking:
+    async def approve_booking(db: AsyncSession, booking_id: UUID, driver_id: UUID) -> Booking:
         """אישור הזמנה על ידי נהג. מפרסם לאוטבוקס – הנוסע יקבל מייל ופוש."""
         try:
             booking = await crud_booking.get_booking_by_id_async(db, booking_id)
@@ -243,9 +219,7 @@ class BookingService:
             raise
 
     @staticmethod
-    async def reject_booking(
-        db: AsyncSession, booking_id: UUID, driver_id: UUID
-    ) -> Booking:
+    async def reject_booking(db: AsyncSession, booking_id: UUID, driver_id: UUID) -> Booking:
         """דחיית הזמנה על ידי נהג. מפרסם לאוטבוקס – הנוסע יקבל מייל ופוש."""
         try:
             booking = await crud_booking.get_booking_by_id_async(db, booking_id)
@@ -269,9 +243,7 @@ class BookingService:
             raise
 
     @staticmethod
-    async def cancel_booking(
-        db: AsyncSession, booking_id: UUID, current_user_id: UUID
-    ) -> Booking:
+    async def cancel_booking(db: AsyncSession, booking_id: UUID, current_user_id: UUID) -> Booking:
         """ביטול הזמנה (נוסע או נהג) – עם בדיקת הרשאות."""
         try:
             booking = await crud_booking.get_booking_by_id_async(db, booking_id)
@@ -303,11 +275,10 @@ class BookingService:
     ):
         """שליפת הזמנות משתמש עם page-based pagination."""
         from app.domain.bookings.schema import PaginatedBookingsResponse, BookingResponse
+
         total = await crud_booking.get_user_bookings_count_async(db, user_id, status)
         offset = (page - 1) * limit
-        bookings = await crud_booking.get_user_bookings_filtered_async(
-            db, user_id, status, offset=offset, limit=limit
-        )
+        bookings = await crud_booking.get_user_bookings_filtered_async(db, user_id, status, offset=offset, limit=limit)
         items = [BookingResponse.model_validate(b) for b in bookings]
         has_more = (page * limit) < total
         return PaginatedBookingsResponse(
@@ -324,9 +295,7 @@ class BookingService:
         ride = await db.get(Ride, ride_id)
         if not ride or ride.driver_id != driver_id:
             raise ForbiddenRideActionError("גישה חסומה")
-        return await crud_booking.get_ride_bookings_by_status_async(
-            db, ride_id, BookingStatus.PENDING
-        )
+        return await crud_booking.get_ride_bookings_by_status_async(db, ride_id, BookingStatus.PENDING)
 
     @staticmethod
     async def get_active_bookings_for_driver(db: AsyncSession, driver_id: UUID):
@@ -361,9 +330,7 @@ class BookingService:
         return {"trips": trips, "stats": stats}
 
     @staticmethod
-    async def get_notifications_for_user(
-        db: AsyncSession, user_id: UUID
-    ) -> List[NotificationItemResponse]:
+    async def get_notifications_for_user(db: AsyncSession, user_id: UUID) -> List[NotificationItemResponse]:
         """אוסף כל ההתראות למשתמש: כנהג – בקשות להצטרפות; כנוסע – אישור/דחייה/ממתין."""
         items: List[NotificationItemResponse] = []
 
@@ -378,9 +345,7 @@ class BookingService:
                 NotificationItemResponse(
                     type="ride_request",
                     title="בקשה להצטרפות לנסיעה",
-                    body=f"{other or 'נוסע'} מבקש להצטרף לנסיעה"
-                    if other
-                    else "בקשה להצטרפות",
+                    body=f"{other or 'נוסע'} מבקש להצטרף לנסיעה" if other else "בקשה להצטרפות",
                     action_url="/my-bookings?tab=driver",
                     created_at=b.created_at,
                     booking_id=b.booking_id,
@@ -420,9 +385,7 @@ class BookingService:
                     ride_id=b.ride_id,
                     other_party_name=driver_name,
                     ride_origin=getattr(ride, "origin_name", None) if ride else None,
-                    ride_destination=getattr(ride, "destination_name", None)
-                    if ride
-                    else None,
+                    ride_destination=getattr(ride, "destination_name", None) if ride else None,
                     status=status_val,
                 )
             )

@@ -68,10 +68,7 @@ class Settings(BaseSettings):
                 return "postgresql+asyncpg://" + url[len("postgresql://") :]
             return url
 
-        return (
-            f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-        )
+        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     # --- Redis ---
     REDIS_HOST: str = Field("localhost")
@@ -107,9 +104,7 @@ class Settings(BaseSettings):
                 netloc = u.netloc
                 if not netloc and u.path:
                     return self.REDIS_URL_RAW
-                return urlunparse(
-                    (u.scheme or "redis", netloc, f"/{self.REDIS_CHAT_DB}", "", "", "")
-                )
+                return urlunparse((u.scheme or "redis", netloc, f"/{self.REDIS_CHAT_DB}", "", "", ""))
             except Exception:
                 pass
         auth = f":{self.REDIS_PASSWORD}@" if self.REDIS_PASSWORD else ""
@@ -150,16 +145,13 @@ class Settings(BaseSettings):
 
     # --- EIA (U.S. fuel prices API) ---
     # Get free API key: https://www.eia.gov/opendata/register.php
-    EIA_API_KEY: str = Field(
-        "", description="EIA Open Data API key for fuel price scanner"
-    )
+    EIA_API_KEY: str = Field("", description="EIA Open Data API key for fuel price scanner")
 
     # --- Google Maps Geocoding API ---
     GOOGLE_MAPS_API_KEY: str = Field(
         "",
         description=(
-            "Google Maps API key – Geocoding, Directions, Distance Matrix. "
-            "גם נשלח לפרונט ל-Maps JavaScript API דרך GET /api/v1/geo/maps-key."
+            "Google Maps API key – Geocoding, Directions, Distance Matrix. גם נשלח לפרונט ל-Maps JavaScript API דרך GET /api/v1/geo/maps-key."
         ),
     )
 
@@ -180,9 +172,7 @@ class Settings(BaseSettings):
     )
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(30, description="תוקף Access Token בדקות")
-    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(
-        7, description="תוקף Refresh Token בימים (לטוקן הארוך)"
-    )
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(7, description="תוקף Refresh Token בימים (לטוקן הארוך)")
     JWT_ISSUER: str = Field("linkup-api", description="JWT claim 'iss' (issuer)")
 
     # --- HTTPS (פרודקשן מאחורי Proxy) ---
@@ -198,12 +188,8 @@ class Settings(BaseSettings):
     )
 
     # --- Rate limiting (auth endpoints) ---
-    RATE_LIMIT_AUTH_WINDOW_SECONDS: int = Field(
-        60, description="חלון זמן ל-rate limit על auth (שניות)"
-    )
-    RATE_LIMIT_AUTH_MAX_REQUESTS: int = Field(
-        10, description="מקסימום בקשות ל-auth ל-IP בחלון"
-    )
+    RATE_LIMIT_AUTH_WINDOW_SECONDS: int = Field(60, description="חלון זמן ל-rate limit על auth (שניות)")
+    RATE_LIMIT_AUTH_MAX_REQUESTS: int = Field(10, description="מקסימום בקשות ל-auth ל-IP בחלון")
 
     # --- Cloud Infrastructure (AWS & Firebase) – אופציונלי בפיתוח ---
     AWS_ACCESS_KEY_ID: str = Field("")
@@ -218,12 +204,8 @@ class Settings(BaseSettings):
         description="Optional directory for upload temp files; default is system temp.",
     )
 
-    FIREBASE_SERVICE_ACCOUNT_PATH: str = Field(
-        "", description="Path to Firebase JSON (optional for local dev)"
-    )
-    FIREBASE_CREDENTIALS_JSON: Optional[str] = Field(
-        None, description="Firebase credentials as JSON string (production)"
-    )
+    FIREBASE_SERVICE_ACCOUNT_PATH: str = Field("", description="Path to Firebase JSON (optional for local dev)")
+    FIREBASE_CREDENTIALS_JSON: Optional[str] = Field(None, description="Firebase credentials as JSON string (production)")
 
     # --- Logging ---
     LOG_LEVEL: str = Field("INFO", description="Log level: DEBUG, INFO, WARNING, ERROR")

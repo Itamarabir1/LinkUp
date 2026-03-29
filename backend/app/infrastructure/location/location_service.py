@@ -11,9 +11,7 @@ from app.domain.geo.schema import LocationUpdate
 logger = logging.getLogger(__name__)
 
 
-async def broadcast_location_to_participants(
-    location_in: LocationUpdate, ride_id: UUID, involved_bookings: List[UUID]
-) -> Dict[str, Any]:
+async def broadcast_location_to_participants(location_in: LocationUpdate, ride_id: UUID, involved_bookings: List[UUID]) -> Dict[str, Any]:
     payload = {
         "type": "location_update",
         "ride_id": str(ride_id),

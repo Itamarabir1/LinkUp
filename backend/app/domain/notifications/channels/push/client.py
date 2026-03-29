@@ -22,13 +22,9 @@ class FCMClient:
         wait=wait_exponential(multiplier=1, min=4, max=60),
         # חשוב: לא מנסים שוב אם הטוקן לא חוקי (שגיאת 400/404 של פיירבייס)
         retry=retry_if_exception_type(Exception),
-        before_sleep=lambda retry_state: logger.info(
-            f"⏳ Push failed, retrying... (Attempt {retry_state.attempt_number})"
-        ),
+        before_sleep=lambda retry_state: logger.info(f"⏳ Push failed, retrying... (Attempt {retry_state.attempt_number})"),
     )
-    async def send(
-        self, token: str, title: str, body: str, data: Optional[Dict] = None
-    ):
+    async def send(self, token: str, title: str, body: str, data: Optional[Dict] = None):
         """
         שם הפונקציה שונה ל-'send' כדי להתאים לממשק ה-Provider.
         """
@@ -39,8 +35,8 @@ class FCMClient:
         # הכנת ההודעה (Firebase SDK) — data בלבד; כל הערכים חייבים להיות Strings ב-FCM
         message = messaging.Message(
             data={
-                'title': title,
-                'body': body,
+                "title": title,
+                "body": body,
                 **{k: str(v) for k, v in (data or {}).items()},
             },
             token=token,

@@ -7,6 +7,7 @@ geocode_cache.py — מקור אמת יחיד לcache של geocoding.
 - TTL: 24 שעות — כתובות מנורמלות (מGoogle autocomplete) לא משתנות
 - cache key: f"geocode:{address.strip()}" — כתובת מנורמלת
 """
+
 import json
 import logging
 from typing import Optional, Tuple

@@ -52,11 +52,7 @@ class RideBuilder(BaseContextBuilder):
         # אנחנו מחפשים מילת מפתח בתוך ה-event_key (כמו cancelled או reminder)
         event_key_lower = (event_key or "").lower()
         matched_content = next(
-            (
-                content
-                for key, content in event_content_map.items()
-                if key in event_key_lower
-            ),
+            (content for key, content in event_content_map.items() if key in event_key_lower),
             self._get_default_content(),
         )
 

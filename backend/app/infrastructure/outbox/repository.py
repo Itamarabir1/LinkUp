@@ -31,9 +31,7 @@ class OutboxRepository:
                 event.status = "PENDING"
 
             await db.flush()  # דוחף ל-DB בלי Commit כדי לקבל ID אם צריך
-            print(
-                f"[NOTIF] Outbox repo: saved event_name={event.event_name}", flush=True
-            )
+            print(f"[NOTIF] Outbox repo: saved event_name={event.event_name}", flush=True)
             logger.info(
                 "[NOTIF] Outbox repo: saved event_name=%s (in API process)",
                 event.event_name,
@@ -43,9 +41,7 @@ class OutboxRepository:
             # כאן תוכל לעטוף ב-LinkupError אם תרצה
             raise
 
-    async def get_pending_events(
-        self, db: AsyncSession, batch_size: int = 100
-    ) -> List[OutboxEvent]:
+    async def get_pending_events(self, db: AsyncSession, batch_size: int = 100) -> List[OutboxEvent]:
         """
         שליפת אירועים לעיבוד עבור ה-Worker.
         שימוש ב-skip_locked מונע התנגשויות בין מספר מופעים של השרת.
@@ -65,17 +61,11 @@ class OutboxRepository:
         מעדכן את האירוע כמעובד עם חותמת זמן של 'עכשיו'.
         ביצוע עדכון ישיר (In-place update) לטובת ביצועים מקסימליים.
         """
-        stmt = (
-            update(OutboxEvent)
-            .where(OutboxEvent.id == event_id)
-            .values(status="PROCESSED", processed_at=datetime.now(timezone.utc))
-        )
+        stmt = update(OutboxEvent).where(OutboxEvent.id == event_id).values(status="PROCESSED", processed_at=datetime.now(timezone.utc))
         await db.execute(stmt)
         logger.info(f"✅ Event {event_id} marked as processed")
 
-    async def increment_retries(
-        self, db: AsyncSession, event_id: str, error_msg: Optional[str] = None
-    ) -> None:
+    async def increment_retries(self, db: AsyncSession, event_id: str, error_msg: Optional[str] = None) -> None:
         """מעלה מונה נסיונות ומעדכן last_error. לא משנה סטטוס (נשאר PENDING לניסיון חוזר)."""
         values = {"retry_count": OutboxEvent.retry_count + 1}
         if error_msg is not None:
@@ -84,9 +74,7 @@ class OutboxRepository:
         await db.execute(stmt)
         logger.warning("Event %s retry incremented", event_id)
 
-    async def mark_as_failed(
-        self, db: AsyncSession, event_id: str, error_msg: str
-    ) -> None:
+    async def mark_as_failed(self, db: AsyncSession, event_id: str, error_msg: str) -> None:
         """מתעד תקלה ומסמן FAILED."""
         stmt = (
             update(OutboxEvent)

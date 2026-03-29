@@ -76,9 +76,7 @@ async def update_fcm_token(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    await user_service.update_fcm_token(
-        db, user_id=current_user.user_id, fcm_token=data.fcm_token
-    )
+    await user_service.update_fcm_token(db, user_id=current_user.user_id, fcm_token=data.fcm_token)
 
     # עדיף להחזיר מופע של הסכמה
     return MessageResponse(message="FCM Token updated successfully", status="success")
@@ -122,9 +120,7 @@ async def get_avatar_upload_url(
     4. השרת דוחף לתור ומחזיר 202 מיד (שנייה)
     5. Worker מעבד ברקע (finalize + DB update)
     """
-    presigned_url, staging_key = await user_service.get_avatar_upload_url(
-        user_id=current_user.user_id, filename=filename
-    )
+    presigned_url, staging_key = await user_service.get_avatar_upload_url(user_id=current_user.user_id, filename=filename)
     return AvatarUploadUrlResponse(
         upload_url=presigned_url,
         staging_key=staging_key,
@@ -163,9 +159,7 @@ async def remove_my_avatar(
     מסיר תמונת פרופיל: מוחק את תיקיית avatars/{user_id}/ מ-S3 ומאפס avatar_key ב-DB.
     """
     await user_service.remove_avatar(db, user_id=current_user.user_id)
-    return AvatarUploadAcceptedResponse(
-        message="Avatar removed", status="accepted"
-    )
+    return AvatarUploadAcceptedResponse(message="Avatar removed", status="accepted")
 
 
 # --- עדכון פרטי פרופיל (שם, אימייל וכו') ---

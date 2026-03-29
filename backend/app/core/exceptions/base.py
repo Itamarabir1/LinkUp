@@ -19,17 +19,9 @@ class LinkupError(Exception):
     ):
         # תאימות לאחור: detail נחשב כ-message
         if kwargs.get("detail") is not None and message is None:
-            message = (
-                kwargs["detail"]
-                if isinstance(kwargs["detail"], str)
-                else str(kwargs["detail"])
-            )
+            message = kwargs["detail"] if isinstance(kwargs["detail"], str) else str(kwargs["detail"])
         self.message = message or getattr(self, "message", "שגיאת מערכת")
-        self.status_code = (
-            status_code
-            if status_code is not None
-            else getattr(self, "status_code", 400)
-        )
+        self.status_code = status_code if status_code is not None else getattr(self, "status_code", 400)
         self.error_code = error_code or getattr(self, "error_code", "GENERIC_ERROR")
         self.payload = payload if payload is not None else {}
         self.trace_id = str(uuid.uuid4())

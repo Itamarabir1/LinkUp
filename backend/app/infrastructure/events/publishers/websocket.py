@@ -14,9 +14,7 @@ class WebSocketPublisher(EventPublisher):
         try:
             channels = event.metadata.get("channels", []) if event.metadata else []
             if not channels:
-                logger.warning(
-                    f"⚠️ No channels specified for WebSocket event {event.name}"
-                )
+                logger.warning(f"⚠️ No channels specified for WebSocket event {event.name}")
                 return False
 
             ws_message = json.dumps(
@@ -34,9 +32,7 @@ class WebSocketPublisher(EventPublisher):
             return True
 
         except Exception as e:
-            logger.error(
-                f"❌ WebSocket publish failed for {event.name}: {e}", exc_info=True
-            )
+            logger.error(f"❌ WebSocket publish failed for {event.name}: {e}", exc_info=True)
             raise
 
     def supports_target(self, target: DispatchTarget) -> bool:

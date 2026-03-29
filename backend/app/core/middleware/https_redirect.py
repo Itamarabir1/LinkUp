@@ -23,10 +23,7 @@ class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
         if not getattr(settings, "FORCE_HTTPS_REDIRECT", False):
             return await call_next(request)
 
-        proto = (
-            request.headers.get("x-forwarded-proto", "").strip().lower()
-            or request.url.scheme
-        )
+        proto = request.headers.get("x-forwarded-proto", "").strip().lower() or request.url.scheme
         if proto == "https":
             return await call_next(request)
 

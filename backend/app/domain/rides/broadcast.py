@@ -47,9 +47,7 @@ class RideNotificationFactory:
         return {
             "event": config["event_prefix"],
             "ride_id": str(ride.ride_id),
-            "status": ride.status.value
-            if hasattr(ride.status, "value")
-            else str(ride.status),
+            "status": ride.status.value if hasattr(ride.status, "value") else str(ride.status),
             "color": config["color"],
             "message": f"{config['message']} (מ-{ride.origin_name} ל-{ride.destination_name})",
         }

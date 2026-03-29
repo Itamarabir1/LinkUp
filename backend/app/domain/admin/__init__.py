@@ -1,2 +1,1 @@
 """Admin domain package."""
-

@@ -21,11 +21,7 @@ def _get_base_url_for_links() -> str:
         if not base:
             return "https://linkup.co.il"
         # קישורים במייל חייבים HTTPS כדי שלא יופיע "החיבור שלך פרטי" (מלבד localhost לפיתוח)
-        if (
-            base.startswith("http://")
-            and "localhost" not in base
-            and "127.0.0.1" not in base
-        ):
+        if base.startswith("http://") and "localhost" not in base and "127.0.0.1" not in base:
             base = "https://" + base[7:]
         return base
     except Exception:
@@ -103,8 +99,4 @@ class BaseContextBuilder(ABC):
         """בונה לינק לכפתור במייל – משתמש ב-FRONTEND_URL כדי שהלינק יפתח את האפליקציה."""
         clean_path = path.lstrip("/")
         base = _get_base_url_for_links()
-        return (
-            f"{base.rstrip('/')}/{clean_path}"
-            if base
-            else f"{self.BASE_URL}/{clean_path}"
-        )
+        return f"{base.rstrip('/')}/{clean_path}" if base else f"{self.BASE_URL}/{clean_path}"

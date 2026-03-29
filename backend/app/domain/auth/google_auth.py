@@ -35,9 +35,7 @@ def verify_google_id_token(id_token_str: str) -> Dict[str, Any]:
     try:
         request = requests.Request()
         logger.info("Verifying Google ID token...")
-        idinfo = id_token.verify_oauth2_token(
-            id_token_str, request, settings.GOOGLE_CLIENT_ID
-        )
+        idinfo = id_token.verify_oauth2_token(id_token_str, request, settings.GOOGLE_CLIENT_ID)
         logger.info("Google ID token verified successfully")
 
         if idinfo["iss"] not in ["accounts.google.com", "https://accounts.google.com"]:
@@ -60,7 +58,5 @@ def verify_google_id_token(id_token_str: str) -> Dict[str, Any]:
         logger.error("Google ID token verification failed: %s", e, exc_info=True)
         raise GoogleAuthFailed() from e
     except Exception as e:
-        logger.error(
-            "Unexpected error verifying Google ID token: %s", e, exc_info=True
-        )
+        logger.error("Unexpected error verifying Google ID token: %s", e, exc_info=True)
         raise GoogleAuthFailed() from e

@@ -30,15 +30,9 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     conversation_id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id_1 = Column(
-        PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
-    )
-    user_id_2 = Column(
-        PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
-    )
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    user_id_1 = Column(PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    user_id_2 = Column(PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
         UniqueConstraint("user_id_1", "user_id_2", name="uq_conversation_pair"),
@@ -69,13 +63,9 @@ class Message(Base):
         ForeignKey("conversations.conversation_id", ondelete="CASCADE"),
         nullable=False,
     )
-    sender_id = Column(
-        PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
-    )
+    sender_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     body = Column(Text, nullable=False)
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     conversation = relationship("Conversation", back_populates="messages")
     sender = relationship("User", foreign_keys=[sender_id])
@@ -134,9 +124,7 @@ class ChatAnalysis(Base):
     meeting_time = Column(Text)
     summary_hebrew = Column(Text)
     analysis_json = Column(JSON)
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     conversation = relationship("Conversation", foreign_keys=[conversation_id])
 

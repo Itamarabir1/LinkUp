@@ -9,9 +9,7 @@ class BaseNotificationProvider(ABC):
     """
 
     @abstractmethod
-    async def send(
-        self, user: Any, channel_config: Dict[str, Any], context: Dict[str, Any]
-    ) -> None:
+    async def send(self, user: Any, channel_config: Dict[str, Any], context: Dict[str, Any]) -> None:
         """חובה לממש לוגיקת שליחה אסינכרונית"""
         pass
 

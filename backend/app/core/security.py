@@ -32,9 +32,7 @@ async def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (
-        expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update(
         {
             "exp": expire,
@@ -81,9 +79,7 @@ def decode_access_token(token: str) -> dict:
         signature_segment = parts[2]
         padded_signature = signature_segment + "=" * (-len(signature_segment) % 4)
         signature_bytes = base64.urlsafe_b64decode(padded_signature.encode("ascii"))
-        canonical_signature = (
-            base64.urlsafe_b64encode(signature_bytes).decode("ascii").rstrip("=")
-        )
+        canonical_signature = base64.urlsafe_b64encode(signature_bytes).decode("ascii").rstrip("=")
         if signature_segment != canonical_signature:
             return None
 

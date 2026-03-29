@@ -14,9 +14,7 @@ class NotificationStreamer:
     אחראי על הזרמת מידע בזמן אמת מהתשתית (Bus) לצינור הפיזי (WebSocket).
     """
 
-    async def stream_user_notifications(
-        self, websocket: WebSocket, user_id: Union[UUID, str, int]
-    ):
+    async def stream_user_notifications(self, websocket: WebSocket, user_id: Union[UUID, str, int]):
         """
         פותח האזנה לערוץ המשתמש ומזרים הודעות עד לניתוק.
         """

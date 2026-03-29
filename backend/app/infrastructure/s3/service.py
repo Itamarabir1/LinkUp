@@ -60,9 +60,7 @@ class StorageService:
         await self.list_and_delete_prefix(prefix)
         logger.info("Deleted avatar folder for user %s", uid_str)
 
-    async def generate_group_image_upload_url(
-        self, group_id: Union[UUID, str], expiration: int = 300
-    ) -> tuple[str, str]:
+    async def generate_group_image_upload_url(self, group_id: Union[UUID, str], expiration: int = 300) -> tuple[str, str]:
         """
         יוצר presigned URL להעלאה ישירה ל-S3 לתמונת קבוצה.
         מפתח: GROUPS/<group_id>/<uuid>.webp
@@ -71,9 +69,7 @@ class StorageService:
         gid_str = str(group_id)
         key = f"{GROUPS_PREFIX}{gid_str}/{uuid.uuid4().hex}.webp"
         content_type = "image/webp"
-        presigned_url = await self.client.generate_presigned_upload_url(
-            key=key, content_type=content_type, expiration=expiration
-        )
+        presigned_url = await self.client.generate_presigned_upload_url(key=key, content_type=content_type, expiration=expiration)
         logger.info("Generated presigned URL for group image: key=%s", key)
         return presigned_url, key
 

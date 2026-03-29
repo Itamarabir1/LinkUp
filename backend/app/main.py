@@ -38,9 +38,7 @@ logger = logging.getLogger(__name__)
 # CORS: origins ממ-config או FRONTEND_URL (מחשבים לפני יצירת app)
 _cors_origins = getattr(settings, "CORS_ORIGINS", None) or []
 if not _cors_origins:
-    _cors_origins = [
-        getattr(settings, "FRONTEND_URL", "https://linkup.co.il").rstrip("/")
-    ]
+    _cors_origins = [getattr(settings, "FRONTEND_URL", "https://linkup.co.il").rstrip("/")]
 _allow_origin_regex = None
 if getattr(settings, "DEBUG", False):
     _allow_origin_regex = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
@@ -69,14 +67,9 @@ class EnsureCORSHeadersMiddleware(BaseHTTPMiddleware):
             print("[Linkup] >>> בקשה: {} {}".format(request.method, path), flush=True)
         response = await call_next(request)
         if "/api/v1/" in path:
-            print(
-                "[Linkup] <<< תגובה: status={}".format(response.status_code), flush=True
-            )
+            print("[Linkup] <<< תגובה: status={}".format(response.status_code), flush=True)
         origin = request.headers.get("origin")
-        if origin and (
-            origin in _cors_origins
-            or (_allow_origin_regex and re.match(_allow_origin_regex, origin))
-        ):
+        if origin and (origin in _cors_origins or (_allow_origin_regex and re.match(_allow_origin_regex, origin))):
             response.headers.setdefault("Access-Control-Allow-Origin", origin)
             response.headers.setdefault("Access-Control-Allow-Credentials", "true")
         return response
@@ -114,9 +107,7 @@ if getattr(settings, "FORCE_HTTPS_REDIRECT", False):
 
 # רישום ה-Admin וה-Exception Handlers (סדר: ספציפי → כללי)
 setup_admin(app, engine)
-app.add_exception_handler(
-    RequestValidationError, request_validation_exception_handler
-)
+app.add_exception_handler(RequestValidationError, request_validation_exception_handler)
 app.add_exception_handler(IntegrityError, integrity_error_handler)
 app.add_exception_handler(SQLAlchemyError, sqlalchemy_error_handler)
 app.add_exception_handler(LinkupError, linkup_exception_handler)
@@ -138,10 +129,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     headers = {}
     if request_id:
         headers["X-Request-ID"] = request_id
-    if origin and (
-        origin in _cors_origins
-        or (_allow_origin_regex and re.match(_allow_origin_regex, origin))
-    ):
+    if origin and (origin in _cors_origins or (_allow_origin_regex and re.match(_allow_origin_regex, origin))):
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
         headers["Access-Control-Allow-Methods"] = "*"

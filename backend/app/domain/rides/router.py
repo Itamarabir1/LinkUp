@@ -53,9 +53,7 @@ async def create_new_ride(
 ):
     if ride_in.group_id is not None:
         await verify_group_membership(db, ride_in.group_id, current_user.user_id)
-    return await ride_svc.create_ride(
-        db=db, ride_in=ride_in, current_user_id=current_user.user_id
-    )
+    return await ride_svc.create_ride(db=db, ride_in=ride_in, current_user_id=current_user.user_id)
 
 
 @router.get("/me", response_model=List[RideResponse])
@@ -81,9 +79,7 @@ async def update_ride(
     ride_svc: RideService = Depends(get_ride_service),
 ):
     """עדכון חלקי לנסיעה – זמן יציאה ו/או מספר מושבים (רק הנהג בעלים)."""
-    return await ride_svc.update_ride(
-        db, ride_id, current_user.user_id, payload
-    )
+    return await ride_svc.update_ride(db, ride_id, current_user.user_id, payload)
 
 
 @router.post("/{ride_id}/start", response_model=RideResponse)
@@ -94,9 +90,7 @@ async def start_ride(
     ride_svc: RideService = Depends(get_ride_service),
 ):
     """התחל נסיעה — מעביר לסטטוס ACTIVE. דורש לפחות נוסע מאושר אחד."""
-    return await ride_svc.start_ride(
-        db, ride_id=ride_id, driver_id=current_user.user_id
-    )
+    return await ride_svc.start_ride(db, ride_id=ride_id, driver_id=current_user.user_id)
 
 
 @router.post("/{ride_id}/end", response_model=RideResponse)
@@ -107,9 +101,7 @@ async def end_ride(
     ride_svc: RideService = Depends(get_ride_service),
 ):
     """סיים נסיעה — מעביר לסטטוס COMPLETED."""
-    return await ride_svc.end_ride(
-        db, ride_id=ride_id, driver_id=current_user.user_id
-    )
+    return await ride_svc.end_ride(db, ride_id=ride_id, driver_id=current_user.user_id)
 
 
 @router.delete("/{ride_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)

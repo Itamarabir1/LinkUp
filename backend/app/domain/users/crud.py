@@ -29,9 +29,7 @@ class CRUDUser:
 
     async def get_by_email(self, db: AsyncSession, email: str) -> Optional[User]:
         """שליפת משתמש לפי אימייל (case-insensitive)"""
-        result = await db.execute(
-            select(User).filter(func.lower(User.email) == func.lower(email))
-        )
+        result = await db.execute(select(User).filter(func.lower(User.email) == func.lower(email)))
         return result.scalars().first()
 
     async def get_by_phone(self, db: AsyncSession, phone: str) -> Optional[User]:
@@ -39,9 +37,7 @@ class CRUDUser:
         result = await db.execute(select(User).filter(User.phone_number == phone))
         return result.scalars().first()
 
-    async def create(
-        self, db: AsyncSession, *, obj_in: UserCreate, hashed_password: str
-    ) -> User:
+    async def create(self, db: AsyncSession, *, obj_in: UserCreate, hashed_password: str) -> User:
         db_obj = User(
             full_name=obj_in.full_name,
             phone_number=obj_in.phone_number,
@@ -88,9 +84,7 @@ class CRUDUser:
         await db.refresh(db_obj)
         return db_obj
 
-    async def update_location(
-        self, db: AsyncSession, *, user_id: Union[UUID, str], lat: float, lon: float
-    ) -> bool:
+    async def update_location(self, db: AsyncSession, *, user_id: Union[UUID, str], lat: float, lon: float) -> bool:
         """עדכון מיקום גיאוגרפי (GIS)"""
         point_wkt = f"POINT({lon} {lat})"  # סטנדרט PostGIS: Longitude קודם
         user = await self.get_by_id(db, user_id)
@@ -100,9 +94,7 @@ class CRUDUser:
             return True
         return False
 
-    async def update_fcm_token(
-        self, db: AsyncSession, *, user: User, token: str
-    ) -> User:
+    async def update_fcm_token(self, db: AsyncSession, *, user: User, token: str) -> User:
         """עדכון ה-FCM Token של המשתמש"""
         user.fcm_token = token
         db.add(user)
@@ -110,9 +102,7 @@ class CRUDUser:
         await db.refresh(user)
         return user
 
-    async def update_refresh_token(
-        self, db: AsyncSession, *, user: User, refresh_token: Optional[str]
-    ) -> User:
+    async def update_refresh_token(self, db: AsyncSession, *, user: User, refresh_token: Optional[str]) -> User:
         """עדכון או ניקוי Refresh Token (לשימוש ב-login וב-logout)."""
         user.refresh_token = refresh_token
         db.add(user)
@@ -120,9 +110,7 @@ class CRUDUser:
         await db.refresh(user)
         return user
 
-    async def update_password(
-        self, db: AsyncSession, *, user: User, hashed_password: str
-    ) -> User:
+    async def update_password(self, db: AsyncSession, *, user: User, hashed_password: str) -> User:
         """עדכון סיסמה (מוצפנת בלבד)"""
         user.hashed_password = hashed_password
         db.add(user)

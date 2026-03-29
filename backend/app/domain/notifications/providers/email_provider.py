@@ -33,10 +33,7 @@ class EmailProvider(BaseNotificationProvider):
             # 2. שליחה דרך EmailClient (Brevo) – נמען = הנהג/משתמש; Brevo דורש name ב-to
             if html_content:
                 recipient_name = (
-                    context.get("user_name")
-                    or context.get("driver_name")
-                    or getattr(user, "full_name", None)
-                    or getattr(user, "first_name", None)
+                    context.get("user_name") or context.get("driver_name") or getattr(user, "full_name", None) or getattr(user, "first_name", None)
                 )
                 if recipient_name is not None:
                     recipient_name = str(recipient_name).strip()

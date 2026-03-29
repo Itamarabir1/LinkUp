@@ -94,9 +94,7 @@ class UserRead(BaseModel):
 
 class UserCreate(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=100)
-    phone_number: str = Field(
-        ..., pattern=r"^\+?[1-9]\d{1,14}$"
-    )  # וולידציה לטלפון בינלאומי
+    phone_number: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")  # וולידציה לטלפון בינלאומי
     password: str = Field(..., min_length=8)  # הסיסמה הגולמית מהמשתמש
     email: Optional[EmailStr] = None
     fcm_token: Optional[str] = None
@@ -145,9 +143,7 @@ class AvatarUploadAcceptedResponse(BaseModel):
 class AvatarUploadUrlRequest(BaseModel):
     """בקשה ל-presigned URL להעלאת אווטאר."""
 
-    filename: Optional[str] = Field(
-        None, description="שם הקובץ (אופציונלי, לזיהוי סיומת)"
-    )
+    filename: Optional[str] = Field(None, description="שם הקובץ (אופציונלי, לזיהוי סיומת)")
 
 
 class AvatarUploadUrlResponse(BaseModel):

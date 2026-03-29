@@ -1,4 +1,3 @@
-
 import logging
 from typing import List, Optional
 from uuid import UUID
@@ -32,9 +31,7 @@ logger = logging.getLogger(__name__)
 
 class PassengerService:
     @staticmethod
-    async def create_passenger_request(
-        db: AsyncSession, request_in: PassengerRequestCreate, passenger_id: UUID
-    ):
+    async def create_passenger_request(db: AsyncSession, request_in: PassengerRequestCreate, passenger_id: UUID):
         """יוצר בקשה (מודעה) ומחפש נהגים תואמים מיד. passenger_id מהטוקן (API)."""
         try:
             if request_in.pickup_lat is not None and request_in.pickup_lon is not None:
@@ -42,35 +39,31 @@ class PassengerService:
             else:
                 pickup_coords = await get_coordinates(request_in.pickup_name)
                 if not pickup_coords:
-                    raise GeocodingError(
-                        address=request_in.pickup_name or request_in.destination_name
-                    )
+                    raise GeocodingError(address=request_in.pickup_name or request_in.destination_name)
                 p_lat, p_lon = pickup_coords
 
             dest_coords = await get_coordinates(request_in.destination_name)
             if not dest_coords:
-                raise GeocodingError(
-                    address=request_in.pickup_name or request_in.destination_name
-                )
+                raise GeocodingError(address=request_in.pickup_name or request_in.destination_name)
             d_lat, d_lon = dest_coords
 
-            new_request = await crud_passenger.create(
-                db, request_in, p_lat, p_lon, d_lat, d_lon, passenger_id=passenger_id
-            )
+            new_request = await crud_passenger.create(db, request_in, p_lat, p_lon, d_lat, d_lon, passenger_id=passenger_id)
             await db.commit()
 
             # 3. מציאת נהגים רלוונטיים באופן מיידי (לא כולל נסיעות של המשתמש עצמו)
             matches, _ = await crud_passenger.find_rides_by_coordinates(
-                db, p_lat, p_lon, d_lat, d_lon, request_in.search_radius,
+                db,
+                p_lat,
+                p_lon,
+                d_lat,
+                d_lon,
+                request_in.search_radius,
                 passenger_id=passenger_id,
             )
 
             # matching_rides חייב להיות List[RideResponse] — find_rides מחזיר tuples (Ride, booking_status)
             new_request.matching_rides = [
-                RideResponse.model_validate(ride).model_copy(
-                    update={"user_booking_status": status}
-                )
-                for ride, status in matches
+                RideResponse.model_validate(ride).model_copy(update={"user_booking_status": status}) for ride, status in matches
             ]
             return new_request
 
@@ -80,9 +73,7 @@ class PassengerService:
             raise
 
     @staticmethod
-    async def cancel_request(
-        db: AsyncSession, request_id: UUID, passenger_id: UUID
-    ):
+    async def cancel_request(db: AsyncSession, request_id: UUID, passenger_id: UUID):
         """ביטול הבקשה ושחרור כל ההזמנות הקשורות אליה (רק לבעל הבקשה)."""
         p_req = await crud_passenger.get_by_id(db, request_id)
         if not p_req:
@@ -95,11 +86,7 @@ class PassengerService:
             raise ForbiddenRideActionError("גישה חסומה")
 
         # 1. ביטול כל ההזמנות ושחרור מושבים
-        bookings = list(
-            (await db.execute(select(Booking).where(Booking.request_id == request_id)))
-            .scalars()
-            .all()
-        )
+        bookings = list((await db.execute(select(Booking).where(Booking.request_id == request_id))).scalars().all())
         for b in bookings:
             await crud_booking.execute_booking_cancellation(db, b)
 
@@ -117,9 +104,7 @@ class PassengerService:
     ) -> List[PassengerRequestResponse]:
         """רשימת הבקשות שלי כנוסע (הבקשות שלי)."""
         status_enum = PassengerStatus(status) if status else None
-        requests = await crud_passenger.get_by_passenger_id(
-            db, passenger_id, status_enum
-        )
+        requests = await crud_passenger.get_by_passenger_id(db, passenger_id, status_enum)
         return [PassengerRequestResponse.model_validate(r) for r in requests]
 
     @staticmethod
@@ -139,19 +124,20 @@ class PassengerService:
             logger.error(f"Error parsing coordinates for request {request_id}: {e}")
             raise GeocodingError(address=str(request_id))
 
-        radius = getattr(p_req, "search_radius_meters", None) or getattr(
-            p_req, "search_radius", 1000
-        )
+        radius = getattr(p_req, "search_radius_meters", None) or getattr(p_req, "search_radius", 1000)
         matches, _ = await crud_passenger.find_rides_by_coordinates(
-            db, p_lat, p_lon, d_lat, d_lon, radius,
+            db,
+            p_lat,
+            p_lon,
+            d_lat,
+            d_lon,
+            radius,
             passenger_id=p_req.passenger_id,
         )
         return matches
 
     @staticmethod
-    async def search_rides_for_passenger(
-        db: AsyncSession, search_data: RideSearchRequest
-    ):
+    async def search_rides_for_passenger(db: AsyncSession, search_data: RideSearchRequest):
         """חיפוש נסיעות פעיל לפי קואורדינטות של כתובות. לא שומר בקשה ב-DB."""
         from app.domain.passengers.schema import RideSearchResponse
 
@@ -159,15 +145,11 @@ class PassengerService:
             pickup_coords = await get_coordinates(search_data.pickup_name)
             dest_coords = await get_coordinates(search_data.destination_name)
             if not pickup_coords or not dest_coords:
-                raise GeocodingError(
-                    address=search_data.pickup_name or search_data.destination_name
-                )
+                raise GeocodingError(address=search_data.pickup_name or search_data.destination_name)
             p_lat, p_lon = pickup_coords
             d_lat, d_lon = dest_coords
 
-            radius = getattr(search_data, "search_radius", None) or getattr(
-                search_data, "radius", 1000
-            )
+            radius = getattr(search_data, "search_radius", None) or getattr(search_data, "radius", 1000)
 
             matches, has_more = await crud_passenger.find_rides_by_coordinates(
                 db,
@@ -185,9 +167,7 @@ class PassengerService:
 
             items = []
             for ride, booking_status in matches:
-                items.append(
-                    RideMapper.to_response(ride, user_booking_status=booking_status)
-                )
+                items.append(RideMapper.to_response(ride, user_booking_status=booking_status))
             next_cursor = str(items[-1].ride_id) if has_more and items else None
             return RideSearchResponse(
                 items=items,
@@ -205,9 +185,7 @@ class PassengerService:
         return await crud_passenger.get_multi_rides(db, status=status)
 
     @staticmethod
-    async def get_ride_driver_info(
-        db: AsyncSession, ride_id: UUID
-    ) -> DriverInfoResponse:
+    async def get_ride_driver_info(db: AsyncSession, ride_id: UUID) -> DriverInfoResponse:
         """פרטי נהג של נסיעה – רק לנסיעות פתוחות (OPEN/FULL). מחזיר 404 אם לא נמצא או לא רלוונטי."""
         ride = await crud_ride.get_with_driver(db, ride_id)
         if not ride:
@@ -250,6 +228,4 @@ class PassengerService:
             is_notification_active=True,
             is_auto_generated=True,
         )
-        return await crud_passenger.create(
-            db, request_in, p_lat, p_lon, d_lat, d_lon, passenger_id=passenger_id
-        )
+        return await crud_passenger.create(db, request_in, p_lat, p_lon, d_lat, d_lon, passenger_id=passenger_id)

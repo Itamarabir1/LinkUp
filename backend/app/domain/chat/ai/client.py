@@ -15,8 +15,6 @@ def get_groq_client() -> Groq:
     if _groq_client is None:
         api_key = os.getenv("GROK_API_KEY") or os.getenv("GROQ_API_KEY")
         if not api_key:
-            raise ValueError(
-                "GROK_API_KEY or GROQ_API_KEY environment variable is required"
-            )
+            raise ValueError("GROK_API_KEY or GROQ_API_KEY environment variable is required")
         _groq_client = Groq(api_key=api_key)
     return _groq_client

@@ -33,9 +33,7 @@ class PassengerStatusEnumType(PG_ENUM):
         try:
             return PassengerStatus[elem]
         except KeyError:
-            raise LookupError(
-                f"'{elem}' is not among the defined enum values. Enum name: passenger_request_status."
-            ) from None
+            raise LookupError(f"'{elem}' is not among the defined enum values. Enum name: passenger_request_status.") from None
 
 
 class PassengerRequest(Base):
@@ -70,9 +68,7 @@ class PassengerRequest(Base):
     pickup_name = Column(String(255))
     pickup_geom = Column(Geography(geometry_type="POINT", srid=4326), nullable=False)
     destination_name = Column(String(255))
-    destination_geom = Column(
-        Geography(geometry_type="POINT", srid=4326), nullable=False
-    )
+    destination_geom = Column(Geography(geometry_type="POINT", srid=4326), nullable=False)
 
     requested_departure_time = Column(DateTime(timezone=True), nullable=False)
     # התאמה לשם העמודה ב-SQL: search_radius_meters
@@ -111,9 +107,7 @@ class PassengerRequest(Base):
     group = relationship("Group")
 
     # מקשר לבוקינגס שנוצרו מהבקשה הזו
-    bookings = relationship(
-        "Booking", back_populates="passenger_request", cascade="all, delete-orphan"
-    )
+    bookings = relationship("Booking", back_populates="passenger_request", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<PassengerRequest(id={self.request_id}, user_id={self.passenger_id}, status={self.status})>"

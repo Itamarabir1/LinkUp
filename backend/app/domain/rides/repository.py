@@ -16,9 +16,7 @@ class RideCacheRepository:
     שכבה זו מפרידה בין הלוגיקה העסקית לבין מימוש ה-Storage.
     """
 
-    async def save_preview(
-        self, preview: RidePreviewResponse, preview_in: RidePreviewCreate
-    ) -> None:
+    async def save_preview(self, preview: RidePreviewResponse, preview_in: RidePreviewCreate) -> None:
         """שומר תצוגה מקדימה של נסיעה ב-Redis: 3 המסלולים (כולל זמן נסיעה וק\"מ) לתוקף 24 שעות."""
         try:
             # הכנת הנתונים (Serialization)
@@ -38,9 +36,7 @@ class RideCacheRepository:
 
             key = get_ride_preview_key(preview.session_id)
             # תוקף 24 שעות – חייב להיות בשניות (86400) כדי שהמשתמש יוכל לבחור מסלול בתוך 24 שעות
-            ttl_seconds = max(
-                RIDE_PREVIEW_TTL, 86400
-            )  # מינימום 24h גם אם הקבוע שונה בטעות
+            ttl_seconds = max(RIDE_PREVIEW_TTL, 86400)  # מינימום 24h גם אם הקבוע שונה בטעות
             await redis_client.save(
                 key=key,
                 data=cache_data,
@@ -56,9 +52,7 @@ class RideCacheRepository:
 
         except Exception as e:
             logger.error(f"Failed to save ride preview to cache: {e}")
-            raise InfrastructureError(
-                f"Cache write error for session: {preview.session_id}", detail=str(e)
-            )
+            raise InfrastructureError(f"Cache write error for session: {preview.session_id}", detail=str(e))
 
     async def get_preview(self, session_id: str) -> Optional[Dict[str, Any]]:
         """שליפת נתונים מהקאש (תוקף 24 שעות)."""
@@ -71,9 +65,7 @@ class RideCacheRepository:
                 key,
             )
         else:
-            logger.debug(
-                "get_preview: key=%s found, routes=%s", key, len(data.get("routes", []))
-            )
+            logger.debug("get_preview: key=%s found, routes=%s", key, len(data.get("routes", [])))
         return data
 
     async def delete_preview(self, session_id: str) -> None:

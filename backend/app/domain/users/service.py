@@ -37,24 +37,16 @@ class UserService:
             raise UserNotFoundError(user_id=user_id)
         return user
 
-    async def get_avatar_upload_url(
-        self, user_id, filename: Optional[str] = None, expiration: int = 300
-    ) -> tuple[str, str]:
+    async def get_avatar_upload_url(self, user_id, filename: Optional[str] = None, expiration: int = 300) -> tuple[str, str]:
         """
         מחזיר presigned URL להעלאה ישירה ל-S3 staging.
         מחזיר: (presigned_url, staging_key)
         """
-        presigned_url, staging_key = await self.s3.generate_avatar_upload_url(
-            user_id=user_id, filename=filename, expiration=expiration
-        )
-        logger.info(
-            "Generated presigned URL for user %s: staging_key=%s", user_id, staging_key
-        )
+        presigned_url, staging_key = await self.s3.generate_avatar_upload_url(user_id=user_id, filename=filename, expiration=expiration)
+        logger.info("Generated presigned URL for user %s: staging_key=%s", user_id, staging_key)
         return presigned_url, staging_key
 
-    async def confirm_avatar_upload(
-        self, db: AsyncSession, user: User, staging_key: str
-    ) -> None:
+    async def confirm_avatar_upload(self, db: AsyncSession, user: User, staging_key: str) -> None:
         """
         מאשר העלאה לאחר שהלקוח העלה ישירות ל-S3. מעדכן avatar_key ב-DB מיידית (אופטימי)
         ודוחף אירוע לתור לעיבוד ברקע (resize + העלאה ל-avatars/{user_id}/).
@@ -68,9 +60,7 @@ class UserService:
                 staging_key,
                 expected_prefix,
             )
-            raise PermissionDeniedError(
-                message="מפתח העלאה לא תואם למשתמש המחובר"
-            )
+            raise PermissionDeniedError(message="מפתח העלאה לא תואם למשתמש המחובר")
 
         # עדכון מיידי ב-DB (אופטימי — הפרונט יכול להציג תמונה מ-staging עד שה-worker יסיים)
         await self.crud.update(db, db_obj=user, obj_in={"avatar_key": staging_key})
@@ -102,22 +92,14 @@ class UserService:
         try:
             await self.s3.delete_user_avatar_folder(user.user_id)
         except S3DeleteFailed as e:
-            logger.warning(
-                "Could not delete avatar folder for user %s: %s", user_id, e.message
-            )
+            logger.warning("Could not delete avatar folder for user %s: %s", user_id, e.message)
 
         await self.crud.update(db, db_obj=user, obj_in={"avatar_key": None})
         await db.commit()
         logger.info("Avatar removed for user %s", user_id)
 
-    async def update_user_location(
-        self, db: AsyncSession, user_id: int, lat: float, lon: float
-    ) -> bool:
-        if (
-            not (-90 <= lat <= 90)
-            or not (-180 <= lon <= 180)
-            or (lat == 0 and lon == 0)
-        ):
+    async def update_user_location(self, db: AsyncSession, user_id: int, lat: float, lon: float) -> bool:
+        if not (-90 <= lat <= 90) or not (-180 <= lon <= 180) or (lat == 0 and lon == 0):
             raise InvalidLocationError(lat=lat, lon=lon)
 
         success = self.crud.update_location(db, user_id=user_id, lat=lat, lon=lon)
@@ -125,9 +107,7 @@ class UserService:
             raise UserNotFoundError(user_id=user_id)
         return True
 
-    async def update_user_info(
-        self, db: AsyncSession, user_id: int, update_data: UserUpdate
-    ) -> User:
+    async def update_user_info(self, db: AsyncSession, user_id: int, update_data: UserUpdate) -> User:
         db_user = await self.get_user_by_id(db, user_id=user_id)
         update_dict = update_data.model_dump(exclude_unset=True)
 
@@ -167,9 +147,7 @@ class UserService:
         await db.refresh(db_user)
         return db_user
 
-    async def update_fcm_token(
-        self, db: AsyncSession, user_id: int, fcm_token: str
-    ) -> bool:
+    async def update_fcm_token(self, db: AsyncSession, user_id: int, fcm_token: str) -> bool:
         db_user = await self.get_user_by_id(db, user_id=user_id)
         await self.crud.update_fcm_token(db, user=db_user, token=fcm_token)
         return True

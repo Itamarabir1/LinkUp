@@ -218,9 +218,7 @@ class PasswordResetConfirmResponse(BaseModel):
 
     message: str = Field(..., description="הודעת הצלחה")
     status: str = Field(default="success", description="סטטוס התגובה")
-    detail: Optional[str] = Field(
-        default=None, description="פירוט אופציונלי (למשל להצגה בפרונט)"
-    )
+    detail: Optional[str] = Field(default=None, description="פירוט אופציונלי (למשל להצגה בפרונט)")
 
 
 class EmailOnlyRequest(BaseModel):
@@ -244,6 +242,4 @@ class EmailOnlyRequest(BaseModel):
 class GoogleSignInRequest(BaseModel):
     """בקשת התחברות דרך Google OAuth - מקבל ID token מ-Google Sign-In."""
 
-    id_token: str = Field(
-        ..., min_length=100, description="Google ID token (JWT) מ-Google Sign-In"
-    )
+    id_token: str = Field(..., min_length=100, description="Google ID token (JWT) מ-Google Sign-In")

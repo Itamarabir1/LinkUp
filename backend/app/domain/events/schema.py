@@ -20,9 +20,7 @@ class Event(BaseModel):
     @classmethod
     def validate_event_name(cls, v: str) -> str:
         if "." not in v:
-            raise ValueError(
-                "Event name must follow the 'domain.action' format (e.g., user.created)"
-            )
+            raise ValueError("Event name must follow the 'domain.action' format (e.g., user.created)")
         return v.lower()
 
     # --- חילוץ נתונים חכם (Properties) ---

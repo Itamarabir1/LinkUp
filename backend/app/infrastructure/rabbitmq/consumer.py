@@ -72,9 +72,7 @@ class RabbitMQConsumer:
             queue = await channel.declare_queue(self.queue_name, durable=True)
 
         for ex_name in self._exchange_names:
-            exchange = await channel.declare_exchange(
-                ex_name, aio_pika.ExchangeType.TOPIC, durable=True
-            )
+            exchange = await channel.declare_exchange(ex_name, aio_pika.ExchangeType.TOPIC, durable=True)
             await queue.bind(exchange, routing_key="#")
             logger.debug("Queue %s bound to exchange %s", self.queue_name, ex_name)
         return queue
@@ -154,9 +152,7 @@ class RabbitMQConsumer:
     async def _process_message(self, message: aio_pika.IncomingMessage) -> None:
         """ניהול לוגיקת העיבוד של הודעה בודדת. תורים ב-RETRYABLE_QUEUES מקבלים retry + DLQ."""
         if self.queue_name in RETRYABLE_QUEUES:
-            await self._handle_with_retry(
-                message, self._callback, self.queue_name
-            )
+            await self._handle_with_retry(message, self._callback, self.queue_name)
         else:
             async with message.process():
                 try:

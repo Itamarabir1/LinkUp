@@ -48,11 +48,7 @@ class UserBuilder(BaseContextBuilder):
 
         # 3. התאמת התוכן
         matched_content = next(
-            (
-                content
-                for key, content in event_content_map.items()
-                if key in event_key.lower()
-            ),
+            (content for key, content in event_content_map.items() if key in event_key.lower()),
             self._get_default_content(),
         )
 

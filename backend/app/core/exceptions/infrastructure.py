@@ -76,9 +76,7 @@ class InfrastructureError(LinkupError):
         error_code: Optional[str] = None,
     ):
         payload = {"detail": detail} if detail else None
-        super().__init__(
-            message=message, error_code=error_code or self.error_code, payload=payload
-        )
+        super().__init__(message=message, error_code=error_code or self.error_code, payload=payload)
 
 
 class RateLimitExceeded(LinkupError):

@@ -25,9 +25,7 @@ async def require_group_member(
     if group_id is None:
         return None
     if current_user is None:
-        raise HTTPException(
-            status_code=401, detail="נדרשת התחברות לגישה לקבוצה"
-        )
+        raise HTTPException(status_code=401, detail="נדרשת התחברות לגישה לקבוצה")
     member = await get_membership(db, group_id, current_user.user_id)
     if not member:
         raise HTTPException(status_code=403, detail="אינך חבר בקבוצה זו")

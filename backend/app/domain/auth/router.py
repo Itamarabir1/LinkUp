@@ -157,9 +157,7 @@ async def verify_email_by_link(
         await auth_svc.verify_user_email(db, email, code)
         return RedirectResponse(url=f"{base}/verified", status_code=302)
     except Exception:
-        return RedirectResponse(
-            url=f"{base}/verify-email?error=invalid", status_code=302
-        )
+        return RedirectResponse(url=f"{base}/verify-email?error=invalid", status_code=302)
 
 
 @router.post("/verify-email", response_model=AuthMessageResponse)
@@ -244,9 +242,7 @@ async def change_password(
     שינוי סיסמה למשתמש מחובר: סיסמה ישנה + סיסמה חדשה פעמיים (אישור).
     ולידציה כמו ברישום: חוזק סיסמה + התאמה בין שני שדות הסיסמה החדשה.
     """
-    return await auth_svc.change_password(
-        db, user_id=current_user.user_id, data=data
-    )
+    return await auth_svc.change_password(db, user_id=current_user.user_id, data=data)
 
 
 @router.post(
@@ -275,9 +271,7 @@ async def google_signin(
             logger.error("GOOGLE_CLIENT_ID not configured in settings")
             raise GoogleAuthFailed(message="שירות Google לא מוגדר בשרת")
 
-        return await auth_svc.authenticate_with_google(
-            db=db, id_token=data.id_token
-        )
+        return await auth_svc.authenticate_with_google(db=db, id_token=data.id_token)
     except LinkupError:
         raise
     except Exception as e:

@@ -42,9 +42,7 @@ from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 logger = logging.getLogger(__name__)
 
 
-async def _require_booking_and_ride_for_chat(
-    db: AsyncSession, booking_id: UUID, current_user_id: UUID
-) -> tuple[Booking, Ride]:
+async def _require_booking_and_ride_for_chat(db: AsyncSession, booking_id: UUID, current_user_id: UUID) -> tuple[Booking, Ride]:
     """טוען הזמנה ונסיעה; זורק שגיאת דומיין אם אין הרשאה לצ'אט."""
     bid = UUID(str(booking_id)) if isinstance(booking_id, str) else booking_id
     result = await db.execute(select(Booking).where(Booking.booking_id == bid))
@@ -64,15 +62,11 @@ async def _require_booking_and_ride_for_chat(
 
     allowed_statuses = {BookingStatus.PENDING, BookingStatus.CONFIRMED}
     if booking.status not in allowed_statuses:
-        raise ForbiddenRideActionError(
-            "ניתן לשוחח רק כשסטטוס ההזמנה ממתין לאישור או מאושר"
-        )
+        raise ForbiddenRideActionError("ניתן לשוחח רק כשסטטוס ההזמנה ממתין לאישור או מאושר")
     return booking, ride
 
 
-async def get_or_create_conversation(
-    db: AsyncSession, current_user_id: UUID, other_user_id: UUID
-) -> ConversationDetail:
+async def get_or_create_conversation(db: AsyncSession, current_user_id: UUID, other_user_id: UUID) -> ConversationDetail:
     """
     מחזיר או יוצר שיחה בין current_user ל־other_user.
     מחזיר ConversationDetail (לשימוש בראוטר).
@@ -86,9 +80,7 @@ async def get_or_create_conversation(
     other = await crud_user.get_by_id(db, id=other_user_id)
     if not other:
         raise UserNotFoundError(user_id=other_user_id)
-    conv = await chat_crud.get_or_create_conversation(
-        db, current_user_id, other_user_id
-    )
+    conv = await chat_crud.get_or_create_conversation(db, current_user_id, other_user_id)
     partner = ConversationPartner(
         user_id=other.user_id,
         full_name=other.full_name,
@@ -101,17 +93,13 @@ async def get_or_create_conversation(
     )
 
 
-async def get_or_create_conversation_by_booking(
-    db: AsyncSession, booking_id: UUID, current_user_id: UUID
-) -> ConversationDetail:
+async def get_or_create_conversation_by_booking(db: AsyncSession, booking_id: UUID, current_user_id: UUID) -> ConversationDetail:
     """
     מחזיר או יוצר שיחה בין נהג לנוסע על בסיס booking_id.
     בודק הרשאות: רק נהג או נוסע של ה-booking יכולים לפתוח שיחה,
     ורק אם הסטטוס הוא pending_approval או confirmed.
     """
-    booking, ride = await _require_booking_and_ride_for_chat(
-        db, booking_id, current_user_id
-    )
+    booking, ride = await _require_booking_and_ride_for_chat(db, booking_id, current_user_id)
 
     driver_id = ride.driver_id
     passenger_id = booking.passenger_id
@@ -128,9 +116,7 @@ async def get_or_create_conversation_by_booking(
     if not other:
         raise UserNotFoundError(user_id=other_user_id)
 
-    conv = await chat_crud.get_or_create_conversation(
-        db, current_user_id, other_user_id
-    )
+    conv = await chat_crud.get_or_create_conversation(db, current_user_id, other_user_id)
     partner = ConversationPartner(
         user_id=other.user_id,
         full_name=other.full_name,
@@ -154,9 +140,7 @@ def _partner_from_conversation(conv, current_user_id: UUID) -> ConversationPartn
     )
 
 
-async def list_my_conversations(
-    db: AsyncSession, current_user_id: UUID
-) -> list[ConversationListItem]:
+async def list_my_conversations(db: AsyncSession, current_user_id: UUID) -> list[ConversationListItem]:
     """
     רשימת שיחות של המשתמש עם פרטי הצד השני והודעה אחרונה.
     """
@@ -172,26 +156,20 @@ async def list_my_conversations(
         last = await chat_crud.get_last_message(db, conv.conversation_id)
         has_unread = False
         if last:
-            has_unread = await chat_crud.has_unread_messages(
-                db, conversation_id=conv.conversation_id, user_id=current_user_id
-            )
+            has_unread = await chat_crud.has_unread_messages(db, conversation_id=conv.conversation_id, user_id=current_user_id)
         out.append(
             ConversationListItem(
                 conversation_id=conv.conversation_id,
                 partner=partner,
                 last_message_at=last.created_at if last else None,
-                last_message_preview=(last.body[:80] + "…")
-                if last and len(last.body) > 80
-                else (last.body if last else None),
+                last_message_preview=(last.body[:80] + "…") if last and len(last.body) > 80 else (last.body if last else None),
                 has_unread=has_unread,
             )
         )
     return out
 
 
-async def get_conversation_detail(
-    db: AsyncSession, conversation_id: UUID, current_user_id: UUID
-) -> ConversationDetail:
+async def get_conversation_detail(db: AsyncSession, conversation_id: UUID, current_user_id: UUID) -> ConversationDetail:
     """
     פרטי שיחה אחת – רק אם המשתמש participant.
     """
@@ -224,9 +202,7 @@ async def send_message(
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, sender_id)
     if not conv:
         raise ChatRoomNotFound()
-    msg = await chat_crud.create_message(
-        db, conversation_id=conversation_id, sender_id=sender_id, body=body
-    )
+    msg = await chat_crud.create_message(db, conversation_id=conversation_id, sender_id=sender_id, body=body)
     recipient_id = conv.user_id_2 if conv.user_id_1 == sender_id else conv.user_id_1
     payload = {
         "message_id": msg.message_id,
@@ -255,9 +231,7 @@ async def send_message(
         except RedisUnavailable:
             raise
         except Exception as e:
-            logger.error(
-                "Error publishing chat completion event: %s", e, exc_info=True
-            )
+            logger.error("Error publishing chat completion event: %s", e, exc_info=True)
             raise MessageSendFailed() from e
 
     return MessageResponse(

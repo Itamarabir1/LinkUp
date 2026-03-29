@@ -78,20 +78,14 @@ class Ride(Base):
     departure_time = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     estimated_arrival_time = Column(DateTime(timezone=True), nullable=True)
-    updated_at = Column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # --- מיקומים (PostGIS) ---
     origin_name = Column(String(255))
     destination_name = Column(String(255))
     origin_geom = Column(Geography(geometry_type="POINT", srid=4326), nullable=False)
-    destination_geom = Column(
-        Geography(geometry_type="POINT", srid=4326), nullable=False
-    )
-    route_coords = Column(
-        Geography(geometry_type="LINESTRING", srid=4326), nullable=True
-    )
+    destination_geom = Column(Geography(geometry_type="POINT", srid=4326), nullable=False)
+    route_coords = Column(Geography(geometry_type="LINESTRING", srid=4326), nullable=True)
     route_summary = Column(String(255), nullable=True)  # סיכום המסלול (כביש) מגוגל
 
     # --- נתונים פיזיים (מותאם ל-SQL שלך) ---
@@ -146,11 +140,7 @@ class Ride(Base):
     def occupied_seats(self) -> int:
         """מחשב כמה מושבים תפוסים בפועל על בסיס הזמנות מאושרות בלבד"""
         # אופטימיזציה: סכימת המושבים מתוך רשימת הבוקינגס בזיכרון
-        return sum(
-            b.num_seats
-            for b in self.bookings
-            if b.status not in ["cancelled", "rejected"]
-        )
+        return sum(b.num_seats for b in self.bookings if b.status not in ["cancelled", "rejected"])
 
     @property
     def seats_left(self) -> int:

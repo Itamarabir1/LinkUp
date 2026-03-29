@@ -33,13 +33,9 @@ async def handle_conversation_completion(
     """
     try:
         # בדיקה שהשיחה קיימת והמשתמש participant
-        conv = await chat_crud.get_conversation_by_id(
-            db, conversation_id, current_user_id
-        )
+        conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
         if not conv:
-            logger.warning(
-                f"Conversation {conversation_id} not found or user {current_user_id} not participant"
-            )
+            logger.warning(f"Conversation {conversation_id} not found or user {current_user_id} not participant")
             return False
 
         # בדיקה אם כבר נותח (idempotency)
@@ -48,9 +44,7 @@ async def handle_conversation_completion(
             return False
 
         # איסוף טקסט השיחה
-        chat_text = await get_conversation_text_for_analysis(
-            db, conversation_id, current_user_id, limit=100
-        )
+        chat_text = await get_conversation_text_for_analysis(db, conversation_id, current_user_id, limit=100)
         if not chat_text:
             logger.warning(f"No messages found for conversation {conversation_id}")
             return False
@@ -89,9 +83,7 @@ async def handle_conversation_completion(
             },
         )
 
-        logger.info(
-            f"Conversation {conversation_id} completed and analyzed successfully"
-        )
+        logger.info(f"Conversation {conversation_id} completed and analyzed successfully")
         return True
 
     except Exception as e:

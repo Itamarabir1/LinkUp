@@ -67,9 +67,7 @@ class NotificationManager:
         try:
             ctx = {**cmd.context, "event_key": cmd.event_key}
             await provider.send(cmd.user, cmd.template, ctx)
-            logger.info(
-                f"✅ {channel_name} sent to user_id={getattr(cmd.user, 'user_id', getattr(cmd.user, 'id', 'N/A'))}"
-            )
+            logger.info(f"✅ {channel_name} sent to user_id={getattr(cmd.user, 'user_id', getattr(cmd.user, 'id', 'N/A'))}")
         except Exception as e:
             # אנחנו לא זורקים LinkupError כאן כדי לא להפיל ערוצים אחרים!
             logger.error(f"❌ {channel_name} failed for {cmd.event_key}: {str(e)}")

@@ -7,9 +7,7 @@ from typing import Optional
 import re
 
 
-def parse_hebrew_time(
-    time_str: str, base_date: Optional[datetime] = None
-) -> Optional[datetime]:
+def parse_hebrew_time(time_str: str, base_date: Optional[datetime] = None) -> Optional[datetime]:
     """
     מפרסר זמן בעברית (למשל "08:00", "16:00", "מחר ב-08:00") לאובייקט datetime.
 
@@ -83,8 +81,6 @@ def parse_hebrew_time(
 
     # חישוב התאריך הסופי
     target_date = base_date + timedelta(days=days_offset)
-    target_datetime = target_date.replace(
-        hour=hour, minute=minute, second=second, microsecond=0
-    )
+    target_datetime = target_date.replace(hour=hour, minute=minute, second=second, microsecond=0)
 
     return target_datetime

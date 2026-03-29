@@ -35,18 +35,10 @@ class OutboxEvent(Base):
     last_error = Column(Text, nullable=True)
 
     # חותמות זמן
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     processed_at = Column(DateTime(timezone=True), nullable=True)
 
-    __table_args__ = (
-        Index(
-            "idx_outbox_pending", "created_at", postgresql_where=(status == "PENDING")
-        ),
-    )
+    __table_args__ = (Index("idx_outbox_pending", "created_at", postgresql_where=(status == "PENDING")),)
 
     def __repr__(self):
-        return (
-            f"<OutboxEvent(name={self.event_name}, status={self.status}, id={self.id})>"
-        )
+        return f"<OutboxEvent(name={self.event_name}, status={self.status}, id={self.id})>"

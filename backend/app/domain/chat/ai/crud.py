@@ -44,9 +44,7 @@ async def get_analysis_by_conversation_id(
     """
     מחזיר ניתוח AI לפי conversation_id.
     """
-    result = await db.execute(
-        select(ChatAnalysis).where(ChatAnalysis.conversation_id == conversation_id)
-    )
+    result = await db.execute(select(ChatAnalysis).where(ChatAnalysis.conversation_id == conversation_id))
     return result.scalars().first()
 
 

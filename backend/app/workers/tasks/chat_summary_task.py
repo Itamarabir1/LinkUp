@@ -30,9 +30,7 @@ async def _process_completion_message(payload_str: str) -> None:
                 "chat completion event missing conversation_id or trigger_user_id: %s",
                 data,
             )
-            raise WorkerTaskFailed(
-                message="אירוע סיום צ'אט חסר conversation_id או trigger_user_id"
-            )
+            raise WorkerTaskFailed(message="אירוע סיום צ'אט חסר conversation_id או trigger_user_id")
         cid = UUID(str(conversation_id))
         uid = UUID(str(trigger_user_id))
         async with SessionLocal() as db:
@@ -71,9 +69,7 @@ async def run_chat_completion_redis_listener(stop_event: asyncio.Event) -> None:
 
         while not stop_event.is_set():
             try:
-                message = await asyncio.wait_for(
-                    pubsub.get_message(timeout=1.0), timeout=2.0
-                )
+                message = await asyncio.wait_for(pubsub.get_message(timeout=1.0), timeout=2.0)
             except asyncio.TimeoutError:
                 continue
             if message is None:
@@ -85,9 +81,7 @@ async def run_chat_completion_redis_listener(stop_event: asyncio.Event) -> None:
                 if isinstance(payload, str):
                     await _process_completion_message(payload)
             except Exception as e:
-                logger.error(
-                    "Chat completion listener message error: %s", e, exc_info=True
-                )
+                logger.error("Chat completion listener message error: %s", e, exc_info=True)
     except asyncio.CancelledError:
         logger.info("Chat completion listener cancelled.")
     except Exception as e:

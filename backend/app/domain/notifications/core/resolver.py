@@ -80,10 +80,7 @@ class RecipientResolver:
             return None
         if hasattr(source, "passenger") and source.passenger is not None:
             return source.passenger
-        if (
-            hasattr(source, "passenger_request")
-            and source.passenger_request is not None
-        ):
+        if hasattr(source, "passenger_request") and source.passenger_request is not None:
             return getattr(source.passenger_request, "user", None)
         return None
 

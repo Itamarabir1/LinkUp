@@ -39,9 +39,7 @@ async def handle_ride_created(db, data: Dict[str, Any]) -> None:
         getattr(ride, "destination_name", None),
         "exists" if getattr(ride, "route_coords", None) else "missing",
     )
-    passengers = await db.run_sync(
-        lambda sess: crud_passenger.find_passengers_for_ride_notification(sess, ride)
-    )
+    passengers = await db.run_sync(lambda sess: crud_passenger.find_passengers_for_ride_notification(sess, ride))
     logger.info(
         "ride.created: found %d matching passengers for ride_id=%s",
         len(passengers),
@@ -97,9 +95,7 @@ async def handle_ride_cancelled_by_driver(db, data: Dict[str, Any]) -> None:
     ]
 
     if not active_bookings:
-        logger.warning(
-            "ride.cancelled_by_driver: no active bookings found for ride_id=%s", ride_id
-        )
+        logger.warning("ride.cancelled_by_driver: no active bookings found for ride_id=%s", ride_id)
         return
 
     for b in active_bookings:
@@ -122,9 +118,7 @@ async def handle_ride_cancelled_by_driver(db, data: Dict[str, Any]) -> None:
     )
 
 
-async def handle_notification_event(
-    data: Dict[str, Any], routing_key: str, handler=notification_handler
-):
+async def handle_notification_event(data: Dict[str, Any], routing_key: str, handler=notification_handler):
     """
     ה-Callback שמופעל ע"י ה-RabbitMQConsumer.
     routing_key הוא השם של האירוע שמגיע מרביט (למשל 'ride.created', 'ride.created_for_passengers')
@@ -143,9 +137,7 @@ async def handle_notification_event(
             else:
                 await handler.handle_event(db, event_name=routing_key, payload=data)
             await db.commit()
-            logger.info(
-                "[NOTIF] Consumer: handler done for routing_key=%s", routing_key
-            )
+            logger.info("[NOTIF] Consumer: handler done for routing_key=%s", routing_key)
         except Exception as e:
             await db.rollback()
             logger.error(

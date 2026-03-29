@@ -2,6 +2,7 @@
 Structured Logging: JSON בפרודקשן, טקסט קריא בפיתוח.
 Request ID מוזרק ל-LogRecord דרך contextvar כדי שיופיע בכל לוג בתוך בקשה.
 """
+
 import logging
 import sys
 from contextvars import ContextVar

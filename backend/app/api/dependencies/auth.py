@@ -39,18 +39,14 @@ async def get_current_user(
     payload = decode_access_token(token)
     if not payload:
         logger.warning("❌ Token decode failed - invalid token or expired")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
     logger.debug(f"✅ Token decoded successfully, payload: {payload}")
 
     user_id = payload.get("sub")
     if not user_id:
         logger.error("❌ Token payload missing 'sub' field")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
     user = await crud_user.get_by_id(db, id=UUID(str(user_id)))
 

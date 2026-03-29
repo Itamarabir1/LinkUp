@@ -38,7 +38,5 @@ async def check_health() -> dict:
         logger.error("Health check RabbitMQ failed: %s", e)
         results["rabbitmq"] = "error"
 
-    results["status"] = (
-        "healthy" if all(v == "ok" for v in results.values()) else "unhealthy"
-    )
+    results["status"] = "healthy" if all(v == "ok" for v in results.values()) else "unhealthy"
     return results

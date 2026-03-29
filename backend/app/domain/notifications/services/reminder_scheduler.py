@@ -26,9 +26,7 @@ class ReminderScheduler:
         await self._remind_passengers(db, start_w, end_w)
         await self._remind_drivers(db, start_w, end_w)
 
-    async def _remind_passengers(
-        self, db: AsyncSession, start: datetime, end: datetime
-    ):
+    async def _remind_passengers(self, db: AsyncSession, start: datetime, end: datetime):
         # השם שונה מ-handle ל-remind כדי להבהיר מה הפעולה העסקית
         bookings = await crud_booking.get_bookings_for_reminders(db, start, end)
         if not bookings:
@@ -91,9 +89,7 @@ class ReminderScheduler:
             logger.info(f"✅ Committed {context}")
         except Exception as e:
             await db.rollback()
-            logger.critical(
-                "Database error in %s: %s", context, e, exc_info=True
-            )
+            logger.critical("Database error in %s: %s", context, e, exc_info=True)
 
 
 # המופע שייובא ב-Celery/Cron task

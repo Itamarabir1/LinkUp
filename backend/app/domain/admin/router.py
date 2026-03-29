@@ -72,77 +72,31 @@ async def admin_stats(
 
     users_total = await db.scalar(select(func.count()).select_from(User))
     rides_active = await db.scalar(
-        select(func.count())
-        .select_from(Ride)
-        .where(
-            Ride.status.in_(
-                [RideStatus.OPEN, RideStatus.FULL, RideStatus.ACTIVE]
-            )
-        )
+        select(func.count()).select_from(Ride).where(Ride.status.in_([RideStatus.OPEN, RideStatus.FULL, RideStatus.ACTIVE]))
     )
     bookings_total = await db.scalar(select(func.count()).select_from(Booking))
-    outbox_pending = await db.scalar(
-        select(func.count())
-        .select_from(OutboxEvent)
-        .where(OutboxEvent.status == "PENDING")
-    )
+    outbox_pending = await db.scalar(select(func.count()).select_from(OutboxEvent).where(OutboxEvent.status == "PENDING"))
 
-    users_new_today = await db.scalar(
-        select(func.count()).select_from(User).where(User.created_at >= today_start)
-    )
+    users_new_today = await db.scalar(select(func.count()).select_from(User).where(User.created_at >= today_start))
     rides_total = await db.scalar(select(func.count()).select_from(Ride))
-    bookings_pending = await db.scalar(
-        select(func.count())
-        .select_from(Booking)
-        .where(Booking.status == BookingStatus.PENDING)
-    )
-    bookings_confirmed = await db.scalar(
-        select(func.count())
-        .select_from(Booking)
-        .where(Booking.status == BookingStatus.CONFIRMED)
-    )
+    bookings_pending = await db.scalar(select(func.count()).select_from(Booking).where(Booking.status == BookingStatus.PENDING))
+    bookings_confirmed = await db.scalar(select(func.count()).select_from(Booking).where(Booking.status == BookingStatus.CONFIRMED))
     groups_total = await db.scalar(select(func.count()).select_from(Group))
-    outbox_failed = await db.scalar(
-        select(func.count())
-        .select_from(OutboxEvent)
-        .where(OutboxEvent.status == "FAILED")
-    )
-    active_users_last_7_days = await db.scalar(
-        select(func.count())
-        .select_from(User)
-        .where(User.last_active_at >= week_ago)
-    )
+    outbox_failed = await db.scalar(select(func.count()).select_from(OutboxEvent).where(OutboxEvent.status == "FAILED"))
+    active_users_last_7_days = await db.scalar(select(func.count()).select_from(User).where(User.last_active_at >= week_ago))
 
-    rides_by_status_result = await db.execute(
-        select(Ride.status, func.count()).group_by(Ride.status)
-    )
-    rides_by_status = {
-        _enum_key(row[0]): int(row[1]) for row in rides_by_status_result.all()
-    }
+    rides_by_status_result = await db.execute(select(Ride.status, func.count()).group_by(Ride.status))
+    rides_by_status = {_enum_key(row[0]): int(row[1]) for row in rides_by_status_result.all()}
 
-    bookings_by_status_result = await db.execute(
-        select(Booking.status, func.count()).group_by(Booking.status)
-    )
-    bookings_by_status = {
-        _enum_key(row[0]): int(row[1]) for row in bookings_by_status_result.all()
-    }
+    bookings_by_status_result = await db.execute(select(Booking.status, func.count()).group_by(Booking.status))
+    bookings_by_status = {_enum_key(row[0]): int(row[1]) for row in bookings_by_status_result.all()}
 
     users_per_day: list[dict] = []
     for i in range(6, -1, -1):
-        day_start = (now - timedelta(days=i)).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        day_start = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = day_start + timedelta(days=1)
-        count = await db.scalar(
-            select(func.count())
-            .select_from(User)
-            .where(
-                and_(User.created_at >= day_start, User.created_at < day_end)
-            )
-        )
-        users_per_day.append(
-            {"date": day_start.strftime("%d/%m"), "count": int(count or 0)}
-        )
+        count = await db.scalar(select(func.count()).select_from(User).where(and_(User.created_at >= day_start, User.created_at < day_end)))
+        users_per_day.append({"date": day_start.strftime("%d/%m"), "count": int(count or 0)})
 
     return {
         "users_total": int(users_total or 0),
@@ -260,9 +214,7 @@ async def admin_rides(
 ):
     stmt = crud_ride._base_ride_stmt()
     if status == "active":
-        stmt = stmt.where(
-            Ride.status.in_([RideStatus.OPEN, RideStatus.FULL, RideStatus.ACTIVE])
-        )
+        stmt = stmt.where(Ride.status.in_([RideStatus.OPEN, RideStatus.FULL, RideStatus.ACTIVE]))
     elif status == "completed":
         stmt = stmt.where(Ride.status == RideStatus.COMPLETED)
     elif status == "cancelled":
@@ -283,9 +235,7 @@ async def admin_rides(
                 "driver_name": driver_name,
                 "origin_name": r.origin_name,
                 "destination_name": r.destination_name,
-                "departure_time": r.departure_time.isoformat()
-                if r.departure_time
-                else None,
+                "departure_time": r.departure_time.isoformat() if r.departure_time else None,
                 "status": st,
                 "available_seats": r.available_seats,
                 "group_id": str(r.group_id) if r.group_id else None,
@@ -421,9 +371,7 @@ async def admin_outbox_requeue(
     if not e:
         raise HTTPException(status_code=404, detail="Outbox event not found")
     if e.status != "FAILED":
-        raise HTTPException(
-            status_code=400, detail="Only FAILED events can be requeued"
-        )
+        raise HTTPException(status_code=400, detail="Only FAILED events can be requeued")
     await db.execute(
         update(OutboxEvent)
         .where(OutboxEvent.id == event_id)
@@ -457,9 +405,7 @@ async def admin_ride_by_id(
         "origin_name": r.origin_name,
         "destination_name": r.destination_name,
         "departure_time": r.departure_time.isoformat() if r.departure_time else None,
-        "estimated_arrival_time": r.estimated_arrival_time.isoformat()
-        if r.estimated_arrival_time
-        else None,
+        "estimated_arrival_time": r.estimated_arrival_time.isoformat() if r.estimated_arrival_time else None,
         "available_seats": r.available_seats,
         "price": float(r.price) if r.price is not None else None,
         "status": status_val,

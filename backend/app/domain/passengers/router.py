@@ -47,9 +47,7 @@ async def get_my_requests(
     ),
 ):
     """רשימת הבקשות שלי כנוסע."""
-    return await PassengerService.get_my_requests(
-        db, current_user.user_id, status=request_status
-    )
+    return await PassengerService.get_my_requests(db, current_user.user_id, status=request_status)
 
 
 # 1. רישום בקשה רשמית (הסוכן החכם)
@@ -65,9 +63,7 @@ async def create_new_request(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        return await PassengerService.create_passenger_request(
-            db=db, request_in=request, passenger_id=current_user.user_id
-        )
+        return await PassengerService.create_passenger_request(db=db, request_in=request, passenger_id=current_user.user_id)
     except HTTPException as he:
         raise he
     except Exception as e:
@@ -144,6 +140,7 @@ async def request_ride_from_search(
         logger.error("request_ride_from_search failed: %s", e, exc_info=True)
         try:
             from app.core.config import settings
+
             detail = str(e) if getattr(settings, "DEBUG", False) else "שגיאה בשליחת הבקשה – נסה שוב או פנה לתמיכה"
         except Exception:
             detail = "שגיאה בשליחת הבקשה – נסה שוב או פנה לתמיכה"
@@ -159,12 +156,8 @@ async def request_ride_from_search(
 async def search_available_rides(
     pickup_name: str,
     destination_name: str,
-    search_radius: int = Query(
-        1000, ge=100, description="רדיוס חיפוש במטרים (אחיד עם יצירת בקשה)"
-    ),
-    departure_time: Optional[datetime] = Query(
-        None, description="אם ריק – יחפש מעכשיו"
-    ),
+    search_radius: int = Query(1000, ge=100, description="רדיוס חיפוש במטרים (אחיד עם יצירת בקשה)"),
+    departure_time: Optional[datetime] = Query(None, description="אם ריק – יחפש מעכשיו"),
     limit: int = Query(20, ge=1, le=50, description="כמות תוצאות"),
     after: Optional[UUID] = Query(None, description="cursor: ride_id להמשך"),
     group_id: Optional[UUID] = Depends(require_group_member),
@@ -200,9 +193,7 @@ async def cancel_request(
 ):
     """מבטל את הבקשה ומשחרר אוטומטית את כל המושבים שנתפסו מול נהגים (רק לבעל הבקשה)."""
     try:
-        return await PassengerService.cancel_request(
-            db, request_id, current_user.user_id
-        )
+        return await PassengerService.cancel_request(db, request_id, current_user.user_id)
     except PassengerRequestNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ForbiddenRideActionError as e:
@@ -219,13 +210,9 @@ async def get_latest_matches(request_id: UUID, db: AsyncSession = Depends(get_db
     return await PassengerService.get_matches_by_request_id(db, request_id)
 
 
-@router.get(
-    "/all", response_model=List[RideResponse], summary="תצוגת כל הנסיעות (ניהול ובקרה)"
-)
+@router.get("/all", response_model=List[RideResponse], summary="תצוגת כל הנסיעות (ניהול ובקרה)")
 async def get_all_rides_admin(
-    filter_status: str = Query(
-        None, description="סנן לפי סטטוס: open, cancelled, completed"
-    ),
+    filter_status: str = Query(None, description="סנן לפי סטטוס: open, cancelled, completed"),
     db: AsyncSession = Depends(get_db),
 ):
     """מחזיר את כל הנסיעות במערכת. אם נשלח סטטוס, יחזיר רק נסיעות בסטטוס הזה."""

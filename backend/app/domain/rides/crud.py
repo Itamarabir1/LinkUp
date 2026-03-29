@@ -77,9 +77,7 @@ class CRUDRide:
         result = await db.execute(stmt)
         return result.scalars().first()
 
-    async def get_for_update(
-        self, db: AsyncSession, ride_id: UUID, driver_id: Optional[UUID] = None
-    ) -> Optional[Ride]:
+    async def get_for_update(self, db: AsyncSession, ride_id: UUID, driver_id: Optional[UUID] = None) -> Optional[Ride]:
         """
         Senior Implementation: שליפת נסיעה עם נעילת שורה (FOR UPDATE).
 
@@ -133,9 +131,7 @@ class CRUDRide:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
-    async def update_status(
-        self, db: AsyncSession, ride_id: UUID, status: RideStatus
-    ) -> Optional[Ride]:
+    async def update_status(self, db: AsyncSession, ride_id: UUID, status: RideStatus) -> Optional[Ride]:
         """עדכון סטטוס מאובטח (SELECT FOR UPDATE)"""
         ride = await self.get_for_update(db, ride_id)
         if ride:
@@ -143,9 +139,7 @@ class CRUDRide:
             await db.flush()
         return ride
 
-    def update_seats(
-        self, db: Session, ride_id: UUID, num_seats_change: int
-    ) -> Optional[Ride]:
+    def update_seats(self, db: Session, ride_id: UUID, num_seats_change: int) -> Optional[Ride]:
         """עדכון מושבים אטומי עם בדיקת תקינות"""
         ride = self.get_for_update(db, ride_id)
         if ride:
@@ -158,9 +152,7 @@ class CRUDRide:
 
     ALLOWED_UPDATE_FIELDS = ("available_seats", "departure_time")
 
-    async def update_partial(
-        self, db: AsyncSession, ride_id: UUID, driver_id: UUID, **updates: Any
-    ) -> Optional[Ride]:
+    async def update_partial(self, db: AsyncSession, ride_id: UUID, driver_id: UUID, **updates: Any) -> Optional[Ride]:
         """עדכון חלקי – רק available_seats ו-departure_time. בודק בעלות וולידציית מושבים."""
         ride = await self.get_for_update(db, ride_id, driver_id)
         if not ride:
@@ -173,15 +165,9 @@ class CRUDRide:
             if key not in self.ALLOWED_UPDATE_FIELDS or value is None:
                 continue
             if key == "available_seats":
-                occupied = sum(
-                    b.num_seats
-                    for b in ride.bookings
-                    if getattr(b, "status", None) not in ("cancelled", "rejected")
-                )
+                occupied = sum(b.num_seats for b in ride.bookings if getattr(b, "status", None) not in ("cancelled", "rejected"))
                 if value < occupied:
-                    raise ValueError(
-                        f"מספר מושבים לא יכול להיות קטן ממספר התפוסים ({occupied})"
-                    )
+                    raise ValueError(f"מספר מושבים לא יכול להיות קטן ממספר התפוסים ({occupied})")
                 ride.available_seats = value
             elif key == "departure_time":
                 ride.departure_time = value
@@ -194,25 +180,17 @@ class CRUDRide:
 
     def get_expired_ids(self, db: Session, now: datetime) -> list:
         """רק מביא את ה-IDs של מה שצריך לסגור"""
-        query = db.query(Ride.ride_id).filter(
-            Ride.departure_time < now, Ride.status == RideStatus.OPEN
-        )
+        query = db.query(Ride.ride_id).filter(Ride.departure_time < now, Ride.status == RideStatus.OPEN)
         return [r.ride_id for r in query.all()]
 
     def bulk_set_completed(self, db: Session, ride_ids: list):
         """מעדכן סטטוס גורף לנסיעות ספציפיות"""
         if not ride_ids:
             return 0
-        return (
-            db.query(Ride)
-            .filter(Ride.ride_id.in_(ride_ids))
-            .update({Ride.status: RideStatus.COMPLETED}, synchronize_session=False)
-        )
+        return db.query(Ride).filter(Ride.ride_id.in_(ride_ids)).update({Ride.status: RideStatus.COMPLETED}, synchronize_session=False)
 
     # --- התיקון כאן: הוספתי self ויישרתי את ההזחה ---
-    def get_bookings_for_reminders(
-        self, db: Session, start_window: datetime, end_window: datetime
-    ):
+    def get_bookings_for_reminders(self, db: Session, start_window: datetime, end_window: datetime):
         """
         שליפת כל ההזמנות המאושרות שזמן האיסוף שלהן חל בחלון הזמן המוגדר.
         """
@@ -234,9 +212,7 @@ class CRUDRide:
         )
 
     # בתוך קלאס CRUDRide
-    async def get_rides_needing_reminders(
-        self, db: AsyncSession, start_window: datetime, end_window: datetime
-    ) -> List[Ride]:
+    async def get_rides_needing_reminders(self, db: AsyncSession, start_window: datetime, end_window: datetime) -> List[Ride]:
         """שליפת נסיעות שעומדות לצאת עבור תזכורת לנהג."""
         stmt = self._base_ride_stmt().where(
             and_(
@@ -249,9 +225,7 @@ class CRUDRide:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_for_notification(
-        self, db: AsyncSession, ride_id: UUID
-    ) -> Optional[Ride]:
+    async def get_for_notification(self, db: AsyncSession, ride_id: UUID) -> Optional[Ride]:
         """שליפת נסיעה עם נהג (לבניית קונטקסט במייל/פוש)."""
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         stmt = self._base_ride_stmt().where(Ride.ride_id == rid)

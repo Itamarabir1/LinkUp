@@ -41,9 +41,7 @@ class S3Client:
                     file_data,
                     self.bucket_name,
                     key,
-                    ExtraArgs={
-                        "ContentType": content_type or "application/octet-stream"
-                    },
+                    ExtraArgs={"ContentType": content_type or "application/octet-stream"},
                 )
             return self._public_url(key)
         except Exception as e:
@@ -98,23 +96,17 @@ class S3Client:
         try:
             async with self._session.client("s3") as s3:
                 paginator = s3.get_paginator("list_objects_v2")
-                async for page in paginator.paginate(
-                    Bucket=self.bucket_name, Prefix=prefix
-                ):
+                async for page in paginator.paginate(Bucket=self.bucket_name, Prefix=prefix):
                     for obj in page.get("Contents") or []:
                         k = obj.get("Key")
                         if k:
                             keys.append(k)
         except Exception as e:
-            logger.error(
-                "S3 list_objects failed prefix=%s: %s", prefix, e, exc_info=True
-            )
+            logger.error("S3 list_objects failed prefix=%s: %s", prefix, e, exc_info=True)
             raise ExternalServiceError() from e
         return keys
 
-    async def generate_presigned_upload_url(
-        self, key: str, content_type: str, expiration: int = 300
-    ) -> str:
+    async def generate_presigned_upload_url(self, key: str, content_type: str, expiration: int = 300) -> str:
         """
         יוצר presigned URL להעלאה ישירה ל-S3.
         expiration: זמן תוקף בשניות (ברירת מחדל: 5 דקות).
@@ -139,9 +131,7 @@ class S3Client:
                 )
                 return presigned_url
         except Exception as e:
-            logger.error(
-                "Failed to generate presigned URL for key=%s: %s", key, e, exc_info=True
-            )
+            logger.error("Failed to generate presigned URL for key=%s: %s", key, e, exc_info=True)
             raise S3UploadFailed() from e
 
 

@@ -13,9 +13,7 @@ class NotificationOrchestrator:
         active_bookings = [b for b in ride.bookings if b.status != "cancelled"]
 
         if not active_bookings:
-            logger.info(
-                f"No active passengers for ride {ride.id}, skipping notification."
-            )
+            logger.info(f"No active passengers for ride {ride.id}, skipping notification.")
             return
 
         try:
@@ -29,9 +27,5 @@ class NotificationOrchestrator:
                 },
             )
         except Exception as e:
-            logger.exception(
-                "Failed to dispatch ride.cancelled notification: %s", e
-            )
-            raise NotificationError(
-                f"Failed to dispatch cancellation: {str(e)}"
-            ) from e
+            logger.exception("Failed to dispatch ride.cancelled notification: %s", e)
+            raise NotificationError(f"Failed to dispatch cancellation: {str(e)}") from e
