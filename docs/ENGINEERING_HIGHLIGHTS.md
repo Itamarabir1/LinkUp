@@ -5,7 +5,7 @@
 מסמך זה אוסף **במקום אחד** את הפיצ’רים, הטכנולוגיות, הדפוסים וההחלטות שמיועדות ל**סקייל, אמינות ותחזוקה** — כדי להציג את הפרויקט ברמת מומחה.  
 *זה סיכום “להצגה”, לא מיפוי כל שורה בקוד; אחרי סקירה מול ה-repo הוכנסו גם workers, AI, FCM, Brevo, Google, **חיזוק auth ועומס מקבילי**, **k6**, **ריפקטור async משמעותי ב-passengers/bookings/rides**, **ריפקטור ארגון בפרונט**, ו**מסך אדמין פנימי (React + `/api/v1/admin`)**.*
 
-לפרטים טכניים עמוקים יותר: `../ARCHITECTURE.md`, `architecture/REALTIME.md`, `architecture/EVENTS.md`, `architecture/DATABASE.md`, `architecture/API.md`, `backend/docs/GOOGLE_OAUTH.md`.
+לפרטים טכניים עמוקים יותר: `../ARCHITECTURE.md`, `ERRORS.md`, `architecture/REALTIME.md`, `architecture/EVENTS.md`, `architecture/DATABASE.md`, `architecture/API.md`, `backend/docs/GOOGLE_OAUTH.md`.
 
 ---
 
@@ -42,6 +42,16 @@
 | מייל | **Brevo** (API transactional) |
 | Push | **FCM** — `fcm_token` ב-DB; שליחה דרך Firebase Admin עם **`data` בלבד** (ללא בלוק `notification` של FCM); הצגה בידי האפליקציה: ברקע SW על `push`; בחזית **Toast + צליל** (`onMessage` + `payload.data`) |
 | כניסה Google | **Google Sign-In** — אימות `id_token` ב-backend; client ID משותף FE/BE (`backend/docs/GOOGLE_OAUTH.md`) |
+
+---
+
+## 2ב. שגיאות API אחידות (Backend + Frontend + chat-ws)
+
+| שכבה | מה ממומש |
+|------|----------|
+| **FastAPI** | `LinkupError` ותתי־מחלקות לפי דומיין ב־`app/core/exceptions/`; handlers ב־`main.py` ל־validation (422), `IntegrityError` / `SQLAlchemyError`, ו־`LinkupError`. תגובה: `detail` עם `error_code`, `message`, `trace_id`, `payload` אופציונלי — **`docs/ERRORS.md`**. |
+| **Frontend** | `useErrorHandler` (axios), `ChatErrorBoundary`; טיפוסים לפורמט שגיאה. |
+| **chat-ws (Go)** | לוגים מובנים עם **`slog`**; ל-HTTP (למשל PATCH last-seen) תגובות JSON עקביות; סגירת WebSocket עם קודים מתועדים היכן שרלוונטי — פירוט ב־**`docs/ERRORS.md`**. |
 
 ### כל סוגי ה-API שקשורים למפות / מיקום (מלא)
 
@@ -183,8 +193,8 @@
 | **מניעת username enumeration (OWASP)** | לוגין: **אותה** `InvalidCredentialsError` (401) לאימייל שלא קיים ולסיסמה שגויה — לא חושפים אם המשתמש רשום. |
 | **bcrypt ב-thread pool** | `get_password_hash` / `verify_password` — **async** עם `asyncio.get_running_loop().run_in_executor` — לא חוסמים את לולאת ה-ASGI תחת עומס סיסמאות. |
 | **Request ID** | `X-Request-ID` — מעקב בין לוגים לבקשה. |
-| **JSON logging בפרודקשן** | ingestion ל-ELK / CloudWatch בעתיד. |
-| **Uvicorn + מספר workers** (`UVICORN_WORKERS` ב־Docker Compose; `backend/.env.example` מציין 4) | ניצול מספר cores ל-API. |
+| **JSON logging בפרודקשן** | **python-json-logger** v3+ (`pythonjsonlogger.json`); ingestion ל-ELK / CloudWatch בעתיד. |
+| **Uvicorn + מספר workers** (`UVICORN_WORKERS` ב־`backend/.env`; `entrypoint.sh` בדוקר; `.env.example` מציין 4) | ניצול מספר cores ל-API. |
 | **Redis DB נפרד לצ’אט** | בידוד עומס pub/sub ומפתחות צ’אט מ-cache הכללי של ה-API. |
 
 ### 7ב. Defensive Programming (תכנות הגנתי) — כן, ממומש בפרויקט

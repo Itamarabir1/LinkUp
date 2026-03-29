@@ -1,9 +1,9 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, HTTPException
-from sqlalchemy import select, or_, func, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -19,6 +19,7 @@ from app.domain.users.crud import crud_user
 from app.domain.users.model import User
 from app.infrastructure.health.health_service import check_health
 from app.infrastructure.outbox.model import OutboxEvent
+from app.domain.bookings.enum import BookingStatus
 from app.domain.bookings.model import Booking
 
 logger = logging.getLogger(__name__)
@@ -55,12 +56,20 @@ async def admin_health(current_user: User = Depends(get_current_admin_user)):
     return await check_health()
 
 
+def _enum_key(v) -> str:
+    return v.value if hasattr(v, "value") else str(v)
+
+
 @router.get("/stats")
 async def admin_stats(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
     """Aggregates for admin dashboard (single round-trip)."""
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_ago = now - timedelta(days=7)
+
     users_total = await db.scalar(select(func.count()).select_from(User))
     rides_active = await db.scalar(
         select(func.count())
@@ -77,11 +86,79 @@ async def admin_stats(
         .select_from(OutboxEvent)
         .where(OutboxEvent.status == "PENDING")
     )
+
+    users_new_today = await db.scalar(
+        select(func.count()).select_from(User).where(User.created_at >= today_start)
+    )
+    rides_total = await db.scalar(select(func.count()).select_from(Ride))
+    bookings_pending = await db.scalar(
+        select(func.count())
+        .select_from(Booking)
+        .where(Booking.status == BookingStatus.PENDING)
+    )
+    bookings_confirmed = await db.scalar(
+        select(func.count())
+        .select_from(Booking)
+        .where(Booking.status == BookingStatus.CONFIRMED)
+    )
+    groups_total = await db.scalar(select(func.count()).select_from(Group))
+    outbox_failed = await db.scalar(
+        select(func.count())
+        .select_from(OutboxEvent)
+        .where(OutboxEvent.status == "FAILED")
+    )
+    active_users_last_7_days = await db.scalar(
+        select(func.count())
+        .select_from(User)
+        .where(User.last_active_at >= week_ago)
+    )
+
+    rides_by_status_result = await db.execute(
+        select(Ride.status, func.count()).group_by(Ride.status)
+    )
+    rides_by_status = {
+        _enum_key(row[0]): int(row[1]) for row in rides_by_status_result.all()
+    }
+
+    bookings_by_status_result = await db.execute(
+        select(Booking.status, func.count()).group_by(Booking.status)
+    )
+    bookings_by_status = {
+        _enum_key(row[0]): int(row[1]) for row in bookings_by_status_result.all()
+    }
+
+    users_per_day: list[dict] = []
+    for i in range(6, -1, -1):
+        day_start = (now - timedelta(days=i)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        day_end = day_start + timedelta(days=1)
+        count = await db.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(
+                and_(User.created_at >= day_start, User.created_at < day_end)
+            )
+        )
+        users_per_day.append(
+            {"date": day_start.strftime("%d/%m"), "count": int(count or 0)}
+        )
+
     return {
         "users_total": int(users_total or 0),
         "rides_active": int(rides_active or 0),
         "bookings_total": int(bookings_total or 0),
         "outbox_pending": int(outbox_pending or 0),
+        "users_new_today": int(users_new_today or 0),
+        "rides_total": int(rides_total or 0),
+        "bookings_pending": int(bookings_pending or 0),
+        "bookings_confirmed": int(bookings_confirmed or 0),
+        "groups_total": int(groups_total or 0),
+        "outbox_failed": int(outbox_failed or 0),
+        "active_users_last_7_days": int(active_users_last_7_days or 0),
+        "rides_by_status": rides_by_status,
+        "bookings_by_status": bookings_by_status,
+        "users_per_day": users_per_day,
     }
 
 

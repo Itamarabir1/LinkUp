@@ -86,13 +86,10 @@ class RateLimitExceeded(LinkupError):
 
     status_code = 429
     error_code = "RATE_LIMIT_EXCEEDED"
-    message = "יותר מדי בקשות, נסה שוב מאוחר יותר"
+    message = "יותר מדי בקשות, נסה שוב בעוד מעט"
 
-    def __init__(self, retry_after: Optional[int] = None):
-        payload: Optional[Dict[str, Any]] = None
-        if retry_after is not None:
-            payload = {"retry_after": retry_after}
-        super().__init__(payload=payload)
+    def __init__(self, retry_after: int = 60):
+        super().__init__(payload={"retry_after": retry_after})
 
 
 class S3UploadFailed(LinkupError):

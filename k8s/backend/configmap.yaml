@@ -1,14 +1,46 @@
+# Non-secret config aligned with backend/.env.example and app/core/config.py.
+# Override values (e.g. AWS_REGION, S3_BUCKET_NAME) to match your real bucket/region.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: linkup-backend-config
 data:
+  # RabbitMQ (service linkup-rabbitmq)
   RABBITMQ_HOST: "linkup-rabbitmq"
   RABBITMQ_PORT: "5672"
   RABBITMQ_USER: "guest"
-  AWS_REGION: "eu-central-1"
-  S3_BUCKET_NAME: "linkup-files"
+  # Redis: one cluster instance; logical DB 0 (API) vs 1 (chat) — see REDIS_DB / REDIS_CHAT_DB
+  REDIS_HOST: "linkup-redis"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  REDIS_CHAT_DB: "1"
+  # Postgres service hostname (used if not embedded in DATABASE_URL_RAW)
+  POSTGRES_HOST: "linkup-db"
+  POSTGRES_PORT: "5432"
+  # AWS region — must match S3 bucket; config.py default is eu-central-1, .env.example shows eu-central-1 (override per account).
+  AWS_REGION: "eu-north-1"
+  # Empty until you set a real bucket name (matches .env.example placeholder)
+  S3_BUCKET_NAME: ""
   FRONTEND_URL: "https://linkup.co.il"
+  API_PUBLIC_URL: ""
   LOG_LEVEL: "INFO"
   LOG_FORMAT: "json"
-  WORKERS: "2"
+  DEBUG: "false"
+  ENVIRONMENT: "production"
+  # Optional Sentry — leave empty to disable (same as .env.example)
+  SENTRY_DSN: ""
+  # Worker count: development image uses UVICORN_WORKERS; production image uses WORKERS (see deployment env).
+  UVICORN_WORKERS: "4"
+  # JWT / pool / rate limit — align with backend/.env.example where present
+  ACCESS_TOKEN_EXPIRE_MINUTES: "1440"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  DB_POOL_SIZE: "20"
+  DB_MAX_OVERFLOW: "20"
+  DB_POOL_TIMEOUT: "30"
+  DB_POOL_RECYCLE: "1800"
+  RATE_LIMIT_AUTH_WINDOW_SECONDS: "60"
+  RATE_LIMIT_AUTH_MAX_REQUESTS: "10"
+  CELERY_TIMEZONE: "Asia/Jerusalem"
+  JWT_ISSUER: "linkup-api"
+  ALGORITHM: "HS256"
+  BREVO_SENDER_NAME: "LinkUp"

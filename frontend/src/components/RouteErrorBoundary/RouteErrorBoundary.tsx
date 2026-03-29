@@ -23,8 +23,11 @@ export default class RouteErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    // TODO: Sentry.captureException(error) — להפעיל כשמחברים Sentry
     console.error('[Linkup] RouteErrorBoundary caught:', error, info.componentStack);
+    // TODO: Sentry — להסיר הערה כשעוברים לפרודקשן
+    // קריסות boundary תמיד קריטיות — תפוס הכל
+    // import * as Sentry from "@sentry/react";
+    // if (import.meta.env.PROD) { Sentry.captureException(error); }
   }
 
   componentDidUpdate(prevProps: Props) {

@@ -47,6 +47,18 @@ async def linkup_exception_handler(request: Request, exc: LinkupError):
         extra={"request_id": request_id or ""},
     )
 
+    # TODO: Sentry — להסיר הערה כשעוברים לפרודקשן
+    # רק 5xx — לא לשלוח 401/404/422 עסקיים (מפחית רעש)
+    # import sentry_sdk
+    # if exc.status_code >= 500:
+    #     sentry_sdk.capture_exception(exc)
+
+    headers = {}
+    if request_id:
+        headers["X-Request-ID"] = request_id
+    if exc.error_code == "RATE_LIMIT_EXCEEDED" and exc.payload.get("retry_after"):
+        headers["Retry-After"] = str(exc.payload["retry_after"])
+
     response = JSONResponse(
         status_code=exc.status_code,
         content={
@@ -56,9 +68,8 @@ async def linkup_exception_handler(request: Request, exc: LinkupError):
             "trace_id": exc.trace_id,
             "details": exc.payload,
         },
+        headers=headers,
     )
-    if request_id:
-        response.headers["X-Request-ID"] = request_id
     return response
 
 

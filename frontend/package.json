@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@react-oauth/google": "^0.12.1",
+    "@sentry/react": "^9.0.0",
     "@types/react-datepicker": "^6.2.0",
     "axios": "^1.13.5",
     "date-fns": "^4.1.0",
@@ -22,6 +23,7 @@
     "react-datepicker": "^9.1.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0",
+    "recharts": "^3.8.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {

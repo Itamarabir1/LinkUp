@@ -44,6 +44,15 @@ export default function AdminUsers() {
     void load();
   }, [load]);
 
+  const listSummary = useMemo(() => {
+    if (state.status !== 'ready') return null;
+    const items = state.items;
+    const shown = items.length;
+    const activeCount = items.filter((u) => u.is_active).length;
+    const adminCount = items.filter((u) => u.is_admin).length;
+    return { shown, activeCount, adminCount };
+  }, [state]);
+
   async function runMutation() {
     if (!modal) return;
     const uid = modal.user.user_id;
@@ -89,6 +98,12 @@ export default function AdminUsers() {
 
       {state.status === 'loading' && <p className={page.muted}>טוען…</p>}
       {state.status === 'error' && <p className={page.error}>שגיאה בטעינה.</p>}
+      {state.status === 'ready' && listSummary && (
+        <p className={`${page.muted} ${page.usersSummary}`}>
+          בתוצאות המוצגות: {listSummary.shown} משתמשים | {listSummary.activeCount} פעילים |{' '}
+          {listSummary.adminCount} אדמינים
+        </p>
+      )}
       {state.status === 'ready' && (
         <div className={page.tableWrap}>
           <table className={page.table}>

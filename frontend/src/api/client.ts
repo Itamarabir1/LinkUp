@@ -118,13 +118,18 @@ api.interceptors.response.use(
   (res) => res,
   (err: AxiosError) => {
     if (err.response?.status !== 401) {
-      // TODO: Sentry.captureException(err) — להפעיל כשמחברים Sentry
       console.error('[Linkup] API Error:', {
         error_code: (err.response?.data as { error_code?: string } | undefined)?.error_code,
         message: (err.response?.data as { message?: string } | undefined)?.message,
         trace_id: (err.response?.data as { trace_id?: string } | undefined)?.trace_id,
         status: err.response?.status,
       });
+      // TODO: Sentry — להסיר הערה כשעוברים לפרודקשן
+      // רק 5xx — לא לשלוח 4xx עסקיים (מפחית רעש)
+      // import * as Sentry from "@sentry/react";
+      // if (import.meta.env.PROD && err.response?.status && err.response.status >= 500) {
+      //   Sentry.captureException(err);
+      // }
     }
     return Promise.reject(err);
   }

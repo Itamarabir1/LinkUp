@@ -1,0 +1,26 @@
+# Single entry (same idea as nginx service in docker-compose): traffic hits frontend nginx,
+# which proxies /api/v1, /ws, /presence to backend/chat-ws (see k8s/frontend/nginx-configmap.yaml).
+# TLS: requires cert-manager ClusterIssuer "letsencrypt-prod" or create secret linkup-tls manually.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: linkup-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - linkup.co.il
+      secretName: linkup-tls
+  rules:
+    - host: linkup.co.il
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: linkup-frontend
+                port:
+                  number: 80

@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "LinkUp"
     APP_NAME: str = "linkup-backend"
     DEBUG: bool = Field(False)
+    ENVIRONMENT: str = Field(
+        "development",
+        description="שם סביבה (Sentry, לוגים): development / staging / production",
+    )
+    SENTRY_DSN: Optional[str] = Field(
+        None,
+        description="Sentry DSN; ריק = ללא שליחה ל-Sentry",
+    )
     API_V1_STR: str = "/api/v1"
 
     # --- PostgreSQL / PostGIS ---

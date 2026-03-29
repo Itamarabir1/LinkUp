@@ -114,8 +114,6 @@ services:
       target: development
     container_name: linkup_backend
     restart: unless-stopped
-    # $$ → $ אחרי parse של Compose; המעטפת בקונטיינר מרחיבה ${UVICORN_WORKERS:-1} מ-backend/.env
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers $${UVICORN_WORKERS:-1}
     env_file:
       - ./backend/.env
     environment:

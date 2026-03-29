@@ -79,6 +79,7 @@ outbox-worker
 - **Async SQLAlchemy 2.0 core domains**: passenger/bookings/rides core flows עברו ל־`AsyncSession` ו־`select/execute`.
   - **Bookings** async-only (ללא `db.run_sync`) ומשתמשים ב־`select(...).with_for_update()` לנעילות שורה.
   - `db.run_sync` עדיין עשוי להופיע במודולים אחרים שבהם נשאר CRUD סינכרוני נקודתית.
+- **שגיאות API מרוכזות**: תת־מחלקות של `LinkupError` לפי דומיין ב־`app/core/exceptions/`; ב־`main.py` handlers גלובליים ל־Pydantic (`RequestValidationError` → 422), `IntegrityError` / `SQLAlchemyError`, ו־`LinkupError`. פורמט JSON, Sentry, פרונט ו-chat-ws: [`docs/ERRORS.md`](docs/ERRORS.md).
 
 ---
 
@@ -94,7 +95,7 @@ outbox-worker
 
 ## Performance
 
-- **ASGI server (Docker Compose)**: `uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-1}` — מספר תהליכי worker נשלט מ-**`UVICORN_WORKERS`** ב-`backend/.env` (ראו `backend/.env.example`: **4** למכונות רב-ליבה; אם המשתנה לא מוגדר, ברירת המחדל בפקודת Compose היא **1**). **מיגרציות** רצות בשירות נפרד **`migrate`** לפני עליית ה-backend. **Healthcheck** על המיכל: `GET /api/v1/health`. **פיתוח לוקאלי** (ללא Docker): בדרך כלל `uvicorn ... --reload` — תהליך יחיד; מיגרציה ידנית (`alembic upgrade head`) לפני הרצה.
+- **ASGI server (Docker Compose)**: `backend/entrypoint.sh` מריץ `uvicorn` עם `--workers` לפי **`UVICORN_WORKERS`** ב-`backend/.env` (ברירת מחדל **1** אם חסר; ראו `.env.example`: **4**). **מיגרציות** רצות בשירות נפרד **`migrate`** לפני עליית ה-backend. **Healthcheck** על המיכל: `GET /api/v1/health`. **פיתוח לוקאלי** (ללא Docker): בדרך כלל `uvicorn ... --reload` — תהליך יחיד; מיגרציה ידנית (`alembic upgrade head`) לפני הרצה.
 - **Connection Pool** (`backend/app/db/session.py`): `pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle` מ-**config** (`DB_POOL_*` ב-`.env`; ברירות מחדל ב-`Settings`), `pool_pre_ping=True`.
 - **Indexes**: ראה `docs/DATABASE.md` — כולל 11 ה-indexes מ-migration 004 (rides, bookings, group_members, passenger_requests).
 - **Caching**: Redis לפי צורך — TTL וכו' לפי סוג (למשל OTP, broadcast channels).
@@ -105,9 +106,9 @@ outbox-worker
 
 ### Logging
 - Format: JSON (production) / text (development)
-- Library: python-json-logger
-- Fields: timestamp, level, service, message
-- Controlled via: LOG_FORMAT, LOG_LEVEL env vars
+- Library: **python-json-logger** v3+ (import: `from pythonjsonlogger import json as jsonlogger` ב־`app/core/logging.py`)
+- Fields: timestamp, level, service, message; `request_id` בכל שורה דרך `RequestIDFilter` כשמוגדר
+- Controlled via: `LOG_FORMAT`, `LOG_LEVEL` env vars
 
 ### Request Tracing
 - Every request gets a unique Request ID (8 chars)

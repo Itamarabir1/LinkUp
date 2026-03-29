@@ -31,6 +31,12 @@ Authorization: Bearer <access_token>
 
 ---
 
+## Error responses
+
+תגובות שגיאה מ-**FastAPI** (4xx/5xx) עוקבות אחר חוזה אחיד: `detail` עם שדות כמו **`error_code`**, **`message`**, **`trace_id`**, ו־**`payload`** אופציונלי. טבלת קודים, Sentry, והתאמה לפרונט ול-chat-ws — **[ERRORS.md](../ERRORS.md)**.
+
+---
+
 ## Endpoints
 
 ### Health

@@ -51,6 +51,9 @@ dependencies = [
     # --- Logging ---
     "python-json-logger>=3.0",
 
+    # --- Observability (Sentry; init מוערה ב-logging.py עד הוספת DSN) ---
+    "sentry-sdk[fastapi]>=2.0.0",
+
     # --- Validation & Utilities ---
     "email-validator>=2.0.0",
     "phonenumbers==8.13.48",

@@ -23,17 +23,19 @@ spec:
           image: ghcr.io/Itamarabir1/linkup-backend:latest
           imagePullPolicy: Always
           command: ["python", "-m", "app.workers.main_worker"]
-          # Same split as backend: ConfigMap via envFrom; secrets explicit (linkup-backend-secret).
           envFrom:
             - configMapRef:
                 name: linkup-backend-config
           env:
-            - name: DATABASE_URL
+            # Explicit: outbox-worker listens on chat completion on Redis DB 1 (see docker-compose.yml)
+            - name: REDIS_CHAT_DB
+              value: "1"
+            - name: DATABASE_URL_RAW
               valueFrom:
                 secretKeyRef:
                   name: linkup-backend-secret
                   key: DATABASE_URL
-            - name: REDIS_URL
+            - name: REDIS_URL_RAW
               valueFrom:
                 secretKeyRef:
                   name: linkup-backend-secret
@@ -78,6 +80,11 @@ spec:
                 secretKeyRef:
                   name: linkup-backend-secret
                   key: FIREBASE_CREDENTIALS_JSON
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: linkup-redis-secret
+                  key: password
           resources:
             requests:
               memory: "256Mi"

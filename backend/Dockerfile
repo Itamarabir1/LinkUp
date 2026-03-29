@@ -16,9 +16,11 @@ RUN pip install --no-cache-dir uv && uv pip install --system -e .
 COPY . .
 
 # ===== DEVELOPMENT =====
-# לוקאלי בלבד — uvicorn עם --reload
+# Docker Compose: workers מ-UVICORN_WORKERS ב-backend/.env (shell בתוך הקונטיינר)
 FROM base AS development
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
 
 # ===== PRODUCTION =====
 # פרודקשן — gunicorn בלי --reload

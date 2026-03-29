@@ -9,7 +9,7 @@ FastAPI application: auth, rides, bookings, notifications, chat, workers.
 
 For production, use Docker (see root `docker-compose.yml`).
 
-- **Uvicorn workers:** הקונטיינר מריץ `uvicorn ... --workers ${UVICORN_WORKERS:-1}`. מגדירים ב-`backend/.env` — ב-`.env.example` מופיע **`UVICORN_WORKERS=4`**. בלי משתנה: ברירת המחדל ב-Compose היא תהליך יחיד. פיתוח לוקאלי עם `--reload` — בדרך כלל worker אחד.
+- **Uvicorn workers (Docker):** `backend/entrypoint.sh` מריץ `uvicorn ... --workers` לפי **`UVICORN_WORKERS`** ב-`backend/.env` (ברירת מחדל 1). ב-`.env.example`: **`UVICORN_WORKERS=4`**. פיתוח לוקאלי בלי דוקר: `run-backend.sh` / `run-backend.bat` — `--reload`, worker אחד.
 - **WebSocket auth:** `get_current_user_ws` מאמת **JWT בלבד** (אובייקט `WsUser`), בלי `SELECT` ל-DB בזמן חיבור — ראו `app/api/dependencies/auth.py`. HTTP endpoints עם `get_current_user` עדיין טוענים משתמש מ-DB.
 
 **Push (FCM):** ב־Compose קובץ השירות של Firebase נטען מ־volume לנתיב בקונטיינר; הגדר `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env` (גם ל־`outbox-worker`) — פירוט ב־`docs/FCM_SYSTEM_SUMMARY.md` וב־README בשורש.
@@ -30,6 +30,8 @@ Copy `.env.example` to `.env` and set your values. See root README for full setu
 Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 
 **Error responses (JSON, `error_code`, `trace_id`, handlers):** [`docs/ERRORS.md`](../docs/ERRORS.md).
+
+**Logging (JSON):** בפרודקשן `LOG_FORMAT=json` עם **python-json-logger** (v3+). ה-formatter נטען מ־`pythonjsonlogger.json` — בקוד: `from pythonjsonlogger import json as jsonlogger` ב־`app/core/logging.py`.
 
 ## Admin API (`/api/v1/admin`)
 

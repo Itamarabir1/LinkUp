@@ -200,6 +200,7 @@ async def verify_email(
 async def resend_verification_code(
     data: EmailOnlyRequest,
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(rate_limit_auth),
     auth_svc: AuthService = Depends(get_auth_service),
 ):
     """שליחה חוזרת של קוד האימות"""

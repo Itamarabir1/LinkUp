@@ -1,3 +1,5 @@
+# Single Redis instance (same as docker-compose: one redis-server, logical DB 0 for backend/outbox, DB 1 for chat-ws + completion).
+# backend/app/core/config.py builds REDIS_URL (DB 0) and REDIS_CHAT_URL (DB 1) from REDIS_HOST/PORT/PASSWORD/REDIS_DB/REDIS_CHAT_DB.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

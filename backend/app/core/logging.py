@@ -24,6 +24,29 @@ def setup_logging() -> None:
     """
     מגדיר לוגים: JSON עם שדות קבועים (פרודקשן) או טקסט קריא (פיתוח).
     """
+    # TODO: Sentry — להסיר הערה כשעוברים לפרודקשן ומוסיפים SENTRY_DSN ל-.env
+    # import sentry_sdk
+    # from sentry_sdk.integrations.fastapi import FastApiIntegration
+    # from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+    # from sentry_sdk.integrations.redis import RedisIntegration
+    #
+    # if getattr(settings, "SENTRY_DSN", None):
+    #     sentry_sdk.init(
+    #         dsn=settings.SENTRY_DSN,
+    #         integrations=[
+    #             FastApiIntegration(),
+    #             SqlalchemyIntegration(),
+    #             RedisIntegration(),
+    #         ],
+    #         traces_sample_rate=0.1,
+    #         send_default_pii=False,
+    #         environment=getattr(settings, "ENVIRONMENT", "development"),
+    #     )
+    #
+    # TODO: Sentry — להוסיף sentry_sdk.init גם ב:
+    # - app/workers/main_worker.py (outbox-worker — תהליך נפרד, צריך init נפרד)
+    # - chat-ws: sentry-go SDK נפרד (github.com/getsentry/sentry-go)
+
     log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
 
     if settings.LOG_FORMAT == "json":

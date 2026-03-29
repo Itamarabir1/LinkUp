@@ -7,6 +7,15 @@ type State =
   | { status: 'ready'; data: AdminHealthResponse }
   | { status: 'error' };
 
+function ServiceStatus({ ok }: { ok: boolean }) {
+  return (
+    <span className={page.healthRow}>
+      <span className={`${page.healthDot} ${ok ? page.healthDotOk : page.healthDotErr}`} aria-hidden />
+      {ok ? 'תקין' : 'שגיאה'}
+    </span>
+  );
+}
+
 export default function AdminHealth() {
   const [state, setState] = useState<State>({ status: 'loading' });
 
@@ -31,26 +40,37 @@ export default function AdminHealth() {
   if (state.status === 'error') return <p className={page.error}>שגיאה בטעינת בריאות.</p>;
 
   const { data } = state;
+  const healthy = data.status === 'healthy';
+
   return (
     <div>
-      <h2 className={page.pageTitle}>בריאות מערכת</h2>
-      <p className={page.muted}>
-        סטטוס כללי: <strong>{data.status}</strong>
-      </p>
+      <div className={page.healthTitleRow}>
+        <h2 className={page.healthPageTitle}>בריאות מערכת</h2>
+        <span className={`${page.healthBadge} ${healthy ? page.healthBadgeOk : page.healthBadgeBad}`}>
+          <span className={`${page.healthDot} ${healthy ? page.healthDotOk : page.healthDotErr}`} aria-hidden />
+          {healthy ? 'הכל תקין' : 'יש תקלה'}
+        </span>
+      </div>
       <div className={page.tableWrap}>
         <table className={page.table}>
           <tbody>
             <tr>
               <td>מסד נתונים</td>
-              <td>{data.database}</td>
+              <td>
+                <ServiceStatus ok={data.database === 'ok'} />
+              </td>
             </tr>
             <tr>
               <td>Redis</td>
-              <td>{data.redis}</td>
+              <td>
+                <ServiceStatus ok={data.redis === 'ok'} />
+              </td>
             </tr>
             <tr>
               <td>RabbitMQ</td>
-              <td>{data.rabbitmq}</td>
+              <td>
+                <ServiceStatus ok={data.rabbitmq === 'ok'} />
+              </td>
             </tr>
           </tbody>
         </table>

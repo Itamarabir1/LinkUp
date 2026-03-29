@@ -79,6 +79,7 @@ class RedisClient:
         אם Redis לא מחובר או שגיאה – מחזיר True (fail open).
         """
         if not self.client:
+            logger.warning("Rate limit skipped — Redis not connected | key=%s", key)
             return True
         try:
             count = await self.client.incr(key)
@@ -86,7 +87,11 @@ class RedisClient:
                 await self.client.expire(key, window_seconds)
             return count <= max_count
         except Exception as e:
-            logger.warning("Rate limit check failed (fail open): %s", e)
+            logger.warning(
+                "Rate limit check failed — fail open (Redis unavailable) | key=%s error=%s",
+                key,
+                e,
+            )
             return True
 
 

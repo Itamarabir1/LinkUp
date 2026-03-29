@@ -24,18 +24,17 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
-          # Non-secret app config: envFrom loads all keys from linkup-backend-config (see configmap.yaml).
-          # Secrets stay as explicit secretKeyRef below so rotation/ACL stay separate from ConfigMap.
           envFrom:
             - configMapRef:
                 name: linkup-backend-config
           env:
-            - name: DATABASE_URL
+            # Pydantic Settings field names (see app/core/config.py)
+            - name: DATABASE_URL_RAW
               valueFrom:
                 secretKeyRef:
                   name: linkup-backend-secret
                   key: DATABASE_URL
-            - name: REDIS_URL
+            - name: REDIS_URL_RAW
               valueFrom:
                 secretKeyRef:
                   name: linkup-backend-secret
@@ -80,6 +79,17 @@ spec:
                 secretKeyRef:
                   name: linkup-backend-secret
                   key: FIREBASE_CREDENTIALS_JSON
+            # Production Dockerfile uses gunicorn with WORKERS; map from UVICORN_WORKERS in ConfigMap
+            - name: WORKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: linkup-backend-config
+                  key: UVICORN_WORKERS
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: linkup-redis-secret
+                  key: password
           resources:
             requests:
               memory: "256Mi"
