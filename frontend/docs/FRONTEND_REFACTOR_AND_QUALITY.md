@@ -82,7 +82,7 @@
 | משימה | סטטוס |
 |--------|--------|
 | Vitest | ✅ |
-| `apiError`, `chatReducer`, `notifications.utils` | ✅ |
+| `apiError`, `chatReducer`, `myBookings.utils`, MessageThread WS, `ErrorBanner` | ✅ |
 | Playwright | ⬜ החלטת מוצר |
 
 ---

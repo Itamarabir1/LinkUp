@@ -394,7 +394,7 @@
 | **התראות צ’אט** | **`useChatNotificationsFeed`** — טעינת פיד התראות מסונכרנת עם מצב הצ’אט (פחות רענונים מיותרים). |
 | **בקשות נוסע** | הוק **`useMyRequests`** — לוגיקת MyRequests מרוכזת. |
 | **עיצוב** | **`tokens.css`**, `ThemeContext`, מצב כהה — פחות אינליין CSS בדפי auth. |
-| **איכות** | בדיקות יחידה ל־reducer / נוטיפיקציות (`chatReducer`, `notifications.utils`) לפי המסמך. |
+| **איכות** | בדיקות יחידה ל־reducer ול־utils קריטיים (`chatReducer`, `apiError`, `myBookings.utils`, MessageThread WS, `ErrorBanner`) לפי [`FRONTEND_REFACTOR_AND_QUALITY.md`](../frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md). |
 | **Zod + WebSocket** | סכימות ב־**`src/types/wsEvents.ts`**; אימות בכניסה ב־hooks וב־**`processChatWebSocketMessage`** — ראו **סעיף 5**. |
 
 *בראיון:* “פרדתי שכבת API, פיצלתי דפים כבדים להוקים, ואיחדתי פילטר קבוצות ב-context כדי שלא יישבר בין מסכים.”

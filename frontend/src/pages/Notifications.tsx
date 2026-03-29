@@ -1,3 +1,5 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle,
   XCircle,
@@ -8,24 +10,116 @@ import {
   UserCheck,
   Bell,
 } from 'lucide-react';
-import { getNotificationItemKey } from '../context/ChatContext';
+import { useAuth } from '../context/AuthContext';
+import { useChat, getNotificationItemKey } from '../context/ChatContext';
+import { api } from '../api/client';
+import type { NotificationItem } from '../types/api';
 import { formatDateTimeNoSeconds } from '../utils/date';
-import { getDisplayType } from './notifications.utils';
-import ErrorBanner from '../components/ErrorBanner';
-import { useNotifications } from './useNotifications';
 import styles from './Notifications.module.css';
 
+type DisplayType = 'booking_approved' | 'booking_rejected' | 'ride_cancelled' | 'booking_request' | 'booking_cancelled_by_passenger' | 'group_joined' | 'group_member_joined' | 'pending_approval' | 'default';
+
+/** מיפוי type מהבקאנד לסוג תצוגה (אייקון + סגנון). */
+function getDisplayType(type: string): DisplayType {
+  if (type === 'booking_confirmed') return 'booking_approved';
+  if (type === 'ride_request') return 'booking_request';
+  if (type === 'pending_approval') return 'pending_approval';
+  const known: DisplayType[] = ['booking_approved', 'booking_rejected', 'ride_cancelled', 'booking_request', 'booking_cancelled_by_passenger', 'group_joined', 'group_member_joined', 'pending_approval'];
+  return known.includes(type as DisplayType) ? (type as DisplayType) : 'default';
+}
+
+/** קבוצת זמן: היום, אתמול, השבוע, קודם לכן */
+function getTimeGroup(date: string): string {
+  const d = new Date(date);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round((today.getTime() - dayStart.getTime()) / (24 * 60 * 60 * 1000));
+  if (diffDays === 0) return 'היום';
+  if (diffDays === 1) return 'אתמול';
+  if (diffDays >= 2 && diffDays < 7) return 'השבוע';
+  return 'קודם לכן';
+}
+
+const GROUP_ORDER = ['היום', 'אתמול', 'השבוע', 'קודם לכן'];
+
 export default function Notifications() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const {
-    loading,
-    error,
-    list,
-    grouped,
-    handleRowClick,
-    unreadNotifications,
+    markNotificationRead,
     markAllNotificationsRead,
+    refreshUnreadNotifications,
     isNotificationRead,
-  } = useNotifications();
+    unreadNotifications,
+  } = useChat();
+  const [list, setList] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const fetchNotifications = useCallback(async () => {
+    if (!user?.user_id) return;
+    setLoading(true);
+    setError('');
+    try {
+      const { data } = await api.get<NotificationItem[]>('/users/me/notifications');
+      setList(Array.isArray(data) ? data : []);
+      refreshUnreadNotifications();
+    } catch {
+      setError('לא ניתן לטעון את ההתראות');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.user_id, refreshUnreadNotifications]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  useEffect(() => {
+    const onRefresh = () => {
+      void fetchNotifications();
+    };
+    window.addEventListener('linkup-notifications-refresh', onRefresh);
+    return () => window.removeEventListener('linkup-notifications-refresh', onRefresh);
+  }, [fetchNotifications]);
+
+  const grouped = useCallback(() => {
+    const groups: Record<string, NotificationItem[]> = {};
+    GROUP_ORDER.forEach((g) => { groups[g] = []; });
+    list.forEach((n) => {
+      const g = getTimeGroup(n.created_at);
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(n);
+    });
+    return GROUP_ORDER.filter((g) => groups[g].length > 0).map((g) => ({ label: g, items: groups[g] }));
+  }, [list]);
+
+  const getNotificationTarget = (type: string): string | null => {
+    switch (type) {
+      case 'ride_request':
+      case 'pending_approval':
+      case 'booking_cancelled_by_passenger':
+        return '/my-bookings?tab=driver';
+      case 'booking_confirmed':
+      case 'booking_approved':
+      case 'booking_rejected':
+      case 'ride_cancelled':
+        return '/my-bookings';
+      case 'group_joined':
+      case 'group_member_joined':
+        return '/groups';
+      default:
+        return null;
+    }
+  };
+
+  const handleRowClick = (n: NotificationItem) => {
+    const key = getNotificationItemKey(n);
+    if (!isNotificationRead(key)) markNotificationRead(key);
+    const target = getNotificationTarget(n.type);
+    if (target) navigate(target);
+  };
 
   if (loading) {
     return (
@@ -44,14 +138,14 @@ export default function Notifications() {
           <button
             type="button"
             className={styles.markAllRead}
-            onClick={markAllNotificationsRead}
+            onClick={() => markAllNotificationsRead()}
           >
             סמן הכל כנקרא
           </button>
         )}
       </header>
 
-      {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
+      {error && <p className={styles.pageError}>{error}</p>}
 
       {list.length === 0 ? (
         <div className={styles.empty}>
