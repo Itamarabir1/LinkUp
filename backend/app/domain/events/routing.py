@@ -6,15 +6,19 @@
 - exchange = סוג העבודה (מטרה), לא "שיוך למשתמש". לכן:
   - "user" (ו-ride, booking) = אירועים שמסתיימים בשליחת התראה (מייל/פוש). רישום, איפוס סיסמה, user.registered → כולם exchange "user".
   - "tasks" = משימות כבדות/אסינכרוניות (S3, עיבוד קבצים). העלאת אווטאר → exchange "tasks".
-- גם רישום וגם איפוס סיסמה וגם העלאת תמונה קשורים ל-user, אבל רישום ואיפוס = "שלח מייל" (אותו consumer), העלאת תמונה = "עבד קובץ ב-S3" (consumer אחר). לכן שני exchanges: user vs tasks.
+- גם רישום וגם איפוס סיסמה וגם העלאת תמונה קשורים ל-user, אבל רישום ואיפוס = "שלח מייל"
+  (אותו consumer), העלאת תמונה = "עבד קובץ ב-S3" (consumer אחר). לכן שני exchanges: user vs tasks.
 - routing_key = מזהה האירוע בתוך ה-exchange: auth.email_verification, auth.password_reset_code, user.avatar_upload.
 
 האם בלאגן כשיש שני תורים לאותו exchange?
   לא. אצלנו אין שני תורים לאותו exchange: notifications_queue מקשיב ל-user/ride/booking; avatar_upload_queue מקשיב רק ל-tasks. אין חפיפה.
-  אם היו שני תורים קשורים לאותו exchange עם אותו routing pattern – כל הודעה הייתה מגיעה לשניהם (fan-out). זה רצוי רק כששני צרכנים צריכים את אותה הודעה; אחרת מפרידים ב-exchange או ב-routing pattern.
+  אם היו שני תורים קשורים לאותו exchange עם אותו routing pattern – כל הודעה הייתה מגיעה
+  לשניהם (fan-out). זה רצוי רק כששני צרכנים צריכים את אותה הודעה; אחרת מפרידים ב-exchange או
+  ב-routing pattern.
 
 מתי להחליף מפתח (routing_key)?
-  כשמוסיפים סוג אירוע חדש באותו סוג עיבוד (אותו exchange). לדוגמה auth.email_verification vs auth.password_reset_code – מפתח שונה, אותו exchange "user".
+  כשמוסיפים סוג אירוע חדש באותו סוג עיבוד (אותו exchange).
+  לדוגמה auth.email_verification vs auth.password_reset_code – מפתח שונה, אותו exchange "user".
 
 מתי לשנות exchange?
   כשמשנים סוג העבודה: התראות (user/ride/booking) vs משימות כבדות (tasks). או דומיין עסקי אחר (ride, booking).

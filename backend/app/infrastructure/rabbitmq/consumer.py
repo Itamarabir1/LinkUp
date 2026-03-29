@@ -51,7 +51,7 @@ class RabbitMQConsumer:
             )
             await dlq_queue.bind(dlq_exchange, routing_key=f"{self.queue_name}.dlq")
 
-            retry_queue = await channel.declare_queue(
+            await channel.declare_queue(
                 f"{self.queue_name}.retry",
                 durable=True,
                 arguments={

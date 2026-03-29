@@ -157,7 +157,10 @@ class Settings(BaseSettings):
     # --- Google Maps Geocoding API ---
     GOOGLE_MAPS_API_KEY: str = Field(
         "",
-        description="Google Maps API key – Geocoding, Directions, Distance Matrix. גם נשלח לפרונט ל-Maps JavaScript API דרך GET /api/v1/geo/maps-key.",
+        description=(
+            "Google Maps API key – Geocoding, Directions, Distance Matrix. "
+            "גם נשלח לפרונט ל-Maps JavaScript API דרך GET /api/v1/geo/maps-key."
+        ),
     )
 
     # --- Google OAuth ---

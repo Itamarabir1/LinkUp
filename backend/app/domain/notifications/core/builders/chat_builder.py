@@ -43,7 +43,9 @@ class ChatBuilder(BaseContextBuilder):
         בונה context למייל סיכום שיחה.
 
         Args:
-            payload: נתוני האירוע מ-RabbitMQ (מכיל conversation_id, user_id_1, user_id_2, driver_name, passenger_name, pickup_location, meeting_time, summary_hebrew)
+            payload: נתוני האירוע מ-RabbitMQ (מכיל conversation_id, user_id_1,
+                user_id_2, driver_name, passenger_name, pickup_location,
+                meeting_time, summary_hebrew)
             event_key: שם האירוע (chat.conversation.completed)
 
         Returns:

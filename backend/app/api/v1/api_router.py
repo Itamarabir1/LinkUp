@@ -32,6 +32,5 @@ api_router.include_router(
 api_router.include_router(admin_router, prefix="/admin", tags=["Admin"])
 
 # Groups last to avoid circular import (User <-> Group via app.db.models)
-from app.domain.groups.router import router as groups_router
-
+from app.domain.groups.router import router as groups_router  # noqa: E402
 api_router.include_router(groups_router, prefix="/groups", tags=["Groups"])

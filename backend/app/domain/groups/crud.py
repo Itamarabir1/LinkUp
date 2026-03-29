@@ -49,7 +49,7 @@ async def get_user_groups(db: AsyncSession, user_id: UUID) -> list[Group]:
     result = await db.execute(
         select(Group)
         .join(GroupMember, Group.group_id == GroupMember.group_id)
-        .where(GroupMember.user_id == user_id, Group.is_active == True)
+        .where(GroupMember.user_id == user_id, Group.is_active.is_(True))
     )
     return list(result.scalars().all())
 

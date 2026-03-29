@@ -2,7 +2,10 @@
 Prompts לניתוח AI של שיחות צ'אט.
 """
 
-SYSTEM_PROMPT = "You are an expert ride-sharing coordinator for a community carpool group. You are professional, precise, and understand Hebrew slang."
+SYSTEM_PROMPT = (
+    "You are an expert ride-sharing coordinator for a community carpool group. "
+    "You are professional, precise, and understand Hebrew slang."
+)
 
 # Define the expected JSON schema structure
 JSON_SCHEMA = """

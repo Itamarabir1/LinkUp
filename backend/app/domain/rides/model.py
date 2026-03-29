@@ -125,7 +125,9 @@ class Ride(Base):
     driver = relationship("User", back_populates="rides_as_driver")
     group = relationship("Group")
 
-    # הקשר ל-Bookings: כל המושבים שנתפסו בנסיעה הזו (lazy=select – נטען רק בעת גישה, כדי ש-refresh אחרי יצירת נסיעה לא ייכשל אם טבלת bookings עדיין לא קיימת)
+    # הקשר ל-Bookings: כל המושבים שנתפסו בנסיעה הזו
+    # (lazy=select – נטען רק בעת גישה, כדי ש-refresh אחרי יצירת נסיעה לא ייכשל
+    # אם טבלת bookings עדיין לא קיימת)
     bookings = relationship(
         "Booking",
         back_populates="ride",
