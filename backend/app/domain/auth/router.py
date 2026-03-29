@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, status, Query, Request, HTTPException
+from fastapi import APIRouter, Depends, status, Query, Request
 
 from app.core.exceptions.base import LinkupError
 from app.core.exceptions.auth import GoogleAuthFailed

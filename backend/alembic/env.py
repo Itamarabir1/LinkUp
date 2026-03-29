@@ -2,7 +2,7 @@ import os
 import sys
 import asyncio
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import pool
 from alembic import context
 from sqlalchemy.ext.asyncio import async_engine_from_config
 # 1. הוספת נתיב הפרויקט
@@ -13,13 +13,6 @@ from app.core.config import settings
 from app.db.base import Base
 
 # --- ייבוא מודלים לרישום ב-Metadata ---
-from app.domain.users.model import User
-from app.domain.rides.model import Ride
-from app.domain.bookings.model import Booking
-from app.domain.passengers.model import PassengerRequest
-from app.domain.groups.model import Group, GroupMember
-from app.domain.chat.model import Conversation, Message, ConversationParticipant, ChatAnalysis
-from app.infrastructure.outbox.model import OutboxEvent
 
 config = context.config
 

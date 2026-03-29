@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, patch
 
 from app.core.exceptions.auth import InvalidCredentialsError
 from app.core.exceptions.user import EmailAlreadyRegisteredError
-from app.domain.auth.schema import LoginRequest, UserRegister
+from app.domain.auth.schema import UserRegister
 from app.api.dependencies.services import get_auth_service
 
 import app.db.models  # noqa: F401 — רישום כל המודלים ל-SQLAlchemy

@@ -5,7 +5,7 @@ from uuid import UUID
 
 from app.infrastructure.redis.broadcast import broadcast
 from app.domain.rides.enum import RideStatus, RideBroadcastAction
-from app.infrastructure.redis.keys import RIDES_LIST_CHANNEL, get_ride_channel
+from app.infrastructure.redis.keys import get_ride_channel
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,6 @@ Conversation = זוג משתמשים (מזוהה יחיד). Message = הודעה
 import uuid
 from sqlalchemy import (
     Column,
-    Integer,
     BigInteger,
     ForeignKey,
     DateTime,

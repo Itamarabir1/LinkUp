@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, Text, inspect as sa_inspect
+from sqlalchemy import Column, String, DateTime, Boolean, Text, inspect as sa_inspect
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
