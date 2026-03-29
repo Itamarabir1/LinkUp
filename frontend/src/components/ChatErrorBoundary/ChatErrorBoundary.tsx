@@ -20,6 +20,7 @@ export default class ChatErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, _info: ErrorInfo) {
+    void _info;
     console.error('[Linkup] ChatErrorBoundary caught:', error);
     // TODO: Sentry — להסיר הערה כשעוברים לפרודקשן
     // קריסות צ'אט קריטיות — תפוס הכל

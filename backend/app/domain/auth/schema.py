@@ -176,11 +176,12 @@ class Token(BaseModel):
 
 
 class LoginUserInfo(BaseModel):
-    """מינימום לפרונט – להצגת 'ברוך הבא, {full_name}'."""
+    """פרטי משתמש בתשובות login / google-signin / refresh (כולל הרשאת אדמין לפרונט)."""
 
     user_id: UUID
     full_name: str
     email: EmailStr
+    is_admin: bool = False
 
 
 class LoginResponse(BaseModel):

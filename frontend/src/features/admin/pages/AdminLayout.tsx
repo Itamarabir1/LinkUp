@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity,
@@ -6,7 +5,6 @@ import {
   CarFront,
   LayoutDashboard,
   LogOut,
-  Menu,
   Search,
   Users,
   Inbox,
@@ -34,20 +32,6 @@ export default function AdminLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 900px)');
-    const onChange = () => setIsMobile(mq.matches);
-    onChange();
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-
-  useEffect(() => {
-    setDrawerOpen(false);
-  }, [location.pathname]);
 
   async function handleLogout() {
     await logout();
@@ -60,18 +44,7 @@ export default function AdminLayout() {
 
   return (
     <div className={shell.shell} dir="rtl">
-      {isMobile && drawerOpen ? (
-        <button
-          type="button"
-          className={shell.backdrop}
-          aria-label="סגור תפריט"
-          onClick={() => setDrawerOpen(false)}
-        />
-      ) : null}
-
-      <aside
-        className={`${shell.sidebar} ${drawerOpen ? shell.sidebarDrawerOpen : ''}`}
-      >
+      <aside className={shell.sidebar}>
         <div className={shell.sidebarBrand}>Linkup Admin</div>
         <nav className={shell.nav} aria-label="ניווט ניהול">
           {nav.map(({ to, end, label, icon: Icon }) => (
@@ -82,7 +55,6 @@ export default function AdminLayout() {
               className={({ isActive }) =>
                 `${shell.navLink} ${isActive ? shell.navLinkActive : ''}`
               }
-              onClick={() => setDrawerOpen(false)}
             >
               <Icon className={shell.navIcon} size={18} strokeWidth={2} aria-hidden />
               {label}
@@ -94,14 +66,6 @@ export default function AdminLayout() {
       <div className={shell.main}>
         <header className={shell.topbar}>
           <div className={shell.topbarLeft}>
-            <button
-              type="button"
-              className={shell.menuBtn}
-              aria-label="תפריט"
-              onClick={() => setDrawerOpen((o) => !o)}
-            >
-              <Menu size={20} />
-            </button>
             <h1 className={shell.topbarTitle}>{pageTitle}</h1>
           </div>
           <div className={shell.topbarMeta}>

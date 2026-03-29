@@ -13,7 +13,10 @@ interface Options {
  */
 export function useRideWebSocket({ rideId, onMessage, enabled = true }: Options) {
   const onMessageRef = useRef(onMessage);
-  onMessageRef.current = onMessage;
+
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
 
   useEffect(() => {
     if (!rideId || !enabled) return;
