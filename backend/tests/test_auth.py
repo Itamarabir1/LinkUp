@@ -2,11 +2,11 @@
 Integration tests for auth endpoints — register & login.
 
 דרישות:
-    TEST_DATABASE_URL=postgresql+asyncpg://USER:PASS@HOST:5432/DBNAME
+    DATABASE_URL=postgresql+asyncpg://USER:PASS@HOST:5432/DBNAME
 
 הרצה:
     cd backend
-    TEST_DATABASE_URL=postgresql+asyncpg://... pytest tests/test_auth.py -v
+    DATABASE_URL=postgresql+asyncpg://... pytest tests/test_auth.py -v
 """
 
 from __future__ import annotations

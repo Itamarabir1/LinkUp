@@ -307,7 +307,7 @@
 | **דחיפת images ל-GHCR** | על push ל-`main`: build ו-push ל-`linkup-backend`, `linkup-frontend`, `linkup-chat-ws` — מוכן לפריסה מקונטיינרים. |
 | **uv ב-CI** | התקנת תלויות backend מהירה (`uv pip install`); **`uv.lock`** + **`pyproject.toml`** — כולל נעילת **`phonenumbers==8.13.48`** לאימות מספרים ישראליים עקבי. |
 | **בדיקות אבטחה JWT** | `backend/tests/test_security.py` — טוקן תקין, פג תוקף, חתימה שגויה (מקרים קריטיים ל-auth). |
-| **בדיקות auth + OWASP enumeration** | `backend/tests/test_auth.py` (דורש `TEST_DATABASE_URL`) — רישום, אימייל כפול, סיסמה שגויה ואימייל לא קיים → אותה שגיאת לוגין. |
+| **בדיקות auth + OWASP enumeration** | `backend/tests/test_auth.py` (דורש `DATABASE_URL`) — רישום, אימייל כפול, סיסמה שגויה ואימייל לא קיים → אותה שגיאת לוגין. |
 | **בדיקות יחידה בפרונט (מקומי)** | Vitest — לדוגמה `frontend/src/utils/apiError.test.ts`, **`frontend/src/pages/MessageThread/processChatWebSocketMessage.test.ts`** (אירועי WS / Zod) (`npm run test`); לא חובה ב-CI כרגע (ה-workflow מריץ lint + build). |
 
 ### העלאות קבצים — לא דרך ה-API

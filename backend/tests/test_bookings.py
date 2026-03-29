@@ -1,7 +1,7 @@
 """
 טסטי אינטגרציה ל-BookingService.
 
-דורשים TEST_DATABASE_URL (PostgreSQL + asyncpg + PostGIS) — ראו tests/conftest.py.
+דורשים DATABASE_URL (PostgreSQL + asyncpg + PostGIS) — ראו tests/conftest.py.
 """
 
 from __future__ import annotations

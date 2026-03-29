@@ -132,7 +132,7 @@ outbox-worker
 
 ## בדיקות, עומס ואיכות
 
-- **Backend:** `pytest` תחת `backend/tests/` (auth, JWT, וכו’); ב-CI שירות Postgres + `TEST_DATABASE_URL` — workflow `backend-ci.yml`.
+- **Backend:** `pytest` תחת `backend/tests/` (auth, JWT, וכו’); ב-CI שירות Postgres + `DATABASE_URL` (כולל `alembic upgrade head` לפני הטסטים) — workflow `backend-ci.yml`.
 - **Frontend:** Vitest לדוגמה `frontend/src/utils/*.test.ts` (`npm run test` מקומית); ב-CI — ESLint + build (כולל `tsc`).
 - **chat-ws:** `go test` / `go vet` ב־`chat-ws-ci.yml`.
 - **עומס (k6):** סקריפטים מאורגנים תחת `backend/k6/scripts/` (auth/rides/users/groups/chat/geo/ws), עם wrappers תואמים לאחור ב־`backend/load_test*.js`. אימות זרימות ליבה תחת עומס מקבילי (executor ל-bcrypt, pool, rate limit, outbox). דורש הכנת סביבה (ראו `docs/architecture/DEVELOPMENT.md`, `backend/README.md`, `docs/ENGINEERING_HIGHLIGHTS.md` סעיף 7ג).

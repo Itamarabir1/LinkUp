@@ -4,7 +4,8 @@ Fixtures for async tests.
 המודלים משתמשים ב-PostGIS (Geography) — SQLite in-memory לא יכול להריץ Base.metadata.create_all.
 טסטים שדורשים DB אמיתי (bookings) רצים רק אם מוגדר:
 
-    TEST_DATABASE_URL=postgresql+asyncpg://USER:PASS@HOST:5432/DBNAME
+    DATABASE_URL=postgresql+asyncpg://USER:PASS@HOST:5432/DBNAME
+    (או TEST_DATABASE_URL לתאימות לאחור)
 
 מומלץ DB ייעודי לבדיקות (לא אותו DB כמו פיתוח), עם סכמה מעודכנת (alembic upgrade head).
 """
@@ -19,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 
 def _require_test_db_url() -> str:
-    url = (os.environ.get("TEST_DATABASE_URL") or "").strip()
+    url = (os.environ.get("DATABASE_URL") or os.environ.get("TEST_DATABASE_URL") or "").strip()
     if not url:
         # ברירת מחדל — ה-DB שרץ ב-docker-compose
         url = "postgresql+asyncpg://admin:password123@localhost:5432/linkup_app"
