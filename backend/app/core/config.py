@@ -2,7 +2,7 @@ from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, EmailStr, computed_field
+from pydantic import AliasChoices, Field, EmailStr, computed_field
 from functools import lru_cache
 from typing import Optional, List
 
@@ -47,8 +47,8 @@ class Settings(BaseSettings):
     # אופציונלי: חיבור מלא ל-Postgres משורת סביבה (למשל מ-K8s/פרודקשן)
     DATABASE_URL_RAW: Optional[str] = Field(
         default=None,
+        validation_alias=AliasChoices("DATABASE_URL", "DATABASE_URL_RAW"),
         description="Optional full database URL (e.g. from Kubernetes secret). If set, overrides pieces above.",
-        json_schema_extra={"env": "DATABASE_URL"},
     )
 
     @computed_field
@@ -80,8 +80,8 @@ class Settings(BaseSettings):
     # אופציונלי: חיבור Redis מלא (למשל מ-K8s/פרודקשן)
     REDIS_URL_RAW: Optional[str] = Field(
         default=None,
+        validation_alias=AliasChoices("REDIS_URL", "REDIS_URL_RAW"),
         description="Optional full Redis URL. If set, overrides REDIS_HOST/PORT/DB/PASSWORD.",
-        json_schema_extra={"env": "REDIS_URL"},
     )
 
     @computed_field
@@ -220,6 +220,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        populate_by_name=True,
     )
 
 
