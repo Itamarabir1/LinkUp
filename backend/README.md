@@ -29,6 +29,12 @@ Copy `.env.example` to `.env` and set your values. See root README for full setu
 
 Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 
+## Tests & CI (quality)
+
+- **pytest:** מתוך `backend/` — `uv run pytest tests/ -v`. טסטי אינטגרציה עם DB דורשים **PostgreSQL + PostGIS** וסכמה מעודכנת (**`alembic upgrade head`** על אותו DB). ב־`tests/conftest.py` מקור ה-DSN: **`DATABASE_URL`** (עדיפות), או **`TEST_DATABASE_URL`** (תאימות לאחור), או ברירת מחדל ל-docker-compose המקומי.
+- **GitHub Actions** (`.github/workflows/backend-ci.yml`): שירות Postgres, **`DATABASE_URL` ברמת ה-job** (מיפוי אחיד ל־**Alembic** ול־**pytest**), שלב **`uv run alembic upgrade head`** לפני **`uv run pytest`**, ואז **Ruff** — `ruff check app/` ו־`ruff format --check app/` (אורך שורה 150 ב־`pyproject.toml`).
+- **Settings:** משתני סביבה **`DATABASE_URL`** / **`REDIS_URL`** נקראים ל־`DATABASE_URL_RAW` / `REDIS_URL_RAW` דרך **`validation_alias=AliasChoices(...)`** ב־`app/core/config.py` (pydantic-settings) — כך Alembic (`settings.DATABASE_URL`) והריצה ב-CI מסתנכרנים.
+
 **Error responses (JSON, `error_code`, `trace_id`, handlers):** [`docs/ERRORS.md`](../docs/ERRORS.md).
 
 **Logging (JSON):** בפרודקשן `LOG_FORMAT=json` עם **python-json-logger** (v3+). ה-formatter נטען מ־`pythonjsonlogger.json` — בקוד: `from pythonjsonlogger import json as jsonlogger` ב־`app/core/logging.py`.

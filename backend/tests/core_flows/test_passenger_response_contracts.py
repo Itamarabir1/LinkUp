@@ -49,9 +49,7 @@ async def test_passenger_request_matching_rides_is_ride_response(db_session: Asy
         "app.domain.passengers.service.get_coordinates",
         new=AsyncMock(side_effect=_coords_for_name),
     ):
-        created = await PassengerService.create_passenger_request(
-            db=db_session, request_in=req_in, passenger_id=passenger.user_id
-        )
+        created = await PassengerService.create_passenger_request(db=db_session, request_in=req_in, passenger_id=passenger.user_id)
 
     # Must be plain list (not SQLAlchemy result tuples)
     assert isinstance(created.matching_rides, list)
@@ -71,9 +69,7 @@ async def test_passenger_request_with_matches_model_validate_roundtrip(
     Explicitly validate with response schema to emulate FastAPI response_model coercion.
     """
     driver = await make_user(db_session, "driver-roundtrip", email_suffix="contracts")
-    passenger = await make_user(
-        db_session, "passenger-roundtrip", email_suffix="contracts"
-    )
+    passenger = await make_user(db_session, "passenger-roundtrip", email_suffix="contracts")
     await make_ride(db_session, driver.user_id, status=RideStatus.OPEN)
 
     req_in = PassengerRequestCreate(
@@ -87,9 +83,7 @@ async def test_passenger_request_with_matches_model_validate_roundtrip(
         "app.domain.passengers.service.get_coordinates",
         new=AsyncMock(side_effect=_coords_for_name),
     ):
-        created = await PassengerService.create_passenger_request(
-            db=db_session, request_in=req_in, passenger_id=passenger.user_id
-        )
+        created = await PassengerService.create_passenger_request(db=db_session, request_in=req_in, passenger_id=passenger.user_id)
 
     validated = PassengerRequestWithMatches.model_validate(created)
     dumped = validated.model_dump()
@@ -97,4 +91,3 @@ async def test_passenger_request_with_matches_model_validate_roundtrip(
     assert dumped["request_id"]
     assert "matching_rides" in dumped
     assert isinstance(dumped["matching_rides"], list)
-

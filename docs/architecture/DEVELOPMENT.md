@@ -49,7 +49,8 @@
 | DB_MAX_OVERFLOW | — | חיבורים נוספים תחת עומס (ברירת מחדל 10) |
 | DB_POOL_TIMEOUT | — | שניות המתנה לחיבור מהמאגר (ברירת מחדל 30) |
 | DB_POOL_RECYCLE | — | מחזור חיבורים בשניות (ברירת מחדל 1800) |
-| DATABASE_URL | אופציונלי | override מלא (למשל פרודקשן / K8s) |
+| DATABASE_URL | אופציונלי | override מלא (למשל פרודקשן / K8s / CI); נטען ל־`DATABASE_URL_RAW` ב־Settings דרך **`validation_alias`** (גם **`DATABASE_URL_RAW`** תקף כשם env) |
+| REDIS_URL | אופציונלי | override מלא ל-Redis; נטען ל־`REDIS_URL_RAW` (גם **`REDIS_URL_RAW`** תקף) |
 | REDIS_HOST | — | localhost / redis |
 | REDIS_PORT | — | 6379 |
 | REDIS_DB | — | 0 |
@@ -94,6 +95,14 @@
 | PORT | 8081 |
 | REDIS_URL | redis://[:password@]host:6379/1 |
 | SECRET_KEY / JWT_SECRET | אותו ערך כמו ב-backend (לאימות JWT) |
+
+---
+
+## Backend tests (pytest)
+
+- מתוך **`backend/`**: `uv run pytest tests/ -v`. דורש **PostgreSQL + PostGIS** עם סכמה מעודכנת — הרץ **`alembic upgrade head`** על אותו DB לפני הטסטים.
+- **משתני סביבה:** ב־`tests/conftest.py` — **`DATABASE_URL`** (מומלץ), או **`TEST_DATABASE_URL`** (תאימות לאחור), או ברירת מחדל ל-docker-compose המקומי.
+- **יישור עם CI:** ב-GitHub Actions מוגדר **`DATABASE_URL` ברמת ה-job**, אחריו **`alembic upgrade head`** ואז pytest — ראו `.github/workflows/backend-ci.yml` ו־`backend/README.md`.
 
 ---
 

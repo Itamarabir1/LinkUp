@@ -108,3 +108,37 @@ async def test_approve_booking_changes_status(db_session: AsyncSession):
 
     assert approved.status == BookingStatus.CONFIRMED
     mock_publish.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_reject_booking_changes_status_and_outbox(db_session: AsyncSession):
+    """דחיית הזמנה — סטטוס rejected ואירוע outbox."""
+    driver = await make_user(db_session, "driver4", email_suffix="bookings")
+    passenger = await make_user(db_session, "passenger4", email_suffix="bookings")
+    ride = await make_ride(db_session, driver.user_id, seats=4)
+    p_req = await make_passenger_request(db_session, passenger.user_id)
+
+    with patch(
+        "app.domain.bookings.service.publish_to_outbox",
+        new_callable=AsyncMock,
+    ):
+        booking = await BookingService.request_to_join(
+            db_session,
+            ride.ride_id,
+            p_req.request_id,
+            num_seats=1,
+            current_user_id=passenger.user_id,
+        )
+
+    with patch(
+        "app.domain.bookings.service.publish_to_outbox",
+        new_callable=AsyncMock,
+    ) as mock_publish:
+        rejected = await BookingService.reject_booking(
+            db_session,
+            booking.booking_id,
+            driver.user_id,
+        )
+
+    assert rejected.status == BookingStatus.REJECTED
+    mock_publish.assert_called_once()

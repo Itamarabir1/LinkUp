@@ -58,9 +58,7 @@ async def test_flow_create_request_join_approve_reject(db_session: AsyncSession)
             search_radius=5000,
             is_notification_active=True,
         )
-        created = await PassengerService.create_passenger_request(
-            db=db_session, request_in=req_in, passenger_id=passenger1.user_id
-        )
+        created = await PassengerService.create_passenger_request(db=db_session, request_in=req_in, passenger_id=passenger1.user_id)
 
     # Contract-level assertions: ensure matching_rides is a list of serializable RideResponse.
     assert hasattr(created, "matching_rides")
@@ -82,9 +80,7 @@ async def test_flow_create_request_join_approve_reject(db_session: AsyncSession)
     assert booking1.status == BookingStatus.PENDING
 
     with patch("app.domain.bookings.service.publish_to_outbox", new_callable=AsyncMock):
-        approved = await BookingService.approve_booking(
-            db_session, booking_id=booking1.booking_id, driver_id=driver.user_id
-        )
+        approved = await BookingService.approve_booking(db_session, booking_id=booking1.booking_id, driver_id=driver.user_id)
 
     assert approved.status == BookingStatus.CONFIRMED
 
@@ -100,9 +96,7 @@ async def test_flow_create_request_join_approve_reject(db_session: AsyncSession)
             search_radius=5000,
             is_notification_active=True,
         )
-        created2 = await PassengerService.create_passenger_request(
-            db=db_session, request_in=req2_in, passenger_id=passenger2.user_id
-        )
+        created2 = await PassengerService.create_passenger_request(db=db_session, request_in=req2_in, passenger_id=passenger2.user_id)
 
     with patch("app.domain.bookings.service.publish_to_outbox", new_callable=AsyncMock):
         booking2 = await BookingService.request_to_join(
@@ -114,9 +108,6 @@ async def test_flow_create_request_join_approve_reject(db_session: AsyncSession)
         )
 
     with patch("app.domain.bookings.service.publish_to_outbox", new_callable=AsyncMock):
-        rejected = await BookingService.reject_booking(
-            db_session, booking_id=booking2.booking_id, driver_id=driver.user_id
-        )
+        rejected = await BookingService.reject_booking(db_session, booking_id=booking2.booking_id, driver_id=driver.user_id)
 
     assert rejected.status == BookingStatus.REJECTED
-

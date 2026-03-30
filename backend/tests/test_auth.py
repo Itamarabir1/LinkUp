@@ -28,6 +28,7 @@ import app.db.models  # noqa: F401 — רישום כל המודלים ל-SQLAlch
 # Fixtures
 # ============================================================
 
+
 @pytest_asyncio.fixture
 async def registered_user(db_session: AsyncSession):
     """
@@ -52,6 +53,7 @@ async def registered_user(db_session: AsyncSession):
 # ============================================================
 # Register tests
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_register_success(db_session: AsyncSession):
@@ -110,6 +112,7 @@ async def test_register_password_mismatch_raises(db_session: AsyncSession):
 # ============================================================
 # Login tests
 # ============================================================
+
 
 @pytest.mark.asyncio
 async def test_login_wrong_password_raises(

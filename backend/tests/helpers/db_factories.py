@@ -15,6 +15,8 @@ from geoalchemy2.elements import WKTElement
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.db.models  # noqa: F401 - ensure models are registered
+from app.domain.bookings.enum import BookingStatus
+from app.domain.bookings.model import Booking
 from app.domain.passengers.enum import PassengerStatus
 from app.domain.passengers.model import PassengerRequest
 from app.domain.rides.enum import RideStatus
@@ -54,6 +56,7 @@ async def make_ride(
     *,
     seats: int = 4,
     status: RideStatus = RideStatus.OPEN,
+    group_id=None,
     departure_time: datetime | None = None,
     origin_lon: float = 34.78,
     origin_lat: float = 32.08,
@@ -79,6 +82,7 @@ async def make_ride(
         route_summary="test-route",
         available_seats=seats,
         status=status,
+        group_id=group_id,
     )
     session.add(ride)
     await session.flush()
@@ -111,3 +115,25 @@ async def make_passenger_request(
     await session.flush()
     return pr
 
+
+async def make_booking(
+    session: AsyncSession,
+    ride_id,
+    passenger_id,
+    *,
+    status: BookingStatus = BookingStatus.CONFIRMED,
+    num_seats: int = 1,
+    request_id=None,
+) -> Booking:
+    """הזמנה ישירות ל-DB (אינטגרציה / זרימות נסיעה בלי מסלול API מלא)."""
+    b = Booking(
+        booking_id=uuid4(),
+        ride_id=ride_id,
+        passenger_id=passenger_id,
+        request_id=request_id,
+        num_seats=num_seats,
+        status=status,
+    )
+    session.add(b)
+    await session.flush()
+    return b

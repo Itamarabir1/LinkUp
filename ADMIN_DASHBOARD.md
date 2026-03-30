@@ -1,11 +1,11 @@
 # Admin Dashboard
 
-Admin UI is a **feature module** under `frontend/src/features/admin/` — dark sidebar shell, CSS Modules, RTL-friendly (`dir="rtl"` on shell).
+Admin UI is a **feature module** under `frontend/src/features/admin/` — dark sidebar shell, CSS Modules, RTL-friendly (`dir="rtl"` on shell). **Desktop-oriented:** persistent sidebar (no mobile drawer / off-canvas menu); operators are expected to use a normal browser width; end-user mobile traffic uses the separate **`mobile/`** app.
 
 ## Architecture
 
 - **Entry point**: `http://localhost:5173/admin`
-- **Auth**: `AuthContext` + `AdminRoute` (`user.is_admin`, with `refreshUser()` hydration when `is_admin` is missing after login).
+- **Auth**: `AuthContext` + `AdminRoute` — משתמש מחובר + **`user.is_admin`** (השדה מגיע מתשובות login / Google sign-in / refresh ב־`LoginUserInfo`; אין לולאת `useEffect` / `refreshUser` ייעודית לדף האדמין).
 - **Bundle**: Lazy-loaded via `React.lazy` per route.
 - **Toasts**: `NotificationToast` + `triggerNotificationToast` inside admin layout.
 - **Mutations**: `ConfirmModal` before destructive or sensitive actions; loading on confirm button; lists refresh after success.

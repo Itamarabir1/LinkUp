@@ -67,4 +67,21 @@ describe('chatReducer', () => {
     const next = chatReducer(s, { type: 'RESET_SESSION' });
     expect(next).toEqual(initialChatState);
   });
+
+  it('CLOSE_ALL_CHATS clears both popup and panel', () => {
+    const s = {
+      ...initialChatState,
+      openConversationId: 'a',
+      panelConversationId: 'b',
+    };
+    const next = chatReducer(s, { type: 'CLOSE_ALL_CHATS' });
+    expect(next.openConversationId).toBeNull();
+    expect(next.panelConversationId).toBeNull();
+  });
+
+  it('MARK_ALL_NOTIFICATIONS_READ sets unread to 0', () => {
+    const s = { ...initialChatState, unreadNotifications: 4 };
+    const next = chatReducer(s, { type: 'MARK_ALL_NOTIFICATIONS_READ' });
+    expect(next.unreadNotifications).toBe(0);
+  });
 });

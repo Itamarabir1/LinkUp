@@ -20,7 +20,7 @@
 | **AI** | סיום שיחה → ניתוח (Groq) → שמירה + התראות |
 | **התראות** | מייל (**Brevo**), Push (**FCM** — מהשרת רק מפת `data` ב־FCM, בלי שדה `notification` של Firebase; בחזית **Toast קופץ + צליל**, ברקע התראת מערכת דרך SW), in-app |
 | **משתמשים** | JWT + Refresh ב-DB, **כניסה עם Google** (OAuth / `id_token`), אווטאר (S3 + worker); שדה **`is_admin`** לגישה ל־`/api/v1/admin/*` |
-| **אדמין / תפעול** | ממשק ווב **`/admin`** (מודול `features/admin`): סטטיסטיקות, בריאות, משתמשים (הפעלה/הרשאת אדמין), נסיעות (ביטול), קבוצות, Outbox (requeue), lookup; **lazy routes**, אישור לפני מוטציות, toasts; בקאנד **`get_current_admin_user`** + לוג `[admin_audit]` — **`ADMIN_DASHBOARD.md`** |
+| **אדמין / תפעול** | ממשק ווב **`/admin`** (מודול `features/admin`): סטטיסטיקות, בריאות, משתמשים (הפעלה/הרשאת אדמין), נסיעות (ביטול), קבוצות, Outbox (requeue), lookup; **lazy routes**, מעטפת **דסקטופ** (ללא drawer מובייל), **`AdminRoute`** מינימלי (`is_admin` מ־AuthContext); אישור לפני מוטציות, toasts; בקאנד **`get_current_admin_user`** + לוג `[admin_audit]` — **`ADMIN_DASHBOARD.md`** |
 | **מפות** | Google: **Geocoding**, **Directions**, **Distance Matrix**, **Maps JS**; geocoding הוא **Google-only** עם cache ב-Redis (24h) |
 | **GPS בזמן אמת** | מיקום נהג לנוסעים, מיקום נוסעים לנהג (ערוצי Redis נפרדים + WS). **פרונט:** POST מותאם ב־throttle (~1.5s), `maximumAge: 0` לשידור, `useMapMarker` — יצירת marker פעם אחת ועדכון מיקום בלבד (בלי ריצוד), מפת Google. **Zod** על פריימי WS בכניסה — `frontend/src/types/wsEvents.ts`. פירוט: `docs/architecture/REALTIME.md`. |
 
@@ -303,9 +303,11 @@
 
 | מה | פירוט |
 |----|--------|
-| **GitHub Actions — 3 pipelines נפרדים** | `backend` (**Ruff** lint + format check + **pytest** על Postgres שירות ב-CI), `frontend` (**ESLint** + **build** = `tsc -b` + Vite), `chat-ws` (**go test** + **go vet** + build). טריגר לפי `paths` — לא מריצים הכל על כל commit. |
+| **GitHub Actions — 3 pipelines נפרדים** | `backend`: **Ruff** (`check` + `format --check`), **`DATABASE_URL` ברמת ה-job**, **`alembic upgrade head`** ואז **pytest** על Postgres שירות; `frontend` (**ESLint** + **build**); `chat-ws` (**go test** + **go vet** + build). טריגר לפי `paths`. |
 | **דחיפת images ל-GHCR** | על push ל-`main`: build ו-push ל-`linkup-backend`, `linkup-frontend`, `linkup-chat-ws` — מוכן לפריסה מקונטיינרים. |
 | **uv ב-CI** | התקנת תלויות backend מהירה (`uv pip install`); **`uv.lock`** + **`pyproject.toml`** — כולל נעילת **`phonenumbers==8.13.48`** לאימות מספרים ישראליים עקבי. |
+| **Settings ↔ env (DB/Redis)** | `DATABASE_URL` / `REDIS_URL` מהסביבה נכנסים ל־`DATABASE_URL_RAW` / `REDIS_URL_RAW` דרך **`validation_alias=AliasChoices`** (pydantic-settings) + **`populate_by_name=True`** — Alembic ו-runtime רואים את אותו override כמו ב-CI (לא `json_schema_extra`). |
+| **Redis broadcast — רשימת נסיעות** | שם ערוץ **`rides:list`** ב־`app/infrastructure/redis/keys.py` (`RIDES_LIST_CHANNEL`); ייבוא אחיד משירות הנסיעות. |
 | **בדיקות אבטחה JWT** | `backend/tests/test_security.py` — טוקן תקין, פג תוקף, חתימה שגויה (מקרים קריטיים ל-auth). |
 | **בדיקות auth + OWASP enumeration** | `backend/tests/test_auth.py` (דורש `DATABASE_URL`) — רישום, אימייל כפול, סיסמה שגויה ואימייל לא קיים → אותה שגיאת לוגין. |
 | **בדיקות יחידה בפרונט (מקומי)** | Vitest — לדוגמה `frontend/src/utils/apiError.test.ts`, **`frontend/src/pages/MessageThread/processChatWebSocketMessage.test.ts`** (אירועי WS / Zod) (`npm run test`); לא חובה ב-CI כרגע (ה-workflow מריץ lint + build). |
@@ -401,4 +403,4 @@
 
 ---
 
-*עודכן כחלק מתיעוד הפרויקט — כולל מאגר DB ניתן להגדרה, **auth בעומס** (bcrypt ב-executor, pool, rate limit, outbox), חיזוק OTP, מניעת user enumeration בלוגין (OWASP), **pytest + GitHub Actions + GHCR**, **Vitest + ריפקטור ארגון בפרונט** (`FRONTEND_REFACTOR_AND_QUALITY.md`), **Zod לאימות WebSocket** (`frontend/src/types/wsEvents.ts`), **מסך אדמין** (`ADMIN_DASHBOARD.md`, `/admin` + `/api/v1/admin`), **k6** עם דוגמת תוצאות, **phonenumbers==8.13.48**, ו-**Docker Compose** (שירות **migrate**, healthcheck ל-backend, `.env` בשורש + `backend/.env`, recreate לקונטיינר אחרי שינוי env).*
+*עודכן כחלק מתיעוד הפרויקט — כולל מאגר DB ניתן להגדרה, **auth בעומס** (bcrypt ב-executor, pool, rate limit, outbox), חיזוק OTP, מניעת user enumeration בלוגין (OWASP), **pytest + GitHub Actions + GHCR** (כולל **`DATABASE_URL` אחיד**, **Alembic לפני pytest**, **Ruff** lint/format), **pydantic-settings** (`validation_alias` ל־`DATABASE_URL` / `REDIS_URL`), **Vitest + ריפקטור ארגון בפרונט** (`FRONTEND_REFACTOR_AND_QUALITY.md`), **Zod לאימות WebSocket** (`frontend/src/types/wsEvents.ts`), **מסך אדמין דסקטופ** (`ADMIN_DASHBOARD.md`, `/admin` + `/api/v1/admin`), **k6** עם דוגמת תוצאות, **phonenumbers==8.13.48**, ו-**Docker Compose** (שירות **migrate**, healthcheck ל-backend, `.env` בשורש + `backend/.env`, recreate לקונטיינר אחרי שינוי env).*
