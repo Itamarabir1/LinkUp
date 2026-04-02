@@ -6,6 +6,7 @@ get_due — שולב partial index על deliver_at WHERE sent_at IS NULL.
 mark_sent — מסמן רשומה כנשלחה (sent_at = now).
 create — כותב רשומה חדשה (נקרא מה-outbox worker).
 """
+
 import logging
 from datetime import datetime
 from typing import List
@@ -21,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 
 class CRUDScheduledNotification:
-
     async def create(
         self,
         db: AsyncSession,
@@ -67,11 +67,7 @@ class CRUDScheduledNotification:
 
     async def mark_sent(self, db: AsyncSession, notification_id: UUID) -> None:
         """מסמן תזכורת כנשלחה — sent_at = now()."""
-        stmt = (
-            update(ScheduledNotification)
-            .where(ScheduledNotification.id == notification_id)
-            .values(sent_at=func.now())
-        )
+        stmt = update(ScheduledNotification).where(ScheduledNotification.id == notification_id).values(sent_at=func.now())
         await db.execute(stmt)
 
     async def delete_by_ride(self, db: AsyncSession, ride_id: UUID) -> None:
@@ -80,6 +76,7 @@ class CRUDScheduledNotification:
         ON DELETE CASCADE ב-DB מטפל בזה אוטומטית — זו פונקציה לשימוש ידני אם צריך.
         """
         from sqlalchemy import delete
+
         await db.execute(
             delete(ScheduledNotification).where(
                 ScheduledNotification.ride_id == ride_id,

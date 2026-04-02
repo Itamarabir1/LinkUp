@@ -414,4 +414,5 @@ class CRUDBooking:
         result = await db.execute(stmt.order_by(Booking.created_at.desc()))
         return list(result.scalars().all())
 
+
 crud_booking = CRUDBooking()

@@ -8,6 +8,7 @@ reminder_scheduler.py — שולח תזכורות לפי scheduled_notifications
 
 reminder_sent flag הוסר מ-Ride ו-Booking (migration 008).
 """
+
 import logging
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 
 class ReminderScheduler:
-
     async def run_batch_reminders(self, db: AsyncSession) -> None:
         """
         מריץ batch של תזכורות שעבר זמנן.
@@ -79,9 +79,7 @@ class ReminderScheduler:
             logger.info("✅ ReminderScheduler: batch committed")
         except Exception as e:
             await db.rollback()
-            logger.critical(
-                "ReminderScheduler: commit failed: %s", e, exc_info=True
-            )
+            logger.critical("ReminderScheduler: commit failed: %s", e, exc_info=True)
 
 
 reminder_scheduler = ReminderScheduler()

@@ -6,6 +6,7 @@ notification_tasks.py — handlers לאירועי RabbitMQ + ביצוע תזכו
   - handle_booking_approved: handler חדש — כותב scheduled_notification לנוסע (passenger_reminder).
   - execute_reminders_job: עדיין קורא ל-reminder_scheduler, שעכשיו סורק scheduled_notifications.
 """
+
 import logging
 from datetime import timedelta
 from typing import Dict, Any
@@ -158,8 +159,10 @@ async def handle_ride_cancelled_by_driver(db, data: Dict[str, Any]) -> None:
 
     bookings = await db.run_sync(_find_bookings)
     active_bookings = [
-        b for b in bookings
-        if b.status in (
+        b
+        for b in bookings
+        if b.status
+        in (
             BookingStatus.CANCELLED.value,
             BookingStatus.CONFIRMED.value,
             BookingStatus.PENDING.value,
@@ -167,9 +170,7 @@ async def handle_ride_cancelled_by_driver(db, data: Dict[str, Any]) -> None:
     ]
 
     if not active_bookings:
-        logger.warning(
-            "ride.cancelled_by_driver: no active bookings for ride_id=%s", ride_id
-        )
+        logger.warning("ride.cancelled_by_driver: no active bookings for ride_id=%s", ride_id)
         return
 
     for b in active_bookings:

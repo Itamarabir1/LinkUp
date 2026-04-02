@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class MaintenanceService:
-
     async def run_full_system_cleanup(self, db: AsyncSession) -> dict:
         now = datetime.now()
         try:
@@ -24,20 +23,21 @@ class MaintenanceService:
 
         if settings.USER_EVENTS_ENABLED and pending_events:
             results = await asyncio.gather(
-                *[publish_user_event(e.user_id, e.event, e.extra)
-                  for e in pending_events],
+                *[publish_user_event(e.user_id, e.event, e.extra) for e in pending_events],
                 return_exceptions=True,
             )
             failed = sum(1 for r in results if isinstance(r, Exception))
             if failed:
                 logger.warning(
                     "Maintenance: %d/%d events failed to publish",
-                    failed, len(pending_events),
+                    failed,
+                    len(pending_events),
                 )
 
         logger.info(
             "✅ Maintenance finished. stats=%s events=%d",
-            stats, len(pending_events),
+            stats,
+            len(pending_events),
         )
         return stats
 

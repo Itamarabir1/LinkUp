@@ -5,6 +5,7 @@ ScheduledNotification — רשומת תזכורת מתוזמנת.
 נכתבת ע"י outbox worker אחרי ride.created / booking.approved_by_driver.
 נסרקת ע"י reminder_scheduler כל 5 דקות — query קטן ויעיל בזכות partial index.
 """
+
 import uuid
 from sqlalchemy import Column, String, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -49,6 +50,5 @@ class ScheduledNotification(Base):
 
     def __repr__(self) -> str:
         return (
-            f"<ScheduledNotification(id={self.id}, type={self.type}, "
-            f"user_id={self.user_id}, deliver_at={self.deliver_at}, sent_at={self.sent_at})>"
+            f"<ScheduledNotification(id={self.id}, type={self.type}, user_id={self.user_id}, deliver_at={self.deliver_at}, sent_at={self.sent_at})>"
         )

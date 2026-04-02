@@ -127,10 +127,7 @@ async def get_booking(
     current_user: User = Depends(get_current_user),
 ):
     booking = await BookingService.get_booking(db, booking_id)
-    if (
-        str(booking.passenger_id) != str(current_user.user_id)
-        and str(booking.ride.driver_id) != str(current_user.user_id)
-    ):
+    if str(booking.passenger_id) != str(current_user.user_id) and str(booking.ride.driver_id) != str(current_user.user_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="גישה חסומה")
     return booking
 

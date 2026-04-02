@@ -3,6 +3,7 @@ publisher.py — נקודת הכניסה לשידור אירועי דומיין 
 - ride: broadcast (REDIS_URL / DB0) — מקביל ל-WS של FastAPI על ride_*.
 - user (chat-ws): redis_chat_pubsub (REDIS_CHAT_URL) — אותו DB כמו chat-ws.
 """
+
 import json
 import logging
 from uuid import UUID
@@ -34,9 +35,7 @@ async def publish_user_event(
     """Pub/Sub על REDIS_CHAT_URL (DB כמו chat-ws) — לא broadcast/DB 0."""
     payload = {"event": event, "user_id": str(user_id), **(extra or {})}
     try:
-        n = await redis_chat_pubsub.publish(
-            get_user_channel(user_id), json.dumps(payload)
-        )
+        n = await redis_chat_pubsub.publish(get_user_channel(user_id), json.dumps(payload))
         if n == 0 and redis_chat_pubsub.client is None:
             logger.warning(
                 "publish_user_event skipped (chat redis not connected) [%s] user=%s",

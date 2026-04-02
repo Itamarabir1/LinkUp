@@ -7,6 +7,7 @@ maintenance_crud.py — עדכון סטטוסים פגי תוקף.
 
 שימוש ב-RETURNING: UPDATE אטומי שמחזיר IDs בלי SELECT נוסף.
 """
+
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PendingUserEvent:
     """Event שממתין לשליחה אחרי commit."""
+
     user_id: UUID
     event: str
     extra: dict = field(default_factory=dict)
@@ -43,9 +45,7 @@ class MaintenanceCRUD:
     מחזיר PendingUserEvent לשליחה אחרי commit — לא שולח Redis בעצמו.
     """
 
-    async def bulk_update_expired_entities(
-        self, db: AsyncSession, now: datetime
-    ) -> Tuple[dict, List[PendingUserEvent]]:
+    async def bulk_update_expired_entities(self, db: AsyncSession, now: datetime) -> Tuple[dict, List[PendingUserEvent]]:
         """
         מריץ את כל עדכוני הסטטוס ומחזיר:
           - stats: מילון עם ספירות לכל entity
@@ -71,9 +71,7 @@ class MaintenanceCRUD:
         }
         return stats, pending_events
 
-    async def _update_expired_rides(
-        self, db: AsyncSession, now: datetime
-    ) -> Tuple[list, List[PendingUserEvent]]:
+    async def _update_expired_rides(self, db: AsyncSession, now: datetime) -> Tuple[list, List[PendingUserEvent]]:
         """
         open → completed לנסיעות שעבר זמנן.
         RETURNING ride_id, driver_id — אטומי, ללא race condition.
@@ -98,12 +96,9 @@ class MaintenanceCRUD:
             ride_ids = [r[0] for r in rows]
 
             # שליפת נוסעים confirmed לנסיעות שפגו
-            passenger_stmt = (
-                select(Booking.ride_id, Booking.passenger_id)
-                .where(
-                    Booking.ride_id.in_(ride_ids),
-                    Booking.status == text("'confirmed'::booking_status"),
-                )
+            passenger_stmt = select(Booking.ride_id, Booking.passenger_id).where(
+                Booking.ride_id.in_(ride_ids),
+                Booking.status == text("'confirmed'::booking_status"),
             )
             passenger_result = await db.execute(passenger_stmt)
             ride_passengers: dict = {}
@@ -126,9 +121,7 @@ class MaintenanceCRUD:
                 return [], []
             raise
 
-    async def _update_expired_passenger_requests(
-        self, db: AsyncSession, now: datetime
-    ) -> Tuple[list, List[PendingUserEvent]]:
+    async def _update_expired_passenger_requests(self, db: AsyncSession, now: datetime) -> Tuple[list, List[PendingUserEvent]]:
         """active → expired לבקשות שעבר זמנן."""
         try:
             stmt = (
@@ -160,9 +153,7 @@ class MaintenanceCRUD:
                 return [], []
             raise
 
-    async def _update_completed_passenger_requests(
-        self, db: AsyncSession, now: datetime
-    ) -> Tuple[list, List[PendingUserEvent]]:
+    async def _update_completed_passenger_requests(self, db: AsyncSession, now: datetime) -> Tuple[list, List[PendingUserEvent]]:
         """matched → cancelled לבקשות שעבר זמנן."""
         try:
             stmt = (
@@ -193,9 +184,7 @@ class MaintenanceCRUD:
                 return [], []
             raise
 
-    async def _update_completed_bookings(
-        self, db: AsyncSession, now: datetime
-    ) -> Tuple[list, List[PendingUserEvent]]:
+    async def _update_completed_bookings(self, db: AsyncSession, now: datetime) -> Tuple[list, List[PendingUserEvent]]:
         """confirmed → completed להזמנות של נסיעות שעבר זמנן."""
         try:
             subq = select(Ride.ride_id).where(Ride.departure_time <= now)
