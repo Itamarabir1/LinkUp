@@ -4,7 +4,6 @@ from uuid import UUID
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
-from datetime import datetime
 from sqlalchemy import or_, text
 from app.domain.bookings.model import Booking
 from app.domain.rides.model import Ride
@@ -14,7 +13,7 @@ from app.domain.bookings.enum import BookingStatus
 from app.domain.passengers.enum import PassengerStatus
 from app.core.exceptions.booking import NoSeatsAvailableError
 from app.core.exceptions.booking import ForbiddenRideActionError
-from sqlalchemy import and_, select, func
+from sqlalchemy import select, func
 
 
 class CRUDBooking:
