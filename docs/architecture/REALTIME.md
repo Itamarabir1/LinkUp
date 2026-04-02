@@ -1,6 +1,6 @@
 # Real-time Architecture
 
-תקשורת בזמן אמת: WebSocket לסטטוס נסיעה, שרת צ'אט (Go) + Redis Pub/Sub להודעות צ'אט. **פרונט:** אימות JSON בכניסה עם **Zod** — [`frontend/src/types/wsEvents.ts`](../../frontend/src/types/wsEvents.ts) (בהתאם לחוזים למטה).
+תקשורת בזמן אמת: WebSocket לסטטוס נסיעה, שרת צ'אט (Go) + Redis Pub/Sub להודעות צ'אט. **פרונט:** אימות JSON בכניסה עם **Zod** — [`frontend/src/types/wsEvents.ts`](../../frontend/src/types/wsEvents.ts) (בהתאם לחוזים למטה): אירועי נסיעה/מיקום/`UserEvent`, **והודעת צ'אט נכנסת** — `ChatMessageSchema` + מיפוי מפורש ל־[`MessageResponse`](../../frontend/src/types/api.ts) ב־[`processChatWebSocketMessage.ts`](../../frontend/src/pages/MessageThread/processChatWebSocketMessage.ts).
 
 **Redis — שרת אחד, שני DB לוגיים:** אותו תהליך Redis (פורט 6379); **DB 0** — backend (cache, broadcast נסיעות `ride_*`, rate limit, OTP…); **DB 1** — צ'אט + **אירועי משתמש ל-chat-ws** (pub/sub הודעות, `user:{id}:events`, `presence:*`, `user:online` / `user:offline`, completion). **חשוב:** הודעות צ'אט וגם **`publish_user_event`** מופעלים דרך **`REDIS_CHAT_URL`** / [`redis_chat_pubsub`](../../backend/app/infrastructure/redis/chat_pubsub.py) (ברירת מחדל DB **1**), כדי ש-**chat-ws** (אותו `REDIS_URL` עם `/1`) יקבל את ה-Pub/Sub. ערוצי נסיעה per-ride נשארים ב-**`broadcast`** על **`REDIS_URL`** (DB 0).
 
@@ -70,6 +70,10 @@ Client A (נהג)                Backend API                    Redis DB 1      
 
 - **כתיבת הודעה**: POST ל-FastAPI → שמירה ב-DB → publish ל-Redis `chat:conversation:{id}` → chat-ws מקבל ומעביר ל-clients המנויים.
 - **קבלת הודעה**: Client מחובר ל-chat-ws עם JWT; chat-ws נרשם ל-conversation הרלוונטי; הודעות מגיעות ב-WebSocket.
+
+### אימות הודעה בפרונט (Zod)
+
+Payload של הודעה חדשה מה-WS (ללא שדה `type` של typing/presence) עובר **`ChatMessageSchema.safeParse`** — `message_id` (מספר), `conversation_id`, `sender_id`, `body`, `created_at` (מחרוזות), עם `.passthrough()` לשדות עתידיים. אחרי הצלחה נבנה אובייקט **`MessageResponse`** שדה-שדה (לא cast כפול) לפני `setMessages` / `markConversationRead`. בדיקות: [`processChatWebSocketMessage.test.ts`](../../frontend/src/pages/MessageThread/processChatWebSocketMessage.test.ts).
 
 ---
 

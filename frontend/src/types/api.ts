@@ -135,7 +135,6 @@ export interface Booking {
   passenger_id: string;
   num_seats: number;
   status: string;
-  reminder_sent: boolean;
   created_at: string;
   passenger_name?: string | null;
   phone?: string | null;

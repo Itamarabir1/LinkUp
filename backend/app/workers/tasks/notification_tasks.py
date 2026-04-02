@@ -12,6 +12,8 @@ from datetime import timedelta
 from typing import Dict, Any
 from uuid import UUID
 
+from sqlalchemy import select
+
 from app.db.session import SessionLocal
 from app.domain.notifications.core.handler import notification_handler
 from app.domain.notifications.services.reminder_scheduler import reminder_scheduler
@@ -154,16 +156,13 @@ async def handle_ride_cancelled_by_driver(db, data: Dict[str, Any]) -> None:
         return
     ride_id = UUID(str(ride_id_raw))
 
-    def _find_bookings(sess):
-        return sess.query(Booking).filter(Booking.ride_id == ride_id).all()
-
-    bookings = await db.run_sync(_find_bookings)
+    result = await db.execute(select(Booking).where(Booking.ride_id == ride_id))
+    bookings = list(result.scalars().all())
     active_bookings = [
         b
         for b in bookings
         if b.status
         in (
-            BookingStatus.CANCELLED.value,
             BookingStatus.CONFIRMED.value,
             BookingStatus.PENDING.value,
         )

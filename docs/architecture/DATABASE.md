@@ -252,7 +252,7 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 | 004_add_missing_indexes | 11 indexes — rides (4), bookings (3), group_members (2), passenger_requests (1) | 2025-03-09 |
 | 005_add_active_ride_status | הוספת ערך 'active' ל-enum ride_status (נסיעה בתנועה — התחל/סיים נסיעה, GPS) | 2025-03-09 |
 | 006_chat_participants | טבלת `conversation_participants` (למשל `last_read_at` למשתמש בשיחה) | — |
-| 007_add_last_active_at | `users.last_active_at` — פעילות/צ'אט / last-seen | — |
+| 007_last_active_at (קובץ `007_add_last_active_at.py`) | `users.last_active_at` — פעילות/צ'אט / last-seen | מזהה רוויזיה בקוד: `revision = "007_last_active_at"`; **008** מצביע אליו ב־`down_revision` |
 | 008_scheduled_notifications | טבלת `scheduled_notifications` + partial index; הסרת `reminder_sent` מ-rides ו-bookings | — |
 
 הרצה: מתוך `backend/` — `alembic upgrade head`. downgrade: `alembic downgrade -1`.

@@ -51,7 +51,7 @@ Endpoints for operators only: FastAPI dependency **`get_current_admin_user`** (`
   - `select(...)` + `await db.execute(...)` for async querying
   - `await db.flush()` / `await db.commit()` in async transaction boundaries
 - **Bookings are async-only** now (no `db.run_sync`): lock-critical paths use `select(...).with_for_update()` directly on `AsyncSession` to prevent races while keeping the call chain fully async.
-- `db.run_sync(...)` may still appear in some worker paths; passenger notification lookup (`find_passengers_for_ride_notification`) is **async** on `AsyncSession`.
+- **Workers:** notification handlers (e.g. `notification_tasks.py` — ride created, booking approved, **ride cancelled**) query with `await db.execute(select(...))`; `find_passengers_for_ride_notification` is async. No `db.run_sync` in application code (Alembic `env.py` still uses `connection.run_sync` for migrations).
 - Result: lower event-loop blocking risk, cleaner async call chains, and safer concurrency in booking/ride state transitions.
 
 ## Migrations
@@ -64,7 +64,7 @@ alembic upgrade head
 
 With **Docker Compose** at the repo root, the **`migrate`** service runs `alembic upgrade head` once before **backend** and **outbox-worker** start; the production **Dockerfile** does **not** run migrations in `CMD` (only `gunicorn` / `uvicorn`). If you deploy **without** Compose (e.g. raw image or Kubernetes), run migrations as a one-off Job, init container, or CI step — do not rely on the API container entrypoint alone.
 
-**Recent:** revision **`007_add_last_active_at`** — `users.last_active_at`. Revision **`008_scheduled_notifications`** — טבלת `scheduled_notifications`, אינדקס חלקי על תזמון, והסרת עמודות `reminder_sent` מ-rides/bookings ב-DB. ORM ו-API ציבורי כבר מיושרים לכך (אין שדה `reminder_sent` בתגובות הזמנה). See `docs/architecture/DATABASE.md` and `docs/architecture/EVENTS.md`.
+**Recent:** קובץ **`007_add_last_active_at.py`** — מזהה רוויזיה ב-Alembic: **`007_last_active_at`** (`users.last_active_at`). **`008_scheduled_notifications`** — `down_revision` חייב להיות **`007_last_active_at`** (לא שם הקובץ); טבלת `scheduled_notifications`, אינדקס חלקי, הסרת `reminder_sent` מ-rides/bookings. ORM, API וטיפוסי הפרונט מיושרים (אין `reminder_sent` בתגובות / ב-`frontend` types). See `docs/architecture/DATABASE.md` and `docs/architecture/EVENTS.md`.
 
 ## Load testing (k6)
 

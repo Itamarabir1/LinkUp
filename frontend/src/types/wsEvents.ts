@@ -77,6 +77,25 @@ export const ChatPresenceEventSchema = z.discriminatedUnion('type', [
 ]);
 export type ChatPresenceEvent = z.infer<typeof ChatPresenceEventSchema>;
 
+/** הודעת צ'אט שמגיעה ב-WS (מקביל ל-MessageResponse ב-api). */
+export const ChatMessageSchema = z
+  .object({
+    message_id: z.number(),
+    conversation_id: z.string(),
+    sender_id: z.string(),
+    body: z.string(),
+    created_at: z.string(),
+  })
+  .passthrough();
+export type ChatMessage = z.infer<typeof ChatMessageSchema>;
+
+// --- Notifications WebSocket (FastAPI /notifications/ws) ---
+export const NotificationRefreshEventSchema = z
+  .object({
+    type: z.literal('notifications_refresh'),
+  })
+  .strict();
+
 // --- User Events (channel: user:{user_id}:events via chat-ws) ---
 export const UserEventSchema = z
   .object({

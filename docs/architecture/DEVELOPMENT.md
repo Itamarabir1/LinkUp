@@ -210,6 +210,6 @@ Linkup/
 ## Recent backend architecture updates
 
 - **Async refactor (passengers/bookings/rides):** רוב זרימות הליבה עברו ל-SQLAlchemy async (`AsyncSession`, `select/execute`) כדי לשפר throughput ולשמור שרשרת async נקייה בין router -> service -> crud.
-- **Selective sync retention:** `db.run_sync(...)` עדיין קיים במקומות שבהם נשאר CRUD סינכרוני נקודתית. **Bookings** עברו ל־async-only, כולל נעילות עם `select(...).with_for_update()` (ללא `db.run_sync`), כדי לשמור שרשרת async נקייה.
+- **Async end-to-end (API + workers):** **Bookings** וזרימות ליבה async-only; workers (למשל `app/workers/tasks/notification_tasks.py`) משתמשים ב־`await db.execute(select(...))` — אין `Session.run_sync` בקוד האפליקציה. `run_sync` נשאר רק ב־Alembic (`alembic/env.py`) עבור מיגרציות.
 - **Geocode cache (24h):** כתובות שחוזרות על עצמן נשמרות ב-Redis ל-24 שעות כדי לחסוך קריאות **Google Geocoding** ולשפר latency.
 - **Admin API + מסך אדמין:** `GET/PATCH … /api/v1/admin/*` דרך `get_current_admin_user`; ממשק React ב־`frontend/src/features/admin/` (`/admin`, lazy). פירוט: **`ADMIN_DASHBOARD.md`** בשורש ה-repo.

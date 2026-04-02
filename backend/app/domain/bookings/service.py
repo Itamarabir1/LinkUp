@@ -75,10 +75,6 @@ class BookingService:
                 {"booking_id": str(new_booking.booking_id)},
                 [DispatchTarget.RABBITMQ.value],
             )
-            print(
-                f"[NOTIF] API: wrote to outbox booking_id={new_booking.booking_id}",
-                flush=True,
-            )
             logger.info(
                 "[NOTIF] API: wrote to outbox event=booking.passenger_join_request booking_id=%s",
                 new_booking.booking_id,

@@ -78,7 +78,8 @@ outbox-worker
 - **Race Condition Protection**: אישור/ביטול הזמנה תחת lock על ה-ride; ביטול מחזיר נסיעה ל-OPEN רק אם לא CANCELLED.
 - **Async SQLAlchemy 2.0 core domains**: passenger/bookings/rides core flows עברו ל־`AsyncSession` ו־`select/execute`.
   - **Bookings** async-only (ללא `db.run_sync`) ומשתמשים ב־`select(...).with_for_update()` לנעילות שורה.
-  - `db.run_sync` עדיין עשוי להופיע בחלק מ-worker tasks/legacy נקודתי; שאילתות תזכורת לנוסעים (`find_passengers_for_ride_notification`) הן async.
+  - **Workers / notifications:** `find_passengers_for_ride_notification`, טעינת הזמנות ב־`handle_ride_cancelled_by_driver` ([`notification_tasks.py`](backend/app/workers/tasks/notification_tasks.py)) וכו' — **async** (`await db.execute(select(...))`). אין `Session.run_sync` בקוד האפליקציה; `run_sync` נשאר רק ב־Alembic (`env.py`) לצורך מיגרציות.
+  - **ביטול נסיעה — התראות:** רק הזמנות במצב **PENDING** או **CONFIRMED** מקבלות `ride.cancelled_by_driver` (לא הזמנות שכבר **CANCELLED**).
 - **תזכורות**: אין עוד `reminder_sent` על `rides`/`bookings` ב-ORM או ב-API ציבורי (מיגרציה **008**); תזמון בשכבת `scheduled_notifications` + `ReminderScheduler` + notification handler; סימון נשלח ב-`sent_at`.
 - **תחזוקת סטטוסים (maintenance)**: `MaintenanceCRUD` מחזיר `PendingUserEvent` עם RETURNING; אחרי `commit` מוצלח, `MaintenanceService` מפרסם `publish_user_event` (מוגן ב-`USER_EVENTS_ENABLED` ב-config).
 - **שגיאות API מרוכזות**: תת־מחלקות של `LinkupError` לפי דומיין ב־`app/core/exceptions/`; ב־`main.py` handlers גלובליים ל־Pydantic (`RequestValidationError` → 422), `IntegrityError` / `SQLAlchemyError`, ו־`LinkupError`. פורמט JSON, Sentry, פרונט ו-chat-ws: [`docs/ERRORS.md`](docs/ERRORS.md).

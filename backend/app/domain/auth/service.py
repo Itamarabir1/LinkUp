@@ -1,7 +1,5 @@
-import random
 import logging
 from uuid import UUID
-from sqlalchemy.orm import Session
 from typing import Dict, Any
 
 # Core & Security
@@ -417,30 +415,6 @@ class AuthService:
         await self.crud_user.update_password(db, user=user, hashed_password=hashed)
         return {"message": "הסיסמה עודכנה בהצלחה", "status": "success"}
 
-    async def initiate_password_reset(self, db: Session, email: str):
-        # קריאה למתודה מה-CRUD
-        user = self.crud_user.get_by_email(db, email=email)
-
-        if not user:
-            # אבטחה: הודעה גנרית כדי לא לחשוף אם המייל קיים
-            return {"detail": "If the user exists, a reset code has been sent"}
-
-        reset_code = f"{random.randint(100000, 999999)}"
-        await self.redis.save(f"reset_code:{email}", reset_code, expire=600)
-
-        await self.rabbit.publish(
-            message={
-                "event_type": "password_reset_code",
-                "user_id": str(user.user_id),
-                "data": {
-                    "email": user.email,
-                    "code": reset_code,
-                    "user_name": user.full_name,
-                },
-            }
-        )
-        return {"detail": "Reset code sent successfully"}
-
     async def reset_password_with_code(self, db: AsyncSession, email: str, code: str, new_password: str):
         """מאמת קוד איפוס (מ-Redis), מעדכן סיסמה ומחזיר הצלחה. הקוד נמחק אחרי שימוש."""
         user = await self.crud_user.get_by_email(db, email=email)
@@ -451,10 +425,3 @@ class AuthService:
         hashed = await get_password_hash(new_password)
         await self.crud_user.update_password(db, user=user, hashed_password=hashed)
         return {"message": "Password reset successfully.", "status": "success"}
-
-    async def _get_user_or_raise(self, db: Session, email: str) -> User:
-        user = self.crud_user.get_by_email(db, email=email)
-        if not user:
-            # תיקון: UserNotFoundError מצפה ל-user_id (int)
-            raise UserNotFoundError(identifier=email)
-        return user

@@ -2,7 +2,7 @@ import type { MutableRefObject } from 'react';
 import { markConversationRead } from '../../api/chat';
 import type { PartnerPresence } from '../../api/presence';
 import type { MessageResponse } from '../../types/api';
-import { ChatPresenceEventSchema } from '../../types/wsEvents';
+import { ChatMessageSchema, ChatPresenceEventSchema } from '../../types/wsEvents';
 import { TYPING_DISPLAY_TIMEOUT_MS } from './messageThread.constants';
 
 export interface ChatWebSocketProcessContext {
@@ -81,8 +81,16 @@ export function processChatWebSocketMessage(
     }
   }
 
-  if (typeof (data as unknown as MessageResponse).message_id === 'number') {
-    const msg = data as unknown as MessageResponse;
+  const msgResult = ChatMessageSchema.safeParse(data);
+  if (msgResult.success) {
+    const d = msgResult.data;
+    const msg: MessageResponse = {
+      message_id: d.message_id,
+      conversation_id: d.conversation_id,
+      sender_id: d.sender_id,
+      body: d.body,
+      created_at: d.created_at,
+    };
     if (msg.conversation_id === ctx.cid) {
       void markConversationRead(ctx.cid)
         .then(() => ctx.refreshUnread())

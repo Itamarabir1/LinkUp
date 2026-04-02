@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { getWsBaseUrl } from '../config/env';
+import { NotificationRefreshEventSchema } from '../types/wsEvents';
 
 /**
  * WebSocket גלובלי יחיד להתראות in-app — רענון badge ורשימת התראות.
@@ -34,10 +35,11 @@ export function useChatNotificationsWebSocket(
       }
       ws.onmessage = (ev) => {
         try {
-          const msg = JSON.parse(String(ev.data)) as { type?: string };
-          if (msg?.type === 'notifications_refresh') onRefresh();
+          const raw = JSON.parse(String(ev.data)) as unknown;
+          const result = NotificationRefreshEventSchema.safeParse(raw);
+          if (result.success) onRefresh();
         } catch {
-          /* ignore */
+          // ignore malformed JSON
         }
       };
       ws.onclose = () => {

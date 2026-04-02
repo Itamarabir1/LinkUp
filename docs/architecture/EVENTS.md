@@ -86,7 +86,7 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 | Task | תיאור |
 |------|--------|
 | run_outbox_worker | Poll outbox_events (PENDING), publish ל-RabbitMQ לפי routing. |
-| notifications_consumer.consume(handle_notification_event) | צורך notifications_queue, מפעיל handler — מייל/פוש לפי NotificationEvent. |
+| notifications_consumer.consume(handle_notification_event) | צורך notifications_queue, מפעיל handler — מייל/פוש לפי NotificationEvent. `handle_ride_cancelled_by_driver` טוען הזמנות ב-async SQL ושולח התראה רק ל-**PENDING** / **CONFIRMED** (לא לבוקינג שכבר **CANCELLED**). |
 | avatar_upload_consumer.consume(handle_avatar_upload_event) | צורך avatar_upload_queue, עיבוד S3 ו-DB. |
 | scheduled_tasks_consumer.consume(handle_scheduled_task) | צורך scheduled_tasks_queue, מפעיל reminders/fuel/maintenance/chat_timeout. |
 | run_scheduled_tasks_publisher | מפרסם משימות מתוזמנות ל-scheduled exchange. |

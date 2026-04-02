@@ -223,30 +223,3 @@ async def booking_location_websocket(
                 await websocket.send_text(event.message)
     except WebSocketDisconnect:
         pass
-
-
-# @router.post("/report_locations", status_code=status.HTTP_204_NO_CONTENT)
-# async def report_location_update(
-#     # location_in: LocationUpdate,
-#     # בהמשך יגיע מה-Token
-#     user_id: int = 123
-# ):
-#     """
-#     הנהג מדווח על המיקום הנוכחי שלו בתוך נסיעה (booking).
-#     השרת דואג להפיץ את הדיווח הזה לנוסע שממתין.
-#     """
-#     await location_service.broadcast_location(
-#         location_in=location_in,
-#         ride_id=user_id
-#     )
-#     return
-
-# @router.get("/me/history", response_model=List[RideResponse])
-# async def get_my_ride_history(
-#     limit: int = 20,
-#     db: Session = Depends(get_db),
-#     current_user: User = Depends(get_current_user)
-# ):
-#     return await UserService.get_user_activity_history(
-#         db, user_id=current_user.user_id, limit=limit
-#     )
