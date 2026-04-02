@@ -11,13 +11,13 @@
   scheduled_notifications מאפשרת סריקה יעילה (index קטן) ותמיכה בסוגי תזכורות מרובים.
 
 Revision ID: 008_scheduled_notifications
-Revises: 007_add_last_active_at
+Revises: 007_last_active_at
 """
 from alembic import op
 import sqlalchemy as sa
 
 revision = "008_scheduled_notifications"
-down_revision = "007_add_last_active_at"
+down_revision = "007_last_active_at"
 branch_labels = None
 depends_on = None
 
