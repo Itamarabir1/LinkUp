@@ -66,7 +66,7 @@ async def test_update_ride_seats_and_broadcast_mocked(db_session: AsyncSession):
     svc = RideService()
     new_dep = ride.departure_time + timedelta(hours=1)
     with (
-        patch("app.domain.rides.service.publish_ride_update", new_callable=AsyncMock) as mock_pub,
+        patch("app.domain.rides.service.publish_ride_event", new_callable=AsyncMock) as mock_pub,
         patch("app.domain.rides.service.broadcast.publish", new_callable=AsyncMock) as mock_bc,
     ):
         out = await svc.update_ride(

@@ -6,7 +6,6 @@ from sqlalchemy import (
     Numeric,
     Index,
     text,
-    Boolean,
     ForeignKey,
 )
 from sqlalchemy.orm import relationship
@@ -96,7 +95,6 @@ class Ride(Base):
     available_seats = Column(Integer, nullable=False, default=4)
 
     price = Column(Numeric(10, 2), default=0.0)
-    reminder_sent = Column(Boolean, default=False, nullable=False)
 
     # --- סטטוס ---
     # RideStatusEnumType: result accepts both value ('open') and name ('OPEN') from DB

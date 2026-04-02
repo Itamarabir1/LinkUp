@@ -3,6 +3,7 @@ import { formatRideDate } from '../../utils/date';
 import { STATUS_LABEL } from './myBookings.constants';
 import { canPassengerShare, getSource } from './myBookings.utils';
 import type { PassengerBookingItem } from './myBookings.types';
+import HistorySection from '../../components/HistorySection/HistorySection';
 import styles from './MyBookings.module.css';
 
 type MyGroup = { group_id: string; name: string };
@@ -32,6 +33,95 @@ export default function PassengerBookingsTab({
   chatLoading,
   onOpenChat,
 }: PassengerBookingsTabProps) {
+  const activeItems = items.filter(
+    (item) => item.bookingStatus !== 'cancelled' && item.bookingStatus !== 'completed'
+  );
+  const pastItems = items.filter(
+    (item) => item.bookingStatus === 'cancelled' || item.bookingStatus === 'completed'
+  );
+
+  const renderItem = ({ ride, bookingId, bookingStatus, driverName }: PassengerBookingItem) => (
+    <div key={bookingId} className={styles.bookingCard}>
+      <div className={styles.cardRoute}>
+        {ride.origin_name ?? '?'} ← {ride.destination_name ?? '?'}
+      </div>
+      <div className={styles.cardMeta}>
+        {formatRideDate(ride.departure_time)} · {STATUS_LABEL[bookingStatus] ?? bookingStatus}
+      </div>
+      {driverName && <div className={styles.cardMeta}>נהג: {driverName}</div>}
+      <div className={styles.cardMeta}>{getSource(ride, myGroups)}</div>
+      {(ride.group_name ?? (ride.group_id ? getSource(ride, myGroups) : null)) && (
+        <div className={styles.cardTagWrap}>
+          <span className={styles.groupTag}>{ride.group_name ?? getSource(ride, myGroups)}</span>
+        </div>
+      )}
+      {(bookingStatus === 'pending_approval' || bookingStatus === 'confirmed') && (
+        <div className={styles.bookingCardActions}>
+          {canPassengerShare(bookingStatus, ride.status) ? (
+            <>
+              <button
+                type="button"
+                className={`${styles.btnOutline} ${
+                  sharingLocationBookingId === bookingId ? styles.btnAccentGreen : ''
+                }`}
+                onClick={() =>
+                  setSharingLocationBookingId((prev) => (prev === bookingId ? null : bookingId))
+                }
+              >
+                <Navigation size={15} />
+                {sharingLocationBookingId === bookingId ? 'הפסק שיתוף' : 'שתף מיקום'}
+              </button>
+              <button
+                type="button"
+                className={`${styles.btnOutline} ${styles.btnAccentBlue}`}
+                onClick={() => setTrackDriverBookingId(bookingId)}
+              >
+                <MapPin size={15} /> מפה
+              </button>
+              <button
+                type="button"
+                className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
+                onClick={() => setBookingToCancel(bookingId)}
+                disabled={cancelling}
+              >
+                בטל
+              </button>
+              <button
+                type="button"
+                className={styles.btnOutline}
+                onClick={() => onOpenChat(bookingId)}
+                disabled={chatLoading === bookingId}
+              >
+                <MessageCircle size={15} />
+                צ&apos;אט
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={styles.btnOutline}
+                onClick={() => onOpenChat(bookingId)}
+                disabled={chatLoading === bookingId}
+              >
+                <MessageCircle size={15} />
+                צ&apos;אט
+              </button>
+              <button
+                type="button"
+                className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
+                onClick={() => setBookingToCancel(bookingId)}
+                disabled={cancelling}
+              >
+                בטל הזמנה
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className={styles.cardList}>
       {loading ? (
@@ -39,87 +129,14 @@ export default function PassengerBookingsTab({
       ) : items.length === 0 ? (
         <p className={styles.emptyText}>אין הזמנות כנוסע. חפש טרמפ ובקש להצטרף.</p>
       ) : (
-        items.map(({ ride, bookingId, bookingStatus, driverName }) => (
-          <div key={bookingId} className={styles.bookingCard}>
-            <div className={styles.cardRoute}>
-              {ride.origin_name ?? '?'} ← {ride.destination_name ?? '?'}
-            </div>
-            <div className={styles.cardMeta}>
-              {formatRideDate(ride.departure_time)} · {STATUS_LABEL[bookingStatus] ?? bookingStatus}
-            </div>
-            {driverName && <div className={styles.cardMeta}>נהג: {driverName}</div>}
-            <div className={styles.cardMeta}>{getSource(ride, myGroups)}</div>
-            {(ride.group_name ?? (ride.group_id ? getSource(ride, myGroups) : null)) && (
-              <div className={styles.cardTagWrap}>
-                <span className={styles.groupTag}>{ride.group_name ?? getSource(ride, myGroups)}</span>
-              </div>
-            )}
-            {(bookingStatus === 'pending_approval' || bookingStatus === 'confirmed') && (
-              <div className={styles.bookingCardActions}>
-                {canPassengerShare(bookingStatus, ride.status) ? (
-                  <>
-                    <button
-                      type="button"
-                      className={`${styles.btnOutline} ${
-                        sharingLocationBookingId === bookingId ? styles.btnAccentGreen : ''
-                      }`}
-                      onClick={() =>
-                        setSharingLocationBookingId((prev) => (prev === bookingId ? null : bookingId))
-                      }
-                    >
-                      <Navigation size={15} />
-                      {sharingLocationBookingId === bookingId ? 'הפסק שיתוף' : 'שתף מיקום'}
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.btnOutline} ${styles.btnAccentBlue}`}
-                      onClick={() => setTrackDriverBookingId(bookingId)}
-                    >
-                      <MapPin size={15} /> מפה
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
-                      onClick={() => setBookingToCancel(bookingId)}
-                      disabled={cancelling}
-                    >
-                      בטל
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.btnOutline}
-                      onClick={() => onOpenChat(bookingId)}
-                      disabled={chatLoading === bookingId}
-                    >
-                      <MessageCircle size={15} />
-                      צ&apos;אט
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className={styles.btnOutline}
-                      onClick={() => onOpenChat(bookingId)}
-                      disabled={chatLoading === bookingId}
-                    >
-                      <MessageCircle size={15} />
-                      צ&apos;אט
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
-                      onClick={() => setBookingToCancel(bookingId)}
-                      disabled={cancelling}
-                    >
-                      בטל הזמנה
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        ))
+        <>
+          {activeItems.map(renderItem)}
+          {pastItems.length > 0 ? (
+            <HistorySection title="היסטוריית הזמנות נוסע">
+              {pastItems.map(renderItem)}
+            </HistorySection>
+          ) : null}
+        </>
       )}
     </div>
   );

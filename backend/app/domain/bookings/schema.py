@@ -5,7 +5,7 @@ from uuid import UUID
 from app.domain.bookings.enum import BookingStatus
 
 
-# 1. יצירת בקשת הצטרפות - נשאר ללא שינוי (המשתמש לא שולח reminder_sent)
+# 1. יצירת בקשת הצטרפות
 class BookingCreate(BaseModel):
     ride_id: UUID
     request_id: UUID
@@ -20,8 +20,6 @@ class BookingResponse(BaseModel):
     passenger_id: UUID
     num_seats: int
     status: BookingStatus
-    # --- השדה החדש ---
-    reminder_sent: bool
     created_at: datetime
 
     passenger_name: Optional[str] = None
@@ -39,8 +37,6 @@ class BookingManifestItem(BaseModel):
     num_seats: int
     whatsapp_link: Optional[str] = None
     status: BookingStatus
-    # הוספה כאן עוזרת לנהג לדעת אם המערכת כבר תזכרה את הנוסע שלו
-    reminder_sent: bool
     # פרטי תחנת עלייה ושעה
     pickup_name: Optional[str] = None
     pickup_time: Optional[datetime] = None
@@ -66,8 +62,6 @@ class BookingShortInfo(BaseModel):
     passenger_name: str
     num_seats: int
     status: BookingStatus
-    # הוספנו כאן למען השקיפות בניהול
-    reminder_sent: bool
     created_at: datetime
 
 

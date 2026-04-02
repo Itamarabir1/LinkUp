@@ -252,9 +252,9 @@ class CRUDPassenger:
         )
         return list((await db.execute(stmt)).scalars().all())
 
-    def find_passengers_for_ride_notification(
+    async def find_passengers_for_ride_notification(
         self,
-        db: Session,
+        db: AsyncSession,
         ride: "Ride",
         radius_destination_m: int = 5000,
         radius_pickup_m: int = 2000,
@@ -262,7 +262,7 @@ class CRUDPassenger:
     ) -> List[PassengerRequest]:
         """
         נוסעים רלוונטיים להתראה על נסיעה חדשה.
-        סדר פילטרים: סטטוס+זמן (אינדקס) → לא הנהג → אופט-אין → יעד 5km → מוצא על המסלול.
+        סדר פילטרים: סטטוס+זמן (אינדקס) → לא הנהג → יעד 5km → מוצא על המסלול.
         """
         now = datetime.now()
         ride_date = ride.departure_time.date() if getattr(ride, "departure_time", None) else None
@@ -272,8 +272,6 @@ class CRUDPassenger:
                 getattr(ride, "ride_id", None),
             )
             return []
-
-        # שימוש ב-route_coords ישירות מהמסד (לא המרה לרשימה וחזרה) – כמו ב-find_rides_by_coordinates
         route_geom = getattr(ride, "route_coords", None)
         if not route_geom:
             logger.warning(
@@ -281,7 +279,6 @@ class CRUDPassenger:
                 getattr(ride, "ride_id", None),
             )
             return []
-
         driver_id = getattr(ride, "driver_id", None)
         dest_geom = getattr(ride, "destination_geom", None)
         if not dest_geom:
@@ -291,67 +288,40 @@ class CRUDPassenger:
             )
             return []
 
-        # חישוב טווח תאריכים גמיש (עד 7 ימים קדימה, עד יום אחד אחורה)
         min_date = ride_date - timedelta(days=1)
         max_date = ride_date + timedelta(days=7)
 
-        # ספירת נוסעים לפני סינון גיאוגרפי (לדיבוג). רק ACTIVE — ביטול בקשה = CANCELLED ולא נשלחת התראה.
-        total_active = (
-            db.query(PassengerRequest)
-            .filter(
-                PassengerRequest.status == PassengerStatus.ACTIVE,
-                PassengerRequest.requested_departure_time > now,
-                func.date(PassengerRequest.requested_departure_time) <= max_date,
-                func.date(PassengerRequest.requested_departure_time) >= min_date,
-                PassengerRequest.passenger_id != driver_id,
-            )
-            .count()
-        )
-        logger.info(
-            "find_passengers_for_ride_notification: ride_id=%s, ride_date=%s, date_range=[%s, %s], total_active_passengers=%d (before geo filter)",
-            getattr(ride, "ride_id", None),
-            ride_date,
-            min_date,
-            max_date,
-            total_active,
-        )
-
-        # מוצא הנוסע חייב להיות במרחק עד 2 ק"מ מהמסלול של הנסיעה (route). רק ACTIVE — ביטול = CANCELLED.
-        q = (
-            db.query(PassengerRequest)
-            .filter(
-                PassengerRequest.status == PassengerStatus.ACTIVE,
-                PassengerRequest.requested_departure_time > now,
-                func.date(PassengerRequest.requested_departure_time) <= max_date,
-                func.date(PassengerRequest.requested_departure_time) >= min_date,
-                PassengerRequest.passenger_id != driver_id,
-                # יעד בטווח של 5 ק"מ מהיעד של הנסיעה
-                func.ST_DWithin(
-                    cast(PassengerRequest.destination_geom, Geography),
-                    cast(dest_geom, Geography),
-                    radius_destination_m,
-                ),
-                # מוצא הנוסע: במרחק עד 2 ק"מ מהמסלול של הנסיעה בלבד
-                func.ST_DWithin(
-                    cast(PassengerRequest.pickup_geom, Geography),
-                    cast(route_geom, Geography),
-                    radius_pickup_m,
-                ),
+        stmt = (
+            select(PassengerRequest)
+            .where(
+                and_(
+                    PassengerRequest.status == PassengerStatus.ACTIVE,
+                    PassengerRequest.requested_departure_time > now,
+                    func.date(PassengerRequest.requested_departure_time) >= min_date,
+                    func.date(PassengerRequest.requested_departure_time) <= max_date,
+                    PassengerRequest.passenger_id != driver_id,
+                    func.ST_DWithin(
+                        cast(PassengerRequest.destination_geom, Geography),
+                        cast(dest_geom, Geography),
+                        radius_destination_m,
+                    ),
+                    func.ST_DWithin(
+                        cast(PassengerRequest.pickup_geom, Geography),
+                        cast(route_geom, Geography),
+                        radius_pickup_m,
+                    ),
+                )
             )
             .limit(limit)
         )
-        results = q.all()
+        result = await db.execute(stmt)
+        passengers = list(result.scalars().all())
         logger.info(
-            "find_passengers_for_ride_notification: ride_id=%s, found %d matching passengers after all filters",
+            "find_passengers_for_ride_notification: ride_id=%s found %d passengers",
             getattr(ride, "ride_id", None),
-            len(results),
+            len(passengers),
         )
-        if results:
-            logger.info(
-                "find_passengers_for_ride_notification: matching passenger_ids=%s",
-                [r.passenger_id for r in results],
-            )
-        return results
+        return passengers
 
     # --- נסיעות (שליפה לצורך UI/רשימות) ---
 

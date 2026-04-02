@@ -153,7 +153,6 @@ class BookingService:
                     "whatsapp_link": f"https://wa.me/{clean_phone}?text={quote('היי, אני הנהג שלך מהאפליקציה')}",
                     "num_seats": b.num_seats,
                     "status": b.status,
-                    "reminder_sent": b.reminder_sent,
                     "pickup_name": b.pickup_name,
                     "pickup_time": b.pickup_time,
                     "destination_name": (b.passenger_request.destination_name if b.passenger_request else None),
@@ -320,8 +319,8 @@ class BookingService:
     @staticmethod
     async def get_history_with_stats(db: AsyncSession, user_id: UUID, role: str):
         trips = await crud_booking.get_user_history(db, user_id=user_id, role=role)
-        total_km = sum(t.distance_km for t in trips if t.distance_km)
-        total_minutes = sum(t.duration_minutes for t in trips if t.duration_minutes)
+        total_km = sum(float(t.ride.distance_km) for t in trips if t.ride and t.ride.distance_km)
+        total_minutes = sum(float(t.ride.duration_min) for t in trips if t.ride and t.ride.duration_min)
         stats = {
             "count": len(trips),
             "total_km": round(total_km, 2),

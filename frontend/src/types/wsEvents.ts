@@ -76,3 +76,16 @@ export const ChatPresenceEventSchema = z.discriminatedUnion('type', [
   UnreadCountEventSchema,
 ]);
 export type ChatPresenceEvent = z.infer<typeof ChatPresenceEventSchema>;
+
+// --- User Events (channel: user:{user_id}:events via chat-ws) ---
+export const UserEventSchema = z
+  .object({
+    event: z.string(),
+    user_id: z.string(),
+    ride_id: z.string().optional(),
+    booking_id: z.string().optional(),
+    request_id: z.string().optional(),
+    status: z.string().optional(),
+  })
+  .passthrough();
+export type UserEvent = z.infer<typeof UserEventSchema>;

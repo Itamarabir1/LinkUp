@@ -206,14 +206,21 @@ async def cancel_request(
     response_model=List[RideResponse],
     summary="שליפת התאמות עדכניות לבקשה קיימת",
 )
-async def get_latest_matches(request_id: UUID, db: AsyncSession = Depends(get_db)):
-    return await PassengerService.get_matches_by_request_id(db, request_id)
+async def get_latest_matches(
+    request_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await PassengerService.get_matches_by_request_id(db, request_id, current_user.user_id)
 
 
 @router.get("/all", response_model=List[RideResponse], summary="תצוגת כל הנסיעות (ניהול ובקרה)")
 async def get_all_rides_admin(
     filter_status: str = Query(None, description="סנן לפי סטטוס: open, cancelled, completed"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """מחזיר את כל הנסיעות במערכת. אם נשלח סטטוס, יחזיר רק נסיעות בסטטוס הזה."""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="גישה מנהלים בלבד")
     return await PassengerService.get_all_rides_for_admin(db, status=filter_status)

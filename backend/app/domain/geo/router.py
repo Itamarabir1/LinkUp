@@ -20,7 +20,7 @@ router = APIRouter(tags=["Geo"])
     summary="מפתח Google Maps לתצוגת מפה בפרונט",
     description="מחזיר את מפתח ה-API המוגדר בבקאנד (GOOGLE_MAPS_API_KEY). הפרונט משתמש בו ל-Maps JavaScript API.",
 )
-def get_maps_api_key():
+async def get_maps_api_key(current_user: User = Depends(get_current_user)):
     """מפתח המפות מוגדר ב-.env של הבקאנד – מקור אמת יחיד."""
     return {"google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or ""}
 

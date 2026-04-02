@@ -1,0 +1,16 @@
+.wrap {
+  margin-top: 16px;
+}
+
+.toggle {
+  border: 0;
+  background: transparent;
+  color: #d0d7ff;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 6px 0;
+}
+
+.body {
+  margin-top: 8px;
+}

@@ -13,12 +13,13 @@ const (
 	ChatChannelPattern   = "chat:conversation:*"
 	TypingChannelPattern = "chat:typing:*"
 	NotifChannelPattern  = "chat:notification:*"
+	UserEventPattern     = "user:*:events"
 )
 
-// RunSubscriber subscribes to chat:conversation:*, chat:typing:* and chat:notification:* and forwards messages to the Hub.
+// RunSubscriber subscribes to chat/user event channels and forwards messages to the Hub.
 // Caller owns the client; RunSubscriber does not close it.
 func RunSubscriber(ctx context.Context, client *redis.Client, h *hub.Hub) {
-	pubsub := client.PSubscribe(ctx, ChatChannelPattern, TypingChannelPattern, NotifChannelPattern)
+	pubsub := client.PSubscribe(ctx, ChatChannelPattern, TypingChannelPattern, NotifChannelPattern, UserEventPattern)
 	defer pubsub.Close()
 	ch := pubsub.Channel()
 	for {
@@ -35,6 +36,10 @@ func RunSubscriber(ctx context.Context, client *redis.Client, h *hub.Hub) {
 			} else if strings.HasPrefix(msg.Channel, "chat:notification:") {
 				recipientID := strings.TrimPrefix(msg.Channel, "chat:notification:")
 				h.SendToUser(recipientID, payload)
+			} else if strings.HasPrefix(msg.Channel, "user:") && strings.HasSuffix(msg.Channel, ":events") {
+				userID := strings.TrimPrefix(msg.Channel, "user:")
+				userID = strings.TrimSuffix(userID, ":events")
+				h.SendToUser(userID, payload)
 			} else {
 				h.PublishChatMessage(payload)
 			}

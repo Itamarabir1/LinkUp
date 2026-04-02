@@ -1,5 +1,6 @@
 import type { DriverBookingItem } from './myBookings.types';
 import DriverRideBlock from './DriverRideBlock';
+import HistorySection from '../../components/HistorySection/HistorySection';
 import styles from './MyBookings.module.css';
 
 type MyGroup = { group_id: string; name: string };
@@ -23,6 +24,12 @@ export interface DriverBookingsTabProps {
 
 export default function DriverBookingsTab(props: DriverBookingsTabProps) {
   const { loading, items, myGroups, ...blockProps } = props;
+  const activeItems = items.filter(
+    (item) => item.ride.status !== 'cancelled' && item.ride.status !== 'completed'
+  );
+  const pastItems = items.filter(
+    (item) => item.ride.status === 'cancelled' || item.ride.status === 'completed'
+  );
 
   return (
     <div className={styles.cardList}>
@@ -31,9 +38,18 @@ export default function DriverBookingsTab(props: DriverBookingsTabProps) {
       ) : items.length === 0 ? (
         <p className={styles.emptyText}>אין הזמנות שאישרת. נוסעים שאישרת יופיעו כאן.</p>
       ) : (
-        items.map((item) => (
-          <DriverRideBlock key={item.ride.ride_id} item={item} myGroups={myGroups} {...blockProps} />
-        ))
+        <>
+          {activeItems.map((item) => (
+            <DriverRideBlock key={item.ride.ride_id} item={item} myGroups={myGroups} {...blockProps} />
+          ))}
+          {pastItems.length > 0 ? (
+            <HistorySection title="היסטוריית נסיעות נהג">
+              {pastItems.map((item) => (
+                <DriverRideBlock key={item.ride.ride_id} item={item} myGroups={myGroups} {...blockProps} />
+              ))}
+            </HistorySection>
+          ) : null}
+        </>
       )}
     </div>
   );

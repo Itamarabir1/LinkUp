@@ -31,3 +31,8 @@ def get_ride_passengers_channel(ride_id) -> str:
 def get_booking_channel(booking_id) -> str:
     """מיקום נהג → נוסע ספציפי."""
     return f"booking_{booking_id}"
+
+
+def get_user_channel(user_id) -> str:
+    """אירועי משתמש אישיים → chat-ws → WS client."""
+    return f"user:{user_id}:events"

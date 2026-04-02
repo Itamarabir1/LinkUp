@@ -13,6 +13,7 @@ import ConfirmModal from '../components/ConfirmModal/ConfirmModal';
 import ErrorBanner from '../components/ErrorBanner';
 import { getApiErrorMessage } from '../utils/apiError';
 import { getRideSourceLabel } from '../utils/rideDisplay';
+import HistorySection from '../components/HistorySection/HistorySection';
 import styles from './MyRides.module.css';
 
 function getStatusLabel(r: Ride): string {
@@ -47,14 +48,13 @@ export default function MyRides() {
     if (activeChipId === 'public') return !r.group_id;
     return r.group_id === activeChipId;
   });
+  const activeRides = displayedRides.filter((r) => r.status !== 'cancelled' && r.status !== 'completed');
+  const pastRides = displayedRides.filter((r) => r.status === 'cancelled' || r.status === 'completed');
 
   const fetchRides = useCallback(async () => {
     try {
       const { data } = await fetchMyRides();
-      const active = (Array.isArray(data) ? data : []).filter(
-        (r) => r.status !== 'cancelled'
-      );
-      setRides(active);
+      setRides(Array.isArray(data) ? data : []);
       setError('');
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'טעינת נסיעות נכשלה'));
@@ -66,6 +66,22 @@ export default function MyRides() {
   useEffect(() => {
     fetchRides();
   }, [fetchRides]);
+
+  useEffect(() => {
+    const onUserEvent = (evt: Event) => {
+      const detail = (evt as CustomEvent<{ event?: string; ride_id?: string; status?: string }>).detail;
+      if (!detail?.event || !detail.ride_id) return;
+      if (detail.event === 'RIDE_FINISHED' || detail.event === 'RIDE_CANCELLED') {
+        setRides((prev) =>
+          prev.map((r) =>
+            r.ride_id === detail.ride_id ? { ...r, status: (detail.status as Ride['status']) ?? 'completed' } : r
+          )
+        );
+      }
+    };
+    window.addEventListener('linkup:user-event', onUserEvent as EventListener);
+    return () => window.removeEventListener('linkup:user-event', onUserEvent as EventListener);
+  }, []);
 
   useEffect(() => {
     const rideIds = rides.map((r) => r.ride_id);
@@ -136,7 +152,9 @@ export default function MyRides() {
     setError('');
     try {
       await cancelRide(rideToCancel);
-      setRides((prev) => prev.filter((r) => r.ride_id !== rideToCancel));
+      setRides((prev) =>
+        prev.map((r) => (r.ride_id === rideToCancel ? { ...r, status: 'cancelled' } : r))
+      );
       setRideToCancel(null);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'ביטול הנסיעה נכשל'));
@@ -163,7 +181,7 @@ export default function MyRides() {
       />
       {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
 
-      {rides.length === 0 ? (
+      {displayedRides.length === 0 ? (
         <div className={styles.emptyState}>
           <Car size={48} strokeWidth={1.5} className={styles.emptyIcon} />
           <h2 className={styles.emptyTitle}>אין נסיעות עדיין</h2>
@@ -178,31 +196,50 @@ export default function MyRides() {
           </button>
         </div>
       ) : (
-        <div className={styles.grid}>
-          {displayedRides.map((r) => (
-            <div key={r.ride_id} className={styles.cardWrap}>
-              <button
-                type="button"
-                className={styles.cardDeleteBtn}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setRideToCancel(r.ride_id);
-                }}
-                title="מחק נסיעה"
-                aria-label="מחק נסיעה"
-              >
-                ×
-              </button>
-              <RideCard
-                route={`${r.origin_name ?? '?'} ← ${r.destination_name ?? '?'}`}
-                scheduleCaption="זמן הנסיעה"
-                time={formatDateTimeNoSeconds(r.departure_time)}
-                status={getStatusLabel(r)}
-                source={getRideSourceLabel(r.group_id, myGroups)}
-              />
-            </div>
-          ))}
-        </div>
+        <>
+          <div className={styles.grid}>
+            {activeRides.map((r) => (
+              <div key={r.ride_id} className={styles.cardWrap}>
+                <button
+                  type="button"
+                  className={styles.cardDeleteBtn}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRideToCancel(r.ride_id);
+                  }}
+                  title="מחק נסיעה"
+                  aria-label="מחק נסיעה"
+                >
+                  ×
+                </button>
+                <RideCard
+                  route={`${r.origin_name ?? '?'} ← ${r.destination_name ?? '?'}`}
+                  scheduleCaption="זמן הנסיעה"
+                  time={formatDateTimeNoSeconds(r.departure_time)}
+                  status={getStatusLabel(r)}
+                  source={getRideSourceLabel(r.group_id, myGroups)}
+                />
+              </div>
+            ))}
+          </div>
+          {pastRides.length > 0 ? (
+            <HistorySection title="נסיעות עבר">
+              <div className={styles.grid}>
+                {pastRides.map((r) => (
+                  <div key={r.ride_id} className={styles.cardWrap}>
+                    <RideCard
+                      route={`${r.origin_name ?? '?'} ← ${r.destination_name ?? '?'}`}
+                      scheduleCaption="זמן הנסיעה"
+                      time={formatDateTimeNoSeconds(r.departure_time)}
+                      status={getStatusLabel(r)}
+                      source={getRideSourceLabel(r.group_id, myGroups)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </HistorySection>
+          ) : null}
+        </>
       )}
 
       <ConfirmModal

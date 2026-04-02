@@ -9,6 +9,7 @@ import ConfirmModal from '../components/ConfirmModal/ConfirmModal';
 import ErrorBanner from '../components/ErrorBanner';
 import { formatDateTimeNoSeconds } from '../utils/date';
 import { getRideSourceLabel } from '../utils/rideDisplay';
+import HistorySection from '../components/HistorySection/HistorySection';
 import styles from './MyRequests.module.css';
 
 const statusLabels: Record<string, string> = {
@@ -47,6 +48,8 @@ export default function MyRequests() {
     if (activeChipId === 'public') return !r.group_id;
     return r.group_id === activeChipId;
   });
+  const activeRequests = displayedRequests.filter((r) => r.status !== 'cancelled' && r.status !== 'completed' && r.status !== 'expired');
+  const pastRequests = displayedRequests.filter((r) => r.status === 'cancelled' || r.status === 'completed' || r.status === 'expired');
 
   if (loading) {
     return (
@@ -60,7 +63,7 @@ export default function MyRequests() {
     <div className={styles.page}>
       <Chips items={chipItems} activeId={activeChipId} onChange={setActiveChipId} />
       {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
-      {requests.length === 0 ? (
+      {displayedRequests.length === 0 ? (
         <div className={styles.emptyState}>
           <Search size={48} strokeWidth={1.5} className={styles.emptyIcon} />
           <h2 className={styles.emptyTitle}>אין בקשות טרמפ פעילות</h2>
@@ -75,28 +78,47 @@ export default function MyRequests() {
           </button>
         </div>
       ) : (
-        <div className={styles.grid}>
-          {displayedRequests.map((r) => (
-            <div key={r.request_id} className={styles.cardWrap}>
-              <button
-                type="button"
-                className={styles.cardDeleteBtn}
-                onClick={() => setRequestToCancel(r)}
-                aria-label="הסר בקשת טרמפ"
-                title="הסר בקשה"
-              >
-                ×
-              </button>
-              <RideCard
-                route={`${r.pickup_name ?? '?'} ← ${r.destination_name ?? '?'}`}
-                scheduleCaption="זמן מבוקש לנסיעה"
-                time={formatDateTimeNoSeconds(r.requested_departure_time)}
-                status={statusLabels[r.status] || r.status}
-                source={getRideSourceLabel(r.group_id, myGroups)}
-              />
-            </div>
-          ))}
-        </div>
+        <>
+          <div className={styles.grid}>
+            {activeRequests.map((r) => (
+              <div key={r.request_id} className={styles.cardWrap}>
+                <button
+                  type="button"
+                  className={styles.cardDeleteBtn}
+                  onClick={() => setRequestToCancel(r)}
+                  aria-label="הסר בקשת טרמפ"
+                  title="הסר בקשה"
+                >
+                  ×
+                </button>
+                <RideCard
+                  route={`${r.pickup_name ?? '?'} ← ${r.destination_name ?? '?'}`}
+                  scheduleCaption="זמן מבוקש לנסיעה"
+                  time={formatDateTimeNoSeconds(r.requested_departure_time)}
+                  status={statusLabels[r.status] || r.status}
+                  source={getRideSourceLabel(r.group_id, myGroups)}
+                />
+              </div>
+            ))}
+          </div>
+          {pastRequests.length > 0 ? (
+            <HistorySection title="בקשות עבר">
+              <div className={styles.grid}>
+                {pastRequests.map((r) => (
+                  <div key={r.request_id} className={styles.cardWrap}>
+                    <RideCard
+                      route={`${r.pickup_name ?? '?'} ← ${r.destination_name ?? '?'}`}
+                      scheduleCaption="זמן מבוקש לנסיעה"
+                      time={formatDateTimeNoSeconds(r.requested_departure_time)}
+                      status={statusLabels[r.status] || r.status}
+                      source={getRideSourceLabel(r.group_id, myGroups)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </HistorySection>
+          ) : null}
+        </>
       )}
       <ConfirmModal
         open={requestToCancel != null}

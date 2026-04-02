@@ -213,6 +213,7 @@ class Settings(BaseSettings):
         "json",
         description="json (production) or text (local dev)",
     )
+    USER_EVENTS_ENABLED: bool = True
 
     # --- Pydantic Configuration ---
     model_config = SettingsConfigDict(

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from sqlalchemy.orm import Session
-from sqlalchemy import Select, select, and_
+from sqlalchemy import Select, select
 from sqlalchemy.orm import selectinload
 from app.domain.rides.enum import RideStatus
 
@@ -13,9 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # ---------------------------
 from sqlalchemy.orm import joinedload
 from datetime import timedelta
-from app.domain.bookings.model import Booking
-
-
 from app.domain.rides.model import Ride
 
 logger = logging.getLogger(__name__)
@@ -177,53 +174,6 @@ class CRUDRide:
         await db.flush()
         await db.refresh(ride)
         return ride
-
-    def get_expired_ids(self, db: Session, now: datetime) -> list:
-        """רק מביא את ה-IDs של מה שצריך לסגור"""
-        query = db.query(Ride.ride_id).filter(Ride.departure_time < now, Ride.status == RideStatus.OPEN)
-        return [r.ride_id for r in query.all()]
-
-    def bulk_set_completed(self, db: Session, ride_ids: list):
-        """מעדכן סטטוס גורף לנסיעות ספציפיות"""
-        if not ride_ids:
-            return 0
-        return db.query(Ride).filter(Ride.ride_id.in_(ride_ids)).update({Ride.status: RideStatus.COMPLETED}, synchronize_session=False)
-
-    # --- התיקון כאן: הוספתי self ויישרתי את ההזחה ---
-    def get_bookings_for_reminders(self, db: Session, start_window: datetime, end_window: datetime):
-        """
-        שליפת כל ההזמנות המאושרות שזמן האיסוף שלהן חל בחלון הזמן המוגדר.
-        """
-        return (
-            db.query(Booking)
-            .options(
-                joinedload(Booking.passenger),
-                joinedload(Booking.ride).joinedload(Ride.driver),
-            )
-            .filter(
-                and_(
-                    Booking.status == "confirmed",
-                    ~Booking.reminder_sent,
-                    Booking.pickup_time >= start_window,
-                    Booking.pickup_time <= end_window,
-                )
-            )
-            .all()
-        )
-
-    # בתוך קלאס CRUDRide
-    async def get_rides_needing_reminders(self, db: AsyncSession, start_window: datetime, end_window: datetime) -> List[Ride]:
-        """שליפת נסיעות שעומדות לצאת עבור תזכורת לנהג."""
-        stmt = self._base_ride_stmt().where(
-            and_(
-                Ride.status == RideStatus.OPEN,
-                ~Ride.reminder_sent,
-                Ride.departure_time >= start_window,
-                Ride.departure_time <= end_window,
-            )
-        )
-        result = await db.execute(stmt)
-        return list(result.scalars().all())
 
     async def get_for_notification(self, db: AsyncSession, ride_id: UUID) -> Optional[Ride]:
         """שליפת נסיעה עם נהג (לבניית קונטקסט במייל/פוש)."""

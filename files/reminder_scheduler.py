@@ -41,21 +41,17 @@ class ReminderScheduler:
                     await notification_handler.handle_event(
                         db,
                         event_name=NotificationEvent.PICKUP_REMINDER_PASSENGER.value,
-                        payload={
-                            "scheduled_notification_id": str(notification.id),
-                            "ride_id": str(notification.ride_id) if notification.ride_id else None,
-                            "user_id": str(notification.user_id),
-                        },
+                        payload={"scheduled_notification_id": str(notification.id),
+                                 "ride_id": str(notification.ride_id) if notification.ride_id else None,
+                                 "user_id": str(notification.user_id)},
                     )
                 elif notification.type == ScheduledNotificationType.DRIVER_REMINDER:
                     await notification_handler.handle_event(
                         db,
                         event_name=NotificationEvent.RIDE_START_DRIVER.value,
-                        payload={
-                            "scheduled_notification_id": str(notification.id),
-                            "ride_id": str(notification.ride_id) if notification.ride_id else None,
-                            "user_id": str(notification.user_id),
-                        },
+                        payload={"scheduled_notification_id": str(notification.id),
+                                 "ride_id": str(notification.ride_id) if notification.ride_id else None,
+                                 "user_id": str(notification.user_id)},
                     )
 
                 await crud_scheduled_notification.mark_sent(db, notification.id)

@@ -30,22 +30,14 @@ export function useMyBookingsDriver(
     setError('');
     try {
       const { data: myRides } = await fetchMyRides();
-      const activeRides = (Array.isArray(myRides) ? myRides : []).filter((r) => r.status !== 'cancelled');
+      const allRides = Array.isArray(myRides) ? myRides : [];
       const items: DriverBookingItem[] = [];
       await Promise.all(
-        activeRides.map(async (ride) => {
+        allRides.map(async (ride) => {
           try {
-            const manifestRes = await fetchRideManifest(ride.ride_id, userId);
+            const manifestRes = await fetchRideManifest(ride.ride_id);
             const passengers = manifestRes.data?.passengers ?? [];
-            const filteredPassengers = passengers
-              .filter((p) =>
-                p.status === 'pending_approval' ||
-                p.status === 'confirmed' ||
-                p.status === 'en_route' ||
-                p.status === 'arrived' ||
-                p.status === 'trip_in_progress'
-              )
-              .map((p) => ({
+            const mappedPassengers = passengers.map((p) => ({
                 bookingId: p.booking_id,
                 passengerName: p.passenger_name ?? 'נוסע',
                 numSeats: p.num_seats,
@@ -55,8 +47,8 @@ export function useMyBookingsDriver(
                 dropoffName: p.destination_name ?? null,
               }));
 
-            if (filteredPassengers.length > 0) {
-              items.push({ ride, passengers: filteredPassengers });
+            if (mappedPassengers.length > 0) {
+              items.push({ ride, passengers: mappedPassengers });
             }
           } catch {
             // skip ride
@@ -78,6 +70,24 @@ export function useMyBookingsDriver(
   useEffect(() => {
     if (activeTab === 'driver') void fetchDriverBookings();
   }, [activeTab, fetchDriverBookings]);
+
+  useEffect(() => {
+    const onUserEvent = (evt: Event) => {
+      const detail = (evt as CustomEvent<{ event?: string; ride_id?: string; status?: string }>).detail;
+      if (!detail?.event || !detail.ride_id) return;
+      if (detail.event === 'RIDE_FINISHED') {
+        setDriverList((prev) =>
+          prev.map((item) =>
+            item.ride.ride_id === detail.ride_id
+              ? { ...item, ride: { ...item.ride, status: (detail.status as typeof item.ride.status) ?? 'completed' } }
+              : item
+          )
+        );
+      }
+    };
+    window.addEventListener('linkup:user-event', onUserEvent as EventListener);
+    return () => window.removeEventListener('linkup:user-event', onUserEvent as EventListener);
+  }, []);
 
   const handleShareStart = useCallback(
     async (rideId: string) => {
@@ -137,7 +147,7 @@ export function useMyBookingsDriver(
       setActionBookingId(bookingId);
       setError('');
       try {
-        await approveBooking(bookingId, userId);
+        await approveBooking(bookingId);
         await fetchDriverBookings();
       } catch (err: unknown) {
         setError(getApiErrorMessage(err, 'אישור הבקשה נכשל'));
@@ -154,7 +164,7 @@ export function useMyBookingsDriver(
       setActionBookingId(bookingId);
       setError('');
       try {
-        await rejectBooking(bookingId, userId);
+        await rejectBooking(bookingId);
         await fetchDriverBookings();
       } catch (err: unknown) {
         setError(getApiErrorMessage(err, 'דחיית הבקשה נכשלה'));
@@ -171,12 +181,19 @@ export function useMyBookingsDriver(
     setError('');
     try {
       await cancelRide(rideToCancel);
+      setDriverList((prev) =>
+        prev.map((item) =>
+          item.ride.ride_id === rideToCancel
+            ? { ...item, ride: { ...item.ride, status: 'cancelled' } }
+            : item
+        )
+      );
       if (sharingRideId === rideToCancel) setSharingRideId(null);
       setLiveRideId((prev) => (prev === rideToCancel ? null : prev));
       setRideToCancel(null);
-      await fetchDriverBookings();
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'ביטול הנסיעה נכשל'));
+      await fetchDriverBookings();
     } finally {
       setCancellingRide(false);
     }

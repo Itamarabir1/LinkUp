@@ -43,7 +43,7 @@ async def test_driver_patch_seats(
     ride = seeded_ride_confirmed_booking["ride"]
     auth_ctx["user"] = driver
     with (
-        patch("app.domain.rides.service.publish_ride_update", new_callable=AsyncMock),
+        patch("app.domain.rides.service.publish_ride_event", new_callable=AsyncMock),
         patch("app.domain.rides.service.broadcast.publish", new_callable=AsyncMock),
     ):
         res = await client.patch(

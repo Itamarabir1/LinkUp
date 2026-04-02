@@ -53,7 +53,9 @@ async def handle_ride_created(db, data: Dict[str, Any]) -> None:
     )
 
     # 1. שליחת מייל לנוסעים רלוונטיים
-    passengers = await crud_passenger.find_passengers_for_ride_notification(db, ride)
+    passengers = await db.run_sync(
+        lambda sess: crud_passenger.find_passengers_for_ride_notification(sess, ride)
+    )
     for pr in passengers:
         try:
             await notification_handler.handle_event(

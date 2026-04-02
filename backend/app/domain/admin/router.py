@@ -434,7 +434,6 @@ async def admin_booking_by_id(
         "num_seats": b.num_seats,
         "pickup_name": b.pickup_name,
         "pickup_time": b.pickup_time.isoformat() if b.pickup_time else None,
-        "reminder_sent": bool(b.reminder_sent),
         "status": status_val,
         "created_at": b.created_at.isoformat() if b.created_at else None,
         "updated_at": b.updated_at.isoformat() if b.updated_at else None,

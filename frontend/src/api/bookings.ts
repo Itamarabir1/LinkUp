@@ -17,18 +17,16 @@ export type RideManifestPassenger = {
   destination_name?: string | null;
 };
 
-export function fetchRideManifest(rideId: string, driverId: string) {
-  return api.get<{ passengers: RideManifestPassenger[] }>(`/bookings/ride/${rideId}/manifest`, {
-    params: { driver_id: driverId },
-  });
+export function fetchRideManifest(rideId: string) {
+  return api.get<{ passengers: RideManifestPassenger[] }>(`/bookings/ride/${rideId}/manifest`);
 }
 
-export function approveBooking(bookingId: string, driverId: string) {
-  return api.patch(`/bookings/${bookingId}/approve`, {}, { params: { driver_id: driverId } });
+export function approveBooking(bookingId: string) {
+  return api.patch(`/bookings/${bookingId}/approve`, {});
 }
 
-export function rejectBooking(bookingId: string, driverId: string) {
-  return api.patch(`/bookings/${bookingId}/reject`, {}, { params: { driver_id: driverId } });
+export function rejectBooking(bookingId: string) {
+  return api.patch(`/bookings/${bookingId}/reject`, {});
 }
 
 export function cancelPassengerBooking(bookingId: string) {

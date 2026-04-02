@@ -108,11 +108,15 @@ class PassengerService:
         return [PassengerRequestResponse.model_validate(r) for r in requests]
 
     @staticmethod
-    async def get_matches_by_request_id(db: AsyncSession, request_id: UUID):
+    async def get_matches_by_request_id(db: AsyncSession, request_id: UUID, current_user_id: UUID):
         """שליפת התאמות חדשות לבקשה קיימת"""
+        from app.core.exceptions.booking import ForbiddenRideActionError
+
         p_req = await crud_passenger.get_by_id(db, request_id)
         if not p_req:
             raise PassengerRequestNotFoundError(request_id=str(request_id))
+        if str(p_req.passenger_id) != str(current_user_id):
+            raise ForbiddenRideActionError("גישה חסומה")
 
         try:
             origin_point = to_shape(p_req.pickup_geom)

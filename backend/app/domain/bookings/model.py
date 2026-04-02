@@ -5,7 +5,6 @@ from sqlalchemy import (
     DateTime,
     func,
     UniqueConstraint,
-    Boolean,
     text,
     String,
     inspect as sa_inspect,
@@ -66,9 +65,6 @@ class Booking(Base):
     pickup_name = Column(String(255))
     pickup_point = Column(Geography(geometry_type="POINT", srid=4326), nullable=True)
     pickup_time = Column(DateTime(timezone=True), nullable=True)
-
-    # ניהול תזכורות (Celery)
-    reminder_sent = Column(Boolean, default=False, server_default="false", nullable=False)
 
     # BookingStatusEnumType: result accepts both value and name from DB
     status = Column(

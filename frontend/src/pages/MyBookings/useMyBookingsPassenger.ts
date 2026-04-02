@@ -24,12 +24,7 @@ export function useMyBookingsPassenger(
       const { data } = await fetchMyBookings(50);
       const asPassenger = data.filter(
         (b) =>
-          b.passenger_id === userId &&
-          (b.status === 'pending_approval' ||
-            b.status === 'confirmed' ||
-            b.status === 'en_route' ||
-            b.status === 'arrived' ||
-            b.status === 'trip_in_progress')
+          b.passenger_id === userId
       );
       const byRideId = new Map<string, BookingRow>();
       asPassenger.forEach((b) => {
@@ -45,7 +40,6 @@ export function useMyBookingsPassenger(
               fetchPassengerDriverInfo(rideId).catch(() => null),
             ]);
             const ride = rideRes.data;
-            if (ride.status === 'cancelled') return;
             const booking = byRideId.get(rideId)!;
             items.push({
               ride,
@@ -73,6 +67,20 @@ export function useMyBookingsPassenger(
   useEffect(() => {
     void fetchPassengerBookings();
   }, [fetchPassengerBookings]);
+
+  useEffect(() => {
+    const onUserEvent = (evt: Event) => {
+      const detail = (evt as CustomEvent<{ event?: string; booking_id?: string }>).detail;
+      if (detail?.event !== 'BOOKING_COMPLETED' || !detail.booking_id) return;
+      setPassengerList((prev) =>
+        prev.map((item) =>
+          item.bookingId === detail.booking_id ? { ...item, bookingStatus: 'completed' } : item
+        )
+      );
+    };
+    window.addEventListener('linkup:user-event', onUserEvent as EventListener);
+    return () => window.removeEventListener('linkup:user-event', onUserEvent as EventListener);
+  }, []);
 
   const watchedRideId =
     passengerList.find(
@@ -105,10 +113,15 @@ export function useMyBookingsPassenger(
     setError('');
     try {
       await cancelPassengerBooking(bookingToCancel);
+      setPassengerList((prev) =>
+        prev.map((item) =>
+          item.bookingId === bookingToCancel ? { ...item, bookingStatus: 'cancelled' } : item
+        )
+      );
       setBookingToCancel(null);
-      await fetchPassengerBookings();
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'ביטול ההזמנה נכשל'));
+      await fetchPassengerBookings();
     } finally {
       setCancelling(false);
     }

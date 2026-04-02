@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +22,7 @@ from app.domain.rides.schema import RideResponse
 from app.infrastructure.s3.service import storage_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=GroupOut, status_code=status.HTTP_201_CREATED)
@@ -140,8 +142,8 @@ async def delete_group_image(
         raise HTTPException(status_code=403, detail="רק אדמין יכול למחוק תמונת קבוצה")
     try:
         await storage_service.delete_group_image_folder(group_id)
-    except Exception:
-        pass  # ממשיכים לאפס ב-DB גם אם S3 נכשל
+    except Exception as e:
+        logger.warning("S3 delete failed (non-critical): %s", e)
     group = await crud.update_group_avatar_key(db, group, None)
     count = await crud.get_member_count(db, group_id)
     return group_to_out(group, count)

@@ -1,35 +1,45 @@
+import asyncio
 import logging
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.domain.system.maintenance_crud import crud_maintenance
+from app.infrastructure.redis.publisher import publish_user_event
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 class MaintenanceService:
-    """
-    Service layer to manage system-wide maintenance.
-    Encapsulates transaction logic and business rules.
-    """
 
     async def run_full_system_cleanup(self, db: AsyncSession) -> dict:
-        """מנהל את תהליך הניקוי ברמת השירות"""
         now = datetime.now()
         try:
-            results = await crud_maintenance.bulk_update_expired_entities(db, now)
+            stats, pending_events = await crud_maintenance.bulk_update_expired_entities(db, now)
             await db.commit()
-            rides, req_exp, req_comp, bookings = results
-            return {
-                "rides": rides,
-                "expired_requests": req_exp,
-                "completed_requests": req_comp,
-                "bookings": bookings,
-            }
         except Exception as e:
             await db.rollback()
-            logger.error(f"❌ Maintenance Service Error: {str(e)}", exc_info=True)
+            logger.error("❌ Maintenance cleanup failed: %s", e, exc_info=True)
             raise
 
+        if settings.USER_EVENTS_ENABLED and pending_events:
+            results = await asyncio.gather(
+                *[publish_user_event(e.user_id, e.event, e.extra)
+                  for e in pending_events],
+                return_exceptions=True,
+            )
+            failed = sum(1 for r in results if isinstance(r, Exception))
+            if failed:
+                logger.warning(
+                    "Maintenance: %d/%d events failed to publish",
+                    failed, len(pending_events),
+                )
 
-# יצירת מופע יחיד לייבוא בשאר המערכת
+        logger.info(
+            "✅ Maintenance finished. stats=%s events=%d",
+            stats, len(pending_events),
+        )
+        return stats
+
+
 maintenance_service = MaintenanceService()

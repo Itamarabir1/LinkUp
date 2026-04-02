@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
 import { initFCM } from '../../services/fcm';
+import { useUserEventStream } from '../../hooks/useUserEventStream';
+import type { UserEvent } from '../../types/wsEvents';
 
 export function formatNavBadge(count: number): string | null {
   if (count <= 0) return null;
@@ -11,7 +13,24 @@ export function formatNavBadge(count: number): string | null {
 
 export function useLayoutShell() {
   const { logout } = useAuth();
-  const { unreadMessages, unreadNotifications, openConversationId } = useChat();
+  const {
+    unreadMessages,
+    unreadNotifications,
+    openConversationId,
+    refreshUnread,
+    refreshUnreadNotifications,
+  } = useChat();
+  const handleUserEvent = useCallback(
+    (event: UserEvent) => {
+      window.dispatchEvent(new CustomEvent('linkup:user-event', { detail: event }));
+      void refreshUnread();
+      void refreshUnreadNotifications();
+    },
+    [refreshUnread, refreshUnreadNotifications]
+  );
+
+  useUserEventStream({ onEvent: handleUserEvent });
+
   const navigate = useNavigate();
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);

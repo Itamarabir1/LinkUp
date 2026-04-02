@@ -13,8 +13,7 @@ export function useMyRequests() {
   const fetchRequests = useCallback(async () => {
     try {
       const { data } = await fetchMyPassengerRequests();
-      const all = Array.isArray(data) ? data : [];
-      setRequests(all.filter((r) => r.status !== 'cancelled'));
+      setRequests(Array.isArray(data) ? data : []);
       setError('');
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'טעינת בקשות נכשלה'));
@@ -27,13 +26,33 @@ export function useMyRequests() {
     void fetchRequests();
   }, [fetchRequests]);
 
+  useEffect(() => {
+    const onUserEvent = (evt: Event) => {
+      const detail = (evt as CustomEvent<{ event?: string; request_id?: string }>).detail;
+      if (!detail?.event || !detail.request_id) return;
+      if (detail.event === 'REQUEST_EXPIRED') {
+        setRequests((prev) =>
+          prev.map((r) =>
+            r.request_id === detail.request_id ? { ...r, status: 'expired' } : r
+          )
+        );
+      }
+    };
+    window.addEventListener('linkup:user-event', onUserEvent as EventListener);
+    return () => window.removeEventListener('linkup:user-event', onUserEvent as EventListener);
+  }, []);
+
   const confirmCancelRequest = useCallback(async () => {
     if (!requestToCancel) return;
     setCancelling(true);
     setError('');
     try {
       await cancelPassengerRequest(requestToCancel.request_id);
-      setRequests((prev) => prev.filter((r) => r.request_id !== requestToCancel.request_id));
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.request_id === requestToCancel.request_id ? { ...r, status: 'cancelled' } : r
+        )
+      );
       setRequestToCancel(null);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'ביטול הבקשה נכשל'));

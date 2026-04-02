@@ -30,11 +30,7 @@ from app.domain.rides.schema import (
     RideUpdate,
 )
 from app.domain.rides.enum import RideStatus, RideBroadcastAction
-from app.domain.rides.broadcast import (
-    RideNotificationFactory,
-    publish_ride_event,
-    publish_ride_update,
-)
+from app.infrastructure.redis.publisher import publish_ride_event
 from app.domain.geo import processor as geo_proc
 from app.domain.bookings.crud import crud_booking
 from app.domain.bookings.enum import BookingStatus
@@ -43,6 +39,49 @@ from app.domain.events.enum import DispatchTarget
 from app.domain.notifications.constants import NotificationEvent
 
 logger = logging.getLogger(__name__)
+
+
+class _RideNotificationFactory:
+    _CONFIG = {
+        RideBroadcastAction.CREATED.value: {
+            "color": "green",
+            "message": "נסיעה חדשה זמינה כעת!",
+            "event_prefix": "RIDE_CREATED",
+        },
+        RideBroadcastAction.UPDATED.value: {
+            "color": "orange",
+            "message": "עדכון בנסיעה (למשל מקום תפוס)",
+            "event_prefix": "RIDE_UPDATED",
+        },
+        RideStatus.CANCELLED.value: {
+            "color": "red",
+            "message": "הנסיעה בוטלה על ידי הנהג",
+            "event_prefix": "RIDE_CANCELLED",
+        },
+        RideStatus.COMPLETED.value: {
+            "color": "green",
+            "message": "הנסיעה הסתיימה בהצלחה",
+            "event_prefix": "RIDE_COMPLETED",
+        },
+    }
+
+    @classmethod
+    def create_broadcast_payload(cls, ride, action: str) -> Dict[str, Any]:
+        config = cls._CONFIG.get(
+            action,
+            {
+                "color": "gray",
+                "message": "עדכון בנסיעה",
+                "event_prefix": "RIDE_UPDATED",
+            },
+        )
+        return {
+            "event": config["event_prefix"],
+            "ride_id": str(ride.ride_id),
+            "status": ride.status.value if hasattr(ride.status, "value") else str(ride.status),
+            "color": config["color"],
+            "message": f"{config['message']} (מ-{ride.origin_name} ל-{ride.destination_name})",
+        }
 
 
 class RideService:
@@ -131,7 +170,7 @@ class RideService:
     async def _after_ride_created(self, response: RideResponse, new_ride: Ride, session_id: str) -> None:
         await self.cache.delete_preview(session_id)
         try:
-            payload = RideNotificationFactory.create_broadcast_payload(new_ride, RideBroadcastAction.CREATED.value)
+            payload = _RideNotificationFactory.create_broadcast_payload(new_ride, RideBroadcastAction.CREATED.value)
             payload["ride"] = response.model_dump(mode="json")
             await broadcast.publish(RIDES_LIST_CHANNEL, json.dumps(payload))
         except Exception as e:
@@ -183,13 +222,10 @@ class RideService:
             )
         ride = await crud_ride.update_partial(db, ride_id, driver_id, **update_dict)
         if not ride:
-            raise RideNotFoundError()
-        await publish_ride_update(
-            ride_id,
-            {"status": ride.status.value, "event": "RIDE_UPDATED"},
-        )
+            raise RideNotFoundError(ride_id)
+        await publish_ride_event(ride_id, "RIDE_UPDATED", {"status": ride.status.value})
         try:
-            broadcast_payload = RideNotificationFactory.create_broadcast_payload(ride, RideBroadcastAction.UPDATED.value)
+            broadcast_payload = _RideNotificationFactory.create_broadcast_payload(ride, RideBroadcastAction.UPDATED.value)
             broadcast_payload["ride_id"] = str(ride_id)
             await broadcast.publish(RIDES_LIST_CHANNEL, json.dumps(broadcast_payload))
         except Exception as e:

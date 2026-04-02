@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from uuid import UUID
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import datetime
@@ -70,10 +70,6 @@ class CRUDBooking:
         )
         result = await db.execute(stmt)
         return result.scalars().first()
-
-    async def get_bookings_for_reminders(self, db, start, end):
-        # הקוד שכתבנו קודם עם ה-select...
-        pass
 
     async def get_ride_for_update(self, db: AsyncSession, ride_id: UUID) -> Optional[Ride]:
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
@@ -332,11 +328,7 @@ class CRUDBooking:
             for rid in sorted(set([r for r in req_ids if r is not None])):
                 await self.update_passenger_request_status_from_bookings(db, rid)
 
-        # PostgreSQL ride_status enum expects lowercase 'cancelled'; ORM would send enum name 'CANCELLED'
-        await db.execute(
-            text("UPDATE rides SET status = CAST(:status AS ride_status), updated_at = now() WHERE ride_id = :ride_id"),
-            {"status": RideStatus.CANCELLED.value, "ride_id": ride_id},
-        )
+        ride.status = RideStatus.CANCELLED
         await db.flush()
         return req_ids
 
@@ -422,47 +414,5 @@ class CRUDBooking:
 
         result = await db.execute(stmt.order_by(Booking.created_at.desc()))
         return list(result.scalars().all())
-
-
-# בתוך קלאס ה-CRUDBooking
-async def get_bookings_for_reminders(
-    self,
-    db: AsyncSession,  # שים לב לסוג האסינכרוני
-    start_window: datetime,
-    end_window: datetime,
-) -> List[Booking]:
-    """
-    שליפת כל ההזמנות המאושרות שזמן האיסוף שלהן חל בחלון הזמן המוגדר.
-
-    Senior Implementation (Async 2.0):
-    1. selectinload: הדרך המועדפת ב-Async לטעון יחסים (Relationships).
-       זה מריץ שאילתה נוספת בצורה יעילה ומונע את שגיאת ה-DetachedInstanceError.
-    2. Execution: שימוש ב-db.execute ו-scalars() כדי לקבל את האובייקטים עצמם.
-    """
-
-    # בניית השאילתה בסינטקס 2.0
-    stmt = (
-        select(Booking)
-        .options(
-            # טעינה אסינכרונית בטוחה של ישויות קשורות
-            selectinload(Booking.passenger),
-            selectinload(Booking.ride),
-        )
-        .where(
-            and_(
-                Booking.status == "confirmed",
-                ~Booking.reminder_sent,
-                Booking.pickup_time >= start_window,
-                Booking.pickup_time <= end_window,
-            )
-        )
-    )
-
-    # הרצה אסינכרונית
-    result = await db.execute(stmt)
-
-    # החזרת כל התוצאות כרשימה של אובייקטי Booking
-    return result.scalars().all()
-
 
 crud_booking = CRUDBooking()
