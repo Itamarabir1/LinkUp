@@ -74,7 +74,7 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 
 | Routing Key | Queue | Purpose |
 |-------------|--------|---------|
-| reminders | scheduled_tasks_queue | תזכורות נסיעה/איסוף |
+| reminders | scheduled_tasks_queue | תזכורות: ה-worker מפעיל `ReminderScheduler` שקורא שורות **due** מטבלת `scheduled_notifications` (לא סריקת rides/bookings לפי `reminder_sent`) |
 | fuel_scan | scheduled_tasks_queue | סריקת מחירי דלק (EIA) |
 | maintenance | scheduled_tasks_queue | משימות תחזוקה |
 | chat_timeout | scheduled_tasks_queue | timeout שיחות |

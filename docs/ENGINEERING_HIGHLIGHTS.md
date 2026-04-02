@@ -23,6 +23,7 @@
 | **אדמין / תפעול** | ממשק ווב **`/admin`** (מודול `features/admin`): סטטיסטיקות, בריאות, משתמשים (הפעלה/הרשאת אדמין), נסיעות (ביטול), קבוצות, Outbox (requeue), lookup; **lazy routes**, מעטפת **דסקטופ** (ללא drawer מובייל), **`AdminRoute`** מינימלי (`is_admin` מ־AuthContext); אישור לפני מוטציות, toasts; בקאנד **`get_current_admin_user`** + לוג `[admin_audit]` — **`ADMIN_DASHBOARD.md`** |
 | **מפות** | Google: **Geocoding**, **Directions**, **Distance Matrix**, **Maps JS**; geocoding הוא **Google-only** עם cache ב-Redis (24h) |
 | **GPS בזמן אמת** | מיקום נהג לנוסעים, מיקום נוסעים לנהג (ערוצי Redis נפרדים + WS). **פרונט:** POST מותאם ב־throttle (~1.5s), `maximumAge: 0` לשידור, `useMapMarker` — יצירת marker פעם אחת ועדכון מיקום בלבד (בלי ריצוד), מפת Google. **Zod** על פריימי WS בכניסה — `frontend/src/types/wsEvents.ts`. פירוט: `docs/architecture/REALTIME.md`. |
+| **תזכורות + אירועי משתמש ב-WS** | טבלת **`scheduled_notifications`** (Alembic 008) במקום דגל `reminder_sent` על rides/bookings; `ReminderScheduler` + handler. פרסום: **`publish_ride_event`** (broadcast/DB0); **`publish_user_event`** דרך **`redis_chat_pubsub`** / `REDIS_CHAT_URL` (DB1, כמו chat-ws) ל-`user:{id}:events`. **chat-ws** נרשם ל-`user:*:events`; **פרונט:** `useUserEventStream` + `HistorySection` / מסכי My Rides & Bookings. |
 
 ---
 

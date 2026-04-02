@@ -100,7 +100,6 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | available_seats | INTEGER NOT NULL DEFAULT 4 | |
 | price | NUMERIC DEFAULT 0 | |
 | status | ride_status ENUM NOT NULL | open, full, **active**, completed, cancelled — index (004). active = נסיעה בתנועה (נהג התחיל/יסיים; שידור GPS). |
-| reminder_sent | BOOLEAN DEFAULT FALSE | |
 | created_at, updated_at | TIMESTAMPTZ | |
 
 ### passenger_requests
@@ -135,7 +134,6 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | num_seats | INTEGER NOT NULL | |
 | pickup_name, pickup_point, pickup_time | VARCHAR/GEOGRAPHY/TIMESTAMPTZ | |
 | status | booking_status ENUM NOT NULL | pending_approval, confirmed, rejected, cancelled, completed — index (004) |
-| reminder_sent | BOOLEAN | |
 | created_at, updated_at | TIMESTAMPTZ | |
 | UNIQUE(ride_id, passenger_id) | | |
 
@@ -192,6 +190,22 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 | created_at | TIMESTAMPTZ | |
 | processed_at | TIMESTAMPTZ | |
 
+### scheduled_notifications
+
+תזמון תזכורות (נוסע/נהג) והחלפת דגל `reminder_sent` שהוסר מ-rides/bookings (מיגרציה **008**).
+
+| שדה | טיפוס | הערות |
+|-----|--------|--------|
+| id | UUID PK | |
+| ride_id | UUID FK rides | nullable אם רלוונטי |
+| user_id | UUID FK users NOT NULL | |
+| type | VARCHAR(50) NOT NULL | למשל passenger/driver reminder |
+| deliver_at | TIMESTAMPTZ NOT NULL | מתי לשלוח |
+| sent_at | TIMESTAMPTZ | null = ממתין; אחרי שליחה מסומן |
+| created_at | TIMESTAMPTZ NOT NULL | |
+
+אינדקס חלקי: `idx_scheduled_notifications_deliver` על `deliver_at` WHERE `sent_at IS NULL`.
+
 ---
 
 ## Indexes
@@ -237,6 +251,9 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 | 003_groups_avatar_desc | groups: avatar_key, description | 2025-03-09 |
 | 004_add_missing_indexes | 11 indexes — rides (4), bookings (3), group_members (2), passenger_requests (1) | 2025-03-09 |
 | 005_add_active_ride_status | הוספת ערך 'active' ל-enum ride_status (נסיעה בתנועה — התחל/סיים נסיעה, GPS) | 2025-03-09 |
+| 006_chat_participants | טבלת `conversation_participants` (למשל `last_read_at` למשתמש בשיחה) | — |
+| 007_add_last_active_at | `users.last_active_at` — פעילות/צ'אט / last-seen | — |
+| 008_scheduled_notifications | טבלת `scheduled_notifications` + partial index; הסרת `reminder_sent` מ-rides ו-bookings | — |
 
 הרצה: מתוך `backend/` — `alembic upgrade head`. downgrade: `alembic downgrade -1`.
 

@@ -1,11 +1,14 @@
 """
-publisher.py — נקודת הכניסה היחידה לשידור אירועים דרך Redis Pub/Sub.
-ניטרלי לדומיין. כל שידור עובר דרך כאן בלבד.
+publisher.py — נקודת הכניסה לשידור אירועי דומיין ב-Redis Pub/Sub.
+- ride: broadcast (REDIS_URL / DB0) — מקביל ל-WS של FastAPI על ride_*.
+- user (chat-ws): redis_chat_pubsub (REDIS_CHAT_URL) — אותו DB כמו chat-ws.
 """
 import json
 import logging
 from uuid import UUID
+
 from app.infrastructure.redis.broadcast import broadcast
+from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 from app.infrastructure.redis.keys import get_ride_channel, get_user_channel
 
 logger = logging.getLogger(__name__)
@@ -28,8 +31,17 @@ async def publish_user_event(
     event: str,
     extra: dict | None = None,
 ) -> None:
+    """Pub/Sub על REDIS_CHAT_URL (DB כמו chat-ws) — לא broadcast/DB 0."""
     payload = {"event": event, "user_id": str(user_id), **(extra or {})}
     try:
-        await broadcast.publish(get_user_channel(user_id), json.dumps(payload))
+        n = await redis_chat_pubsub.publish(
+            get_user_channel(user_id), json.dumps(payload)
+        )
+        if n == 0 and redis_chat_pubsub.client is None:
+            logger.warning(
+                "publish_user_event skipped (chat redis not connected) [%s] user=%s",
+                event,
+                user_id,
+            )
     except Exception as e:
         logger.warning("publish_user_event failed [%s] user=%s: %s", event, user_id, e)

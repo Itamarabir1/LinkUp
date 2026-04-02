@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class RedisChatPubSub:
-    """חיבור ייעודי ל-REDIS_CHAT_URL — chat:conversation:*, chat:notification:*"""
+    """חיבור ייעודי ל-REDIS_CHAT_URL — chat:conversation:*, chat:notification:*, user:*:events"""
 
     def __init__(self):
         self.client: redis.Redis | None = None

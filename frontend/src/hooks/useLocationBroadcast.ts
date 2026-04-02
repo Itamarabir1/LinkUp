@@ -46,7 +46,7 @@ export function useLocationBroadcast(options: UseLocationBroadcastOptions) {
     onStopRef.current = onStop;
   });
 
-  const fetchOneBookingId = useCallback(async (rId: string, _dId: string): Promise<string | null> => {
+  const fetchOneBookingId = useCallback(async (rId: string): Promise<string | null> => {
     try {
       const { data } = await fetchRideManifest(rId);
       const confirmed = (data?.passengers ?? []).find((p: RideManifestPassenger) => p.status === 'confirmed');
@@ -98,7 +98,7 @@ export function useLocationBroadcast(options: UseLocationBroadcastOptions) {
       return;
     }
     let cancelled = false;
-    fetchOneBookingId(rideId, driverId).then((id) => {
+    fetchOneBookingId(rideId).then((id) => {
       if (!cancelled) setFetchedBookingId(id);
     });
     return () => {

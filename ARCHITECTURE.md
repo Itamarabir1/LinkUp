@@ -22,7 +22,7 @@
 | Component | Technology | Version | Purpose |
 |-----------|------------|---------|---------|
 | Database | PostgreSQL + PostGIS | 15-3.3 | טבלאות, גיאומטריה, חיפוש מרחבי |
-| Cache / Pub-Sub | Redis | 7.2.0-v10 | Broadcast (ride updates), chat channels, chat completion, OTP |
+| Cache / Pub-Sub | Redis | 7.2.0-v10 | DB 0: ride per-ride + **rides:list**, cache, OTP; DB 1: chat + **`user:{id}:events`** (דרך `redis_chat_pubsub`), completion, presence |
 | Message Broker | RabbitMQ | 3-management | אירועים (Outbox), תורי משימות (notifications, avatar, scheduled) |
 | Runtime | Docker Compose | — | פיתוח: db, redis, rabbitmq, **migrate** (Alembic פעם אחת), backend (**8000** ל-host; uvicorn בלבד, בלי alembic בפקודת ההרצה), outbox-worker, chat-ws; פרוד מקומי: **frontend** סטטי + **nginx** (80) מאותו `docker-compose.yml` + `--profile prod` — nginx אחרי **backend healthy** |
 
@@ -39,18 +39,18 @@ Clients (Web/Mobile)
     │                                    │
     │                                    ├── PostgreSQL (asyncpg)
     │                                    ├── Redis DB 0 (broadcast, cache)
-    │                                    ├── Redis DB 1 PUB (chat messages, chat:completion)
+    │                                    ├── Redis DB 1 PUB (chat messages, user:*:events, chat:completion)
     │                                    └── Outbox table ──► outbox-worker
     │
     └── WebSocket /chat ────────► chat-ws:8081 (Go)
                                        │
-                                       └── Redis DB 1 SUB (chat:conversation:*, chat:typing:*)
+                                       └── Redis DB 1 SUB (chat:conversation:*, chat:typing:*, chat:notification:*, user:*:events)
 
 outbox-worker
     ├── Poll outbox_events (PENDING) ──► Publish to RabbitMQ (exchanges: user, ride, booking, tasks, scheduled)
     ├── notifications_queue consumer ──► Send email (Brevo), push (Firebase FCM, **`data` map only** — title/body strings in `data`; UI: toast+chime / SW notification)
     ├── avatar_upload_queue consumer ──► S3 resize, DB update
-    ├── scheduled_tasks_queue consumer ──► Reminders, fuel scan, maintenance
+    ├── scheduled_tasks_queue consumer ──► ReminderScheduler (DB `scheduled_notifications`), fuel scan, maintenance
     └── Redis DB 1 SUB (chat:completion:*) ──► AI analysis (Groq), save ChatAnalysis, optional outbox
 ```
 
@@ -58,7 +58,7 @@ outbox-worker
 
 ## Features
 
-- **GPS Tracking**: מיקום נהג ונוסעים בזמן אמת במהלך נסיעה פעילה. נהג: **התחל/סיים נסיעה** מטאב "אני נהג" ב־My Bookings (דורש לפחות הזמנה אחת מאושרת), שידור מיקום ל־POST /bookings/{id}/location; נוסעים מקבלים עדכונים ב־WebSocket /bookings/ws/{id}/location. נוסעים יכולים לשתף מיקום ל־POST /bookings/{id}/passenger-location; נהג מאזין ב־WebSocket /rides/ws/{id}/passengers. ערוצי Redis: `booking_{booking_id}` (מיקום נהג), `ride_{ride_id}:passenger_locations` (מיקום נוסעים) — שמות מרוכזים ב־`app/infrastructure/redis/keys.py`. **עדכוני סטטוס נסיעה** ללקוח: `publish_ride_event` ב־`app/domain/rides/broadcast.py`. **פרונט:** throttle לשידור ~1.5s, `maximumAge: 0` לשידור, `useMapMarker` (יצירה מול עדכון), reconnect ב־`useDriverLocation` / `usePassengerLocations` / `useRideWebSocket`, אימות JSON בכניסה עם **Zod** ב־`frontend/src/types/wsEvents.ts` — פירוט ב־`docs/architecture/REALTIME.md` (סעיף GPS, “פרונט”) ו־`docs/ENGINEERING_HIGHLIGHTS.md` (סעיף 5). ראה גם `docs/architecture/API.md`.
+- **GPS Tracking**: מיקום נהג ונוסעים בזמן אמת במהלך נסיעה פעילה. נהג: **התחל/סיים נסיעה** מטאב "אני נהג" ב־My Bookings (דורש לפחות הזמנה אחת מאושרת), שידור מיקום ל־POST /bookings/{id}/location; נוסעים מקבלים עדכונים ב־WebSocket /bookings/ws/{id}/location. נוסעים יכולים לשתף מיקום ל־POST /bookings/{id}/passenger-location; נהג מאזין ב־WebSocket /rides/ws/{id}/passengers. ערוצי Redis: `booking_{booking_id}` (מיקום נהג), `ride_{ride_id}:passenger_locations` (מיקום נוסעים) — שמות מרוכזים ב־`app/infrastructure/redis/keys.py`. **עדכוני סטטוס נסיעה** ללקוח (ערוץ `ride_{ride_id}`): `publish_ride_event` ב־`app/infrastructure/redis/publisher.py`; **רשימת נסיעות** (`rides:list`) נשארת דרך `app/infrastructure/redis/broadcast.py` (Broadcast). **אירועי משתמש** (תחזוקה וכו'): `publish_user_event` → **`redis_chat_pubsub`** על **`REDIS_CHAT_URL`** (DB 1) → ערוץ `user:{user_id}:events` → **chat-ws** נרשם ל-pattern `user:*:events` ומעביר ל־WebSocket של אותו משתמש. **פרונט:** throttle לשידור ~1.5s, `useLocationBroadcast` שולף `booking_id` מ-manifest נסיעה; `useUserEventStream` מפרש אירועי משתמש (Zod) על אותו חיבור chat-ws — פירוט ב־`docs/architecture/REALTIME.md`. ראה גם `docs/architecture/API.md`.
 - **Ride preview cache**: תצוגת מקדימה לנסיעה (3 מסלולים) נשמרת ב־Redis 24 שעות; סריאליזציה עם `driver_id` כ־string. תג קבוצה בכרטיסיות (group_name או "ציבורי") מ־RideResponse (כולל group).
 - **Geocode cache (24h)**: תוצאות כתובת→קואורדינטות נשמרות ב־Redis ל־24 שעות כדי לצמצם קריאות חוזרות ל־**Google Geocoding** עבור אותן כתובות. המימוש fail-open כדי לא לחסום flow אם Redis לא זמין.
 - **Admin (תפעול):** REST תחת **`/api/v1/admin/*`** — רק משתמש עם `users.is_admin`; dependency ב־`app/api/dependencies/admin.py` (`get_current_admin_user`). ראוטר דומיין: `backend/app/domain/admin/router.py` (סטטיסטיקות, בריאות, משתמשים, נסיעות, קבוצות, Outbox, lookup); פעולות רגישות עם לוג **`[admin_audit]`**. במקביל נשאר **SQLAdmin** (`app/admin/setup.py`) לדפדפן ניהול DB קלאסי. **ממשק React** למפעילים: `frontend/src/features/admin/` — מסלולים `/admin`, `/admin/health`, `/admin/users`, `/admin/rides`, `/admin/groups`, `/admin/outbox`, `/admin/lookup` (טעינה עצלה, RTL); **מעטפת דסקטופ בלבד** (ללא drawer/סיידבר מובייל) — שימוש אדמין מכוון לדפדפן; אפליקציית **mobile/** נפרדת. מקור אמת למסך ול־API: **`ADMIN_DASHBOARD.md`**.
@@ -78,7 +78,9 @@ outbox-worker
 - **Race Condition Protection**: אישור/ביטול הזמנה תחת lock על ה-ride; ביטול מחזיר נסיעה ל-OPEN רק אם לא CANCELLED.
 - **Async SQLAlchemy 2.0 core domains**: passenger/bookings/rides core flows עברו ל־`AsyncSession` ו־`select/execute`.
   - **Bookings** async-only (ללא `db.run_sync`) ומשתמשים ב־`select(...).with_for_update()` לנעילות שורה.
-  - `db.run_sync` עדיין עשוי להופיע במודולים אחרים שבהם נשאר CRUD סינכרוני נקודתית.
+  - `db.run_sync` עדיין עשוי להופיע בחלק מ-worker tasks/legacy נקודתי; שאילתות תזכורת לנוסעים (`find_passengers_for_ride_notification`) הן async.
+- **תזכורות**: אין עוד `reminder_sent` על `rides`/`bookings` ב-ORM או ב-API ציבורי (מיגרציה **008**); תזמון בשכבת `scheduled_notifications` + `ReminderScheduler` + notification handler; סימון נשלח ב-`sent_at`.
+- **תחזוקת סטטוסים (maintenance)**: `MaintenanceCRUD` מחזיר `PendingUserEvent` עם RETURNING; אחרי `commit` מוצלח, `MaintenanceService` מפרסם `publish_user_event` (מוגן ב-`USER_EVENTS_ENABLED` ב-config).
 - **שגיאות API מרוכזות**: תת־מחלקות של `LinkupError` לפי דומיין ב־`app/core/exceptions/`; ב־`main.py` handlers גלובליים ל־Pydantic (`RequestValidationError` → 422), `IntegrityError` / `SQLAlchemyError`, ו־`LinkupError`. פורמט JSON, Sentry, פרונט ו-chat-ws: [`docs/ERRORS.md`](docs/ERRORS.md).
 
 ---
@@ -134,7 +136,7 @@ outbox-worker
 
 - **Backend:** `pytest` תחת `backend/tests/` (auth, JWT, וכו’); ב-CI שירות Postgres, משתנה סביבה **`DATABASE_URL` ברמת ה-job** (אותו ערך ל־**Alembic** ול־**pytest** דרך `Settings` + `conftest`), **`alembic upgrade head`** לפני הטסטים — workflow **`backend-ci.yml`**. איכות קוד: **Ruff** (`ruff check`, `ruff format --check`, `line-length` 150 ב־`pyproject.toml`).
 - **Config / env:** ב־`app/core/config.py`, `DATABASE_URL` ו־`REDIS_URL` מהסביבה נטענים לשדות `*_RAW` באמצעות **`validation_alias=AliasChoices(...)`** (pydantic-settings) — לא `json_schema_extra`; כך Alembic (`settings.DATABASE_URL`) והאפליקציה רואים את אותו override כמו ב-CI.
-- **Broadcast רשימת נסיעות:** שם ערוץ Redis **`rides:list`** מרוכז ב־`app/infrastructure/redis/keys.py` (`RIDES_LIST_CHANNEL`); שירות הנסיעות מייבא משם לפרסום עדכוני רשימה.
+- **Broadcast רשימת נסיעות:** שם ערוץ Redis **`rides:list`** מרוכז ב־`app/infrastructure/redis/keys.py` (`RIDES_LIST_CHANNEL`); שירות הנסיעות מפרסם עדכוני רשימה דרך `broadcast.publish` (תשתית). אירועי נסיעה per-ride ואירועי משתמש per-user יוצאים דרך **`app/infrastructure/redis/publisher.py`**.
 - **Frontend:** Vitest לדוגמה `frontend/src/utils/*.test.ts` (`npm run test` מקומית); ב-CI — ESLint + build (כולל `tsc`).
 - **chat-ws:** `go test` / `go vet` ב־`chat-ws-ci.yml`.
 - **עומס (k6):** סקריפטים מאורגנים תחת `backend/k6/scripts/` (auth/rides/users/groups/chat/geo/ws), עם wrappers תואמים לאחור ב־`backend/load_test*.js`. אימות זרימות ליבה תחת עומס מקבילי (executor ל-bcrypt, pool, rate limit, outbox). דורש הכנת סביבה (ראו `docs/architecture/DEVELOPMENT.md`, `backend/README.md`, `docs/ENGINEERING_HIGHLIGHTS.md` סעיף 7ג).

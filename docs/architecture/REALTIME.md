@@ -2,7 +2,7 @@
 
 תקשורת בזמן אמת: WebSocket לסטטוס נסיעה, שרת צ'אט (Go) + Redis Pub/Sub להודעות צ'אט. **פרונט:** אימות JSON בכניסה עם **Zod** — [`frontend/src/types/wsEvents.ts`](../../frontend/src/types/wsEvents.ts) (בהתאם לחוזים למטה).
 
-**Redis — שרת אחד, שני DB לוגיים:** אותו תהליך Redis (פורט 6379); **DB 0** — backend (cache, broadcast נסיעות, rate limit, OTP…); **DB 1** — צ'אט (pub/sub הודעות, `presence:*`, `user:online` / `user:offline`, completion). **חשוב:** ה-backend מפרסם הודעות צ'אט ל-`REDIS_CHAT_URL` (ברירת מחדל DB **1**). **chat-ws חייב להשתמש באותו מספר DB** (`REDIS_URL` בסודות K8s — למשל `.../1`). אם ה-backend על DB 0 ו-chat-ws על DB 1, הודעות לא יגיעו ב-WebSocket עד רענון.
+**Redis — שרת אחד, שני DB לוגיים:** אותו תהליך Redis (פורט 6379); **DB 0** — backend (cache, broadcast נסיעות `ride_*`, rate limit, OTP…); **DB 1** — צ'אט + **אירועי משתמש ל-chat-ws** (pub/sub הודעות, `user:{id}:events`, `presence:*`, `user:online` / `user:offline`, completion). **חשוב:** הודעות צ'אט וגם **`publish_user_event`** מופעלים דרך **`REDIS_CHAT_URL`** / [`redis_chat_pubsub`](../../backend/app/infrastructure/redis/chat_pubsub.py) (ברירת מחדל DB **1**), כדי ש-**chat-ws** (אותו `REDIS_URL` עם `/1`) יקבל את ה-Pub/Sub. ערוצי נסיעה per-ride נשארים ב-**`broadcast`** על **`REDIS_URL`** (DB 0).
 
 ---
 
@@ -31,7 +31,7 @@
 
 ### Redis DB 0 (Backend / Outbox-worker)
 
-- **Broadcast (ride updates)**: ערוץ `ride_{ride_id}` דרך `get_ride_channel` ב-`keys.py`. Backend משדר עדכוני סטטוס בעיקר דרך `publish_ride_event`; לקוחות מתחברים ל-WebSocket ב-FastAPI (`/api/v1/rides/ws/{ride_id}?token=JWT`) ומאזינים דרך `broadcaster` ל-Redis.
+- **Broadcast (ride updates)**: ערוץ `ride_{ride_id}` דרך `get_ride_channel` ב-`keys.py`. Backend משדר עדכוני סטטוס דרך **`publish_ride_event`** ב-[`app/infrastructure/redis/publisher.py`](../../backend/app/infrastructure/redis/publisher.py) (Pub/Sub דרך `broadcast` / DB 0); לקוחות מתחברים ל-WebSocket ב-FastAPI (`/api/v1/rides/ws/{ride_id}?token=JWT`) ומאזינים דרך `broadcaster` ל-Redis.
 - **GPS — מיקום נהג לנוסעים**: ערוצים `booking_{booking_id}`. נהג שולח מיקום ב־POST /bookings/{id}/location; Backend מפרסם ל-Redis. נוסע מתחבר ל־WebSocket `/api/v1/bookings/ws/{booking_id}/location?token=JWT` ומאזין לעדכונים.
 - **GPS — מיקום נוסעים לנהג**: ערוץ `ride_{ride_id}:passenger_locations`. נוסע שולח מיקום ב־POST /bookings/{id}/passenger-location; Backend מפרסם ל-Redis. נהג מתחבר ל־WebSocket `/api/v1/rides/ws/{ride_id}/passengers?token=JWT` ומאזין לעדכונים.
 - **שימוש**: `app/infrastructure/redis/broadcast.py` — RedisBroadcast (Broadcast from `broadcaster`); [`app/infrastructure/location/location_service.py`](../../backend/app/infrastructure/location/location_service.py) — `broadcast_location_to_participants`, `broadcast_passenger_location_to_driver`.
@@ -39,6 +39,8 @@
 ### Redis DB 1 (Chat-ws + Outbox-worker)
 
 - **הודעות צ'אט**: ערוץ `chat:conversation:{conversation_id}`. Backend (או שירות שכותב הודעות) מפרסם; chat-ws מנוי ל-pattern `chat:conversation:*` ומעביר ל-clients מחוברים.
+- **התראות in-app דרך chat-ws**: pattern `chat:notification:*` (העברה ל-`SendToUser`).
+- **אירועי דומיין למשתמש**: pattern `user:*:events` — ה-backend מפרסם דרך **`publish_user_event`** → [`redis_chat_pubsub.publish`](../../backend/app/infrastructure/redis/chat_pubsub.py) על **`REDIS_CHAT_URL`** (אותו DB כמו chat-ws). JSON כללי (למשל תחזוקה, סיום נסיעה); הפרונט מסנן עם **Zod** ב-[`useUserEventStream`](../../frontend/src/hooks/useUserEventStream.ts) / [`UserEventSchema`](../../frontend/src/types/wsEvents.ts). **chat-ws** נרשם ל-pattern ב-[`internal/redis/subscriber.go`](../../chat-ws/internal/redis/subscriber.go) (`UserEventPattern`) ומעביר ל-`SendToUser`.
 - **Typing indicators**: ערוץ `chat:typing:*` — pattern ב-chat-ws. ה-client שולח `typing_start` / `typing_stop`, וה-Go forwarding מעביר את ה-event ל-recipient. **מבנה JSON לנמען** (כמו ב־[`chat-ws/internal/hub/message.go`](../../chat-ws/internal/hub/message.go) — `TypingPayload`): `type`, `user_id`, `conversation_id`, `recipient_id`, ואופציונלי `full_name` ב־`typing_start`. הפרונט מסנן echo למשתמש הנוכחי; בדיקות יחידה ב־[`frontend/src/pages/MessageThread/processChatWebSocketMessage.test.ts`](../../frontend/src/pages/MessageThread/processChatWebSocketMessage.test.ts) משקפות את אותם שדות חובה.
 - **Presence / last-seen** (keys ב-Redis DB=1):
   - `presence:{user_id}` — TTL 60 שנ׳ (online/offline).
@@ -74,9 +76,10 @@ Client A (נהג)                Backend API                    Redis DB 1      
 ## Broadcast (Rides)
 
 - **ערוץ**: `ride_{ride_id}` — מוגדר ב־[`app/infrastructure/redis/keys.py`](../../backend/app/infrastructure/redis/keys.py) (`get_ride_channel`). מיקום נוסעים לנהג: `get_ride_passengers_channel`; מיקום נהג לנוסע: `get_booking_channel`.
-- **מפרסם**: עדכוני סטטוס נסיעה עוברים דרך `publish_ride_event` ב־[`app/domain/rides/broadcast.py`](../../backend/app/domain/rides/broadcast.py) (אירועים כמו `RIDE_STARTED`, `RIDE_ENDED`, `RIDE_CANCELLED`, `RIDE_FINISHED`).
+- **מפרסם (סטטוס נסיעה)**: `publish_ride_event` ב־[`app/infrastructure/redis/publisher.py`](../../backend/app/infrastructure/redis/publisher.py) (אירועים כמו `RIDE_STARTED`, `RIDE_ENDED`, `RIDE_CANCELLED`, `RIDE_UPDATED`).
+- **מפרסם (רשימת נסיעות)**: עדיין [`app/infrastructure/redis/broadcast.py`](../../backend/app/infrastructure/redis/broadcast.py) — ערוץ `rides:list` (`RIDES_LIST_CHANNEL`) לעדכוני כרטיסים ברשימה.
 - **מאזין**: Client מתחבר ל־WebSocket `GET /api/v1/rides/ws/{ride_id}?token=JWT` (FastAPI); **אימות חובה** — `get_current_user_ws`. השרת נרשם ל־Redis עם אותו שם ערוץ ושולח JSON ללקוח.
-- **צורת JSON ללקוח** (סטטוס נסיעה): לפחות `event`, `ride_id` (מחרוזות); לעיתים גם `status`, `color`, `message` — ראו [`publish_ride_event`](../../backend/app/domain/rides/broadcast.py) / `RideNotificationFactory`.
+- **צורת JSON ללקוח** (סטטוס נסיעה): לפחות `event`, `ride_id` (מחרוזות); לעיתים גם `status`, `color`, `message` — מקור: שירות הנסיעות + publisher.
 
 ---
 
@@ -84,7 +87,7 @@ Client A (נהג)                Backend API                    Redis DB 1      
 
 - **Endpoint**: `app/domain/notifications/router.py` — `@router.websocket("/ws")` תחת prefix `/notifications` → נתיב מלא **`GET /api/v1/notifications/ws?token=JWT`**.
 - **אימות**: `get_current_user_ws` ב-`app/api/dependencies/auth.py` — **רק JWT** (`decode_access_token`), מחזיר `WsUser` עם `user_id` מה-`sub` (**ללא קריאת DB** בזמן חיבור). מניעת עומס על connection pool; trade-off: אין בדיקת `is_active` ב-handshake (מול HTTP שכן טוען `User` מ-DB).
-- **שימוש**: `notification_streamer.stream_user_notifications(websocket, user_id)` — Redis Pub/Sub דרך `broadcaster`, ערוץ `user_{user_id}`.
+- **שימוש**: `notification_streamer.stream_user_notifications(websocket, user_id)` — Redis Pub/Sub דרך `broadcaster`, ערוץ פנימי `user_{user_id}` (מקביל נפרד מ-`user:{id}:events` שמשמש את chat-ws לדחיפות דומיין).
 
 ---
 

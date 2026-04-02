@@ -85,6 +85,9 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ## ערוצי Redis
 
 - `chat:conversation:{conversation_id}` – הודעות צ'אט (נשלח מ-backend, נשמע ע"י Go WS + AI analyzer)
+- `chat:typing:*` – אינדיקציית הקלדה
+- `chat:notification:*` – דחיפות in-app לפי נמען
+- **`user:*:events`** – אירועי דומיין מה-backend (`publish_user_event` דרך **`REDIS_CHAT_URL`** / DB כמו chat-ws, לא `broadcast`/DB0); Go מנתב ל-`SendToUser` לפי מזהה מהערוץ. הקבוע בקוד: `UserEventPattern` ב-`internal/redis/subscriber.go`
 - `chat:analysis:{conversation_id}` – תוצאות ניתוח AI (נשלח מ-AI analyzer)
 - `chat:conversation_cache:{conversation_id}` – cache של הודעות אחרונות (נשמר ע"י AI analyzer)
 
