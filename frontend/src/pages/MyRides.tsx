@@ -4,7 +4,8 @@ import { Car, Plus } from 'lucide-react';
 import { cancelRide, fetchMyRides } from '../api/rides';
 import type { Ride } from '../types/api';
 import { formatDateTimeNoSeconds } from '../utils/date';
-import { getRideWebSocketUrl } from '../config/env';
+import { STORAGE_KEYS } from '../config/constants';
+import { WS_URLS } from '../config/wsUrls';
 import { RideEventSchema } from '../types/wsEvents';
 import { useGroup } from '../context/GroupContext';
 import Chips, { type ChipItem } from '../components/Chips/Chips';
@@ -86,7 +87,7 @@ export default function MyRides() {
   useEffect(() => {
     const rideIds = rides.map((r) => r.ride_id);
     const currentIds = new Set(rideIds);
-    const token = localStorage.getItem('linkup_access_token');
+    const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!token) return;
 
     const handleMessage = (_rideId: string, ev: MessageEvent) => {
@@ -110,7 +111,7 @@ export default function MyRides() {
     const openWs = (rideId: string) => {
       if (wsRefs.current.has(rideId)) return;
       try {
-        const ws = new WebSocket(getRideWebSocketUrl(rideId, token));
+        const ws = new WebSocket(WS_URLS.ride(rideId, token));
         wsRefs.current.set(rideId, ws);
         ws.onmessage = (ev) => handleMessage(rideId, ev);
         ws.onclose = () => {

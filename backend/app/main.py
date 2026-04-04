@@ -1,6 +1,7 @@
-import logging
 import re
 import uuid
+
+import structlog
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import FastAPI, Request, HTTPException, Response
@@ -33,7 +34,7 @@ import app.infrastructure.firebase_core.firebase  # noqa: F401
 from app.admin.setup import setup_admin
 
 setup_logging()
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # CORS: origins ממ-config או FRONTEND_URL (מחשבים לפני יצירת app)
 _cors_origins = getattr(settings, "CORS_ORIGINS", None) or []
@@ -64,10 +65,10 @@ class EnsureCORSHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
         if "/api/v1/" in path:
-            print("[Linkup] >>> בקשה: {} {}".format(request.method, path), flush=True)
+            logger.debug("request %s %s", request.method, path)
         response = await call_next(request)
         if "/api/v1/" in path:
-            print("[Linkup] <<< תגובה: status={}".format(response.status_code), flush=True)
+            logger.debug("response status=%s %s", response.status_code, path)
         origin = request.headers.get("origin")
         if origin and (origin in _cors_origins or (_allow_origin_regex and re.match(_allow_origin_regex, origin))):
             response.headers.setdefault("Access-Control-Allow-Origin", origin)
@@ -163,5 +164,4 @@ async def api_health(response: Response):
     return health
 
 
-# הדפסה בעלייה – לוודא שהקוד הנכון רץ
-print("[Linkup] Backend נטען (main.py) – CORS + לוגים פעילים", flush=True)
+logger.info("Linkup backend started")

@@ -6,6 +6,7 @@ import logging
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.constants import BATCH_SIZE_DEFAULT
 from app.domain.chat import crud as chat_crud
 from app.domain.chat.ai.analyzer import analyze_conversation
 from app.domain.chat.ai.crud import create_analysis, analysis_exists
@@ -44,7 +45,7 @@ async def handle_conversation_completion(
             return False
 
         # איסוף טקסט השיחה
-        chat_text = await get_conversation_text_for_analysis(db, conversation_id, current_user_id, limit=100)
+        chat_text = await get_conversation_text_for_analysis(db, conversation_id, current_user_id, limit=BATCH_SIZE_DEFAULT)
         if not chat_text:
             logger.warning(f"No messages found for conversation {conversation_id}")
             return False

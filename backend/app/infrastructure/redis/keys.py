@@ -1,7 +1,10 @@
-# תוקף שמירת תצוגת המסלולים (כולל 3 המסלולים) ב-Redis – 24 שעות
-RIDE_PREVIEW_TTL = 86400  # 24 שעות (בשניות)
+from app.core import constants
 
-OTP_VERIFICATION_TTL = 600  # 10 דקות
+# תוקף שמירת תצוגת המסלולים (כולל 3 המסלולים) ב-Redis – 24 שעות (מקור: app.core.constants)
+RIDE_PREVIEW_TTL = constants.RIDE_PREVIEW_TTL
+
+# שם היסטורי לקוד אימות (אותו ערך כמו OTP_TTL)
+OTP_VERIFICATION_TTL = constants.OTP_TTL
 
 
 def get_ride_preview_key(session_id: str) -> str:

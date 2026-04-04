@@ -16,7 +16,7 @@ class BookingCreate(BaseModel):
 class BookingResponse(BaseModel):
     booking_id: UUID
     ride_id: UUID
-    request_id: UUID
+    request_id: Optional[UUID] = None
     passenger_id: UUID
     num_seats: int
     status: BookingStatus

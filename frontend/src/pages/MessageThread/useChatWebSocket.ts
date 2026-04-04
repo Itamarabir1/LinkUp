@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { MessageResponse } from '../../types/api';
+import { STORAGE_KEYS } from '../../config/constants';
 import { getChatWebSocketUrl } from '../../config/env';
 import type { PartnerPresence } from '../../api/presence';
 import { TYPING_THROTTLE_MS } from './messageThread.constants';
@@ -63,7 +64,7 @@ export function useChatWebSocket(options: {
     };
 
     const connect = () => {
-      const token = localStorage.getItem('linkup_access_token');
+      const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       if (!token || cancelled) return;
 
       const url = getChatWebSocketUrl(token);

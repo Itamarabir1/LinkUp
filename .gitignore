@@ -1,5 +1,6 @@
 # --- Environment & secrets ---
 .env
+*.env
 backend/.env
 frontend/.env
 chat-ws/.env

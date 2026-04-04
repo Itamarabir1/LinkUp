@@ -1,4 +1,6 @@
 import logging
+import secrets
+from datetime import datetime, timezone
 from uuid import UUID
 from typing import Dict, Any
 
@@ -287,8 +289,6 @@ class AuthService:
 
             # יצירת סיסמה דמה (לא בשימוש, אבל נדרש ב-DB)
             # נשתמש ב-random string ארוך שלא ניתן לנחש
-            import secrets
-
             dummy_password = secrets.token_urlsafe(32)
             hashed_password = await get_password_hash(dummy_password)
 
@@ -342,8 +342,6 @@ class AuthService:
         refresh_token = create_refresh_token(data={"sub": str(user.user_id)})
 
         # 5+6. שמירת Refresh Token + עדכון last_login ב-commit אחד
-        from datetime import datetime, timezone
-
         user.refresh_token = refresh_token
         user.last_login = datetime.now(timezone.utc)
         db.add(user)

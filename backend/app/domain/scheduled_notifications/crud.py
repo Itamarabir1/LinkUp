@@ -16,6 +16,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func
 
+from app.core.constants import BATCH_SIZE_DEFAULT
 from app.domain.scheduled_notifications.model import ScheduledNotification
 
 logger = logging.getLogger(__name__)
@@ -46,12 +47,12 @@ class CRUDScheduledNotification:
         self,
         db: AsyncSession,
         now: datetime,
-        limit: int = 100,
+        limit: int = BATCH_SIZE_DEFAULT,
     ) -> List[ScheduledNotification]:
         """
         שולף תזכורות שעבר זמנן וטרם נשלחו.
         מנצל את ה-partial index idx_scheduled_notifications_deliver.
-        limit=100 — מגן מפני עומס בריצה בודדת.
+        BATCH_SIZE_DEFAULT — מגן מפני עומס בריצה בודדת.
         """
         stmt = (
             select(ScheduledNotification)

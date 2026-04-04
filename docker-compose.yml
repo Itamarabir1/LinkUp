@@ -63,9 +63,8 @@ services:
   migrate:
     build:
       context: ./backend
-      target: development
+      target: migrate
     container_name: linkup_migrate
-    command: alembic upgrade head
     env_file:
       - ./backend/.env
     environment:
@@ -120,6 +119,7 @@ services:
       - POSTGRES_HOST=db
       - REDIS_HOST=redis
       - REDIS_DB=0 # מפורש: DB 0 לbackend
+      - REDIS_CHAT_DB=1 # אותו DB כמו chat-ws — Pub/Sub אירועי משתמש/צ'אט
       - RABBITMQ_HOST=rabbitmq
       - DOCKER_MODE=true
       - LOG_LEVEL=${LOG_LEVEL:-INFO}

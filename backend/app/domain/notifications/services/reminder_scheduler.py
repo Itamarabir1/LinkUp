@@ -13,6 +13,7 @@ import logging
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.constants import BATCH_SIZE_DEFAULT
 from app.domain.notifications.core.handler import notification_handler
 from app.domain.notifications.constants import NotificationEvent
 from app.domain.scheduled_notifications.crud import crud_scheduled_notification
@@ -25,10 +26,10 @@ class ReminderScheduler:
     async def run_batch_reminders(self, db: AsyncSession) -> None:
         """
         מריץ batch של תזכורות שעבר זמנן.
-        limit=100 מגן מפני עומס — אם יש יותר, הריצה הבאה תטפל בשאר.
+        מגבלת batch (BATCH_SIZE_DEFAULT) מגנה מפני עומס — אם יש יותר, הריצה הבאה תטפל בשאר.
         """
         now = datetime.now(timezone.utc)
-        due = await crud_scheduled_notification.get_due(db, now, limit=100)
+        due = await crud_scheduled_notification.get_due(db, now, limit=BATCH_SIZE_DEFAULT)
 
         if not due:
             return

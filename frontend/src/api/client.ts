@@ -1,11 +1,9 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import { STORAGE_KEYS } from '../config/constants';
 import { API_BASE_URL, API_TIMEOUT_MS } from '../config/env';
 
 // לוודא לאן הבקשות הולכות (יופיע בקונסול של הדפדפן F12)
 console.log('[Linkup Frontend] API Base URL:', API_BASE_URL);
-
-const TOKEN_KEY = 'linkup_access_token';
-const REFRESH_KEY = 'linkup_refresh_token';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -14,21 +12,21 @@ export const api = axios.create({
 });
 
 function getStoredAccessToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
 }
 
 function getStoredRefreshToken(): string | null {
-  return localStorage.getItem(REFRESH_KEY);
+  return localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
 }
 
 export function setTokens(access: string, refresh: string): void {
-  localStorage.setItem(TOKEN_KEY, access);
-  localStorage.setItem(REFRESH_KEY, refresh);
+  localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, access);
+  localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refresh);
 }
 
 export function clearTokens(): void {
-  localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_KEY);
+  localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
 }
 
 async function refreshAccessToken(): Promise<string | null> {
@@ -45,8 +43,8 @@ async function refreshAccessToken(): Promise<string | null> {
     const newAccess = data.access_token;
     const newRefresh = data.refresh_token;
     if (newAccess) {
-      localStorage.setItem(TOKEN_KEY, newAccess);
-      if (newRefresh) localStorage.setItem(REFRESH_KEY, newRefresh);
+      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, newAccess);
+      if (newRefresh) localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, newRefresh);
       return newAccess;
     }
   } catch {

@@ -3,7 +3,7 @@ CRUD לבקשות נוסעים – מקור אמת יחיד, API עקבי.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy.orm import Session
@@ -22,6 +22,18 @@ from app.domain.bookings.model import Booking
 from app.domain.bookings.enum import BookingStatus
 
 logger = logging.getLogger(__name__)
+
+# חלון זמן יחסי ל-min_departure_time בחיפוש נסיעות (± שעות)
+_DEPARTURE_FLEXIBILITY_HOURS = 2
+# נהג מחפש נוסעים לאורך המסלול — רדיוס ברירת מחדל (מטר)
+_FIND_PASSENGERS_ON_ROUTE_RADIUS_M = 2000
+# התראת נסיעה חדשה: רדיוס יעד / מוצא על המסלול ומגבלת תוצאות
+_RIDE_NOTIFICATION_RADIUS_DEST_M = 5000
+_RIDE_NOTIFICATION_RADIUS_PICKUP_M = 2000
+_RIDE_NOTIFICATION_PASSENGER_LIMIT = 200
+_RIDE_DATE_WINDOW_DAYS_BEFORE = 1
+_RIDE_DATE_WINDOW_DAYS_AFTER = 7
+_GET_MULTI_RIDES_DEFAULT_LIMIT = 100
 
 
 class CRUDPassenger:
@@ -69,8 +81,6 @@ class CRUDPassenger:
         passenger_id: UUID,
     ) -> PassengerRequest:
         """יצירת בקשה חדשה. passenger_id מהשרת (טוקן), לא מהגוף."""
-        from datetime import timezone
-
         req_time = request.requested_departure_time
         if req_time is None:
             req_time = datetime.now(timezone.utc)
@@ -134,11 +144,8 @@ class CRUDPassenger:
             < func.ST_LineLocatePoint(cast(Ride.route_coords, Geometry), cast(dest_geo, Geometry)),
         )
         if min_departure_time is not None:
-            from datetime import timedelta
-
-            FLEXIBILITY_HOURS = 2
-            earliest = min_departure_time - timedelta(hours=FLEXIBILITY_HOURS)
-            latest = min_departure_time + timedelta(hours=FLEXIBILITY_HOURS)
+            earliest = min_departure_time - timedelta(hours=_DEPARTURE_FLEXIBILITY_HOURS)
+            latest = min_departure_time + timedelta(hours=_DEPARTURE_FLEXIBILITY_HOURS)
             filters = and_(
                 filters,
                 Ride.departure_time >= earliest,
@@ -196,7 +203,7 @@ class CRUDPassenger:
         self,
         db: AsyncSession,
         route_coords: list,
-        radius_meters: int = 2000,
+        radius_meters: int = _FIND_PASSENGERS_ON_ROUTE_RADIUS_M,
     ) -> List[PassengerRequest]:
         """נהג מחפש נוסעים לאורך המסלול שלו."""
         if not route_coords or len(route_coords) < 2:
@@ -256,9 +263,9 @@ class CRUDPassenger:
         self,
         db: AsyncSession,
         ride: "Ride",
-        radius_destination_m: int = 5000,
-        radius_pickup_m: int = 2000,
-        limit: int = 200,
+        radius_destination_m: int = _RIDE_NOTIFICATION_RADIUS_DEST_M,
+        radius_pickup_m: int = _RIDE_NOTIFICATION_RADIUS_PICKUP_M,
+        limit: int = _RIDE_NOTIFICATION_PASSENGER_LIMIT,
     ) -> List[PassengerRequest]:
         """
         נוסעים רלוונטיים להתראה על נסיעה חדשה.
@@ -288,8 +295,8 @@ class CRUDPassenger:
             )
             return []
 
-        min_date = ride_date - timedelta(days=1)
-        max_date = ride_date + timedelta(days=7)
+        min_date = ride_date - timedelta(days=_RIDE_DATE_WINDOW_DAYS_BEFORE)
+        max_date = ride_date + timedelta(days=_RIDE_DATE_WINDOW_DAYS_AFTER)
 
         stmt = (
             select(PassengerRequest)
@@ -330,7 +337,7 @@ class CRUDPassenger:
         db: AsyncSession,
         status: Optional[str] = None,
         skip: int = 0,
-        limit: int = 100,
+        limit: int = _GET_MULTI_RIDES_DEFAULT_LIMIT,
     ) -> List[Ride]:
         """שליפת רשימת נסיעות עם סינון אופציונלי לפי סטטוס."""
         stmt = select(Ride)

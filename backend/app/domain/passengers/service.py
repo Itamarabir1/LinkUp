@@ -28,6 +28,8 @@ from app.infrastructure.geo.geocode_cache import get_coordinates
 # הגדרת לוגר
 logger = logging.getLogger(__name__)
 
+_DEFAULT_SEARCH_RADIUS_M = 1000
+
 
 class PassengerService:
     @staticmethod
@@ -128,7 +130,7 @@ class PassengerService:
             logger.error(f"Error parsing coordinates for request {request_id}: {e}")
             raise GeocodingError(address=str(request_id))
 
-        radius = getattr(p_req, "search_radius_meters", None) or getattr(p_req, "search_radius", 1000)
+        radius = getattr(p_req, "search_radius_meters", None) or getattr(p_req, "search_radius", _DEFAULT_SEARCH_RADIUS_M)
         matches, _ = await crud_passenger.find_rides_by_coordinates(
             db,
             p_lat,
@@ -153,7 +155,7 @@ class PassengerService:
             p_lat, p_lon = pickup_coords
             d_lat, d_lon = dest_coords
 
-            radius = getattr(search_data, "search_radius", None) or getattr(search_data, "radius", 1000)
+            radius = getattr(search_data, "search_radius", None) or getattr(search_data, "radius", _DEFAULT_SEARCH_RADIUS_M)
 
             matches, has_more = await crud_passenger.find_rides_by_coordinates(
                 db,
@@ -228,7 +230,7 @@ class PassengerService:
             pickup_name=pickup_name,
             destination_name=destination_name,
             num_passengers=num_seats,
-            search_radius=1000,
+            search_radius=_DEFAULT_SEARCH_RADIUS_M,
             is_notification_active=True,
             is_auto_generated=True,
         )

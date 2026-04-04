@@ -24,6 +24,17 @@ from app.domain.bookings.model import Booking
 
 logger = logging.getLogger(__name__)
 
+# סטטיסטיקות דשבורד — חלון "פעילים" וגרף הרשמות (ימים)
+_ADMIN_STATS_ACTIVE_USERS_DAYS = 7
+_ADMIN_STATS_CHART_DAYS = 7
+# ברירות מחדל ל-pagination ב-endpoints אדמין
+_QUERY_DEFAULT_USERS_LIMIT = 50
+_QUERY_MAX_USERS_LIMIT = 200
+_QUERY_DEFAULT_RIDES_LIMIT = 100
+_QUERY_DEFAULT_GROUPS_LIMIT = 200
+_QUERY_DEFAULT_OUTBOX_LIMIT = 100
+_QUERY_MAX_ADMIN_LIST_LIMIT = 500
+
 router = APIRouter(tags=["Admin"])
 
 
@@ -68,7 +79,7 @@ async def admin_stats(
     """Aggregates for admin dashboard (single round-trip)."""
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    week_ago = now - timedelta(days=7)
+    week_ago = now - timedelta(days=_ADMIN_STATS_ACTIVE_USERS_DAYS)
 
     users_total = await db.scalar(select(func.count()).select_from(User))
     rides_active = await db.scalar(
@@ -92,7 +103,7 @@ async def admin_stats(
     bookings_by_status = {_enum_key(row[0]): int(row[1]) for row in bookings_by_status_result.all()}
 
     users_per_day: list[dict] = []
-    for i in range(6, -1, -1):
+    for i in range(_ADMIN_STATS_CHART_DAYS - 1, -1, -1):
         day_start = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = day_start + timedelta(days=1)
         count = await db.scalar(select(func.count()).select_from(User).where(and_(User.created_at >= day_start, User.created_at < day_end)))
@@ -122,7 +133,7 @@ async def admin_users(
     is_active: bool | None = Query(default=None),
     is_admin: bool | None = Query(default=None),
     is_verified: bool | None = Query(default=None),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=_QUERY_DEFAULT_USERS_LIMIT, ge=1, le=_QUERY_MAX_USERS_LIMIT),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
@@ -208,7 +219,7 @@ async def admin_rides(
         default=None,
         description="Filter: active | completed | cancelled (omit = all recent)",
     ),
-    limit: int = Query(default=100, ge=1, le=500),
+    limit: int = Query(default=_QUERY_DEFAULT_RIDES_LIMIT, ge=1, le=_QUERY_MAX_ADMIN_LIST_LIMIT),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
@@ -261,7 +272,7 @@ async def admin_cancel_ride(
 
 @router.get("/groups")
 async def admin_groups(
-    limit: int = Query(default=200, ge=1, le=500),
+    limit: int = Query(default=_QUERY_DEFAULT_GROUPS_LIMIT, ge=1, le=_QUERY_MAX_ADMIN_LIST_LIMIT),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
@@ -309,7 +320,7 @@ async def admin_groups(
 async def admin_outbox(
     status: str | None = Query(default=None, description="PENDING/PROCESSED/FAILED"),
     event_name: str | None = Query(default=None),
-    limit: int = Query(default=100, ge=1, le=500),
+    limit: int = Query(default=_QUERY_DEFAULT_OUTBOX_LIMIT, ge=1, le=_QUERY_MAX_ADMIN_LIST_LIMIT),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):

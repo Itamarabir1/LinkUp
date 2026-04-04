@@ -22,6 +22,12 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
+# ===== MIGRATE =====
+# שירות חד-פעמי: alembic בלבד — בלי entrypoint של uvicorn
+FROM base AS migrate
+ENTRYPOINT ["alembic"]
+CMD ["upgrade", "head"]
+
 # ===== PRODUCTION =====
 # פרודקשן — gunicorn בלי --reload
 FROM base AS production

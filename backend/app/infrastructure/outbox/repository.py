@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.constants import BATCH_SIZE_DEFAULT
 from app.infrastructure.outbox.model import OutboxEvent
 
 logger = logging.getLogger(__name__)
@@ -41,7 +43,7 @@ class OutboxRepository:
             # כאן תוכל לעטוף ב-LinkupError אם תרצה
             raise
 
-    async def get_pending_events(self, db: AsyncSession, batch_size: int = 100) -> List[OutboxEvent]:
+    async def get_pending_events(self, db: AsyncSession, batch_size: int = BATCH_SIZE_DEFAULT) -> List[OutboxEvent]:
         """
         שליפת אירועים לעיבוד עבור ה-Worker.
         שימוש ב-skip_locked מונע התנגשויות בין מספר מופעים של השרת.

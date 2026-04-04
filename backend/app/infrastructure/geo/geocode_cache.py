@@ -12,12 +12,11 @@ import json
 import logging
 from typing import Optional, Tuple
 
+from app.core.constants import GEOCODE_CACHE_TTL
 from app.infrastructure.geo.geocoding import GeocodingService
 from app.infrastructure.redis.client import redis_client
 
 logger = logging.getLogger(__name__)
-
-GEOCODE_CACHE_TTL = 60 * 60 * 24  # 24 שעות
 
 
 async def get_cached_coords(address: str) -> Optional[Tuple[float, float]]:

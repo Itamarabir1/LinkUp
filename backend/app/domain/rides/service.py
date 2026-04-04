@@ -1,6 +1,7 @@
 import json
-import logging
 from typing import Any, Dict, List, Optional
+
+import structlog
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,7 +39,7 @@ from app.domain.events.outbox import publish_to_outbox
 from app.domain.events.enum import DispatchTarget
 from app.domain.notifications.constants import NotificationEvent
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class _RideNotificationFactory:
@@ -143,7 +144,7 @@ class RideService:
 
     async def _validate_and_get_cached_ride(self, ride_in: RideCreate) -> Dict[str, Any]:
         if not (ride_in.session_id and str(ride_in.session_id).strip()):
-            logger.warning("create_ride called with empty session_id")
+            logger.warning("create_ride_empty_session_id")
             raise SessionExpiredError(session_id=ride_in.session_id or "")
         cached_data = await self.cache.get_preview(ride_in.session_id)
         if not cached_data:

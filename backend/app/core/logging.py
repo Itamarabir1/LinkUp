@@ -1,11 +1,19 @@
 """
-Structured Logging: JSON בפרודקשן, טקסט קריא בפיתוח.
-Request ID מוזרק ל-LogRecord דרך contextvar כדי שיופיע בכל לוג בתוך בקשה.
+Structured Logging with structlog.
+
+- לוקאלי (LOG_FORMAT=text): צבעוני + קריא עם ConsoleRenderer
+- פרודקשן (LOG_FORMAT=json): JSON נקי עם JSONRenderer
+- request_id מוזרק אוטומטית לכל log דרך ContextVar (structlog) + RequestIDFilter על LogRecord
+- stdlib logging (uvicorn, sqlalchemy, FastAPI) מנותב דרך structlog (foreign_pre_chain)
 """
 
 import logging
 import sys
 from contextvars import ContextVar
+from typing import Any
+
+import structlog
+from structlog.types import EventDict, WrappedLogger
 
 from app.core.config import settings
 
@@ -21,9 +29,22 @@ class RequestIDFilter(logging.Filter):
         return True
 
 
+def add_request_id(
+    logger: WrappedLogger,
+    method_name: str,
+    event_dict: EventDict,
+) -> EventDict:
+    """structlog processor — מוסיף request_id מה-ContextVar."""
+    request_id = request_id_ctx.get()
+    if request_id:
+        event_dict["request_id"] = request_id
+    return event_dict
+
+
 def setup_logging() -> None:
     """
-    מגדיר לוגים: JSON עם שדות קבועים (פרודקשן) או טקסט קריא (פיתוח).
+    מגדיר structlog + stdlib logging.
+    structlog processors רצים על כל log — גם מקוד האפליקציה וגם מ-uvicorn/sqlalchemy.
     """
     # TODO: Sentry — להסיר הערה כשעוברים לפרודקשן ומוסיפים SENTRY_DSN ל-.env
     # import sentry_sdk
@@ -48,25 +69,42 @@ def setup_logging() -> None:
     # - app/workers/main_worker.py (outbox-worker — תהליך נפרד, צריך init נפרד)
     # - chat-ws: sentry-go SDK נפרד (github.com/getsentry/sentry-go)
 
-    log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+    shared_processors: list[Any] = [
+        structlog.contextvars.merge_contextvars,
+        add_request_id,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+    ]
 
     if settings.LOG_FORMAT == "json":
-        from pythonjsonlogger import json as jsonlogger
-
-        formatter = jsonlogger.JsonFormatter(
-            fmt="%(asctime)s %(name)s %(levelname)s %(message)s %(request_id)s",
-            datefmt="%Y-%m-%dT%H:%M:%S",
-        )
+        renderer = structlog.processors.JSONRenderer()
     else:
-        formatter = logging.Formatter(
-            fmt="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+        renderer = structlog.dev.ConsoleRenderer(colors=True)
+
+    structlog.configure(
+        processors=shared_processors
+        + [
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        wrapper_class=structlog.stdlib.BoundLogger,
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+
+    formatter = structlog.stdlib.ProcessorFormatter(
+        processor=renderer,
+        foreign_pre_chain=shared_processors,
+    )
 
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
     handler.addFilter(RequestIDFilter())
 
+    log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
     root = logging.getLogger()
     root.setLevel(log_level)
     root.handlers = [handler]

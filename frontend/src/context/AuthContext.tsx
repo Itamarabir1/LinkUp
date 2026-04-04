@@ -12,6 +12,7 @@ import {
   signInWithGoogleToken,
 } from '../api/auth';
 import { clearTokens, setTokens } from '../api/client';
+import { STORAGE_KEYS } from '../config/constants';
 import { fetchCurrentUser } from '../api/users';
 import type { User } from '../types/api';
 
@@ -47,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const refreshUser = useCallback(async () => {
-    const token = localStorage.getItem('linkup_access_token');
+    const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!token) {
       setState((s) => ({
         ...s,
@@ -78,7 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    const token = localStorage.getItem('linkup_access_token');
+    const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!token || !mounted) {
       if (mounted) queueMicrotask(() => setState((s) => ({ ...s, isLoading: false })));
       return;
