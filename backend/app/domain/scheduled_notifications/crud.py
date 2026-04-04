@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import List
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import func
 
@@ -76,8 +76,6 @@ class CRUDScheduledNotification:
         מוחק תזכורות של נסיעה שבוטלה.
         ON DELETE CASCADE ב-DB מטפל בזה אוטומטית — זו פונקציה לשימוש ידני אם צריך.
         """
-        from sqlalchemy import delete
-
         await db.execute(
             delete(ScheduledNotification).where(
                 ScheduledNotification.ride_id == ride_id,

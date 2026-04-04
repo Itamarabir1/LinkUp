@@ -1,5 +1,7 @@
 import asyncio
 import logging
+
+from app.domain.events.enum import DispatchTarget
 from app.infrastructure.outbox.repository import OutboxRepository
 from app.infrastructure.events.dispatcher.base import EventDispatcher
 from app.domain.events.schema import Event
@@ -19,8 +21,6 @@ class OutboxService:
         exchange + routing_key נגזרים מ-event_name (מקור אמת ב-domain.events.routing).
         """
         try:
-            from app.domain.events.enum import DispatchTarget
-
             targets = [DispatchTarget(t) for t in (db_event.targets or []) if t]
             metadata = get_routing_metadata(db_event.event_name)
             event_dto = Event(

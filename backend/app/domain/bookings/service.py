@@ -23,8 +23,10 @@ from app.domain.bookings.enum import BookingStatus
 from app.domain.rides.enum import RideStatus
 from app.domain.bookings.schema import (
     BookingManifestItem,
-    RideManifestResponse,
+    BookingResponse,
     NotificationItemResponse,
+    PaginatedBookingsResponse,
+    RideManifestResponse,
 )
 
 # אירועים – Outbox בלבד
@@ -269,8 +271,6 @@ class BookingService:
         limit: int = 20,
     ):
         """שליפת הזמנות משתמש עם page-based pagination."""
-        from app.domain.bookings.schema import PaginatedBookingsResponse, BookingResponse
-
         total = await crud_booking.get_user_bookings_count_async(db, user_id, status)
         offset = (page - 1) * limit
         bookings = await crud_booking.get_user_bookings_filtered_async(db, user_id, status, offset=offset, limit=limit)

@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
-from sqlalchemy import or_, text
+from sqlalchemy import or_, text, select, func, update as sa_update
 from app.domain.bookings.model import Booking
 from app.domain.rides.model import Ride
 from app.domain.passengers.model import PassengerRequest
@@ -13,7 +13,6 @@ from app.domain.bookings.enum import BookingStatus
 from app.domain.passengers.enum import PassengerStatus
 from app.core.exceptions.booking import NoSeatsAvailableError
 from app.core.exceptions.booking import ForbiddenRideActionError
-from sqlalchemy import select, func
 
 
 class CRUDBooking:
@@ -54,9 +53,6 @@ class CRUDBooking:
 
     async def get_async(self, db: AsyncSession, booking_id: UUID) -> Optional[Booking]:
         """שליפה אסינכרונית להזמנה עם טעינת יחסים (לשימוש ב-API endpoints)."""
-        from app.domain.rides.model import Ride
-        from app.domain.passengers.model import PassengerRequest
-
         bid = UUID(str(booking_id)) if isinstance(booking_id, str) else booking_id
         stmt = (
             select(Booking)
@@ -197,8 +193,6 @@ class CRUDBooking:
         1. מבטל את כל ההזמנות (Bookings) של הנסיעה.
         2. מחזיר את כל בקשות הנוסעים (PassengerRequests) לסטטוס PENDING.
         """
-        from sqlalchemy import update as sa_update
-
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         stmt = select(Booking.request_id).where(Booking.ride_id == rid, Booking.request_id.isnot(None))
         result = await db.execute(stmt)
@@ -332,8 +326,6 @@ class CRUDBooking:
         return req_ids
 
     async def bulk_update_requests_status(self, db: AsyncSession, request_ids: list, new_status: PassengerStatus):
-        from sqlalchemy import update as sa_update
-
         status_value = new_status.value if hasattr(new_status, "value") else str(new_status)
         await db.execute(sa_update(PassengerRequest).where(PassengerRequest.request_id.in_(request_ids)).values(status=status_value))
 
@@ -374,7 +366,6 @@ class CRUDBooking:
         """מעדכן את סטטוס ה-PassengerRequest לפי מצב ה-bookings שלו."""
         if not request_id:
             return
-        from sqlalchemy import update as sa_update
 
         reqid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
         new_status = await self.determine_passenger_request_status(db, reqid)
@@ -384,8 +375,6 @@ class CRUDBooking:
 
     async def complete_bookings_by_ride_ids(self, db: AsyncSession, ride_ids: list):
         """מעדכן סטטוס לכל הבוקינגס ששייכים לרשימת נסיעות"""
-        from sqlalchemy import update as sa_update
-
         await db.execute(
             sa_update(Booking)
             .where(

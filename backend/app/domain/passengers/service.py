@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions.base import LinkupError
-from app.core.exceptions.booking import PassengerRequestNotFoundError
+from app.core.exceptions.booking import ForbiddenRideActionError, PassengerRequestNotFoundError
 from app.core.exceptions.infrastructure import GeocodingError
 from app.core.exceptions.ride import InvalidRideStatusError, RideNotFoundError
 from app.domain.passengers.crud import crud_passenger
@@ -18,6 +18,7 @@ from app.domain.passengers.schema import (
     PassengerRequestCreate,
     PassengerRequestResponse,
     RideSearchRequest,
+    RideSearchResponse,
 )
 from app.domain.rides.crud import crud_ride
 from app.domain.rides.enum import RideStatus
@@ -83,8 +84,6 @@ class PassengerService:
 
         # הרשאות: רק בעל הבקשה יכול לבטל
         if p_req.passenger_id != passenger_id:
-            from app.core.exceptions.booking import ForbiddenRideActionError
-
             raise ForbiddenRideActionError("גישה חסומה")
 
         # 1. ביטול כל ההזמנות ושחרור מושבים
@@ -112,8 +111,6 @@ class PassengerService:
     @staticmethod
     async def get_matches_by_request_id(db: AsyncSession, request_id: UUID, current_user_id: UUID):
         """שליפת התאמות חדשות לבקשה קיימת"""
-        from app.core.exceptions.booking import ForbiddenRideActionError
-
         p_req = await crud_passenger.get_by_id(db, request_id)
         if not p_req:
             raise PassengerRequestNotFoundError(request_id=str(request_id))
@@ -145,8 +142,6 @@ class PassengerService:
     @staticmethod
     async def search_rides_for_passenger(db: AsyncSession, search_data: RideSearchRequest):
         """חיפוש נסיעות פעיל לפי קואורדינטות של כתובות. לא שומר בקשה ב-DB."""
-        from app.domain.passengers.schema import RideSearchResponse
-
         try:
             pickup_coords = await get_coordinates(search_data.pickup_name)
             dest_coords = await get_coordinates(search_data.destination_name)
