@@ -1,7 +1,7 @@
 import json
 import logging
-from datetime import UTC, datetime, timezone
-from typing import Any, Dict, List
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from app.domain.geo.schema import LocationUpdate

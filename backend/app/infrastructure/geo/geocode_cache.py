@@ -10,7 +10,6 @@ geocode_cache.py — מקור אמת יחיד לcache של geocoding.
 
 import json
 import logging
-from typing import Optional, Tuple
 
 from app.core.constants import GEOCODE_CACHE_TTL
 from app.infrastructure.geo.geocoding import GeocodingService

@@ -9,7 +9,7 @@ notification_tasks.py — handlers לאירועי RabbitMQ + ביצוע תזכו
 
 import logging
 from datetime import timedelta
-from typing import Any, Dict
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select

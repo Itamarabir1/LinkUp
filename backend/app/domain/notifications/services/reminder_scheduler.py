@@ -10,7 +10,7 @@ reminder_sent flag הוסר מ-Ride ו-Booking (migration 008).
 """
 
 import logging
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

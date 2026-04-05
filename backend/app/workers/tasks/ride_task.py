@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict
+from typing import Any
 from uuid import UUID
 
 from app.domain.rides.services.maps_service import maps_service

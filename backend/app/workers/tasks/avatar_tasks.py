@@ -4,7 +4,7 @@
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any
 from uuid import UUID
 
 from app.core.exceptions.infrastructure import WorkerTaskFailed

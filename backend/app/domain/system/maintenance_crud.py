@@ -11,7 +11,6 @@ maintenance_crud.py — עדכון סטטוסים פגי תוקף.
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Tuple
 from uuid import UUID
 
 from sqlalchemy import select, text, update

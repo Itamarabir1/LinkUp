@@ -3,7 +3,6 @@
 """
 
 from datetime import datetime, timedelta
-from typing import Optional
 
 from icalendar import Event
 

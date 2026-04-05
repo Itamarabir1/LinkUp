@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from app.domain.notifications.channels.push.client import fcm_client
 from app.domain.notifications.channels.push.render import render_push_content

@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from typing import Union
 
 
 def calculate_estimated_arrival(departure_time: str | datetime, duration_min: int) -> datetime:

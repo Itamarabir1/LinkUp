@@ -2,7 +2,7 @@ import json
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import aio_pika
 

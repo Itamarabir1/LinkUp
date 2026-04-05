@@ -3,7 +3,7 @@
 הדומיין לא יודע על RabbitMQ או EventDispatcher – רק כותב ל-Outbox באותה טרנזקציה.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

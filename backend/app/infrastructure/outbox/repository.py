@@ -1,6 +1,5 @@
 import logging
-from datetime import UTC, datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession

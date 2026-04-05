@@ -1,5 +1,5 @@
 # app/domain/notifications/core/builders/user_builder.py
-from typing import Any, Dict
+from typing import Any
 
 from .base import BaseContextBuilder
 

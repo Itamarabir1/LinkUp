@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from app.domain.notifications.channels.email.client import email_client
 from app.domain.notifications.channels.email.renderer import render_email_template

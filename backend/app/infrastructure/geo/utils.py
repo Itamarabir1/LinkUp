@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from typing import List, Optional, Tuple
 
 from geoalchemy2.shape import from_shape
 from shapely.geometry import LineString, Point

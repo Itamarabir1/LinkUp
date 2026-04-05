@@ -1,6 +1,5 @@
 # app/domain/bookings/service.py
 import logging
-from typing import List, Optional
 from urllib.parse import quote
 from uuid import UUID
 

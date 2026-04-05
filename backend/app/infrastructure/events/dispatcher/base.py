@@ -1,5 +1,4 @@
 import logging
-from typing import Dict
 
 from app.domain.events.enum import DispatchTarget
 from app.domain.events.schema import Event

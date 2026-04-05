@@ -6,7 +6,6 @@
 
 import logging
 import uuid
-from typing import Optional, Union
 from uuid import UUID
 
 from app.core.exceptions.infrastructure import S3DeleteFailed

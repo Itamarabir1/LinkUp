@@ -3,7 +3,7 @@ CRUD צ'אט 1:1 – שיחות והודעות.
 תמיד שומרים user_id_1 < user_id_2 ב־Conversation.
 """
 
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import desc, func, or_, select

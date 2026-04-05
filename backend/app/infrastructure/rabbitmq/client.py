@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-from typing import Dict, Optional
 
 import aio_pika
 

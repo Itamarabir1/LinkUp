@@ -3,7 +3,6 @@
 """
 
 from datetime import datetime
-from typing import List, Optional
 
 from ..ai.schema import RideSummary
 from .builder import create_calendar_from_rides

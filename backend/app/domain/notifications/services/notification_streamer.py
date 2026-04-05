@@ -1,5 +1,4 @@
 import logging
-from typing import Union
 from uuid import UUID
 
 from fastapi import WebSocket, WebSocketDisconnect

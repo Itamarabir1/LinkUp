@@ -7,7 +7,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 from app.domain.events.routing import (
     ROUTING_KEY_CHAT_TIMEOUT,

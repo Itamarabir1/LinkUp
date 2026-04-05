@@ -1,6 +1,5 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional
 from urllib.parse import urlparse, urlunparse
 
 from pydantic import AliasChoices, EmailStr, Field, computed_field

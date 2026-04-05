@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Dict, Union
+from typing import Any
 
 from app.domain.notifications.providers.base import BaseNotificationProvider
 from app.infrastructure.redis.broadcast import broadcast

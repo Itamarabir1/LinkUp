@@ -1,7 +1,6 @@
 # app/domain/geo/processor.py
 import logging
 from datetime import datetime
-from typing import Dict, Optional
 
 from app.core.exceptions.validation import InvalidLocationError
 from app.domain.geo.schema import GeoLocation, RouteOptionData

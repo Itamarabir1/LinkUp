@@ -1,5 +1,4 @@
 import secrets
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import func, select

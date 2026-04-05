@@ -1,5 +1,4 @@
 import logging
-from typing import List, Optional, Set
 
 from app.domain.events.enum import DispatchTarget
 from app.infrastructure.events.publishers.base import EventPublisher

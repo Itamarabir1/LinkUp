@@ -4,7 +4,7 @@
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from app.core.exceptions.base import LinkupError
 

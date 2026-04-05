@@ -28,7 +28,7 @@
   - כל תור מקשיב ל-exchange(es) שמתאימים לו בלבד. לא מערבבים התראות ומשימות כבדות באותו תור.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 # קידומת event_name → exchange
 _EXCHANGE_BY_PREFIX: dict[str, str] = {

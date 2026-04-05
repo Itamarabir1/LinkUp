@@ -1,5 +1,4 @@
 # app/domain/bookings/router.py
-from typing import List, Optional
 from uuid import UUID
 
 from fastapi import (

@@ -4,7 +4,6 @@
 
 import re
 from datetime import datetime, timedelta
-from typing import Optional
 
 
 def parse_hebrew_time(time_str: str, base_date: datetime | None = None) -> datetime | None:

@@ -1,5 +1,5 @@
-from datetime import UTC, datetime, timezone
-from typing import Any, Dict, Optional, Union
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from geoalchemy2.functions import ST_GeomFromText

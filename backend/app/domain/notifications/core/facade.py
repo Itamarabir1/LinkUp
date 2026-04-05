@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from app.core.exceptions.base import LinkupError
 from app.domain.notifications.constants import NotificationEvent

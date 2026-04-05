@@ -1,7 +1,7 @@
 # app/domain/rides/repository.py — ride cache (Redis)
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.core.exceptions.infrastructure import InfrastructureError
 from app.domain.rides.schema import RidePreviewCreate, RidePreviewResponse

@@ -9,7 +9,6 @@ create — כותב רשומה חדשה (נקרא מה-outbox worker).
 
 import logging
 from datetime import datetime
-from typing import List
 from uuid import UUID
 
 from sqlalchemy import delete, select, update

@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from typing import Dict, Optional
 
 from firebase_admin import messaging
 from tenacity import (
