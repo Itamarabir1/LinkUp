@@ -11,10 +11,10 @@ class LinkupError(Exception):
 
     def __init__(
         self,
-        message: Optional[str] = None,
-        status_code: Optional[int] = None,
-        error_code: Optional[str] = None,
-        payload: Optional[Dict[str, Any]] = None,
+        message: str | None = None,
+        status_code: int | None = None,
+        error_code: str | None = None,
+        payload: dict[str, Any] | None = None,
         **kwargs,
     ):
         # תאימות לאחור: detail נחשב כ-message

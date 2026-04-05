@@ -2,16 +2,16 @@ import logging
 from typing import Any, Dict
 
 from app.core.exceptions.base import LinkupError
+from app.domain.notifications.constants import NotificationEvent
 
 from .builders.registry import CONTEXT_MAP
-from app.domain.notifications.constants import NotificationEvent
 
 logger = logging.getLogger(__name__)
 
 
 class NotificationContextFacade:
     @classmethod
-    def get_context(cls, event_key: NotificationEvent, data: Any) -> Dict[str, Any]:
+    def get_context(cls, event_key: NotificationEvent, data: Any) -> dict[str, Any]:
         config = CONTEXT_MAP.get(event_key)
         if not config:
             raise LinkupError(f"No configuration for event: {event_key}")

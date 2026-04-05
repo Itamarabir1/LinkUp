@@ -8,7 +8,9 @@ PUT מ-origin של הפרונט (למשל http://localhost:5173 בפיתוח). �
 
 import logging
 from urllib.parse import quote
+
 from aioboto3 import Session
+
 from app.core.config import settings
 from app.core.exceptions.infrastructure import (
     ExternalServiceError,

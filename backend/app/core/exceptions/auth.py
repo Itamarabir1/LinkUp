@@ -1,7 +1,8 @@
-from .base import LinkupError
 from typing import Optional
 
 from fastapi import status
+
+from .base import LinkupError
 
 
 class SessionExpiredError(LinkupError):
@@ -56,7 +57,7 @@ class InvalidResetCodeError(LinkupError):
     error_code = "AUTH_INVALID_RESET_CODE"
     message = "קוד שחזור הסיסמה שגוי או פג תוקף"
 
-    def __init__(self, email: Optional[str] = None):
+    def __init__(self, email: str | None = None):
         super().__init__(message=self.message, payload={"email": email} if email else None)
 
 

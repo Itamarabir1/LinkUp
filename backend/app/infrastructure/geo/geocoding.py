@@ -1,6 +1,8 @@
-import httpx
 import logging
 from typing import Optional, Tuple
+
+import httpx
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -19,7 +21,7 @@ class GeocodingService:
     @staticmethod
     async def get_coordinates_from_address(
         address: str,
-    ) -> Tuple[Optional[float], Optional[float]]:
+    ) -> tuple[float | None, float | None]:
         """
         Geocoding: הופך כתובת לקואורדינטות (lat, lon).
         משתמש ב-Google Maps Geocoding API.
@@ -53,13 +55,11 @@ class GeocodingService:
                         lng = float(location.get("lng", 0))
                         logger.info(f"Geocoded '{address}' → ({lat}, {lng})")
                         return lat, lng
-                    else:
-                        status = data.get("status", "UNKNOWN")
-                        logger.warning(f"Google Maps geocoding failed for '{address}': {status}")
-                        return None, None
-                else:
-                    logger.error(f"Google Maps geocoding API error: {response.status_code} for address: {address}")
+                    status = data.get("status", "UNKNOWN")
+                    logger.warning(f"Google Maps geocoding failed for '{address}': {status}")
                     return None, None
+                logger.error(f"Google Maps geocoding API error: {response.status_code} for address: {address}")
+                return None, None
 
         except httpx.TimeoutException:
             logger.error(f"Geocoding timeout for address: {address}")
@@ -69,7 +69,7 @@ class GeocodingService:
             return None, None
 
     @staticmethod
-    async def get_address_from_gps(lat: float, lon: float) -> Optional[str]:
+    async def get_address_from_gps(lat: float, lon: float) -> str | None:
         """
         Reverse Geocoding: הופך קואורדינטות לכתובת קריאה.
         משתמש ב-Google Maps Geocoding API.
@@ -103,14 +103,12 @@ class GeocodingService:
                         if address:
                             logger.info(f"Reverse geocoded ({lat}, {lon}) → '{address}'")
                             return address
-                        else:
-                            logger.warning(f"No formatted_address found for coordinates: ({lat}, {lon})")
-                            return None
-                    else:
-                        status = data.get("status", "UNKNOWN")
-                        logger.warning(f"Google Maps reverse geocoding failed for ({lat}, {lon}): {status}")
+                        logger.warning(f"No formatted_address found for coordinates: ({lat}, {lon})")
                         return None
-                elif response.status_code == 429:
+                    status = data.get("status", "UNKNOWN")
+                    logger.warning(f"Google Maps reverse geocoding failed for ({lat}, {lon}): {status}")
+                    return None
+                if response.status_code == 429:
                     # Rate limiting (Too Many Requests)
                     logger.warning(f"Google Maps rate limit exceeded (429) for ({lat}, {lon})")
                     from app.core.exceptions.infrastructure import InfrastructureError
@@ -120,9 +118,8 @@ class GeocodingService:
                         detail="Google Maps API returned 429 Too Many Requests",
                         error_code="GEO_SERVICE_UNAVAILABLE",
                     )
-                else:
-                    logger.error(f"Reverse geocoding API error: {response.status_code} for ({lat}, {lon}). Response: {response.text[:200]}")
-                    return None
+                logger.error(f"Reverse geocoding API error: {response.status_code} for ({lat}, {lon}). Response: {response.text[:200]}")
+                return None
 
         except httpx.TimeoutException:
             logger.error(f"Reverse geocoding timeout for ({lat}, {lon})")

@@ -1,7 +1,6 @@
 import { Outlet, NavLink, Link } from 'react-router-dom';
 import { MessageCircle, Bell, User, Search, Plus } from 'lucide-react';
 import ChatPopup from '../ChatPopup/ChatPopup';
-import { NotificationToast } from '../NotificationToast/NotificationToast';
 import { useLayoutShell } from './useLayoutShell';
 import styles from './Layout.module.css';
 
@@ -138,7 +137,6 @@ export default function Layout() {
       {showChatPopup && openConversationId && (
         <ChatPopup conversationId={openConversationId} />
       )}
-      <NotificationToast />
     </div>
   );
 }

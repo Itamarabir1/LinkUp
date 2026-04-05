@@ -9,20 +9,20 @@ notification_tasks.py — handlers לאירועי RabbitMQ + ביצוע תזכו
 
 import logging
 from datetime import timedelta
-from typing import Dict, Any
+from typing import Any, Dict
 from uuid import UUID
 
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
-from app.domain.notifications.core.handler import notification_handler
-from app.domain.notifications.services.reminder_scheduler import reminder_scheduler
-from app.domain.notifications.constants import NotificationEvent
-from app.domain.rides.crud import crud_ride
 from app.domain.bookings.crud import crud_booking
-from app.domain.passengers.crud import crud_passenger
 from app.domain.bookings.enum import BookingStatus
 from app.domain.bookings.model import Booking
+from app.domain.notifications.constants import NotificationEvent
+from app.domain.notifications.core.handler import notification_handler
+from app.domain.notifications.services.reminder_scheduler import reminder_scheduler
+from app.domain.passengers.crud import crud_passenger
+from app.domain.rides.crud import crud_ride
 from app.domain.scheduled_notifications.crud import crud_scheduled_notification
 from app.domain.scheduled_notifications.model import ScheduledNotificationType
 
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 REMINDER_OFFSET = timedelta(minutes=30)
 
 
-async def handle_ride_created(db, data: Dict[str, Any]) -> None:
+async def handle_ride_created(db, data: dict[str, Any]) -> None:
     """
     אירוע ride.created:
       1. שולח מייל לנוסעים רלוונטיים (כמקודם).
@@ -94,7 +94,7 @@ async def handle_ride_created(db, data: Dict[str, Any]) -> None:
     )
 
 
-async def handle_booking_approved(db, data: Dict[str, Any]) -> None:
+async def handle_booking_approved(db, data: dict[str, Any]) -> None:
     """
     אירוע booking.approved_by_driver:
       1. שולח מייל+פוש לנוסע (כמקודם, דרך notification_handler).
@@ -144,7 +144,7 @@ async def handle_booking_approved(db, data: Dict[str, Any]) -> None:
         )
 
 
-async def handle_ride_cancelled_by_driver(db, data: Dict[str, Any]) -> None:
+async def handle_ride_cancelled_by_driver(db, data: dict[str, Any]) -> None:
     """
     אירוע ride.cancelled_by_driver:
     שולח מייל+פוש לכל נוסע שהיה בנסיעה.
@@ -194,7 +194,7 @@ async def handle_ride_cancelled_by_driver(db, data: Dict[str, Any]) -> None:
 
 
 async def handle_notification_event(
-    data: Dict[str, Any],
+    data: dict[str, Any],
     routing_key: str,
     handler=notification_handler,
 ) -> None:

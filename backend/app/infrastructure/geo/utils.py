@@ -1,13 +1,14 @@
 import asyncio
 import logging
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
+
 from geoalchemy2.shape import from_shape
-from shapely.geometry import Point, LineString
+from shapely.geometry import LineString, Point
 
 logger = logging.getLogger(__name__)
 
 
-def get_coords_from_address(address: str) -> Tuple[Optional[float], Optional[float]]:
+def get_coords_from_address(address: str) -> tuple[float | None, float | None]:
     """
     Sync wrapper על Google Geocoding עם Redis cache.
     משמש קוד sync שלא יכול לקרוא async ישירות.
@@ -43,7 +44,7 @@ def to_geo_point(lat: float, lon: float, srid: int = 4326):
     return from_shape(Point(lon, lat), srid=srid)
 
 
-def to_geo_line(coords: List[Tuple[float, float]], srid: int = 4326):
+def to_geo_line(coords: list[tuple[float, float]], srid: int = 4326):
     """
     Technical utility to convert a list of points to a PostGIS LineString.
     """

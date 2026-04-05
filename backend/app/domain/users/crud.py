@@ -1,10 +1,11 @@
-from datetime import datetime, timezone
-from typing import Optional, Any, Dict, Union
+from datetime import UTC, datetime, timezone
+from typing import Any, Dict, Optional, Union
 from uuid import UUID
+
+from geoalchemy2.functions import ST_GeomFromText
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
-from geoalchemy2.functions import ST_GeomFromText
 
 # ייבוא המודל והסכימות
 from app.domain.users.model import User
@@ -17,22 +18,22 @@ class CRUDUser:
     מימוש אסינכרוני מלא (SQLAlchemy 2.0) התואם לשיטת DDD.
     """
 
-    async def get_by_id(self, db: AsyncSession, id: Union[UUID, str]) -> Optional[User]:
+    async def get_by_id(self, db: AsyncSession, id: UUID | str) -> User | None:
         """שליפת משתמש לפי ID (UUID)"""
         uid = UUID(str(id)) if isinstance(id, str) else id
         result = await db.execute(select(User).filter(User.user_id == uid))
         return result.scalars().first()
 
-    async def get(self, db: AsyncSession, *, id: Union[UUID, str]) -> Optional[User]:
+    async def get(self, db: AsyncSession, *, id: UUID | str) -> User | None:
         """שליפת משתמש לפי ID – חתימה get(db, id=...) לשימוש ב־NotificationHandler. id יכול להיות UUID או str."""
         return await self.get_by_id(db, id)
 
-    async def get_by_email(self, db: AsyncSession, email: str) -> Optional[User]:
+    async def get_by_email(self, db: AsyncSession, email: str) -> User | None:
         """שליפת משתמש לפי אימייל (case-insensitive)"""
         result = await db.execute(select(User).filter(func.lower(User.email) == func.lower(email)))
         return result.scalars().first()
 
-    async def get_by_phone(self, db: AsyncSession, phone: str) -> Optional[User]:
+    async def get_by_phone(self, db: AsyncSession, phone: str) -> User | None:
         """שליפת משתמש לפי מספר טלפון"""
         result = await db.execute(select(User).filter(User.phone_number == phone))
         return result.scalars().first()
@@ -60,7 +61,7 @@ class CRUDUser:
         db: AsyncSession,
         *,
         db_obj: User,
-        obj_in: Union[UserUpdate, Dict[str, Any]],
+        obj_in: UserUpdate | dict[str, Any],
     ) -> User:
         """
         עדכון דינמי וחסין.
@@ -84,7 +85,7 @@ class CRUDUser:
         await db.refresh(db_obj)
         return db_obj
 
-    async def update_location(self, db: AsyncSession, *, user_id: Union[UUID, str], lat: float, lon: float) -> bool:
+    async def update_location(self, db: AsyncSession, *, user_id: UUID | str, lat: float, lon: float) -> bool:
         """עדכון מיקום גיאוגרפי (GIS)"""
         point_wkt = f"POINT({lon} {lat})"  # סטנדרט PostGIS: Longitude קודם
         user = await self.get_by_id(db, user_id)
@@ -102,7 +103,7 @@ class CRUDUser:
         await db.refresh(user)
         return user
 
-    async def update_refresh_token(self, db: AsyncSession, *, user: User, refresh_token: Optional[str]) -> User:
+    async def update_refresh_token(self, db: AsyncSession, *, user: User, refresh_token: str | None) -> User:
         """עדכון או ניקוי Refresh Token (לשימוש ב-login וב-logout)."""
         user.refresh_token = refresh_token
         db.add(user)
@@ -126,12 +127,12 @@ class CRUDUser:
         await db.refresh(user)
         return user
 
-    async def update_last_active(self, db: AsyncSession, *, user_id: Union[UUID, str]) -> bool:
+    async def update_last_active(self, db: AsyncSession, *, user_id: UUID | str) -> bool:
         """עדכון זמן פעילות אחרונה (צ'אט וכו') — לא משנה last_login."""
         user = await self.get_by_id(db, user_id)
         if not user:
             return False
-        user.last_active_at = datetime.now(timezone.utc)
+        user.last_active_at = datetime.now(UTC)
         db.add(user)
         await db.commit()
         return True

@@ -11,10 +11,10 @@ from app.domain.users.model import User
 
 
 async def require_group_member(
-    group_id: Optional[UUID] = Query(None),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    group_id: UUID | None = Query(None),
+    current_user: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
-) -> Optional[UUID]:
+) -> UUID | None:
     """
     Dependency לשימוש בראוטרים.
     - אם אין group_id → מחזיר None (זרימה ציבורית רגילה)

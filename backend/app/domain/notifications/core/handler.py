@@ -1,26 +1,29 @@
 import logging
-from urllib.parse import quote
 from typing import Any
+from urllib.parse import quote
 from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Domain Imports
-from app.domain.rides.crud import crud_ride
-from app.domain.users.crud import crud_user
+from app.core.exceptions.base import LinkupError
 from app.domain.bookings.crud import crud_booking
-from app.domain.passengers.crud import crud_passenger
 
 # Core, Mappings & Schemas
 from app.domain.notifications.config.mappings import NOTIFICATION_STRATEGY
 from app.domain.notifications.config.templates_map.email_conf import EMAIL_MAP
 from app.domain.notifications.config.templates_map.push_conf import PUSH_TEMPLATES
-from app.domain.notifications.core.resolver import recipient_resolver
-from app.domain.notifications.manager import (
-    notification_manager,
-    NotificationCommand,
-)  # הוספנו את ה-Schema
 from app.domain.notifications.constants import NotificationEvent
-from app.core.exceptions.base import LinkupError
+from app.domain.notifications.core.resolver import recipient_resolver
+from app.domain.notifications.core.scheduled_reminder_source import ScheduledReminderSource
+from app.domain.notifications.manager import (
+    NotificationCommand,
+    notification_manager,
+)  # הוספנו את ה-Schema
+from app.domain.passengers.crud import crud_passenger
+
+# Domain Imports
+from app.domain.rides.crud import crud_ride
+from app.domain.users.crud import crud_user
 
 logger = logging.getLogger(__name__)
 
@@ -59,30 +62,41 @@ class NotificationHandler:
                     payload,
                 )
                 return
-            logger.info(
-                "[NOTIF] Handler: source_data loaded (booking_id=%s)",
-                getattr(source_data, "booking_id", payload.get("booking_id")),
-            )
-
-            # 4. Resolve - זיהוי הנמען (מי המשתמש שיקבל את המייל/פוש)
-            # ride.created_for_passengers / ride.cancelled_by_driver: הנמען לפי passenger_id ב-payload
-            if payload.get("passenger_id") and event_key in (
-                NotificationEvent.RIDE_CREATED_FOR_PASSENGERS,
-                NotificationEvent.RIDE_CANCELLED_BY_DRIVER,
-            ):
-                pid = payload["passenger_id"]
-                resolved = await crud_user.get(db, id=UUID(str(pid)) if not isinstance(pid, UUID) else pid)
+            if isinstance(source_data, ScheduledReminderSource):
+                logger.info(
+                    "[NOTIF] Handler: source_data=ScheduledReminderSource ride_id=%s recipient_user_id=%s",
+                    getattr(source_data.ride, "ride_id", None),
+                    source_data.recipient_user_id,
+                )
             else:
-                resolved = recipient_resolver.resolve(event_key, source_data)
+                logger.info(
+                    "[NOTIF] Handler: source_data loaded (booking_id=%s)",
+                    getattr(source_data, "booking_id", payload.get("booking_id")),
+                )
+
+            builder = strategy["builder"]
+
+            # 4–5. Resolve נמען + Build context
+            if isinstance(source_data, ScheduledReminderSource):
+                resolved = await crud_user.get(db, id=source_data.recipient_user_id)
+                context = builder.build(source_data.ride, event_key.value)
+            else:
+                # ride.created_for_passengers / ride.cancelled_by_driver: הנמען לפי passenger_id ב-payload
+                if payload.get("passenger_id") and event_key in (
+                    NotificationEvent.RIDE_CREATED_FOR_PASSENGERS,
+                    NotificationEvent.RIDE_CANCELLED_BY_DRIVER,
+                ):
+                    pid = payload["passenger_id"]
+                    resolved = await crud_user.get(db, id=UUID(str(pid)) if not isinstance(pid, UUID) else pid)
+                else:
+                    resolved = recipient_resolver.resolve(event_key, source_data)
+                context = builder.build(source_data, event_key.value)
+
             logger.info(
                 "[NOTIF] Handler: recipient user_id=%s email=%s",
                 getattr(resolved, "user_id", getattr(resolved, "id", None)) if resolved else None,
                 getattr(resolved, "email", None) if resolved else None,
             )
-
-            # 5. Build Context - הכנת הנתונים (הזרקת נתונים לתוך ה-Template)
-            builder = strategy["builder"]
-            context = builder.build(source_data, event_key.value)
             # מיזוג נתונים מה-payload (קוד אימות, שם וכו') – נדרש למייל אימות / איפוס סיסמה
             data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
             # תמיכה גם ב-payload שטוח (code/token ברמה הראשית) וגם ב-payload.data
@@ -175,7 +189,7 @@ class NotificationHandler:
                     await notification_manager.process_and_send(command2)
 
                 logger.info(
-                    f"✅ Notification dispatched to both users: {event_key} -> user_id_1={resolved['user_id_1']}, user_id_2={resolved['user_id_2']}"
+                    f"✅ Notification dispatched to both users: {event_key} -> user_id_1={resolved['user_id_1']}, user_id_2={resolved['user_id_2']}",
                 )
             else:
                 # שליחה למשתמש אחד (התנהגות רגילה)
@@ -214,7 +228,7 @@ class NotificationHandler:
                 )
 
         except Exception as e:
-            logger.error(f"❌ NotificationHandler Error [{event_name}]: {str(e)}", exc_info=True)
+            logger.error(f"❌ NotificationHandler Error [{event_name}]: {e!s}", exc_info=True)
             # When source_data is missing (e.g. stale message, booking_id not in DB), skip and ack – don't requeue
             if "Could not hydrate source data" in str(e):
                 logger.warning(
@@ -222,7 +236,7 @@ class NotificationHandler:
                     event_name,
                 )
                 return
-            raise LinkupError(f"Notification System Failure: {str(e)}") from e
+            raise LinkupError(f"Notification System Failure: {e!s}") from e
 
     async def _fetch_source(self, db: AsyncSession, payload: dict) -> Any:
         """
@@ -249,6 +263,33 @@ class NotificationHandler:
                 if not booking:
                     logger.warning("[NOTIF] Handler: no booking found for booking_id=%s", bid)
                 return booking
+
+        sched_raw = payload.get("scheduled_notification_id")
+        if sched_raw and user_id and ride_id:
+            try:
+                sched_uuid = UUID(str(sched_raw))
+                recipient_uuid = UUID(str(user_id)) if not isinstance(user_id, UUID) else user_id
+                rid = UUID(str(ride_id)) if not isinstance(ride_id, UUID) else ride_id
+            except (TypeError, ValueError) as e:
+                logger.warning(
+                    "[NOTIF] Handler: scheduled reminder payload UUID parse failed: %s keys=%s",
+                    e,
+                    list(payload.keys()),
+                )
+            else:
+                ride = await crud_ride.get_for_notification(db, rid)
+                if not ride:
+                    logger.warning(
+                        "[NOTIF] Handler: scheduled reminder ride not found ride_id=%s",
+                        rid,
+                    )
+                else:
+                    return ScheduledReminderSource(
+                        ride=ride,
+                        recipient_user_id=recipient_uuid,
+                        scheduled_notification_id=sched_uuid,
+                    )
+
         if ride_id:
             rid = UUID(str(ride_id)) if not isinstance(ride_id, UUID) else ride_id
             return await crud_ride.get_for_notification(db, rid)

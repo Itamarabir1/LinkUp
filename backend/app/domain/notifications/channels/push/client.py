@@ -1,12 +1,13 @@
-import logging
 import asyncio
-from typing import Optional, Dict
+import logging
+from typing import Dict, Optional
+
 from firebase_admin import messaging
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class FCMClient:
         retry=retry_if_exception_type(Exception),
         before_sleep=lambda retry_state: logger.info(f"⏳ Push failed, retrying... (Attempt {retry_state.attempt_number})"),
     )
-    async def send(self, token: str, title: str, body: str, data: Optional[Dict] = None):
+    async def send(self, token: str, title: str, body: str, data: dict | None = None):
         """
         שם הפונקציה שונה ל-'send' כדי להתאים לממשק ה-Provider.
         """

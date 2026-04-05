@@ -1,4 +1,5 @@
 from typing import Any, Dict
+
 from .base import BaseContextBuilder
 
 
@@ -7,7 +8,7 @@ class RideBuilder(BaseContextBuilder):
     Senior Implementation: Uses declarative mapping instead of imperative if/else.
     """
 
-    def build(self, ride: Any, event_key: str = "") -> Dict[str, Any]:
+    def build(self, ride: Any, event_key: str = "") -> dict[str, Any]:
         # 1. הכנת נתוני הבסיס (הזרקה לכל סוגי ההודעות)
         driver_name = self._resolve_attr(ride, "driver.first_name", "נהג")
         origin = getattr(ride, "origin_name", "N/A")
@@ -46,6 +47,12 @@ class RideBuilder(BaseContextBuilder):
                 "description": f"תזכורת: הנסיעה מ{origin} מחכה לך ב-{ride_date}.",
                 "cta_label": "צפה בפרטי הנסיעה",
             },
+            "ride_start_driver": {
+                "subject": "תזכורת: זמן לצאת לנסיעה",
+                "hero_text": "יוצאים לדרך בקרוב",
+                "description": f"תזכורת לנהג: הנסיעה מ{origin} ל{destination} ב-{ride_date}.",
+                "cta_label": "צפה בפרטי הנסיעה",
+            },
         }
 
         # 3. חילוץ התוכן המתאים או שימוש בברירת מחדל
@@ -58,7 +65,7 @@ class RideBuilder(BaseContextBuilder):
 
         return {**context, **matched_content}
 
-    def _get_default_content(self) -> Dict[str, str]:
+    def _get_default_content(self) -> dict[str, str]:
         return {
             "subject": "עדכון לגבי נסיעה ב-Linkup",
             "hero_text": "עדכון נסיעה",

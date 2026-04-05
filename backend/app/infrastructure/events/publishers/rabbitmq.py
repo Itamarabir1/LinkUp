@@ -1,6 +1,7 @@
 import logging
-from app.domain.events.schema import Event
+
 from app.domain.events.enum import DispatchTarget
+from app.domain.events.schema import Event
 from app.infrastructure.events.publishers.base import EventPublisher
 
 logger = logging.getLogger(__name__)

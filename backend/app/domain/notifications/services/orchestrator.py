@@ -1,8 +1,9 @@
 # app/domain/notifications/services/orchestrator.py
 import logging
+
+from app.core.exceptions import NotificationError
 from app.domain.rides.model import Ride
 from app.infrastructure.events.dispatcher.base import dispatch
-from app.core.exceptions import NotificationError
 
 logger = logging.getLogger(__name__)
 
@@ -28,4 +29,4 @@ class NotificationOrchestrator:
             )
         except Exception as e:
             logger.exception("Failed to dispatch ride.cancelled notification: %s", e)
-            raise NotificationError(f"Failed to dispatch cancellation: {str(e)}") from e
+            raise NotificationError(f"Failed to dispatch cancellation: {e!s}") from e

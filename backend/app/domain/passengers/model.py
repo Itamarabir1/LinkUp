@@ -1,19 +1,22 @@
+import uuid
+
+from geoalchemy2 import Geography  # שימוש ב-Geography לסנכרון עם ה-SQL
 from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    DateTime,
     Boolean,
+    Column,
+    DateTime,
     ForeignKey,
-    text,
-    Numeric,
     Index,
+    Integer,
+    Numeric,
+    String,
+    text,
 )
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM, UUID as PG_UUID
-from geoalchemy2 import Geography  # שימוש ב-Geography לסנכרון עם ה-SQL
-import uuid
+
 from app.db.base import Base
 from app.domain.passengers.enum import PassengerStatus
 

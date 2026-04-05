@@ -1,11 +1,12 @@
 # app/domain/rides/repository.py — ride cache (Redis)
 
 import logging
-from typing import Optional, Dict, Any
-from app.domain.rides.schema import RidePreviewResponse, RidePreviewCreate
-from app.infrastructure.redis.keys import get_ride_preview_key, RIDE_PREVIEW_TTL
-from app.infrastructure.redis.client import redis_client
+from typing import Any, Dict, Optional
+
 from app.core.exceptions.infrastructure import InfrastructureError
+from app.domain.rides.schema import RidePreviewCreate, RidePreviewResponse
+from app.infrastructure.redis.client import redis_client
+from app.infrastructure.redis.keys import RIDE_PREVIEW_TTL, get_ride_preview_key
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class RideCacheRepository:
                     "origin_lon": preview.origin_coords[1],
                     "dest_lat": preview.destination_coords[0],
                     "dest_lon": preview.destination_coords[1],
-                }
+                },
             )
 
             key = get_ride_preview_key(preview.session_id)
@@ -54,7 +55,7 @@ class RideCacheRepository:
             logger.error(f"Failed to save ride preview to cache: {e}")
             raise InfrastructureError(f"Cache write error for session: {preview.session_id}", detail=str(e))
 
-    async def get_preview(self, session_id: str) -> Optional[Dict[str, Any]]:
+    async def get_preview(self, session_id: str) -> dict[str, Any] | None:
         """שליפת נתונים מהקאש (תוקף 24 שעות)."""
         key = get_ride_preview_key(session_id)
         data = await redis_client.get(key)

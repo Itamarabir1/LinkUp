@@ -1,8 +1,10 @@
 import logging
 from typing import Dict
-from app.domain.events.schema import Event
+
 from app.domain.events.enum import DispatchTarget
+from app.domain.events.schema import Event
 from app.infrastructure.events.publishers.base import EventPublisher
+
 from .evaluator import DispatchEvaluator
 
 logger = logging.getLogger(__name__)
@@ -11,13 +13,13 @@ logger = logging.getLogger(__name__)
 class EventDispatcher:
     def __init__(
         self,
-        publishers_map: Dict[DispatchTarget, EventPublisher],
+        publishers_map: dict[DispatchTarget, EventPublisher],
         evaluator: DispatchEvaluator,
     ):
         self._publishers = publishers_map
         self._evaluator = evaluator
 
-    async def dispatch(self, event: Event) -> Dict[DispatchTarget, bool]:
+    async def dispatch(self, event: Event) -> dict[DispatchTarget, bool]:
         results = {}
         errors = []
 

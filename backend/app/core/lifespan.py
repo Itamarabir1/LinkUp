@@ -1,12 +1,13 @@
 import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 # ייבוא ה-Singletons של התשתיות
 from app.infrastructure.rabbitmq.client import rabbit_client
-from app.infrastructure.redis.client import redis_client
-from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 from app.infrastructure.redis.broadcast import broadcast
+from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
+from app.infrastructure.redis.client import redis_client
 
 logger = logging.getLogger(__name__)
 

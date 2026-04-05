@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
+import { NotificationToast } from './components/NotificationToast/NotificationToast';
 import ThemeToggle from './components/ThemeToggle/ThemeToggle';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { GroupProvider } from './context/GroupContext';
@@ -126,6 +127,7 @@ export default function App() {
             <ChatProvider>
               <ThemeToggle />
               <AppRoutes />
+              <NotificationToast />
             </ChatProvider>
           </GroupProvider>
         </AuthProvider>

@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional
+
 from .base import LinkupError
 
 
@@ -9,7 +10,7 @@ class StorageServiceError(LinkupError):
     error_code = "INFRA_STORAGE_ERROR"
     message = "שירות אחסון הקבצים אינו זמין כעת"
 
-    def __init__(self, payload: Optional[Dict[str, Any]] = None):
+    def __init__(self, payload: dict[str, Any] | None = None):
         super().__init__(payload=payload)
 
 
@@ -20,7 +21,7 @@ class CacheConnectionError(LinkupError):
     error_code = "INFRA_REDIS_ERROR"
     message = "שגיאת חיבור לשירות הזיכרון (Redis)"
 
-    def __init__(self, payload: Optional[Dict[str, Any]] = None):
+    def __init__(self, payload: dict[str, Any] | None = None):
         super().__init__(payload=payload)
 
 
@@ -31,7 +32,7 @@ class QueueServiceError(LinkupError):
     error_code = "INFRA_RABBIT_ERROR"
     message = "שגיאת חיבור לשירות ההודעות (RabbitMQ)"
 
-    def __init__(self, payload: Optional[Dict[str, Any]] = None):
+    def __init__(self, payload: dict[str, Any] | None = None):
         super().__init__(payload=payload)
 
 
@@ -54,7 +55,7 @@ class GeocodingError(LinkupError):
     error_code = "GEO_ADDRESS_NOT_RESOLVED"
     message = "לא הצלחנו לאתר את הכתובת המבוקשת"
 
-    def __init__(self, address: Optional[str] = None):
+    def __init__(self, address: str | None = None):
         super().__init__(
             message=self.message,
             status_code=self.status_code,
@@ -72,8 +73,8 @@ class InfrastructureError(LinkupError):
     def __init__(
         self,
         message: str,
-        detail: Optional[str] = None,
-        error_code: Optional[str] = None,
+        detail: str | None = None,
+        error_code: str | None = None,
     ):
         payload = {"detail": detail} if detail else None
         super().__init__(message=message, error_code=error_code or self.error_code, payload=payload)

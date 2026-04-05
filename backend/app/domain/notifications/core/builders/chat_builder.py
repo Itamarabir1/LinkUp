@@ -4,6 +4,7 @@ Builder ל-context של מייל סיכום שיחה.
 
 from typing import Any, Dict
 from uuid import UUID
+
 from app.domain.notifications.core.builders.base import BaseContextBuilder
 
 
@@ -16,7 +17,7 @@ def build_email_context(
     pickup_location: str,
     meeting_time: str,
     summary_hebrew: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     בונה context למייל סיכום שיחה.
     """
@@ -38,7 +39,7 @@ class ChatBuilder(BaseContextBuilder):
     בונה context למייל סיכום שיחה עם פרטי הנסיעה והסיכום בעברית.
     """
 
-    def build(self, payload: Dict[str, Any], event_key: str) -> Dict[str, Any]:
+    def build(self, payload: dict[str, Any], event_key: str) -> dict[str, Any]:
         """
         בונה context למייל סיכום שיחה.
 

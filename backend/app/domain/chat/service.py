@@ -3,14 +3,14 @@
 אחרי שמירת הודעה – מפרסם ל-Redis Pub/Sub (שרת ה-WS ב-Go מאזין).
 """
 
-import logging
 import json
+import logging
 from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
+
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions.base import LinkupError
-from app.core.exceptions.infrastructure import RedisUnavailable
 from app.core.exceptions.booking import (
     BookingNotFoundError,
     ForbiddenRideActionError,
@@ -20,22 +20,22 @@ from app.core.exceptions.chat import (
     MessageSendFailed,
     UnauthorizedChatAccess,
 )
+from app.core.exceptions.infrastructure import RedisUnavailable
 from app.core.exceptions.ride import RideNotFoundError
 from app.core.exceptions.user import UserNotFoundError
-
+from app.domain.bookings.enum import BookingStatus
+from app.domain.bookings.model import Booking
 from app.domain.chat import crud as chat_crud
 from app.domain.chat.schema import (
-    ConversationListItem,
     ConversationDetail,
+    ConversationListItem,
     ConversationPartner,
     MessageResponse,
     PaginatedMessagesResponse,
 )
+from app.domain.rides.model import Ride
 from app.domain.users.crud import crud_user
 from app.domain.users.schema import _avatar_url_from_key
-from app.domain.bookings.model import Booking
-from app.domain.bookings.enum import BookingStatus
-from app.domain.rides.model import Ride
 from app.infrastructure.events.publishers.redis import publish_chat_message
 from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 
@@ -164,7 +164,7 @@ async def list_my_conversations(db: AsyncSession, current_user_id: UUID) -> list
                 last_message_at=last.created_at if last else None,
                 last_message_preview=(last.body[:80] + "…") if last and len(last.body) > 80 else (last.body if last else None),
                 has_unread=has_unread,
-            )
+            ),
         )
     return out
 

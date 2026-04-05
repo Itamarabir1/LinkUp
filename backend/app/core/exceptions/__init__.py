@@ -1,52 +1,58 @@
 # app/core/exceptions/__init__.py
 """ייצוא מרכזי של כל שגיאות הדומיין – שימוש: from app.core.exceptions import LinkupError, UserNotFoundError, ..."""
 
-from .base import LinkupError
-
 # Auth
 from .auth import (
-    SessionExpiredError,
-    PermissionDeniedError,
-    InvalidVerificationCodeError,
-    InvalidCredentialsError,
-    UserNotVerifiedError,
-    InvalidResetCodeError,
-    InvalidRefreshTokenError,
-    InvalidPasswordError,
-    PasswordTooWeakError,
-    PasswordsDoNotMatchError,
-    NewPasswordSameAsOldError,
-    VerificationCodeExpiredError,
     GoogleAuthFailed,
+    InvalidCredentialsError,
+    InvalidPasswordError,
+    InvalidRefreshTokenError,
+    InvalidResetCodeError,
+    InvalidVerificationCodeError,
+    NewPasswordSameAsOldError,
+    PasswordsDoNotMatchError,
+    PasswordTooWeakError,
+    PermissionDeniedError,
+    SessionExpiredError,
+    UserNotVerifiedError,
+    VerificationCodeExpiredError,
 )
-
-# User
-from .user import (
-    UserNotFoundError,
-    PhoneAlreadyRegisteredError,
-    EmailAlreadyRegisteredError,
-    PasswordSameAsOldError,
-)
-
-# Ride
-from .ride import (
-    RideNotFoundError,
-    InvalidRideStatusError,
-    InvalidRouteError,
-    InvalidDateTimeError,
-    RideFullError,
-    SessionExpiredError as RideSessionExpiredError,
-    RideAlreadyCancelledError,
-)
+from .base import LinkupError
 
 # Booking
 from .booking import (
-    RideNotAvailableError,
     BookingAlreadyExistsError,
-    PassengerRequestNotFoundError,
     BookingNotFoundError,
     ForbiddenRideActionError,
     NoSeatsAvailableError,
+    PassengerRequestNotFoundError,
+    RideNotAvailableError,
+)
+
+# Chat
+from .chat import ChatRoomNotFound, MessageSendFailed, UnauthorizedChatAccess
+
+# Infrastructure
+from .infrastructure import (
+    CacheConnectionError,
+    ExternalServiceError,
+    GeocodingError,
+    InfrastructureError,
+    QueueServiceError,
+    RateLimitExceeded,
+    RedisUnavailable,
+    RouteNotFoundError,
+    S3DeleteFailed,
+    S3UploadFailed,
+    StorageServiceError,
+    WorkerTaskFailed,
+)
+
+# Notification
+from .notification import (
+    ContextBuilderError,
+    NotificationError,
+    RecipientResolverError,
 )
 
 # Passenger
@@ -55,100 +61,95 @@ from .passenger import (
     InsufficientPermissionsForRide,
 )
 
+# Ride
+from .ride import (
+    InvalidDateTimeError,
+    InvalidRideStatusError,
+    InvalidRouteError,
+    RideAlreadyCancelledError,
+    RideFullError,
+    RideNotFoundError,
+)
+from .ride import (
+    SessionExpiredError as RideSessionExpiredError,
+)
+
+# User
+from .user import (
+    EmailAlreadyRegisteredError,
+    PasswordSameAsOldError,
+    PhoneAlreadyRegisteredError,
+    UserNotFoundError,
+)
+
 # Validation
 from .validation import (
-    InvalidEmailError,
-    InvalidPhoneError,
-    InvalidFileTypeError,
     FileTooLargeError,
-    InvalidLocationError,
     InsufficientSeatsError,
+    InvalidEmailError,
+    InvalidFileTypeError,
+    InvalidLocationError,
+    InvalidPhoneError,
     SameOriginDestinationError,
 )
 
-# Infrastructure
-from .infrastructure import (
-    StorageServiceError,
-    CacheConnectionError,
-    QueueServiceError,
-    RouteNotFoundError,
-    GeocodingError,
-    InfrastructureError,
-    RateLimitExceeded,
-    S3UploadFailed,
-    S3DeleteFailed,
-    RedisUnavailable,
-    WorkerTaskFailed,
-    ExternalServiceError,
-)
-
-# Chat
-from .chat import ChatRoomNotFound, UnauthorizedChatAccess, MessageSendFailed
-
-# Notification
-from .notification import (
-    NotificationError,
-    RecipientResolverError,
-    ContextBuilderError,
-)
-
 __all__ = [
-    "LinkupError",
-    "SessionExpiredError",
-    "PermissionDeniedError",
-    "InvalidVerificationCodeError",
-    "InvalidCredentialsError",
-    "UserNotVerifiedError",
-    "InvalidResetCodeError",
-    "InvalidRefreshTokenError",
-    "InvalidPasswordError",
-    "PasswordTooWeakError",
-    "PasswordsDoNotMatchError",
-    "NewPasswordSameAsOldError",
-    "VerificationCodeExpiredError",
-    "GoogleAuthFailed",
-    "UserNotFoundError",
-    "PhoneAlreadyRegisteredError",
+    "ActiveBookingExistsError",
+    "BookingAlreadyExistsError",
+    "BookingNotFoundError",
+    "CacheConnectionError",
+    "ChatRoomNotFound",
+    "ContextBuilderError",
     "EmailAlreadyRegisteredError",
-    "PasswordSameAsOldError",
-    "RideNotFoundError",
+    "ExternalServiceError",
+    "FileTooLargeError",
+    "ForbiddenRideActionError",
+    "GeocodingError",
+    "GoogleAuthFailed",
+    "InfrastructureError",
+    "InsufficientPermissionsForRide",
+    "InsufficientSeatsError",
+    "InvalidCredentialsError",
+    "InvalidDateTimeError",
+    "InvalidEmailError",
+    "InvalidFileTypeError",
+    "InvalidLocationError",
+    "InvalidPasswordError",
+    "InvalidPhoneError",
+    "InvalidRefreshTokenError",
+    "InvalidResetCodeError",
     "InvalidRideStatusError",
     "InvalidRouteError",
-    "InvalidDateTimeError",
-    "RideFullError",
-    "RideSessionExpiredError",
-    "RideAlreadyCancelledError",
-    "RideNotAvailableError",
-    "BookingAlreadyExistsError",
-    "PassengerRequestNotFoundError",
-    "BookingNotFoundError",
-    "ForbiddenRideActionError",
-    "NoSeatsAvailableError",
-    "ActiveBookingExistsError",
-    "InsufficientPermissionsForRide",
-    "InvalidEmailError",
-    "InvalidPhoneError",
-    "InvalidFileTypeError",
-    "FileTooLargeError",
-    "InvalidLocationError",
-    "InsufficientSeatsError",
-    "SameOriginDestinationError",
-    "StorageServiceError",
-    "CacheConnectionError",
-    "QueueServiceError",
-    "RouteNotFoundError",
-    "GeocodingError",
-    "InfrastructureError",
-    "RateLimitExceeded",
-    "S3UploadFailed",
-    "S3DeleteFailed",
-    "RedisUnavailable",
-    "WorkerTaskFailed",
-    "ExternalServiceError",
-    "ChatRoomNotFound",
-    "UnauthorizedChatAccess",
+    "InvalidVerificationCodeError",
+    "LinkupError",
     "MessageSendFailed",
+    "NewPasswordSameAsOldError",
+    "NoSeatsAvailableError",
     "NotificationError",
+    "PassengerRequestNotFoundError",
+    "PasswordSameAsOldError",
+    "PasswordTooWeakError",
+    "PasswordsDoNotMatchError",
+    "PermissionDeniedError",
+    "PhoneAlreadyRegisteredError",
+    "QueueServiceError",
+    "RateLimitExceeded",
     "RecipientResolverError",
-    "ContextBuilderError",
+    "RedisUnavailable",
+    "RideAlreadyCancelledError",
+    "RideFullError",
+    "RideNotAvailableError",
+    "RideNotFoundError",
+    "RideSessionExpiredError",
+    "RouteNotFoundError",
+    "S3DeleteFailed",
+    "S3UploadFailed",
+    "SameOriginDestinationError",
+    "SessionExpiredError",
+    "StorageServiceError",
+    "UnauthorizedChatAccess",
+    "UserNotFoundError",
+    "UserNotVerifiedError",
+    "VerificationCodeExpiredError",
+    "WorkerTaskFailed",
 ]

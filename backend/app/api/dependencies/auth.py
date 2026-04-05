@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from typing import Optional
-
-from fastapi import Depends, HTTPException, status, Query
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
+
+from fastapi import Depends, HTTPException, Query, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decode_access_token
 from app.db.session import get_db
@@ -78,8 +78,8 @@ async def get_current_user_optional(
 
 
 async def get_current_user_ws(
-    token: Optional[str] = Query(None, alias="token"),
-) -> Optional[WsUser]:
+    token: str | None = Query(None, alias="token"),
+) -> WsUser | None:
     """
     אימות WS לפי JWT בלבד (?token=...) — ללא קריאת DB.
     decode_access_token מאמת חתימה, תוקף ו-base64 קנוני.

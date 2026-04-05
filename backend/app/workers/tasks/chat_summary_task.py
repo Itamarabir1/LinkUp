@@ -7,12 +7,13 @@ import asyncio
 import json
 import logging
 from uuid import UUID
+
 import redis.asyncio as redis
 
 from app.core.config import settings
+from app.core.exceptions.infrastructure import WorkerTaskFailed
 from app.db.session import SessionLocal
 from app.domain.chat.completion.service import handle_conversation_completion
-from app.core.exceptions.infrastructure import WorkerTaskFailed
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ async def run_chat_completion_redis_listener(stop_event: asyncio.Event) -> None:
         while not stop_event.is_set():
             try:
                 message = await asyncio.wait_for(pubsub.get_message(timeout=1.0), timeout=2.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             if message is None:
                 continue

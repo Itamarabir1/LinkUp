@@ -1,8 +1,9 @@
 import logging
-from typing import Dict, Any
-from app.domain.notifications.providers.base import BaseNotificationProvider
+from typing import Any, Dict
+
 from app.domain.notifications.channels.push.client import fcm_client
 from app.domain.notifications.channels.push.render import render_push_content
+from app.domain.notifications.providers.base import BaseNotificationProvider
 from app.domain.users.model import User
 
 logger = logging.getLogger(__name__)
@@ -12,7 +13,7 @@ class PushProvider(BaseNotificationProvider):
     def can_send(self, user: User) -> bool:
         return bool(user and user.fcm_token)
 
-    async def send(self, user: User, template_name: str, context: Dict[str, Any]):
+    async def send(self, user: User, template_name: str, context: dict[str, Any]):
         if not user or not getattr(user, "fcm_token", None):
             logger.warning("⚠️ Push skipped: no user or fcm_token")
             return

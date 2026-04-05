@@ -4,7 +4,7 @@
 """
 
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -93,9 +93,9 @@ def validate_israeli_phone_number(phone: str) -> str:
 def validate_future_datetime(dt: datetime) -> datetime:
     """בודק שהזמן שנבחר הוא עתידי (UTC)."""
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
 
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     if dt < now_utc + timedelta(seconds=10):
         raise ValueError("עליך לבחור זמן עתידי")
 
@@ -126,7 +126,7 @@ def validate_avatar_file(file: "UploadFile") -> None:
     משליך InvalidFileTypeError / FileTooLargeError.
     משמש כ-Dependency (api/dependencies/file) או קריאה ישירה.
     """
-    from app.core.exceptions.validation import InvalidFileTypeError, FileTooLargeError
+    from app.core.exceptions.validation import FileTooLargeError, InvalidFileTypeError
 
     if file.content_type not in ALLOWED_AVATAR_CONTENT_TYPES:
         raise InvalidFileTypeError(content_type=file.content_type or "")

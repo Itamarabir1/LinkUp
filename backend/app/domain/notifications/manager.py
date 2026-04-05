@@ -3,6 +3,7 @@ import logging
 from typing import Any, Dict, List
 
 from pydantic import BaseModel
+
 from app.domain.notifications.providers.email_provider import EmailProvider
 from app.domain.notifications.providers.push_provider import PushProvider
 from app.domain.notifications.providers.websocket_provider import WebSocketProvider
@@ -14,8 +15,8 @@ logger = logging.getLogger(__name__)
 class NotificationCommand(BaseModel):
     user: Any  # אובייקט המשתמש שהגיע מה-Resolver
     template: str
-    channels: List[str]
-    context: Dict[str, Any]
+    channels: list[str]
+    context: dict[str, Any]
     event_key: str
 
 
@@ -70,7 +71,7 @@ class NotificationManager:
             logger.info(f"✅ {channel_name} sent to user_id={getattr(cmd.user, 'user_id', getattr(cmd.user, 'id', 'N/A'))}")
         except Exception as e:
             # אנחנו לא זורקים LinkupError כאן כדי לא להפיל ערוצים אחרים!
-            logger.error(f"❌ {channel_name} failed for {cmd.event_key}: {str(e)}")
+            logger.error(f"❌ {channel_name} failed for {cmd.event_key}: {e!s}")
 
 
 notification_manager = NotificationManager()

@@ -1,31 +1,33 @@
 import logging
 from typing import List, Optional
 from uuid import UUID
+
 from fastapi import (
     APIRouter,
     Depends,
-    status,
     Query,
     WebSocket,
     WebSocketDisconnect,
+    status,
 )
-from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
+
+from app.api.dependencies.auth import WsUser, get_current_user, get_current_user_ws
+from app.api.dependencies.group_membership import verify_group_membership
+from app.api.dependencies.services import get_ride_service
+from app.core.exceptions.ride import RideNotFoundError
 from app.db.session import get_db
 from app.domain.rides.schema import (
-    RidePreviewResponse,
     RideCreate,
     RidePreviewCreate,
+    RidePreviewResponse,
     RideResponse,
     RideUpdate,
 )
-from app.core.exceptions.ride import RideNotFoundError
-from app.infrastructure.redis.broadcast import broadcast
-from app.domain.users.model import User
-from app.api.dependencies.auth import get_current_user, get_current_user_ws, WsUser
-from app.api.dependencies.group_membership import verify_group_membership
-from app.api.dependencies.services import get_ride_service
 from app.domain.rides.service import RideService
+from app.domain.users.model import User
+from app.infrastructure.redis.broadcast import broadcast
 from app.infrastructure.redis.keys import get_ride_channel, get_ride_passengers_channel
 
 logger = logging.getLogger(__name__)
@@ -56,11 +58,11 @@ async def create_new_ride(
     return await ride_svc.create_ride(db=db, ride_in=ride_in, current_user_id=current_user.user_id)
 
 
-@router.get("/me", response_model=List[RideResponse])
+@router.get("/me", response_model=list[RideResponse])
 async def get_my_rides(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    status: Optional[str] = Query(
+    status: str | None = Query(
         None,
         description="סנן לפי סטטוס: open, full, active, completed, cancelled",
     ),
@@ -137,7 +139,7 @@ async def read_ride(
 async def ride_status_websocket(
     websocket: WebSocket,
     ride_id: UUID,
-    user: Optional[WsUser] = Depends(get_current_user_ws),
+    user: WsUser | None = Depends(get_current_user_ws),
 ):
     if not user:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
@@ -159,7 +161,7 @@ async def ride_status_websocket(
 async def ride_passengers_locations_websocket(
     websocket: WebSocket,
     ride_id: UUID,
-    user: Optional[WsUser] = Depends(get_current_user_ws),
+    user: WsUser | None = Depends(get_current_user_ws),
     db: AsyncSession = Depends(get_db),
     ride_svc: RideService = Depends(get_ride_service),
 ):

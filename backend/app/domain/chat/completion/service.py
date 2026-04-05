@@ -4,13 +4,14 @@ Service לזיהוי סיום שיחה, ניתוח AI, ושמירת תוצאות
 
 import logging
 from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import BATCH_SIZE_DEFAULT
 from app.domain.chat import crud as chat_crud
-from app.domain.chat.ai.analyzer import analyze_conversation
-from app.domain.chat.ai.crud import create_analysis, analysis_exists
 from app.domain.chat.ai.analysis import get_conversation_text_for_analysis
+from app.domain.chat.ai.analyzer import analyze_conversation
+from app.domain.chat.ai.crud import analysis_exists, create_analysis
 from app.domain.events.outbox import publish_to_outbox
 
 logger = logging.getLogger(__name__)

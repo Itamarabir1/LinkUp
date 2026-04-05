@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class GeoLocation(BaseModel):
@@ -19,7 +20,7 @@ class RouteOptionData(BaseModel):
     summary: str
     duration_min: float
     distance_km: float
-    coords: List[List[float]]  # רשימה של [lat, lon]
+    coords: list[list[float]]  # רשימה של [lat, lon]
 
 
 class DriverLocationReport(BaseModel):
@@ -27,8 +28,8 @@ class DriverLocationReport(BaseModel):
 
     lat: float = Field(..., ge=-90, le=90)
     lng: float = Field(..., ge=-180, le=180)
-    heading: Optional[float] = None
-    speed: Optional[float] = None
+    heading: float | None = None
+    speed: float | None = None
 
 
 class PassengerLocationReport(BaseModel):
@@ -36,15 +37,15 @@ class PassengerLocationReport(BaseModel):
 
     lat: float = Field(..., ge=-90, le=90)
     lng: float = Field(..., ge=-180, le=180)
-    heading: Optional[float] = None
-    speed: Optional[float] = None
+    heading: float | None = None
+    speed: float | None = None
 
 
 class LocationUpdate(BaseModel):
     booking_id: int
     latitude: float = Field(..., alias="lat")  # תמיכה גם ב-lat וגם ב-latitude
     longitude: float = Field(..., alias="lon")
-    heading: Optional[float] = 0.0  # כיוון הנסיעה באייקון
+    heading: float | None = 0.0  # כיוון הנסיעה באייקון
     speed: float = 0.0
 
     model_config = ConfigDict(populate_by_name=True)

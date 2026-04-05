@@ -1,6 +1,8 @@
-from pydantic import BaseModel, Field, field_validator
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
+
+from pydantic import BaseModel, Field, field_validator
+
 from app.domain.events.enum import DispatchTarget
 
 
@@ -11,9 +13,9 @@ class Event(BaseModel):
     """
 
     name: str = Field(..., example="user.verification_code_created")
-    payload: Dict[str, Any] = Field(default_factory=dict)
-    targets: List[DispatchTarget] = Field(default_factory=list)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    payload: dict[str, Any] = Field(default_factory=dict)
+    targets: list[DispatchTarget] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     # --- וולידציה ברמת סניור ---
     @field_validator("name")
@@ -26,7 +28,7 @@ class Event(BaseModel):
     # --- חילוץ נתונים חכם (Properties) ---
 
     @property
-    def user_id(self) -> Optional[UUID]:
+    def user_id(self) -> UUID | None:
         """חילוץ בטוח של user_id מה-payload"""
         val = self.payload.get("user_id")
         if val is None:
@@ -39,7 +41,7 @@ class Event(BaseModel):
             return None
 
     @property
-    def ride_id(self) -> Optional[UUID]:
+    def ride_id(self) -> UUID | None:
         """חילוץ בטוח של ride_id מה-payload"""
         val = self.payload.get("ride_id")
         if val is None:

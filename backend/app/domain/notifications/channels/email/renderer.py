@@ -1,5 +1,6 @@
-import os
 import logging
+import os
+
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound, select_autoescape
 
 logger = logging.getLogger(__name__)
@@ -32,5 +33,5 @@ def render_email_template(template_name: str, **context) -> str:
         return ""  # במייל עדיף להחזיר ריק או שגיאה ברורה כדי לא לשלוח ג'יבריש ללקוח
 
     except Exception as e:
-        logger.error(f"❌ Rendering error for {template_name}: {str(e)}")
+        logger.error(f"❌ Rendering error for {template_name}: {e!s}")
         return ""

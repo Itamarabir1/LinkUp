@@ -1,16 +1,16 @@
 import logging
 from typing import Any, Dict
 
-from app.domain.notifications.providers.base import BaseNotificationProvider
 from app.domain.notifications.channels.email.client import email_client
 from app.domain.notifications.channels.email.renderer import render_email_template
+from app.domain.notifications.providers.base import BaseNotificationProvider
 from app.domain.users.model import User
 
 logger = logging.getLogger(__name__)
 
 
 class EmailProvider(BaseNotificationProvider):
-    def _render_subject(self, subject: str, context: Dict[str, Any]) -> str:
+    def _render_subject(self, subject: str, context: dict[str, Any]) -> str:
         """מחליף placeholders בנושא (למשל {passenger_name}) בערכי context."""
         if not subject or "{" not in subject:
             return subject or "Update from Linkup"
@@ -21,7 +21,7 @@ class EmailProvider(BaseNotificationProvider):
         # השארת placeholders שלא ב-context כרשימה (למקרה שחסר ערך)
         return result
 
-    async def send(self, user: User, template_name: str, context: Dict[str, Any]):
+    async def send(self, user: User, template_name: str, context: dict[str, Any]):
         try:
             # ה-Subject יכול להגיע מהקונטקסט (הבילדר הכין אותו) – מחליפים placeholders
             raw_subject = context.get("subject", "Update from Linkup")

@@ -1,8 +1,10 @@
-import json
-import aio_pika
-import logging
 import asyncio
+import json
+import logging
 from typing import Dict, Optional
+
+import aio_pika
+
 from app.core.config import settings
 from app.core.exceptions.infrastructure import QueueServiceError
 
@@ -11,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 class RabbitMQClient:
     def __init__(self):
-        self._connection: Optional[aio_pika.abc.AbstractConnection] = None
-        self._channel: Optional[aio_pika.abc.AbstractChannel] = None
-        self._exchanges: Dict[str, aio_pika.abc.AbstractExchange] = {}
+        self._connection: aio_pika.abc.AbstractConnection | None = None
+        self._channel: aio_pika.abc.AbstractChannel | None = None
+        self._exchanges: dict[str, aio_pika.abc.AbstractExchange] = {}
         self._lock = asyncio.Lock()
 
     async def connect(self):

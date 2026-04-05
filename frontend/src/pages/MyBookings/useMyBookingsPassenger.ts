@@ -35,11 +35,12 @@ export function useMyBookingsPassenger(
       await Promise.all(
         rideIds.map(async (rideId) => {
           try {
-            const [rideRes, driverRes] = await Promise.all([
-              fetchRideById(rideId),
-              fetchPassengerDriverInfo(rideId).catch(() => null),
-            ]);
+            const rideRes = await fetchRideById(rideId);
             const ride = rideRes.data;
+            const driverRes =
+              ride.status !== 'cancelled' && ride.status !== 'completed'
+                ? await fetchPassengerDriverInfo(rideId).catch(() => null)
+                : null;
             const booking = byRideId.get(rideId)!;
             items.push({
               ride,
@@ -71,6 +72,13 @@ export function useMyBookingsPassenger(
   useEffect(() => {
     const onUserEvent = (evt: Event) => {
       const detail = (evt as CustomEvent<{ event?: string; booking_id?: string }>).detail;
+      if (
+        detail?.event === 'booking.approved_by_driver' ||
+        detail?.event === 'booking.rejected_by_driver'
+      ) {
+        void fetchPassengerBookings();
+        return;
+      }
       if (detail?.event !== 'BOOKING_COMPLETED' || !detail.booking_id) return;
       setPassengerList((prev) =>
         prev.map((item) =>
@@ -80,7 +88,7 @@ export function useMyBookingsPassenger(
     };
     window.addEventListener('linkup:user-event', onUserEvent as EventListener);
     return () => window.removeEventListener('linkup:user-event', onUserEvent as EventListener);
-  }, []);
+  }, [fetchPassengerBookings]);
 
   const watchedRideId =
     passengerList.find(

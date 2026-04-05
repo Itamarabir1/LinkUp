@@ -1,8 +1,10 @@
-import aio_pika
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Callable, Awaitable, Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
+
+import aio_pika
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +25,8 @@ class RabbitMQConsumer:
         self,
         rabbit_client,
         queue_name: str,
-        exchange_name: Optional[str] = None,
-        exchange_names: Optional[List[str]] = None,
+        exchange_name: str | None = None,
+        exchange_names: list[str] | None = None,
     ):
         self._client = rabbit_client
         self.queue_name = queue_name
@@ -77,7 +79,7 @@ class RabbitMQConsumer:
             logger.debug("Queue %s bound to exchange %s", self.queue_name, ex_name)
         return queue
 
-    async def consume(self, callback: Callable[[Dict[str, Any], str], Awaitable[None]]):
+    async def consume(self, callback: Callable[[dict[str, Any], str], Awaitable[None]]):
         """אחראי רק על לופ ההאזנה והעברת הודעות ל-Callback"""
         self._callback = callback
         queue = await self._setup()

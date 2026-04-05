@@ -2,7 +2,7 @@ import secrets
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -13,8 +13,8 @@ async def create_group(
     db: AsyncSession,
     name: str,
     admin_id: UUID,
-    max_members: Optional[int] = None,
-    description: Optional[str] = None,
+    max_members: int | None = None,
+    description: str | None = None,
 ) -> Group:
     invite_code = secrets.token_urlsafe(16)
     desc_trimmed = description[:500] if description else None
@@ -35,19 +35,19 @@ async def create_group(
     return group
 
 
-async def get_group_by_id(db: AsyncSession, group_id: UUID) -> Optional[Group]:
+async def get_group_by_id(db: AsyncSession, group_id: UUID) -> Group | None:
     result = await db.execute(select(Group).where(Group.group_id == group_id))
     return result.scalars().first()
 
 
-async def get_group_by_invite_code(db: AsyncSession, invite_code: str) -> Optional[Group]:
+async def get_group_by_invite_code(db: AsyncSession, invite_code: str) -> Group | None:
     result = await db.execute(select(Group).where(Group.invite_code == invite_code))
     return result.scalars().first()
 
 
 async def get_user_groups(db: AsyncSession, user_id: UUID) -> list[Group]:
     result = await db.execute(
-        select(Group).join(GroupMember, Group.group_id == GroupMember.group_id).where(GroupMember.user_id == user_id, Group.is_active.is_(True))
+        select(Group).join(GroupMember, Group.group_id == GroupMember.group_id).where(GroupMember.user_id == user_id, Group.is_active.is_(True)),
     )
     return list(result.scalars().all())
 
@@ -57,7 +57,7 @@ async def get_group_members(db: AsyncSession, group_id: UUID) -> list[GroupMembe
     return list(result.scalars().all())
 
 
-async def get_membership(db: AsyncSession, group_id: UUID, user_id: UUID) -> Optional[GroupMember]:
+async def get_membership(db: AsyncSession, group_id: UUID, user_id: UUID) -> GroupMember | None:
     result = await db.execute(select(GroupMember).where(GroupMember.group_id == group_id, GroupMember.user_id == user_id))
     return result.scalars().first()
 
@@ -94,7 +94,7 @@ async def remove_member(db: AsyncSession, group_id: UUID, user_id: UUID) -> None
     await db.commit()
 
 
-async def update_member_role(db: AsyncSession, group_id: UUID, user_id: UUID, role: str) -> Optional[GroupMember]:
+async def update_member_role(db: AsyncSession, group_id: UUID, user_id: UUID, role: str) -> GroupMember | None:
     member = await get_membership(db, group_id, user_id)
     if member:
         member.role = role
@@ -110,7 +110,7 @@ async def rename_group(db: AsyncSession, group: Group, name: str) -> Group:
     return group
 
 
-async def update_group_description(db: AsyncSession, group: Group, description: Optional[str]) -> Group:
+async def update_group_description(db: AsyncSession, group: Group, description: str | None) -> Group:
     if description is not None and len(description) > 500:
         description = description[:500]
     group.description = description
@@ -119,7 +119,7 @@ async def update_group_description(db: AsyncSession, group: Group, description: 
     return group
 
 
-async def update_group_avatar_key(db: AsyncSession, group: Group, avatar_key: Optional[str]) -> Group:
+async def update_group_avatar_key(db: AsyncSession, group: Group, avatar_key: str | None) -> Group:
     group.avatar_key = avatar_key
     await db.commit()
     await db.refresh(group)

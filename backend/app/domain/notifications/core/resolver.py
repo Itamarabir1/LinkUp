@@ -5,6 +5,7 @@
 
 import logging
 from typing import Any, Optional
+
 from app.core.exceptions.base import LinkupError
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ class RecipientResolver:
     - Booking: selectinload(Booking.ride).selectinload(Ride.driver), selectinload(Booking.passenger_request).selectinload(PassengerRequest.user)
     """
 
-    def resolve(self, event_key: Any, source: Any) -> Optional[Any]:
+    def resolve(self, event_key: Any, source: Any) -> Any | None:
         """
         מחזיר User (נמען) או None.
         strategy["role"] קובע: self → source הוא User; driver → נהג מה־Ride/Booking; passenger → נוסע מה־Booking.
@@ -57,7 +58,7 @@ class RecipientResolver:
         """role=self: source הוא User – מחזירים אותו."""
         return source
 
-    def _get_driver(self, source: Any) -> Optional[Any]:
+    def _get_driver(self, source: Any) -> Any | None:
         """
         role=driver: source הוא Ride או Booking.
         Ride: נדרש source.driver (או נחזיר None).
@@ -71,7 +72,7 @@ class RecipientResolver:
             return source.driver
         return None
 
-    def _get_passenger(self, source: Any) -> Optional[Any]:
+    def _get_passenger(self, source: Any) -> Any | None:
         """
         role=passenger: source הוא Booking (או ישות עם passenger/passenger_request).
         נדרש source.passenger או source.passenger_request.user.
@@ -84,7 +85,7 @@ class RecipientResolver:
             return getattr(source.passenger_request, "user", None)
         return None
 
-    def _get_both(self, source: Any) -> Optional[Any]:
+    def _get_both(self, source: Any) -> Any | None:
         """
         role=both: source הוא payload dict עם user_id_1 ו-user_id_2.
         מחזיר list של שני משתמשים (או None אם לא ניתן לזהות).

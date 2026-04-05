@@ -2,10 +2,10 @@ import asyncio
 import logging
 
 from app.domain.events.enum import DispatchTarget
-from app.infrastructure.outbox.repository import OutboxRepository
-from app.infrastructure.events.dispatcher.base import EventDispatcher
-from app.domain.events.schema import Event
 from app.domain.events.routing import get_routing_metadata
+from app.domain.events.schema import Event
+from app.infrastructure.events.dispatcher.base import EventDispatcher
+from app.infrastructure.outbox.repository import OutboxRepository
 
 logger = logging.getLogger(__name__)
 

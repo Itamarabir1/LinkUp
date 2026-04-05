@@ -1,19 +1,20 @@
 import logging
-from typing import List
 from datetime import datetime, timedelta
+from typing import List
+
 from geoalchemy2.shape import to_shape
 
 logger = logging.getLogger(__name__)
 
 
-def convert_db_route_to_list(route_geom) -> List[List[float]]:
+def convert_db_route_to_list(route_geom) -> list[list[float]]:
     """המרת אובייקט Geometry מה-DB לרשימת [lat, lon] ל-Frontend."""
     if not route_geom:
         return []
     try:
         shape = to_shape(route_geom)
         # shape.coords מחזיר (lon, lat) – tuple או Point; המרה ל-[lat, lon]
-        out: List[List[float]] = []
+        out: list[list[float]] = []
         for pt in shape.coords:
             if hasattr(pt, "x") and hasattr(pt, "y"):
                 out.append([pt.y, pt.x])

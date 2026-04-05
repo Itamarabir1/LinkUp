@@ -1,15 +1,16 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, computed_field
 from typing import Optional
 from uuid import UUID
 
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
+
 from app.core.config import settings
+from app.core.exceptions.auth import PasswordTooWeakError
+from app.core.exceptions.validation import InvalidEmailError, InvalidPhoneError
 from app.core.utils.validators import (
     normalize_email_for_auth,
     validate_password_strength,
     validate_phone_number,
 )
-from app.core.exceptions.auth import PasswordTooWeakError
-from app.core.exceptions.validation import InvalidEmailError, InvalidPhoneError
 
 
 class UserBaseSchema(BaseModel):
@@ -17,15 +18,15 @@ class UserBaseSchema(BaseModel):
     סכימת בסיס עם וולידציות משותפות – משתמש ב-core.utils.validators (מקור אמת יחיד).
     """
 
-    full_name: Optional[str] = None
-    email: Optional[EmailStr] = None
-    phone_number: Optional[str] = None
-    password: Optional[str] = None
-    new_password: Optional[str] = None
+    full_name: str | None = None
+    email: EmailStr | None = None
+    phone_number: str | None = None
+    password: str | None = None
+    new_password: str | None = None
 
     @field_validator("email")
     @classmethod
-    def validate_email_format(cls, v: Optional[str]):
+    def validate_email_format(cls, v: str | None):
         if v is None:
             return v
         try:
@@ -35,7 +36,7 @@ class UserBaseSchema(BaseModel):
 
     @field_validator("phone_number")
     @classmethod
-    def validate_phone(cls, v: Optional[str]):
+    def validate_phone(cls, v: str | None):
         if v is None:
             return v
         try:
@@ -45,7 +46,7 @@ class UserBaseSchema(BaseModel):
 
     @field_validator("password", "new_password", check_fields=False)
     @classmethod
-    def validate_password_strength(cls, v: Optional[str]):
+    def validate_password_strength(cls, v: str | None):
         if v is None:
             return v
         try:
@@ -55,7 +56,7 @@ class UserBaseSchema(BaseModel):
 
 
 # --- קריאה (Response) ---
-def _avatar_url_from_key(avatar_key: Optional[str], filename: str) -> Optional[str]:
+def _avatar_url_from_key(avatar_key: str | None, filename: str) -> str | None:
     """בונה URL מלא ל-S3. אם avatar_key הוא staging (avatars/staging/...) — מחזיר את ה-key כקובץ יחיד."""
     if not avatar_key or not settings.S3_BUCKET_NAME:
         return None
@@ -69,8 +70,8 @@ class UserRead(BaseModel):
     user_id: UUID
     full_name: str
     phone_number: str
-    email: Optional[EmailStr] = None
-    avatar_key: Optional[str] = None
+    email: EmailStr | None = None
+    avatar_key: str | None = None
     is_verified: bool = False
     is_admin: bool = False
 
@@ -78,13 +79,13 @@ class UserRead(BaseModel):
 
     @computed_field
     @property
-    def avatar_url_small(self) -> Optional[str]:
+    def avatar_url_small(self) -> str | None:
         """150x150 — רשימות צ'אט, אווטארים קטנים."""
         return _avatar_url_from_key(self.avatar_key, "150x150.webp")
 
     @computed_field
     @property
-    def avatar_url_medium(self) -> Optional[str]:
+    def avatar_url_medium(self) -> str | None:
         """400x400 — תמונת פרופיל ראשית."""
         return _avatar_url_from_key(self.avatar_key, "400x400.webp")
 
@@ -96,16 +97,16 @@ class UserCreate(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=100)
     phone_number: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")  # וולידציה לטלפון בינלאומי
     password: str = Field(..., min_length=8)  # הסיסמה הגולמית מהמשתמש
-    email: Optional[EmailStr] = None
-    fcm_token: Optional[str] = None
+    email: EmailStr | None = None
+    fcm_token: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 # --- עדכונים ---
 class UserUpdate(UserBaseSchema):
-    full_name: Optional[str] = Field(None, min_length=2, max_length=100)
-    email: Optional[EmailStr] = None
+    full_name: str | None = Field(None, min_length=2, max_length=100)
+    email: EmailStr | None = None
 
 
 # --- מיקום ו-FCM ---
@@ -129,8 +130,8 @@ class MessageResponse(BaseModel):
 class UserAvatarResponse(BaseModel):
     """תגובה לאחר העלאת אווטאר – מחזיר מפתח או URL לפי צורך."""
 
-    avatar_key: Optional[str] = None
-    avatar_url_medium: Optional[str] = None
+    avatar_key: str | None = None
+    avatar_url_medium: str | None = None
 
 
 class AvatarUploadAcceptedResponse(BaseModel):
@@ -143,7 +144,7 @@ class AvatarUploadAcceptedResponse(BaseModel):
 class AvatarUploadUrlRequest(BaseModel):
     """בקשה ל-presigned URL להעלאת אווטאר."""
 
-    filename: Optional[str] = Field(None, description="שם הקובץ (אופציונלי, לזיהוי סיומת)")
+    filename: str | None = Field(None, description="שם הקובץ (אופציונלי, לזיהוי סיומת)")
 
 
 class AvatarUploadUrlResponse(BaseModel):

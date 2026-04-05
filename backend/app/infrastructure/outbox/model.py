@@ -1,6 +1,8 @@
 import uuid
-from sqlalchemy import Column, String, Integer, DateTime, Text, Index, func
-from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
+
+from sqlalchemy import Column, DateTime, Index, Integer, String, Text, func
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
+
 from app.db.base import Base
 
 # ייבוא מהקבצים החדשים שפיצלת - זה מה שמונע כפילויות!

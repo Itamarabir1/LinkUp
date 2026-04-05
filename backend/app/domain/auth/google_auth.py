@@ -4,16 +4,18 @@
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
+
 from google.auth.transport import requests
 from google.oauth2 import id_token
+
 from app.core.config import settings
 from app.core.exceptions.auth import GoogleAuthFailed
 
 logger = logging.getLogger(__name__)
 
 
-def verify_google_id_token(id_token_str: str) -> Dict[str, Any]:
+def verify_google_id_token(id_token_str: str) -> dict[str, Any]:
     """
     מאמת ID token מ-Google Sign-In.
 

@@ -4,8 +4,9 @@
 
 import json
 import logging
+
 from groq import APIError
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from app.domain.chat.ai.client import get_groq_client
 from app.domain.chat.ai.prompts import SYSTEM_PROMPT, USER_PROMPT

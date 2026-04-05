@@ -7,9 +7,11 @@ ScheduledNotification — רשומת תזכורת מתוזמנת.
 """
 
 import uuid
-from sqlalchemy import Column, String, DateTime, ForeignKey
+
+from sqlalchemy import Column, DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.sql import func
+
 from app.db.base import Base
 
 

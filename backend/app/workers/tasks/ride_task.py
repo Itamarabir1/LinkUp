@@ -1,19 +1,21 @@
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 from uuid import UUID
-from app.db.session import SessionLocal
+
 from app.domain.rides.services.maps_service import maps_service
-from app.domain.rides.crud import crud_ride
 
 # TODO: dispatch function does not exist — EventDispatcher.dispatch is a method, not a module-level function
 from app.infrastructure.events.dispatcher.dispatcher import dispatch
+
 from app.core.exceptions import InfrastructureError
 from app.core.exceptions.infrastructure import WorkerTaskFailed
+from app.db.session import SessionLocal
+from app.domain.rides.crud import crud_ride
 
 logger = logging.getLogger(__name__)
 
 
-async def handle_map_tasks(payload: Dict[str, Any], routing_key: str):
+async def handle_map_tasks(payload: dict[str, Any], routing_key: str):
     """
     מנתב משימות מפות לפי ה-routing_key.
     דוגמה למפתח: ride.maps.calculate_route
@@ -22,7 +24,7 @@ async def handle_map_tasks(payload: Dict[str, Any], routing_key: str):
         await calculate_ride_route_task(payload)
 
 
-async def calculate_ride_route_task(data: Dict[str, Any]):
+async def calculate_ride_route_task(data: dict[str, Any]):
     """
     משימה כבדה: פנייה ל-Google Maps, עדכון DB והפצת אירוע סיום.
     """

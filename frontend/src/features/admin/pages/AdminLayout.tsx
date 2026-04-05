@@ -10,7 +10,6 @@ import {
   Inbox,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
-import { NotificationToast } from '../../../components/NotificationToast/NotificationToast';
 import shell from '../styles/AdminShell.module.css';
 
 const nav: Array<{
@@ -82,7 +81,6 @@ export default function AdminLayout() {
           <Outlet />
         </main>
       </div>
-      <NotificationToast />
     </div>
   );
 }

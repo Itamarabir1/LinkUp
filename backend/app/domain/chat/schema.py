@@ -2,10 +2,11 @@
 סכמות צ'אט 1:1 – קלט/פלט ל־API.
 """
 
-from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ConversationCreate(BaseModel):
@@ -39,7 +40,7 @@ class PaginatedMessagesResponse(BaseModel):
     """הודעות בשיחה עם pagination (cursor-based)."""
 
     items: list[MessageResponse] = Field(default_factory=list)
-    next_cursor: Optional[str] = Field(None, description="message_id של הישן ביותר להבא (before=)")
+    next_cursor: str | None = Field(None, description="message_id של הישן ביותר להבא (before=)")
     has_more: bool = False
 
 
@@ -48,7 +49,7 @@ class ConversationPartner(BaseModel):
 
     user_id: UUID
     full_name: str
-    avatar_url: Optional[str] = None
+    avatar_url: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -58,8 +59,8 @@ class ConversationListItem(BaseModel):
 
     conversation_id: UUID
     partner: ConversationPartner
-    last_message_at: Optional[datetime] = None
-    last_message_preview: Optional[str] = None
+    last_message_at: datetime | None = None
+    last_message_preview: str | None = None
     has_unread: bool = False
 
     model_config = ConfigDict(from_attributes=True)
@@ -71,6 +72,6 @@ class ConversationDetail(BaseModel):
     conversation_id: UUID
     partner: ConversationPartner
     created_at: datetime
-    booking_id: Optional[UUID] = None  # קישור ל-booking אם השיחה נוצרה דרך booking
+    booking_id: UUID | None = None  # קישור ל-booking אם השיחה נוצרה דרך booking
 
     model_config = ConfigDict(from_attributes=True)

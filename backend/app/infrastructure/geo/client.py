@@ -1,9 +1,11 @@
-import time
-import httpx
-from datetime import datetime
-from typing import Optional, List, Dict, Tuple, Any
-from app.core.config import settings
 import logging
+import time
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
+
+import httpx
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -16,14 +18,14 @@ TIMEOUT_DIRECTIONS = 15.0
 TIMEOUT_DISTANCE_MATRIX = 10.0
 
 
-def _decode_polyline(encoded: str) -> List[List[float]]:
+def _decode_polyline(encoded: str) -> list[list[float]]:
     """
     מפענח Google encoded polyline לרשימת [lat, lon].
     אלגוריתם סטנדרטי של Google (1e-5 degrees).
     """
     if not encoded:
         return []
-    coords: List[List[float]] = []
+    coords: list[list[float]] = []
     i = 0
     lat, lon = 0, 0
     n = len(encoded)
@@ -62,7 +64,7 @@ class GeoClient:
 
         self.geolocator = _GeoLocator()
 
-    async def fetch_coordinates(self, address: str) -> Tuple[Optional[float], Optional[float]]:
+    async def fetch_coordinates(self, address: str) -> tuple[float | None, float | None]:
         """
         הופך כתובת לקואורדינטות (Geocoding) — עם Redis cache.
 
@@ -97,7 +99,7 @@ class GeoClient:
         await set_cached_coords(address, lat, lon)
         return lat, lon
 
-    async def fetch_distance_matrix(self, start: Tuple[float, float], end: Tuple[float, float]) -> Optional[Tuple[int, int]]:
+    async def fetch_distance_matrix(self, start: tuple[float, float], end: tuple[float, float]) -> tuple[int, int] | None:
         """
         קריאה ל-Google Distance Matrix API לזמן נסיעה ומרחק (מטרים) בין מוצא ליעד.
         מחזיר (duration_sec, distance_m) או None אם נכשל.
@@ -116,7 +118,7 @@ class GeoClient:
                 if response.status_code != 200:
                     logger.warning(f"Distance Matrix API error: {response.status_code}")
                     return None
-                data: Dict[str, Any] = response.json()
+                data: dict[str, Any] = response.json()
                 if data.get("status") != "OK":
                     logger.warning(f"Distance Matrix status: {data.get('status')}")
                     return None
@@ -135,10 +137,10 @@ class GeoClient:
 
     async def fetch_raw_routes(
         self,
-        start: Tuple[float, float],
-        end: Tuple[float, float],
-        departure_time: Optional[datetime] = None,
-    ) -> List[Dict]:
+        start: tuple[float, float],
+        end: tuple[float, float],
+        departure_time: datetime | None = None,
+    ) -> list[dict]:
         """
         שליפת 2-3 מסלולים מ-Google Directions API.
         זמן ומרחק לכל מסלול מגיעים מ-Distance Matrix API (fallback ל-Directions אם נכשל).
@@ -148,10 +150,10 @@ class GeoClient:
 
     async def fetch_routes_google_directions(
         self,
-        start: Tuple[float, float],
-        end: Tuple[float, float],
-        departure_time: Optional[datetime] = None,
-    ) -> List[Dict]:
+        start: tuple[float, float],
+        end: tuple[float, float],
+        departure_time: datetime | None = None,
+    ) -> list[dict]:
         """
         שליפת עד 3 מסלולים מ-Google Directions API (alternatives=true).
         מחזיר רשימה בפורמט תואם ל-processor: summary, duration (שניות), distance (מטרים), coords.
@@ -187,7 +189,7 @@ class GeoClient:
                 if not isinstance(raw_list, list):
                     raw_list = [raw_list] if raw_list else []
                 routes_raw = raw_list[:MAX_ROUTES]
-                out: List[Dict] = []
+                out: list[dict] = []
                 for i, r in enumerate(routes_raw):
                     legs = r.get("legs", [])
                     duration_sec = sum(leg.get("duration", {}).get("value", 0) for leg in legs)
@@ -201,7 +203,7 @@ class GeoClient:
                             "duration": duration_sec,
                             "distance": distance_m,
                             "coords": coords,
-                        }
+                        },
                     )
                 # זמן ומרחק Distance Matrix API (זמן נסיעה וק"מ לכל מסלול)
                 dm_result = await self.fetch_distance_matrix(start, end)

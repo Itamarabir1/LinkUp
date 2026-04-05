@@ -3,6 +3,7 @@ Groq API client לניתוח AI של שיחות.
 """
 
 import os
+
 from groq import Groq
 
 # יצירת client (singleton)

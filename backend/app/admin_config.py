@@ -1,8 +1,9 @@
 from sqladmin import ModelView
-from app.domain.users.model import User
+
+from app.domain.bookings.model import Booking
 from app.domain.passengers.model import PassengerRequest
 from app.domain.rides.model import Ride
-from app.domain.bookings.model import Booking
+from app.domain.users.model import User
 
 
 # תצוגת משתמשים

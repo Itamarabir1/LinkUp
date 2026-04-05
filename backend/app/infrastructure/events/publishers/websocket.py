@@ -1,7 +1,8 @@
-import logging
 import json
-from backend.app.infrastructure.outbox.model import Event, DispatchTarget
+import logging
+
 from backend.app.infrastructure.events.publishers.base import EventPublisher
+from backend.app.infrastructure.outbox.model import DispatchTarget, Event
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class WebSocketPublisher(EventPublisher):
                     "type": event.name,
                     "data": event.payload,
                     "timestamp": event.payload.get("timestamp"),
-                }
+                },
             )
 
             for channel in channels:

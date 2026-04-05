@@ -1,31 +1,30 @@
 import logging
 
-from fastapi import APIRouter, Depends, status, Query, Request
-
-from app.core.exceptions.base import LinkupError
-from app.core.exceptions.auth import GoogleAuthFailed
+from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies.auth import get_db, get_current_user
+from app.api.dependencies.auth import get_current_user, get_db
 from app.api.dependencies.rate_limit import rate_limit_auth
+from app.api.dependencies.services import get_auth_service
 from app.core.config import settings
+from app.core.exceptions.auth import GoogleAuthFailed
+from app.core.exceptions.base import LinkupError
 from app.domain.auth.schema import (
-    UserRegister,
-    UserOut,
+    AuthMessageResponse,
+    ChangePasswordRequest,
+    EmailOnlyRequest,
+    GoogleSignInRequest,
     LoginRequest,
     LoginResponse,
+    PasswordResetConfirm,
+    PasswordResetConfirmResponse,
     RefreshRequest,
     RefreshResponse,
+    UserOut,
+    UserRegister,
     VerifyEmailRequest,
-    EmailOnlyRequest,
-    PasswordResetConfirm,
-    ChangePasswordRequest,
-    AuthMessageResponse,
-    PasswordResetConfirmResponse,
-    GoogleSignInRequest,
 )
-from app.api.dependencies.services import get_auth_service
 from app.domain.auth.service import AuthService
 from app.domain.users.model import User
 

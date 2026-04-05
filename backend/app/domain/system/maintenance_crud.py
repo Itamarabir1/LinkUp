@@ -14,13 +14,13 @@ from datetime import datetime
 from typing import List, Tuple
 from uuid import UUID
 
-from sqlalchemy import select, update, text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, text, update
 from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.rides.model import Ride
-from app.domain.passengers.model import PassengerRequest
 from app.domain.bookings.model import Booking
+from app.domain.passengers.model import PassengerRequest
+from app.domain.rides.model import Ride
 
 logger = logging.getLogger(__name__)
 
@@ -45,13 +45,13 @@ class MaintenanceCRUD:
     מחזיר PendingUserEvent לשליחה אחרי commit — לא שולח Redis בעצמו.
     """
 
-    async def bulk_update_expired_entities(self, db: AsyncSession, now: datetime) -> Tuple[dict, List[PendingUserEvent]]:
+    async def bulk_update_expired_entities(self, db: AsyncSession, now: datetime) -> tuple[dict, list[PendingUserEvent]]:
         """
         מריץ את כל עדכוני הסטטוס ומחזיר:
           - stats: מילון עם ספירות לכל entity
           - pending_events: רשימת events לשליחה אחרי commit
         """
-        pending_events: List[PendingUserEvent] = []
+        pending_events: list[PendingUserEvent] = []
 
         ride_rows, ride_events = await self._update_expired_rides(db, now)
         req_expired_rows, req_exp_events = await self._update_expired_passenger_requests(db, now)
@@ -71,7 +71,7 @@ class MaintenanceCRUD:
         }
         return stats, pending_events
 
-    async def _update_expired_rides(self, db: AsyncSession, now: datetime) -> Tuple[list, List[PendingUserEvent]]:
+    async def _update_expired_rides(self, db: AsyncSession, now: datetime) -> tuple[list, list[PendingUserEvent]]:
         """
         open → completed לנסיעות שעבר זמנן.
         RETURNING ride_id, driver_id — אטומי, ללא race condition.
@@ -105,7 +105,7 @@ class MaintenanceCRUD:
             for ride_id, passenger_id in passenger_result.all():
                 ride_passengers.setdefault(ride_id, []).append(passenger_id)
 
-            events: List[PendingUserEvent] = []
+            events: list[PendingUserEvent] = []
             for ride_id, driver_id in rows:
                 extra = {"ride_id": str(ride_id), "status": "completed"}
                 events.append(PendingUserEvent(driver_id, "RIDE_FINISHED", extra))
@@ -121,7 +121,7 @@ class MaintenanceCRUD:
                 return [], []
             raise
 
-    async def _update_expired_passenger_requests(self, db: AsyncSession, now: datetime) -> Tuple[list, List[PendingUserEvent]]:
+    async def _update_expired_passenger_requests(self, db: AsyncSession, now: datetime) -> tuple[list, list[PendingUserEvent]]:
         """active → expired לבקשות שעבר זמנן."""
         try:
             stmt = (
@@ -153,7 +153,7 @@ class MaintenanceCRUD:
                 return [], []
             raise
 
-    async def _update_completed_passenger_requests(self, db: AsyncSession, now: datetime) -> Tuple[list, List[PendingUserEvent]]:
+    async def _update_completed_passenger_requests(self, db: AsyncSession, now: datetime) -> tuple[list, list[PendingUserEvent]]:
         """matched → cancelled לבקשות שעבר זמנן."""
         try:
             stmt = (
@@ -184,7 +184,7 @@ class MaintenanceCRUD:
                 return [], []
             raise
 
-    async def _update_completed_bookings(self, db: AsyncSession, now: datetime) -> Tuple[list, List[PendingUserEvent]]:
+    async def _update_completed_bookings(self, db: AsyncSession, now: datetime) -> tuple[list, list[PendingUserEvent]]:
         """confirmed → completed להזמנות של נסיעות שעבר זמנן."""
         try:
             subq = select(Ride.ride_id).where(Ride.departure_time <= now)

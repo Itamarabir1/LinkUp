@@ -1,21 +1,26 @@
+import uuid
+
+from geoalchemy2 import Geography
 from sqlalchemy import (
     Column,
-    Integer,
-    ForeignKey,
     DateTime,
-    func,
-    UniqueConstraint,
-    text,
+    ForeignKey,
+    Index,
+    Integer,
     String,
+    UniqueConstraint,
+    func,
+    text,
+)
+from sqlalchemy import (
     inspect as sa_inspect,
 )
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM, UUID as PG_UUID
-from geoalchemy2 import Geography
-import uuid
+
 from app.db.base import Base
 from app.domain.bookings.enum import BookingStatus
-from sqlalchemy import Index
 
 
 class BookingStatusEnumType(PG_ENUM):

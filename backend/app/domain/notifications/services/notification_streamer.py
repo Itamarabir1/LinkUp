@@ -1,6 +1,7 @@
 import logging
 from typing import Union
 from uuid import UUID
+
 from fastapi import WebSocket, WebSocketDisconnect
 
 # התיקון הארכיטקטוני: במקום לייבא את Redis ישירות, מייבאים את ה-Bus
@@ -14,7 +15,7 @@ class NotificationStreamer:
     אחראי על הזרמת מידע בזמן אמת מהתשתית (Bus) לצינור הפיזי (WebSocket).
     """
 
-    async def stream_user_notifications(self, websocket: WebSocket, user_id: Union[UUID, str, int]):
+    async def stream_user_notifications(self, websocket: WebSocket, user_id: UUID | str | int):
         """
         פותח האזנה לערוץ המשתמש ומזרים הודעות עד לניתוק.
         """

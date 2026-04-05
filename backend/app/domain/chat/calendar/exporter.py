@@ -9,7 +9,7 @@ from ..ai.schema import RideSummary
 from .builder import create_calendar_from_rides
 
 
-def export_to_ical(rides: List[RideSummary], output_path: str, base_date: Optional[datetime] = None) -> bool:
+def export_to_ical(rides: list[RideSummary], output_path: str, base_date: datetime | None = None) -> bool:
     """
     מייצא רשימת טרמפים לקובץ iCal (.ics).
 
@@ -33,7 +33,7 @@ def export_to_ical(rides: List[RideSummary], output_path: str, base_date: Option
         return False
 
 
-def export_rides_to_ical_bytes(rides: List[RideSummary], base_date: Optional[datetime] = None) -> bytes:
+def export_rides_to_ical_bytes(rides: list[RideSummary], base_date: datetime | None = None) -> bytes:
     """
     מייצא רשימת טרמפים ל-bytes של קובץ iCal (.ics).
 
@@ -51,10 +51,10 @@ def export_rides_to_ical_bytes(rides: List[RideSummary], base_date: Optional[dat
 
 
 def export_batch_to_ical(
-    rides_groups: List[List[RideSummary]],
-    output_paths: List[str],
-    base_date: Optional[datetime] = None,
-) -> List[bool]:
+    rides_groups: list[list[RideSummary]],
+    output_paths: list[str],
+    base_date: datetime | None = None,
+) -> list[bool]:
     """
     מייצא מספר קבוצות של טרמפים לקבצי iCal נפרדים.
 

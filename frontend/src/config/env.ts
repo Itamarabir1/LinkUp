@@ -4,7 +4,7 @@ export const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS) || 300
 
 export function getChatWebSocketUrl(token: string): string {
   if (import.meta.env.DEV) {
-    return `ws://localhost:8081/ws?token=${encodeURIComponent(token)}`;
+    return `ws://127.0.0.1:8081/ws?token=${encodeURIComponent(token)}`;
   }
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${proto}//${window.location.host}/ws?token=${encodeURIComponent(token)}`;
@@ -12,7 +12,7 @@ export function getChatWebSocketUrl(token: string): string {
 
 export function getWsBaseUrl(): string {
   if (import.meta.env.DEV) {
-    return 'ws://localhost:8000/api/v1';
+    return 'ws://127.0.0.1:8000/api/v1';
   }
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${proto}//${window.location.host}/api/v1`;

@@ -1,6 +1,7 @@
 import logging
-from typing import Any, Dict, Optional
 from datetime import datetime
+from typing import Any, Dict, Optional
+
 from .base import BaseContextBuilder
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ class BookingBuilder(BaseContextBuilder):
     """
 
     @classmethod
-    def build(cls, booking: Any, event_key: Optional[str] = None) -> Dict[str, Any]:
+    def build(cls, booking: Any, event_key: str | None = None) -> dict[str, Any]:
         """
         בונה קונטקסט מלא מהזמנה.
         """
@@ -87,7 +88,7 @@ class BookingBuilder(BaseContextBuilder):
                 ),
                 "action_url": inst._get_cta_url("my-bookings?tab=driver"),
                 "is_urgent": "urgent" in (event_key or "").lower(),
-            }
+            },
         )
 
         return context

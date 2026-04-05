@@ -4,15 +4,15 @@
 """
 
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 from uuid import UUID
 
+from app.core.exceptions.infrastructure import WorkerTaskFailed
 from app.db.session import SessionLocal
 from app.domain.users.crud import crud_user
 from app.infrastructure.s3.client import s3_client
 from app.infrastructure.s3.image_processor import process_and_save_avatar
 from app.infrastructure.s3.service import storage_service
-from app.core.exceptions.infrastructure import WorkerTaskFailed
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ AVATAR_UPLOAD_EVENT = "user.avatar_upload"
 AVATAR_REMOVE_EVENT = "user.avatar_remove"
 
 
-async def handle_avatar_upload_event(data: Dict[str, Any], routing_key: str) -> None:
+async def handle_avatar_upload_event(data: dict[str, Any], routing_key: str) -> None:
     """
     מעבד אירועי אווטאר: העלאה או מחיקה.
     - user.avatar_upload: עיבוד תמונה (resize ל-3 גדלים) + עדכון avatar_key במסד.
@@ -34,7 +34,7 @@ async def handle_avatar_upload_event(data: Dict[str, Any], routing_key: str) -> 
         logger.warning("Ignoring non-avatar event: %s", routing_key)
 
 
-async def _handle_avatar_upload(data: Dict[str, Any]) -> None:
+async def _handle_avatar_upload(data: dict[str, Any]) -> None:
     """
     מעבד אירוע העלאת אווטאר: הורדה מ-staging, resize ל-3 גדלים, העלאה ל-avatars/{user_id}/, עדכון avatar_key.
     payload: { "user_id": str/uuid, "staging_key": str }
@@ -78,7 +78,7 @@ async def _handle_avatar_upload(data: Dict[str, Any]) -> None:
             raise WorkerTaskFailed() from e
 
 
-async def _handle_avatar_remove(data: Dict[str, Any]) -> None:
+async def _handle_avatar_remove(data: dict[str, Any]) -> None:
     """
     מעבד אירוע מחיקת אווטאר: מוחק מ-S3 את avatars/{user_id}/.
     payload: { "user_id": str/uuid }

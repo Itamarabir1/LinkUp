@@ -1,6 +1,6 @@
 import asyncio
 import base64
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Optional
 
 from jose import JWTError, jwt
@@ -30,14 +30,14 @@ async def verify_password(plain_password: str, hashed_password: str) -> bool:
     return await loop.run_in_executor(None, _verify_sync, plain_password, hashed_password)
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update(
         {
             "exp": expire,
             "iss": getattr(settings, "JWT_ISSUER", "linkup-api"),
-        }
+        },
     )
     return jwt.encode(
         to_encode,
@@ -52,10 +52,10 @@ def create_refresh_token(data: dict) -> str:
     expire_days = settings.REFRESH_TOKEN_EXPIRE_DAYS
     to_encode.update(
         {
-            "exp": datetime.now(timezone.utc) + timedelta(days=expire_days),
+            "exp": datetime.now(UTC) + timedelta(days=expire_days),
             "type": "refresh",
             "iss": getattr(settings, "JWT_ISSUER", "linkup-api"),
-        }
+        },
     )
     return jwt.encode(
         to_encode,
@@ -90,10 +90,10 @@ def decode_access_token(token: str) -> dict:
         )
         return payload
     except JWTError as e:
-        logger.warning(f"Token decode failed: {str(e)}")
+        logger.warning(f"Token decode failed: {e!s}")
         return None
     except Exception as e:
-        logger.error(f"Unexpected token decode error: {str(e)}")
+        logger.error(f"Unexpected token decode error: {e!s}")
         return None
 
 

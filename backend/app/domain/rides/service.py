@@ -1,28 +1,31 @@
 import json
 from typing import Any, Dict, List, Optional
-
-import structlog
 from uuid import UUID
 
+import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions.base import LinkupError
+from app.core.exceptions.infrastructure import RouteNotFoundError
 from app.core.exceptions.ride import (
-    RideNotFoundError,
-    RideAlreadyCancelledError,
     InvalidRideStatusError,
     NoConfirmedBookingsError,
+    RideAlreadyCancelledError,
+    RideNotFoundError,
     SessionExpiredError,
 )
 from app.core.exceptions.validation import SameOriginDestinationError
-from app.core.exceptions.infrastructure import RouteNotFoundError
-
-from app.infrastructure.redis.broadcast import broadcast
-from app.infrastructure.redis.keys import RIDES_LIST_CHANNEL
-from app.domain.rides.repository import ride_cache_repo, RideCacheRepository
-from app.domain.rides.model import Ride
+from app.domain.bookings.crud import crud_booking
+from app.domain.bookings.enum import BookingStatus
+from app.domain.events.enum import DispatchTarget
+from app.domain.events.outbox import publish_to_outbox
+from app.domain.geo import processor as geo_proc
+from app.domain.notifications.constants import NotificationEvent
 from app.domain.rides.crud import crud_ride
+from app.domain.rides.enum import RideBroadcastAction, RideStatus
 from app.domain.rides.mapper import RideMapper
+from app.domain.rides.model import Ride
+from app.domain.rides.repository import RideCacheRepository, ride_cache_repo
 from app.domain.rides.schema import (
     RideCreate,
     RidePreviewCreate,
@@ -30,14 +33,9 @@ from app.domain.rides.schema import (
     RideResponse,
     RideUpdate,
 )
-from app.domain.rides.enum import RideStatus, RideBroadcastAction
+from app.infrastructure.redis.broadcast import broadcast
+from app.infrastructure.redis.keys import RIDES_LIST_CHANNEL
 from app.infrastructure.redis.publisher import publish_ride_event
-from app.domain.geo import processor as geo_proc
-from app.domain.bookings.crud import crud_booking
-from app.domain.bookings.enum import BookingStatus
-from app.domain.events.outbox import publish_to_outbox
-from app.domain.events.enum import DispatchTarget
-from app.domain.notifications.constants import NotificationEvent
 
 logger = structlog.get_logger(__name__)
 
@@ -67,7 +65,7 @@ class _RideNotificationFactory:
     }
 
     @classmethod
-    def create_broadcast_payload(cls, ride, action: str) -> Dict[str, Any]:
+    def create_broadcast_payload(cls, ride, action: str) -> dict[str, Any]:
         config = cls._CONFIG.get(
             action,
             {
@@ -142,7 +140,7 @@ class RideService:
             logger.error("Failed to save ride to DB: %s", e)
             raise
 
-    async def _validate_and_get_cached_ride(self, ride_in: RideCreate) -> Dict[str, Any]:
+    async def _validate_and_get_cached_ride(self, ride_in: RideCreate) -> dict[str, Any]:
         if not (ride_in.session_id and str(ride_in.session_id).strip()):
             logger.warning("create_ride_empty_session_id")
             raise SessionExpiredError(session_id=ride_in.session_id or "")
@@ -161,7 +159,7 @@ class RideService:
         await db.refresh(new_ride)
 
     @staticmethod
-    def _build_ride_response(new_ride: Ride, cached_data: Dict[str, Any], ride_in: RideCreate) -> RideResponse:
+    def _build_ride_response(new_ride: Ride, cached_data: dict[str, Any], ride_in: RideCreate) -> RideResponse:
         response = RideMapper.to_response(new_ride)
         if not response.route_coords and cached_data.get("routes"):
             selected_route = cached_data["routes"][ride_in.selected_route_index]
@@ -188,14 +186,14 @@ class RideService:
         self,
         db: AsyncSession,
         driver_id: UUID,
-        status: Optional[str] = None,
-    ) -> List[RideResponse]:
+        status: str | None = None,
+    ) -> list[RideResponse]:
         """רשימת נסיעות של הנהג המחובר (הנסיעות שלי)."""
         status_enum = RideStatus(status) if status else None
         rides = await crud_ride.get_by_driver_id(db, driver_id, status_enum)
         return [RideMapper.to_response(r) for r in rides]
 
-    async def get_rides_by_group_id(self, db: AsyncSession, group_id: UUID) -> List[RideResponse]:
+    async def get_rides_by_group_id(self, db: AsyncSession, group_id: UUID) -> list[RideResponse]:
         """רשימת נסיעות של קבוצה (לטאב נסיעות במסך קבוצה). לא בודק חברות – יש לקרוא רק אחרי אימות שהמשתמש חבר בקבוצה."""
         rides = await crud_ride.get_by_group_id(db, group_id, exclude_cancelled=True)
         return [RideMapper.to_response(r) for r in rides]
@@ -210,7 +208,7 @@ class RideService:
         payload: RideUpdate,
     ) -> RideResponse:
         """עדכון חלקי – זמן יציאה ו/או מספר מושבים. רק הנהג בעלים."""
-        update_dict: Dict[str, Any] = {}
+        update_dict: dict[str, Any] = {}
         if payload.departure_time is not None:
             update_dict["departure_time"] = payload.departure_time
         if payload.available_seats is not None:

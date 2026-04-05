@@ -28,10 +28,10 @@
   - כל תור מקשיב ל-exchange(es) שמתאימים לו בלבד. לא מערבבים התראות ומשימות כבדות באותו תור.
 """
 
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 # קידומת event_name → exchange
-_EXCHANGE_BY_PREFIX: Dict[str, str] = {
+_EXCHANGE_BY_PREFIX: dict[str, str] = {
     "auth.": "user",
     "user.": "user",
     "ride.": "ride",
@@ -43,13 +43,13 @@ DEFAULT_EXCHANGE = "system_events"
 TASKS_EXCHANGE = "tasks"
 
 # משימות כבדות (העלאת תמונה וכו') – תור נפרד מ-notifications
-_TASK_EVENT_NAMES: List[str] = [
+_TASK_EVENT_NAMES: list[str] = [
     "user.avatar_upload",
     "user.avatar_remove",
 ]
 
 # תור הנוטיפיקציות מקשיב לכל ה-exchanges האלו (תור אחד, וורקר אחד לכל המיילים/פוש)
-NOTIFICATION_EXCHANGES: List[str] = [
+NOTIFICATION_EXCHANGES: list[str] = [
     "user",
     "ride",
     "booking",
@@ -57,12 +57,12 @@ NOTIFICATION_EXCHANGES: List[str] = [
 ]
 
 # תור העלאת אווטאר (ותמונה/קבצים) מקשיב ל-tasks
-AVATAR_UPLOAD_EXCHANGES: List[str] = [TASKS_EXCHANGE]
+AVATAR_UPLOAD_EXCHANGES: list[str] = [TASKS_EXCHANGE]
 
 # משימות מתוזמנות (maintenance, reminders, fuel) – תור ייעודי, לא אירועים
 SCHEDULED_EXCHANGE = "scheduled"
 SCHEDULED_TASKS_QUEUE = "scheduled_tasks_queue"
-SCHEDULED_EXCHANGES: List[str] = [SCHEDULED_EXCHANGE]
+SCHEDULED_EXCHANGES: list[str] = [SCHEDULED_EXCHANGE]
 
 # routing_key למשימות מתוזמנות (נשלח ע"י המתזמן, מפורש ע"י ה-consumer)
 ROUTING_KEY_FUEL_SCAN = "fuel_scan"
@@ -71,7 +71,7 @@ ROUTING_KEY_REMINDERS = "reminders"
 ROUTING_KEY_CHAT_TIMEOUT = "chat_timeout"
 
 
-def get_routing_metadata(event_name: str) -> Dict[str, Any]:
+def get_routing_metadata(event_name: str) -> dict[str, Any]:
     """
     מחזיר metadata לשליחה ל-RabbitMQ: exchange ו-routing_key.
     אירועי משימות (avatar_upload) → exchange "tasks"; שאר אירועים → לפי קידומת דומיין.

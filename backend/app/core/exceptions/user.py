@@ -1,4 +1,5 @@
 from typing import Optional
+
 from .base import LinkupError
 
 
@@ -7,7 +8,7 @@ class UserNotFoundError(LinkupError):
     error_code = "USER_NOT_FOUND"
     message = "המשתמש המבוקש לא נמצא במערכת"
 
-    def __init__(self, user_id: Optional[int] = None, identifier: Optional[str] = None):
+    def __init__(self, user_id: int | None = None, identifier: str | None = None):
         msg = self.message
         payload = {}
         if user_id is not None:

@@ -3,14 +3,14 @@
 נהג ונוסע קוראים ל־GET /geo/address כשהמשתמש לוחץ "השתמש במיקום שלי".
 """
 
-from fastapi import APIRouter, Query, Depends
+from fastapi import APIRouter, Depends, Query
 
-from app.core.config import settings
 from app.api.dependencies.auth import get_current_user
-from app.domain.users.model import User
+from app.core.config import settings
+from app.core.exceptions.validation import InvalidLocationError
 from app.domain.geo.processor import get_address_from_gps
 from app.domain.geo.schema import AddressFromCoordsResponse
-from app.core.exceptions.validation import InvalidLocationError
+from app.domain.users.model import User
 
 router = APIRouter(tags=["Geo"])
 

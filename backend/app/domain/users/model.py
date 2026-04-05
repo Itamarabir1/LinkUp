@@ -1,10 +1,13 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, Boolean, Text, inspect as sa_inspect
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from app.db.base import Base
+
 from geoalchemy2 import Geography  # שימוש ב-Geography עבור PostGIS
+from sqlalchemy import Boolean, Column, DateTime, String, Text
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
+from app.db.base import Base
 
 
 class User(Base):

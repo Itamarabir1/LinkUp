@@ -4,22 +4,22 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
 from app.api.dependencies.auth import get_current_user
-from app.domain.users.service import user_service
-from app.domain.users.model import User
+from app.db.session import get_db
+from app.domain.bookings.schema import NotificationItemResponse
+from app.domain.bookings.service import BookingService
 from app.domain.users.crud import crud_user
+from app.domain.users.model import User
 from app.domain.users.schema import (
-    UserRead,
-    UserUpdate,
+    AvatarUploadAcceptedResponse,
+    AvatarUploadConfirmRequest,
+    AvatarUploadUrlResponse,
     FCMTokenUpdate,
     MessageResponse,
-    AvatarUploadAcceptedResponse,
-    AvatarUploadUrlResponse,
-    AvatarUploadConfirmRequest,
+    UserRead,
+    UserUpdate,
 )
-from app.domain.bookings.service import BookingService
-from app.domain.bookings.schema import NotificationItemResponse
+from app.domain.users.service import user_service
 
 router = APIRouter(tags=["Users"])  # prefix="/users" ניתן ב-api_router
 
@@ -60,7 +60,7 @@ async def get_user_last_seen(
 
 
 # --- התראות (מסך התראות) ---
-@router.get("/me/notifications", response_model=List[NotificationItemResponse])
+@router.get("/me/notifications", response_model=list[NotificationItemResponse])
 async def get_my_notifications(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -108,7 +108,7 @@ async def test_push(
     status_code=status.HTTP_200_OK,
 )
 async def get_avatar_upload_url(
-    filename: Optional[str] = None,
+    filename: str | None = None,
     current_user: User = Depends(get_current_user),
 ):
     """

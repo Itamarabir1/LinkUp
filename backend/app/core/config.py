@@ -1,10 +1,10 @@
+from functools import lru_cache
 from pathlib import Path
+from typing import List, Optional
 from urllib.parse import urlparse, urlunparse
 
+from pydantic import AliasChoices, EmailStr, Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import AliasChoices, Field, EmailStr, computed_field
-from functools import lru_cache
-from typing import Optional, List
 
 # תיקיית backend (היכן ש-.env נמצא) – כך שה-.env נטען גם כשמריצים מ-cwd אחר
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
         "development",
         description="שם סביבה (Sentry, לוגים): development / staging / production",
     )
-    SENTRY_DSN: Optional[str] = Field(
+    SENTRY_DSN: str | None = Field(
         None,
         description="Sentry DSN; ריק = ללא שליחה ל-Sentry",
     )
@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE: int = Field(1800, description="חידוש חיבורים כל 30 דקות")
 
     # אופציונלי: חיבור מלא ל-Postgres משורת סביבה (למשל מ-K8s/פרודקשן)
-    DATABASE_URL_RAW: Optional[str] = Field(
+    DATABASE_URL_RAW: str | None = Field(
         default=None,
         validation_alias=AliasChoices("DATABASE_URL", "DATABASE_URL_RAW"),
         description="Optional full database URL (e.g. from Kubernetes secret). If set, overrides pieces above.",
@@ -74,11 +74,11 @@ class Settings(BaseSettings):
     REDIS_HOST: str = Field("localhost")
     REDIS_PORT: int = Field(6379)
     REDIS_DB: int = Field(0)
-    REDIS_PASSWORD: Optional[str] = Field(None)
+    REDIS_PASSWORD: str | None = Field(None)
     # Redis DB נפרד לאירועי צ'אט (Pub/Sub completion)
     REDIS_CHAT_DB: int = Field(1)
     # אופציונלי: חיבור Redis מלא (למשל מ-K8s/פרודקשן)
-    REDIS_URL_RAW: Optional[str] = Field(
+    REDIS_URL_RAW: str | None = Field(
         default=None,
         validation_alias=AliasChoices("REDIS_URL", "REDIS_URL_RAW"),
         description="Optional full Redis URL. If set, overrides REDIS_HOST/PORT/DB/PASSWORD.",
@@ -160,7 +160,7 @@ class Settings(BaseSettings):
         "",
         description="Google OAuth 2.0 Client ID מה-Google Cloud Console. נדרש לאימות ID tokens מ-Google Sign-In.",
     )
-    GOOGLE_CLIENT_SECRET: Optional[str] = Field(
+    GOOGLE_CLIENT_SECRET: str | None = Field(
         None,
         description="Google OAuth 2.0 Client Secret (אופציונלי - נדרש רק אם צריך access tokens, לא ל-ID token verification).",
     )
@@ -182,7 +182,7 @@ class Settings(BaseSettings):
     )
 
     # --- CORS ---
-    CORS_ORIGINS: List[str] = Field(
+    CORS_ORIGINS: list[str] = Field(
         default_factory=list,
         description="Allowed CORS origins. If empty, FRONTEND_URL is used.",
     )
@@ -199,13 +199,13 @@ class Settings(BaseSettings):
 
     # --- Upload temp directory (קבצים זמניים לפני העלאה ל-S3) ---
     # ברירת מחדל: תיקיית המערכת (tempfile.gettempdir()). אם מוגדר – משתמשים בתיקייה זו (נוצר אוטומטית אם חסר).
-    UPLOAD_TEMP_DIR: Optional[str] = Field(
+    UPLOAD_TEMP_DIR: str | None = Field(
         None,
         description="Optional directory for upload temp files; default is system temp.",
     )
 
     FIREBASE_SERVICE_ACCOUNT_PATH: str = Field("", description="Path to Firebase JSON (optional for local dev)")
-    FIREBASE_CREDENTIALS_JSON: Optional[str] = Field(None, description="Firebase credentials as JSON string (production)")
+    FIREBASE_CREDENTIALS_JSON: str | None = Field(None, description="Firebase credentials as JSON string (production)")
 
     # --- Logging ---
     LOG_LEVEL: str = Field("INFO", description="Log level: DEBUG, INFO, WARNING, ERROR")
@@ -225,7 +225,7 @@ class Settings(BaseSettings):
     )
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     return Settings()
 

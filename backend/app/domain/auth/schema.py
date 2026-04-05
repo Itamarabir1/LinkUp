@@ -1,16 +1,17 @@
 from typing import Optional
 from uuid import UUID
+
 from pydantic import (
     BaseModel,
-    EmailStr,
     ConfigDict,
+    EmailStr,
     Field,
     computed_field,
     field_validator,
     model_validator,
 )
-from app.core.config import settings
 
+from app.core.config import settings
 from app.core.utils.validators import (
     normalize_email_for_auth,
     validate_password_strength,
@@ -31,7 +32,7 @@ class UserRegister(BaseModel):
     phone_number: str
     password: str = Field(..., min_length=8)
     confirm_password: str = Field(..., min_length=8)
-    fcm_token: Optional[str] = Field(
+    fcm_token: str | None = Field(
         None,
         description="לשימוש האפליקציה בלבד (הרשאות פוש). לא להציג למשתמש בטופס רישום.",
     )
@@ -70,12 +71,12 @@ class LoginRequest(BaseModel):
 
 
 class VerifyEmailRequest(BaseModel):
-    email: Optional[EmailStr] = None  # אופציונלי - יכול לבוא מ-cookie
+    email: EmailStr | None = None  # אופציונלי - יכול לבוא מ-cookie
     code: str
 
     @field_validator("email")
     @classmethod
-    def normalize_email(cls, v: Optional[str]) -> Optional[str]:
+    def normalize_email(cls, v: str | None) -> str | None:
         if v is None:
             return None
         return normalize_email_for_auth(v)
@@ -133,8 +134,8 @@ class ChangePasswordRequest(BaseModel):
     def verify_passwords_match_and_different(self) -> "ChangePasswordRequest":
         """מוודא ששתי הסיסמאות החדשות זהות (כמו ברישום) והסיסמה החדשה שונה מהישנה."""
         from app.core.exceptions.auth import (
-            PasswordsDoNotMatchError,
             NewPasswordSameAsOldError,
+            PasswordsDoNotMatchError,
         )
 
         if self.new_password != self.confirm_password:
@@ -147,7 +148,7 @@ class ChangePasswordRequest(BaseModel):
 # --- Response Schemas ---
 
 
-def _avatar_url_medium_from_key(avatar_key: Optional[str]) -> Optional[str]:
+def _avatar_url_medium_from_key(avatar_key: str | None) -> str | None:
     if not avatar_key or not settings.S3_BUCKET_NAME:
         return None
     return f"https://{settings.S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/{avatar_key}400x400.webp"
@@ -159,13 +160,13 @@ class UserOut(BaseModel):
     email: EmailStr
     phone_number: str
     is_verified: bool
-    avatar_key: Optional[str] = None
+    avatar_key: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
     @computed_field
     @property
-    def avatar_url(self) -> Optional[str]:
+    def avatar_url(self) -> str | None:
         """תאימות לאחור — מחזיר URL ל-400x400."""
         return _avatar_url_medium_from_key(self.avatar_key)
 
@@ -218,7 +219,7 @@ class PasswordResetConfirmResponse(BaseModel):
 
     message: str = Field(..., description="הודעת הצלחה")
     status: str = Field(default="success", description="סטטוס התגובה")
-    detail: Optional[str] = Field(default=None, description="פירוט אופציונלי (למשל להצגה בפרונט)")
+    detail: str | None = Field(default=None, description="פירוט אופציונלי (למשל להצגה בפרונט)")
 
 
 class EmailOnlyRequest(BaseModel):

@@ -4,35 +4,35 @@ import signal
 import sys
 
 # רישום כל המודלים לפני שימוש ב-ORM (מניעת "expression 'Group' failed to locate a name")
-import app.db.models  # noqa: F401
+import app.db.models
 
 # Firebase Admin SDK init (side-effect import; safe idempotent)
-import app.infrastructure.firebase_core.firebase  # noqa: F401
-
+import app.infrastructure.firebase_core.firebase
 from app.core.logging import setup_logging
-
-# Infrastructure
-from app.infrastructure.rabbitmq.client import rabbit_client
-from app.infrastructure.redis.broadcast import broadcast
-from app.infrastructure.rabbitmq.consumer import RabbitMQConsumer
-from app.infrastructure.events.dispatcher.factory import DispatcherFactory
 from app.domain.events.routing import (
-    NOTIFICATION_EXCHANGES,
     AVATAR_UPLOAD_EXCHANGES,
+    NOTIFICATION_EXCHANGES,
     SCHEDULED_EXCHANGES,
     SCHEDULED_TASKS_QUEUE,
 )
+from app.infrastructure.events.dispatcher.factory import DispatcherFactory
 from app.infrastructure.events.publishers.rabbitmq import RabbitMQPublisher
+
+# Infrastructure
+from app.infrastructure.rabbitmq.client import rabbit_client
+from app.infrastructure.rabbitmq.consumer import RabbitMQConsumer
+from app.infrastructure.redis.broadcast import broadcast
+from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 
 # Workers & Tasks
 from app.workers.outbox_worker import run_outbox_worker
-from app.workers.tasks.notification_tasks import handle_notification_event
 from app.workers.tasks.avatar_tasks import handle_avatar_upload_event
-from app.workers.tasks.scheduled_tasks import (
-    run_scheduled_tasks_publisher,
-    handle_scheduled_task,
-)
 from app.workers.tasks.chat_summary_task import run_chat_completion_redis_listener
+from app.workers.tasks.notification_tasks import handle_notification_event
+from app.workers.tasks.scheduled_tasks import (
+    handle_scheduled_task,
+    run_scheduled_tasks_publisher,
+)
 
 setup_logging()
 logger = logging.getLogger("WorkerMain")
@@ -61,6 +61,7 @@ async def main():
         logger.info("ℹ️ Windows detected: Using standard interrupt handling.")
 
     broadcast_ok = False
+    chat_pubsub_ok = False
     try:
         # 2. אתחול תשתיות
         await rabbit_client.connect()
@@ -73,6 +74,13 @@ async def main():
                 "⚠️ [Worker] Redis Broadcast unavailable (WS notifications disabled): %s",
                 e,
             )
+
+        try:
+            await redis_chat_pubsub.connect()
+            chat_pubsub_ok = True
+            logger.info("✅ [Worker] Redis Chat Pub/Sub connected")
+        except Exception as e:
+            logger.warning("⚠️ [Worker] Redis Chat Pub/Sub unavailable: %s", e)
 
         # 3. הזרקת תלויות (Dependency Injection)
         rmq_publisher = RabbitMQPublisher(rabbit_client=rabbit_client)
@@ -136,6 +144,11 @@ async def main():
                 await broadcast.disconnect()
             except Exception as e:
                 logger.warning("⚠️ [Worker] broadcast.disconnect: %s", e)
+        if chat_pubsub_ok:
+            try:
+                await redis_chat_pubsub.close()
+            except Exception as e:
+                logger.warning("⚠️ [Worker] redis_chat_pubsub.close: %s", e)
         await rabbit_client.close()
         logger.info("🏁 Linkup Worker Engine shut down cleanly.")
 

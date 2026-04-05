@@ -1,4 +1,5 @@
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 from pydantic import BaseModel, Field
 
 # מייבאים את ה-Enum מהקובץ המרכזי שלו
@@ -12,9 +13,9 @@ class Event(BaseModel):
     """
 
     name: str = Field(..., min_length=1)
-    payload: Dict[str, Any]
-    targets: List[DispatchTarget] = Field(..., min_items=1)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    payload: dict[str, Any]
+    targets: list[DispatchTarget] = Field(..., min_items=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     class Config:
         # הופך את האובייקט ל-Immutable (לקריאה בלבד)

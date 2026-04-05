@@ -1,7 +1,9 @@
-from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
 from app.domain.bookings.enum import BookingStatus
 
 
@@ -16,14 +18,14 @@ class BookingCreate(BaseModel):
 class BookingResponse(BaseModel):
     booking_id: UUID
     ride_id: UUID
-    request_id: Optional[UUID] = None
+    request_id: UUID | None = None
     passenger_id: UUID
     num_seats: int
     status: BookingStatus
     created_at: datetime
 
-    passenger_name: Optional[str] = None
-    phone: Optional[str] = None
+    passenger_name: str | None = None
+    phone: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -35,12 +37,12 @@ class BookingManifestItem(BaseModel):
     passenger_name: str
     phone: str
     num_seats: int
-    whatsapp_link: Optional[str] = None
+    whatsapp_link: str | None = None
     status: BookingStatus
     # פרטי תחנת עלייה ושעה
-    pickup_name: Optional[str] = None
-    pickup_time: Optional[datetime] = None
-    destination_name: Optional[str] = None
+    pickup_name: str | None = None
+    pickup_time: datetime | None = None
+    destination_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -50,7 +52,7 @@ class RideManifestResponse(BaseModel):
     ride_id: UUID
     total_confirmed_passengers: int
     available_seats_left: int
-    passengers: List[BookingManifestItem]
+    passengers: list[BookingManifestItem]
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -74,7 +76,7 @@ class TripStats(BaseModel):
 class PaginatedBookingsResponse(BaseModel):
     """הזמנות משתמש עם page-based pagination."""
 
-    items: List[BookingResponse] = Field(default_factory=list)
+    items: list[BookingResponse] = Field(default_factory=list)
     total: int = 0
     page: int = 1
     limit: int = 20
@@ -84,7 +86,7 @@ class PaginatedBookingsResponse(BaseModel):
 
 
 class TripHistoryResponse(BaseModel):
-    trips: List[BookingResponse]
+    trips: list[BookingResponse]
     stats: TripStats
 
     model_config = ConfigDict(from_attributes=True)
@@ -94,12 +96,12 @@ class TripHistoryResponse(BaseModel):
 class NotificationItemResponse(BaseModel):
     type: str  # ride_request | booking_confirmed | booking_rejected | pending_approval
     title: str
-    body: Optional[str] = None
-    action_url: Optional[str] = None
+    body: str | None = None
+    action_url: str | None = None
     created_at: datetime
     booking_id: UUID
     ride_id: UUID
-    other_party_name: Optional[str] = None
-    ride_origin: Optional[str] = None
-    ride_destination: Optional[str] = None
-    status: Optional[str] = None  # לנוסע: confirmed / rejected / pending_approval
+    other_party_name: str | None = None
+    ride_origin: str | None = None
+    ride_destination: str | None = None
+    status: str | None = None  # לנוסע: confirmed / rejected / pending_approval

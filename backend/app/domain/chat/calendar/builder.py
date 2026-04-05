@@ -11,7 +11,7 @@ from ..ai.schema import RideSummary
 from .event import create_calendar_event
 
 
-def create_calendar_from_rides(rides: List[RideSummary], base_date: Optional[datetime] = None) -> Calendar:
+def create_calendar_from_rides(rides: list[RideSummary], base_date: datetime | None = None) -> Calendar:
     """
     יוצר לוח שנה (Calendar) מרשימת טרמפים.
 

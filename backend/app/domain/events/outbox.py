@@ -4,11 +4,12 @@
 """
 
 from typing import Any, Dict, List
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.events.enum import DispatchTarget
 from app.infrastructure.outbox.model import OutboxEvent
 from app.infrastructure.outbox.repository import OutboxRepository
-from app.domain.events.enum import DispatchTarget
 
 _outbox_repo = OutboxRepository()
 
@@ -16,8 +17,8 @@ _outbox_repo = OutboxRepository()
 async def publish_to_outbox(
     db: AsyncSession,
     event_name: str,
-    payload: Dict[str, Any],
-    targets: List[str] | None = None,
+    payload: dict[str, Any],
+    targets: list[str] | None = None,
 ) -> None:
     """
     כותב אירוע ל-Outbox באותה טרנזקציה.

@@ -1,6 +1,7 @@
 # app/infrastructure/events/publishers/base.py
 from abc import ABC, abstractmethod
-from app.domain.events.model import Event, DispatchTarget  # תיקון הנתיב ל-Domain
+
+from app.domain.events.model import DispatchTarget, Event  # תיקון הנתיב ל-Domain
 
 
 class EventPublisher(ABC):

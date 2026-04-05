@@ -5,6 +5,7 @@ Used to trigger async AI summary via worker listener; does not run AI in request
 
 import json
 import logging
+
 import redis.asyncio as redis
 
 from app.core.config import settings

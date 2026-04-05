@@ -1,18 +1,19 @@
 import logging
-from typing import Any, Dict, Optional
 from datetime import datetime
+from typing import Any, Dict, Optional
 
 from sqlalchemy import inspect as sa_inspect
 
+from app.core.exceptions.ride import InvalidRouteError
+from app.domain.rides.enum import RideStatus
+
 # מודלים ו-Enums
 from app.domain.rides.model import Ride
-from app.domain.rides.enum import RideStatus
-from app.domain.rides.schema import RideResponse
-from app.core.exceptions.ride import InvalidRouteError
 
 # לוגיקה ותשתיות
 from app.domain.rides.ride_eta import calculate_estimated_arrival
-from app.infrastructure.geo.utils import to_geo_point, to_geo_line
+from app.domain.rides.schema import RideResponse
+from app.infrastructure.geo.utils import to_geo_line, to_geo_point
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class RideMapper:
     """
 
     @staticmethod
-    def map_cache_to_model(cached_data: Dict[str, Any], selected_index: int) -> Ride:
+    def map_cache_to_model(cached_data: dict[str, Any], selected_index: int) -> Ride:
         """
         הפונקציה הראשית (Orchestrator).
         ממירה נתוני חיפוש זמניים מה-Cache לאובייקט Ride קבוע של SQLAlchemy.
@@ -76,11 +77,11 @@ class RideMapper:
             )
 
         except Exception as e:
-            logger.error(f"Mapping failed for ride: {str(e)}")
-            raise InvalidRouteError(detail=f"Failed to map ride data: {str(e)}")
+            logger.error(f"Mapping failed for ride: {e!s}")
+            raise InvalidRouteError(detail=f"Failed to map ride data: {e!s}")
 
     @staticmethod
-    def _validate_input(data: Dict[str, Any], idx: int) -> None:
+    def _validate_input(data: dict[str, Any], idx: int) -> None:
         """בדיקת תקינות המבנה מה-Cache – כולל זמן נסיעה וק\"מ של המסלול הנבחר"""
         routes = data.get("routes", [])
         if not (0 <= idx < len(routes)):
@@ -116,7 +117,7 @@ class RideMapper:
         return departure_time
 
     @staticmethod
-    def _resolve_group_name(ride: Ride, explicit: Optional[str]) -> Optional[str]:
+    def _resolve_group_name(ride: Ride, explicit: str | None) -> str | None:
         """שם קבוצה מפורש או מ-relationship שכבר בזיכרון — בלי lazy load."""
         if explicit is not None:
             return explicit
@@ -133,8 +134,8 @@ class RideMapper:
     @staticmethod
     def to_response(
         ride: Ride,
-        group_name: Optional[str] = None,
-        user_booking_status: Optional[str] = None,
+        group_name: str | None = None,
+        user_booking_status: str | None = None,
     ) -> RideResponse:
         """
         ממיר Ride ORM ל-RideResponse — שדות מפורשים, בלי model_validate על ה-ORM.

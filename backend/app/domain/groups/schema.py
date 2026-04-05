@@ -1,14 +1,14 @@
 from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, computed_field
 
+from pydantic import BaseModel, ConfigDict, computed_field
 from sqlalchemy import inspect as sa_inspect
 
 from app.core.config import settings
 
 
-def _group_avatar_url(avatar_key: Optional[str]) -> Optional[str]:
+def _group_avatar_url(avatar_key: str | None) -> str | None:
     """בונה URL מלא לתמונת קבוצה מ-S3."""
     if not avatar_key or not settings.S3_BUCKET_NAME:
         return None
@@ -18,13 +18,13 @@ def _group_avatar_url(avatar_key: Optional[str]) -> Optional[str]:
 
 class GroupCreate(BaseModel):
     name: str
-    max_members: Optional[int] = None
-    description: Optional[str] = None  # עד 500 תווים
+    max_members: int | None = None
+    description: str | None = None  # עד 500 תווים
 
 
 class GroupUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None  # עד 500 תווים, וולידציה ב-Field לא חובה כאן (מודל DB מגביל)
+    name: str | None = None
+    description: str | None = None  # עד 500 תווים, וולידציה ב-Field לא חובה כאן (מודל DB מגביל)
 
 
 class GroupOut(BaseModel):
@@ -33,22 +33,22 @@ class GroupOut(BaseModel):
     invite_code: str
     admin_id: UUID
     is_active: bool
-    max_members: Optional[int]
-    invite_expires_at: Optional[datetime]
+    max_members: int | None
+    invite_expires_at: datetime | None
     created_at: datetime
-    member_count: Optional[int] = None
-    avatar_key: Optional[str] = None
-    description: Optional[str] = None
+    member_count: int | None = None
+    avatar_key: str | None = None
+    description: str | None = None
 
     @computed_field
     @property
-    def avatar_url(self) -> Optional[str]:
+    def avatar_url(self) -> str | None:
         return _group_avatar_url(self.avatar_key)
 
     model_config = ConfigDict(from_attributes=True)
 
 
-def group_to_out(group: Any, member_count: Optional[int] = None) -> "GroupOut":
+def group_to_out(group: Any, member_count: int | None = None) -> "GroupOut":
     """בניית GroupOut ממודל ORM — בלי group.__dict__."""
     return GroupOut(
         group_id=group.group_id,
@@ -71,14 +71,14 @@ class GroupMemberOut(BaseModel):
     user_id: UUID
     role: str
     joined_at: datetime
-    full_name: Optional[str] = None
+    full_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 def group_member_to_out(member: Any) -> GroupMemberOut:
     """שם מלא מ-user רק אם נטען — בלי lazy load."""
-    full_name: Optional[str] = None
+    full_name: str | None = None
     try:
         st = sa_inspect(member)
         if "user" not in st.unloaded:

@@ -1,16 +1,17 @@
 # app/domain/geo/processor.py
 import logging
 from datetime import datetime
-from typing import Optional, Dict
+from typing import Dict, Optional
+
+from app.core.exceptions.validation import InvalidLocationError
+from app.domain.geo.schema import GeoLocation, RouteOptionData
 from app.infrastructure.geo.client import geo_client
 from app.infrastructure.geo.geocoding import GeocodingService
-from app.domain.geo.schema import GeoLocation, RouteOptionData
-from app.core.exceptions.validation import InvalidLocationError
 
 logger = logging.getLogger(__name__)
 
 
-async def resolve_origin_address(name: Optional[str], lat: Optional[float], lon: Optional[float]) -> str:
+async def resolve_origin_address(name: str | None, lat: float | None, lon: float | None) -> str:
     """
     מבצע 'החלטה' גיאוגרפית: שם מקום או GPS.
     מחזיר כתובת טקסטואלית או זורק שגיאה אם אין כלום.
@@ -32,8 +33,8 @@ async def resolve_origin_address(name: Optional[str], lat: Optional[float], lon:
 async def get_full_routing_data(
     origin_name: str,
     dest_name: str,
-    departure_time: Optional[datetime] = None,
-) -> Optional[Dict]:
+    departure_time: datetime | None = None,
+) -> dict | None:
     """
     מתזמר שליפת נתונים מ-API חיצוני והמרתם לסכימות של הדומיין.
     """
@@ -76,7 +77,7 @@ async def get_full_routing_data(
     }
 
 
-async def get_address_from_gps(lat: float, lon: float) -> Optional[str]:
+async def get_address_from_gps(lat: float, lon: float) -> str | None:
     """
     Reverse Geocoding: הופך קואורדינטות לכתובת קריאה.
     משתמש ב-GeocodingService.

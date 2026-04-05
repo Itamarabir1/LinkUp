@@ -1,6 +1,7 @@
 # app/core/admin_setup.py
 from sqladmin import Admin
-from app.admin_config import UserAdmin, RequestAdmin, RideAdmin, BookingAdmin
+
+from app.admin_config import BookingAdmin, RequestAdmin, RideAdmin, UserAdmin
 
 
 def setup_admin(app, engine):

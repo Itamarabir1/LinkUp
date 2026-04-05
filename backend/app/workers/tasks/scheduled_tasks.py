@@ -7,20 +7,20 @@ import asyncio
 import logging
 import time
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any, Dict
 
-from app.infrastructure.rabbitmq.client import rabbit_client
 from app.domain.events.routing import (
-    SCHEDULED_EXCHANGE,
+    ROUTING_KEY_CHAT_TIMEOUT,
     ROUTING_KEY_FUEL_SCAN,
     ROUTING_KEY_MAINTENANCE,
     ROUTING_KEY_REMINDERS,
-    ROUTING_KEY_CHAT_TIMEOUT,
+    SCHEDULED_EXCHANGE,
 )
-from app.workers.tasks.fuel_price_task import execute_fuel_scan_job, FUEL_SCAN_INTERVAL
+from app.infrastructure.rabbitmq.client import rabbit_client
+from app.workers.tasks.chat_timeout_task import execute_chat_timeout_job
+from app.workers.tasks.fuel_price_task import FUEL_SCAN_INTERVAL, execute_fuel_scan_job
 from app.workers.tasks.maintenance_task import execute_maintenance_job
 from app.workers.tasks.notification_tasks import execute_reminders_job
-from app.workers.tasks.chat_timeout_task import execute_chat_timeout_job
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ async def run_scheduled_tasks_publisher():
         await asyncio.sleep(CHECK_INTERVAL)
 
 
-async def handle_scheduled_task(data: Dict[str, Any], routing_key: str) -> None:
+async def handle_scheduled_task(data: dict[str, Any], routing_key: str) -> None:
     """
     Callback של ה-consumer של scheduled_tasks_queue.
     מפנה לפי routing_key ל־execute_* המתאים.

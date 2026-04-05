@@ -2,12 +2,12 @@
 פרסור זמן בעברית לאובייקט datetime.
 """
 
+import re
 from datetime import datetime, timedelta
 from typing import Optional
-import re
 
 
-def parse_hebrew_time(time_str: str, base_date: Optional[datetime] = None) -> Optional[datetime]:
+def parse_hebrew_time(time_str: str, base_date: datetime | None = None) -> datetime | None:
     """
     מפרסר זמן בעברית (למשל "08:00", "16:00", "מחר ב-08:00") לאובייקט datetime.
 

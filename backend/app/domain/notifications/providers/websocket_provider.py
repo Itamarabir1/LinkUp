@@ -1,6 +1,7 @@
 import json
 import logging
 from typing import Any, Dict, Union
+
 from app.domain.notifications.providers.base import BaseNotificationProvider
 from app.infrastructure.redis.broadcast import broadcast
 
@@ -20,8 +21,8 @@ class WebSocketProvider(BaseNotificationProvider):
     async def send(
         self,
         user: Any,
-        template: Union[str, Dict[str, Any]],
-        context: Dict[str, Any],
+        template: str | dict[str, Any],
+        context: dict[str, Any],
     ) -> None:
         user_id = getattr(user, "user_id", None) or getattr(user, "id", None)
         if not user_id:
@@ -53,5 +54,5 @@ class WebSocketProvider(BaseNotificationProvider):
             logger.debug(f"📡 [WS Provider] Published to {channel}")
 
         except Exception as e:
-            logger.error(f"❌ [WS Provider] Redis Publish Failed: {str(e)}")
+            logger.error(f"❌ [WS Provider] Redis Publish Failed: {e!s}")
             # לא זורקים שגיאה כדי שכישלון ב-WS לא יפיל שליחת מייל או פוש

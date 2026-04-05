@@ -1,23 +1,25 @@
+import uuid
+
+from geoalchemy2 import Geography
 from sqlalchemy import (
     Column,
-    String,
-    Integer,
     DateTime,
-    Numeric,
-    Index,
-    text,
     ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    text,
 )
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.types import TypeDecorator
-from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM, UUID as PG_UUID
-from geoalchemy2 import Geography
-import uuid
 
 from app.db.base import Base
-from app.domain.rides.enum import RideStatus
 from app.domain.geo.utils import convert_db_route_to_list
+from app.domain.rides.enum import RideStatus
 
 
 def _ride_status_from_db(value):

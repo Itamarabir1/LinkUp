@@ -161,7 +161,11 @@ messaging.Message(
    - **Background:** system notification from SW (`push` handler).
    - **Foreground:** toast under app chrome + sound if allowed.
 
-## 8) Related docs
+## 8) Scheduled email reminders (ReminderScheduler → handler)
+
+`ReminderScheduler` calls `NotificationHandler.handle_event` with an in-process payload (not the outbox). **Contract:** `scheduled_notification_id`, `ride_id`, and `user_id` together identify a due row in `scheduled_notifications` and tell the handler to hydrate a **`ScheduledReminderSource`**: the **ride** (with driver) supplies template context (`RideBuilder`); **`user_id`** is the recipient. Without all three fields, `ride_id` alone still loads a bare `Ride` and the usual resolver/builder paths apply. See [`backend/app/domain/notifications/core/scheduled_reminder_source.py`](../backend/app/domain/notifications/core/scheduled_reminder_source.py).
+
+## 9) Related docs
 
 - [`docs/ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) — portfolio summary (includes FCM).
 - [`docs/architecture/API.md`](architecture/API.md) — `PATCH /fcm-token`.

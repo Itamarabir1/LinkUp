@@ -4,19 +4,20 @@ Conversation = זוג משתמשים (מזוהה יחיד). Message = הודעה
 """
 
 import uuid
+
 from sqlalchemy import (
-    Column,
-    BigInteger,
-    ForeignKey,
-    DateTime,
-    Text,
-    func,
-    UniqueConstraint,
-    CheckConstraint,
     JSON,
+    BigInteger,
+    CheckConstraint,
+    Column,
+    DateTime,
+    ForeignKey,
+    Text,
+    UniqueConstraint,
+    func,
 )
-from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.orm import relationship
 
 from app.db.base import Base
 

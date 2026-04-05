@@ -1,5 +1,5 @@
-from .ride_builder import RideBuilder
 from .booking_builder import BookingBuilder
+from .ride_builder import RideBuilder
 
 CONTEXT_MAP = {
     "ride.cancelled_by_driver": {
@@ -23,7 +23,7 @@ CONTEXT_MAP = {
         "schema": None,
     },
     "PICKUP_REMINDER_PASSENGER": {
-        "builder": BookingBuilder(),
+        "builder": RideBuilder(),
         "schema": None,
     },
     "RIDE_START_DRIVER": {

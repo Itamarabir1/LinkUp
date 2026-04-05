@@ -3,6 +3,7 @@ CRUD operations לניתוח AI של שיחות צ'אט.
 """
 
 from uuid import UUID
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

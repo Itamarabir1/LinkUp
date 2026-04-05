@@ -28,6 +28,11 @@ FROM base AS migrate
 ENTRYPOINT ["alembic"]
 CMD ["upgrade", "head"]
 
+# ===== WORKER =====
+# outbox-worker — בלי entrypoint של uvicorn
+FROM base AS worker
+CMD ["python", "-m", "app.workers.main_worker"]
+
 # ===== PRODUCTION =====
 # פרודקשן — gunicorn בלי --reload
 FROM base AS production

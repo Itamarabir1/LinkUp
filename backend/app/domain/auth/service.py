@@ -1,53 +1,55 @@
 import logging
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
+from typing import Any, Dict
 from uuid import UUID
-from typing import Dict, Any
 
-# Core & Security
-from app.core.security import (
-    get_password_hash,
-    verify_password,
-    create_access_token,
-    create_refresh_token,
-    decode_refresh_token,
-)
-from app.core.config import settings
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.infrastructure.outbox.repository import OutboxRepository
-from app.domain.auth.verification_service import verification_service
-from app.domain.users.model import User
+
+from app.core.config import settings
 
 # Exceptions - ניתוב מדויק לפי החלוקה החדשה
 from app.core.exceptions.auth import (
-    InvalidCredentialsError,
-    UserNotVerifiedError,
-    InvalidResetCodeError,
-    InvalidRefreshTokenError,
-    InvalidPasswordError,
     GoogleAuthFailed,
+    InvalidCredentialsError,
+    InvalidPasswordError,
+    InvalidRefreshTokenError,
+    InvalidResetCodeError,
+    UserNotVerifiedError,
 )
 from app.core.exceptions.user import (
-    UserNotFoundError,
-    PhoneAlreadyRegisteredError,
     EmailAlreadyRegisteredError,
+    PhoneAlreadyRegisteredError,
+    UserNotFoundError,
 )
 
-# הסר את כל הכפילויות ושמור רק על זה:
-from app.infrastructure.outbox.model import OutboxEvent
-from app.domain.events.enum import DispatchTarget
+# Core & Security
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
+    get_password_hash,
+    verify_password,
+)
 
 # ייבוא של המודל (כדי שה-IDE יזהה את המתודות של new_user)
 # שים לב: וולידציה בדרך כלל לא נזרקת מהסרוויס אלא מהסכימה, אבל הן כאן ליתר ביטחון
 from app.core.utils.validators import normalize_email_for_auth
+from app.domain.auth.google_auth import verify_google_id_token
+from app.domain.auth.schema import ChangePasswordRequest, UserRegister
+from app.domain.auth.verification_service import verification_service
+from app.domain.events.enum import DispatchTarget
 
 # Domain & Infrastructure
 from app.domain.users.crud import crud_user
+from app.domain.users.model import User
 from app.domain.users.schema import UserCreate
-from app.domain.auth.schema import UserRegister, ChangePasswordRequest
-from app.domain.auth.google_auth import verify_google_id_token
-from app.infrastructure.redis.client import redis_client
+
+# הסר את כל הכפילויות ושמור רק על זה:
+from app.infrastructure.outbox.model import OutboxEvent
+from app.infrastructure.outbox.repository import OutboxRepository
 from app.infrastructure.rabbitmq.client import rabbit_client
+from app.infrastructure.redis.client import redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +201,7 @@ class AuthService:
         db: AsyncSession,
         email: str,
         password: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         אימות: שליפת משתמש לפי מייל, בדיקת סיסמה (verify_password), בדיקת is_verified.
         מחזיר טוקן + פרטי משתמש להצגת 'ברוך הבא, {full_name}'.
@@ -242,7 +244,7 @@ class AuthService:
         self,
         db: AsyncSession,
         id_token: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         אימות/רישום דרך Google OAuth.
 
@@ -343,7 +345,7 @@ class AuthService:
 
         # 5+6. שמירת Refresh Token + עדכון last_login ב-commit אחד
         user.refresh_token = refresh_token
-        user.last_login = datetime.now(timezone.utc)
+        user.last_login = datetime.now(UTC)
         db.add(user)
         await db.commit()
 
@@ -361,7 +363,7 @@ class AuthService:
             },
         }
 
-    async def refresh_access_token(self, db: AsyncSession, refresh_token: str) -> Dict[str, Any]:
+    async def refresh_access_token(self, db: AsyncSession, refresh_token: str) -> dict[str, Any]:
         """
         מפענח Refresh Token, בודק שהוא תואם ל-DB, מחזיר Access Token חדש + Refresh Token חדש (רוטציה).
         """

@@ -1,24 +1,25 @@
 import logging
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies.auth import get_db, get_current_user
+from app.api.dependencies.auth import get_current_user, get_db
+from app.api.dependencies.services import get_ride_service
 from app.domain.groups import crud, service
 from app.domain.groups.schema import (
     GroupCreate,
-    GroupUpdate,
-    GroupOut,
-    GroupMemberOut,
-    GroupImageUploadResponse,
     GroupImageConfirmRequest,
-    group_to_out,
+    GroupImageUploadResponse,
+    GroupMemberOut,
+    GroupOut,
+    GroupUpdate,
     group_member_to_out,
+    group_to_out,
 )
-from app.domain.users.model import User
-from app.api.dependencies.services import get_ride_service
-from app.domain.rides.service import RideService
 from app.domain.rides.schema import RideResponse
+from app.domain.rides.service import RideService
+from app.domain.users.model import User
 from app.infrastructure.s3.service import storage_service
 
 router = APIRouter()

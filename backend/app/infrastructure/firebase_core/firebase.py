@@ -13,11 +13,13 @@ file is in .gitignore. For local dev, copy firebase-credentials.example.json
 to firebase-credentials.json and set FIREBASE_SERVICE_ACCOUNT_PATH to its path.
 """
 
-import os
 import json
 import logging
+import os
+
 import firebase_admin
 from firebase_admin import credentials
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)

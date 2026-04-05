@@ -1,11 +1,12 @@
 import asyncio
 import logging
 from datetime import datetime
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.domain.system.maintenance_crud import crud_maintenance
 from app.infrastructure.redis.publisher import publish_user_event
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 

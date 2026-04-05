@@ -1,4 +1,5 @@
 from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions.base import LinkupError

@@ -1,18 +1,20 @@
 from __future__ import annotations
 
-from uuid import UUID
-from sqlalchemy.orm import joinedload
-from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
-from sqlalchemy import or_, text, select, func, update as sa_update
+from uuid import UUID
+
+from sqlalchemy import func, or_, select, text
+from sqlalchemy import update as sa_update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
+
+from app.core.exceptions.booking import ForbiddenRideActionError, NoSeatsAvailableError
+from app.domain.bookings.enum import BookingStatus
 from app.domain.bookings.model import Booking
-from app.domain.rides.model import Ride
+from app.domain.passengers.enum import PassengerStatus
 from app.domain.passengers.model import PassengerRequest
 from app.domain.rides.enum import RideStatus
-from app.domain.bookings.enum import BookingStatus
-from app.domain.passengers.enum import PassengerStatus
-from app.core.exceptions.booking import NoSeatsAvailableError
-from app.core.exceptions.booking import ForbiddenRideActionError
+from app.domain.rides.model import Ride
 
 
 class CRUDBooking:
@@ -23,7 +25,7 @@ class CRUDBooking:
 
     # --- שליפות (Queries) ---
 
-    async def get_booking_by_id_async(self, db: AsyncSession, booking_id: UUID) -> Optional[Booking]:
+    async def get_booking_by_id_async(self, db: AsyncSession, booking_id: UUID) -> Booking | None:
         """Async variant של get_booking_by_id."""
         bid = UUID(str(booking_id)) if isinstance(booking_id, str) else booking_id
         stmt = (
@@ -42,16 +44,16 @@ class CRUDBooking:
         self,
         db: AsyncSession,
         *,
-        id: Optional[UUID] = None,
-        booking_id: Optional[UUID] = None,
-    ) -> Optional[Booking]:
+        id: UUID | None = None,
+        booking_id: UUID | None = None,
+    ) -> Booking | None:
         """שליפה אסינכרונית להזמנה (לנוטיפיקציות). מקבל id= או booking_id=."""
         bid = id or booking_id
         if bid is None:
             return None
         return await self.get_booking_by_id_async(db, bid)
 
-    async def get_async(self, db: AsyncSession, booking_id: UUID) -> Optional[Booking]:
+    async def get_async(self, db: AsyncSession, booking_id: UUID) -> Booking | None:
         """שליפה אסינכרונית להזמנה עם טעינת יחסים (לשימוש ב-API endpoints)."""
         bid = UUID(str(booking_id)) if isinstance(booking_id, str) else booking_id
         stmt = (
@@ -66,13 +68,13 @@ class CRUDBooking:
         result = await db.execute(stmt)
         return result.scalars().first()
 
-    async def get_ride_for_update(self, db: AsyncSession, ride_id: UUID) -> Optional[Ride]:
+    async def get_ride_for_update(self, db: AsyncSession, ride_id: UUID) -> Ride | None:
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         stmt = select(Ride).where(Ride.ride_id == rid).with_for_update()
         result = await db.execute(stmt)
         return result.scalars().first()
 
-    async def get_existing_booking_async(self, db: AsyncSession, ride_id: UUID, request_id: UUID) -> Optional[Booking]:
+    async def get_existing_booking_async(self, db: AsyncSession, ride_id: UUID, request_id: UUID) -> Booking | None:
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         reqid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
         stmt = select(Booking).where(
@@ -83,7 +85,7 @@ class CRUDBooking:
         result = await db.execute(stmt)
         return result.scalars().first()
 
-    async def get_booking_by_ride_and_passenger_async(self, db: AsyncSession, ride_id: UUID, passenger_id: UUID) -> Optional[Booking]:
+    async def get_booking_by_ride_and_passenger_async(self, db: AsyncSession, ride_id: UUID, passenger_id: UUID) -> Booking | None:
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         pid = UUID(str(passenger_id)) if isinstance(passenger_id, str) else passenger_id
         stmt = select(Booking).where(
@@ -100,7 +102,7 @@ class CRUDBooking:
         passenger_id: UUID,
         request_id: UUID,
         num_seats: int,
-    ) -> Optional[Booking]:
+    ) -> Booking | None:
         """מעדכן booking קיים (CANCELLED/REJECTED) לבקשה חדשה – מאפשר 'בקשת הצטרפות מחדש' בלי להפר את unique_passenger_per_ride."""
         existing = await self.get_booking_by_ride_and_passenger_async(db, ride_id, passenger_id)
         if not existing or existing.status not in (
@@ -199,7 +201,7 @@ class CRUDBooking:
         request_ids = [r[0] for r in result.all()]
         if request_ids:
             await db.execute(
-                sa_update(PassengerRequest).where(PassengerRequest.request_id.in_(request_ids)).values(status=PassengerStatus.ACTIVE.value)
+                sa_update(PassengerRequest).where(PassengerRequest.request_id.in_(request_ids)).values(status=PassengerStatus.ACTIVE.value),
             )
         await db.execute(sa_update(Booking).where(Booking.ride_id == rid).values(status=BookingStatus.CANCELLED.value))
         await db.execute(
@@ -210,7 +212,7 @@ class CRUDBooking:
 
     # --- פונקציות נוספות שנדרשות על ידי ה-BookingService ---
 
-    async def get_user_bookings_count_async(self, db: AsyncSession, user_id: UUID, status_filter: Optional[str] = None) -> int:
+    async def get_user_bookings_count_async(self, db: AsyncSession, user_id: UUID, status_filter: str | None = None) -> int:
         uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
         stmt = select(func.count()).select_from(Booking).where(Booking.passenger_id == uid)
         if status_filter:
@@ -222,10 +224,10 @@ class CRUDBooking:
         self,
         db: AsyncSession,
         user_id: UUID,
-        status_filter: Optional[str] = None,
+        status_filter: str | None = None,
         offset: int = 0,
         limit: int = 20,
-    ) -> List[Booking]:
+    ) -> list[Booking]:
         uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
         stmt = (
             select(Booking)
@@ -243,7 +245,7 @@ class CRUDBooking:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_user_bookings_with_relations(self, db: AsyncSession, user_id: UUID) -> List[Booking]:
+    async def get_user_bookings_with_relations(self, db: AsyncSession, user_id: UUID) -> list[Booking]:
         """הזמנות של הנוסע עם נסיעה ונהג (למסך התראות)."""
         uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
         stmt = (
@@ -258,13 +260,13 @@ class CRUDBooking:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_ride_bookings_by_status_async(self, db: AsyncSession, ride_id: UUID, booking_status: str) -> List[Booking]:
+    async def get_ride_bookings_by_status_async(self, db: AsyncSession, ride_id: UUID, booking_status: str) -> list[Booking]:
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         stmt = select(Booking).where(Booking.ride_id == rid, Booking.status == booking_status)
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_all_pending_bookings_for_driver(self, db: AsyncSession, driver_id: UUID) -> List[Booking]:
+    async def get_all_pending_bookings_for_driver(self, db: AsyncSession, driver_id: UUID) -> list[Booking]:
         """כל הבקשות הממתינות לאישור עבור נסיעות של הנהג (למסך התראות)."""
         did = UUID(str(driver_id)) if isinstance(driver_id, str) else driver_id
         stmt = (
@@ -381,14 +383,14 @@ class CRUDBooking:
                 Booking.ride_id.in_(ride_ids),
                 Booking.status == BookingStatus.CONFIRMED,
             )
-            .values(status=BookingStatus.COMPLETED.value)
+            .values(status=BookingStatus.COMPLETED.value),
         )
 
     # app/domain/bookings/crud.py
 
     # סוף הקובץ app/domain/bookings/crud.py
 
-    async def get_user_history(self, db: AsyncSession, user_id: UUID, role: str) -> List[Booking]:
+    async def get_user_history(self, db: AsyncSession, user_id: UUID, role: str) -> list[Booking]:
         # שימוש ב-joinedload כדי למנוע את בעיית ה-N+1 (שליפה יעילה)
         uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
         stmt = select(Booking).options(joinedload(Booking.ride)).where(Booking.status != BookingStatus.CANCELLED)

@@ -19,7 +19,7 @@ from app.infrastructure.redis.client import redis_client
 logger = logging.getLogger(__name__)
 
 
-async def get_cached_coords(address: str) -> Optional[Tuple[float, float]]:
+async def get_cached_coords(address: str) -> tuple[float, float] | None:
     """
     מחזיר קואורדינטות מcache אם קיימות.
     מחזיר None אם לא נמצא או אם Redis לא זמין (fail open).
@@ -61,7 +61,7 @@ async def set_cached_coords(
         logger.warning(f"Geocode cache write failed (fail open): {e}")
 
 
-async def get_coordinates(address: str) -> Optional[Tuple[float, float]]:
+async def get_coordinates(address: str) -> tuple[float, float] | None:
     """
     מחזיר קואורדינטות לכתובת.
     בודק Redis cache קודם — אם לא נמצא, קורא ל-Google ושומר.

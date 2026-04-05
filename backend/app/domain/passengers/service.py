@@ -10,9 +10,9 @@ from app.core.exceptions.base import LinkupError
 from app.core.exceptions.booking import ForbiddenRideActionError, PassengerRequestNotFoundError
 from app.core.exceptions.infrastructure import GeocodingError
 from app.core.exceptions.ride import InvalidRideStatusError, RideNotFoundError
-from app.domain.passengers.crud import crud_passenger
 from app.domain.bookings.crud import crud_booking
 from app.domain.bookings.model import Booking
+from app.domain.passengers.crud import crud_passenger
 from app.domain.passengers.enum import PassengerStatus
 from app.domain.passengers.schema import (
     PassengerRequestCreate,
@@ -101,8 +101,8 @@ class PassengerService:
     async def get_my_requests(
         db: AsyncSession,
         passenger_id: UUID,
-        status: Optional[str] = None,
-    ) -> List[PassengerRequestResponse]:
+        status: str | None = None,
+    ) -> list[PassengerRequestResponse]:
         """רשימת הבקשות שלי כנוסע (הבקשות שלי)."""
         status_enum = PassengerStatus(status) if status else None
         requests = await crud_passenger.get_by_passenger_id(db, passenger_id, status_enum)

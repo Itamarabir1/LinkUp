@@ -15,7 +15,7 @@ async def validate_avatar(file: UploadFile) -> UploadFile:
 # וולידטור גנרי למסמכים/סוגי קבצים אחרים (גודל וסוג שונים)
 def file_validator(allowed_types: tuple[str, ...], max_size_mb: int):
     """מחזיר Dependency שבודק סוג קובץ וגודל (למשל למסמכים)."""
-    from app.core.exceptions.validation import InvalidFileTypeError, FileTooLargeError
+    from app.core.exceptions.validation import FileTooLargeError, InvalidFileTypeError
 
     async def _validate(file: UploadFile) -> UploadFile:
         if file.content_type not in allowed_types:

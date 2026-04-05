@@ -80,9 +80,8 @@ services:
   outbox-worker:
     build:
       context: ./backend
-      target: development
+      target: worker
     container_name: linkup_outbox_worker
-    command: python -m app.workers.main_worker
     env_file:
       - ./backend/.env
     environment:

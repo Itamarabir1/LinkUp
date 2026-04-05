@@ -1,17 +1,17 @@
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Dict, Any, List
+from datetime import UTC, datetime, timezone
+from typing import Any, Dict, List
 from uuid import UUID
 
+from app.domain.geo.schema import LocationUpdate
 from app.infrastructure.redis.broadcast import broadcast
 from app.infrastructure.redis.keys import get_booking_channel, get_ride_passengers_channel
-from app.domain.geo.schema import LocationUpdate
 
 logger = logging.getLogger(__name__)
 
 
-async def broadcast_location_to_participants(location_in: LocationUpdate, ride_id: UUID, involved_bookings: List[UUID]) -> Dict[str, Any]:
+async def broadcast_location_to_participants(location_in: LocationUpdate, ride_id: UUID, involved_bookings: list[UUID]) -> dict[str, Any]:
     payload = {
         "type": "location_update",
         "ride_id": str(ride_id),
@@ -19,7 +19,7 @@ async def broadcast_location_to_participants(location_in: LocationUpdate, ride_i
         "lng": location_in.longitude,
         "heading": location_in.heading or 0.0,
         "speed": location_in.speed,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     message_json = json.dumps(payload)
     try:
@@ -41,7 +41,7 @@ async def broadcast_passenger_location_to_driver(
     lng: float,
     heading: float = 0.0,
     speed: float = 0.0,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     payload = {
         "type": "passenger_location",
         "ride_id": str(ride_id),
@@ -51,7 +51,7 @@ async def broadcast_passenger_location_to_driver(
         "lng": lng,
         "heading": heading,
         "speed": speed,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     try:
         await broadcast.publish(

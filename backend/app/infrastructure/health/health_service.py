@@ -3,8 +3,8 @@ import logging
 from sqlalchemy import text
 
 from app.db.session import SessionLocal
-from app.infrastructure.redis.client import redis_client
 from app.infrastructure.rabbitmq.client import rabbit_client
+from app.infrastructure.redis.client import redis_client
 
 logger = logging.getLogger(__name__)
 

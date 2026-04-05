@@ -9,7 +9,7 @@ class ActiveBookingExistsError(LinkupError):
     status_code = 409
     error_code = "PSG_ACTIVE_BOOKING"
 
-    def __init__(self, ride_id: Optional[Union[int, str, UUID]] = None):
+    def __init__(self, ride_id: int | str | UUID | None = None):
         payload: dict = {}
         if ride_id is not None:
             payload["ride_id"] = str(ride_id)
@@ -28,8 +28,8 @@ class InsufficientPermissionsForRide(LinkupError):
 
     def __init__(
         self,
-        ride_id: Optional[Union[int, str, UUID]] = None,
-        reason: Optional[str] = None,
+        ride_id: int | str | UUID | None = None,
+        reason: str | None = None,
     ):
         msg = self.message
         if reason:

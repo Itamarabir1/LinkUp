@@ -1,13 +1,15 @@
-import logging
 import asyncio
+import logging
+
 import sib_api_v3_sdk
+from sib_api_v3_sdk.rest import ApiException
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
-from sib_api_v3_sdk.rest import ApiException
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)

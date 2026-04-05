@@ -1,26 +1,27 @@
 import logging
 from typing import Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # 1. Core, Security & Exceptions
 from app.core.exceptions.auth import PermissionDeniedError
 from app.core.exceptions.infrastructure import S3DeleteFailed
 from app.core.exceptions.user import (
-    UserNotFoundError,
     EmailAlreadyRegisteredError,
+    UserNotFoundError,
 )
 from app.core.exceptions.validation import InvalidLocationError
+from app.domain.events.enum import DispatchTarget
+from app.domain.events.outbox import publish_to_outbox
+from app.domain.notifications.constants import NotificationEvent
+from app.domain.users.crud import crud_user
 
 # 2. Domain Schemas & Models
 from app.domain.users.model import User
 from app.domain.users.schema import UserUpdate
-from app.domain.events.outbox import publish_to_outbox
-from app.domain.events.enum import DispatchTarget
-from app.domain.notifications.constants import NotificationEvent
 
 # 3. Infrastructure & Services
 from app.infrastructure.s3.service import storage_service
-from app.domain.users.crud import crud_user
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class UserService:
             raise UserNotFoundError(user_id=user_id)
         return user
 
-    async def get_avatar_upload_url(self, user_id, filename: Optional[str] = None, expiration: int = 300) -> tuple[str, str]:
+    async def get_avatar_upload_url(self, user_id, filename: str | None = None, expiration: int = 300) -> tuple[str, str]:
         """
         מחזיר presigned URL להעלאה ישירה ל-S3 staging.
         מחזיר: (presigned_url, staging_key)

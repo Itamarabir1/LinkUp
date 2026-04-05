@@ -1,5 +1,6 @@
 # app/domain/notifications/core/builders/user_builder.py
 from typing import Any, Dict
+
 from .base import BaseContextBuilder
 
 
@@ -9,7 +10,7 @@ class UserBuilder(BaseContextBuilder):
     אירועים לדוגמה: USER_REGISTERED, PASSWORD_RESET_REQUESTED, EMAIL_VERIFICATION.
     """
 
-    def build(self, user: Any, event_key: str) -> Dict[str, Any]:
+    def build(self, user: Any, event_key: str) -> dict[str, Any]:
         # 1. חילוץ נתוני בסיס מהמשתמש (באופן בטוח)
         first_name = getattr(user, "first_name", "אורח/ת")
         user_email = getattr(user, "email", "")
@@ -58,7 +59,7 @@ class UserBuilder(BaseContextBuilder):
 
         return context
 
-    def _get_default_content(self) -> Dict[str, str]:
+    def _get_default_content(self) -> dict[str, str]:
         return {
             "subject": "עדכון מחשבון Linkup",
             "hero_text": "עדכון מערכת",

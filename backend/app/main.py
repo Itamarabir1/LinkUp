@@ -2,36 +2,33 @@ import re
 import uuid
 
 import structlog
-
-from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi import FastAPI, Request, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-
-from app.core.config import settings
-from app.core.logging import setup_logging, request_id_ctx
-from app.core.lifespan import lifespan
-from app.core.exceptions.base import LinkupError
-from app.core.exceptions.handlers import (
-    linkup_exception_handler,
-    request_validation_exception_handler,
-    integrity_error_handler,
-    sqlalchemy_error_handler,
-)
-from app.core.middleware import HTTPSRedirectMiddleware, SecurityHeadersMiddleware
-from app.db.session import engine
-from app.api.v1.api_router import api_router
-from app.infrastructure.health.health_service import check_health
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # רישום כל המודלים לפני טעינת admin (מניעת "expression 'Group' failed to locate a name")
-import app.db.models  # noqa: F401
+import app.db.models
 
 # Firebase Admin SDK init (side-effect import; safe idempotent)
-import app.infrastructure.firebase_core.firebase  # noqa: F401
-
+import app.infrastructure.firebase_core.firebase
 from app.admin.setup import setup_admin
+from app.api.v1.api_router import api_router
+from app.core.config import settings
+from app.core.exceptions.base import LinkupError
+from app.core.exceptions.handlers import (
+    integrity_error_handler,
+    linkup_exception_handler,
+    request_validation_exception_handler,
+    sqlalchemy_error_handler,
+)
+from app.core.lifespan import lifespan
+from app.core.logging import request_id_ctx, setup_logging
+from app.core.middleware import HTTPSRedirectMiddleware, SecurityHeadersMiddleware
+from app.db.session import engine
+from app.infrastructure.health.health_service import check_health
 
 setup_logging()
 logger = structlog.get_logger(__name__)

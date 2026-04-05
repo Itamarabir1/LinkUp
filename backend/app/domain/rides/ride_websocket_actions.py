@@ -1,8 +1,8 @@
 import logging
 
 from app.domain.notifications.core.builders.ride_builder import RideBuilder
-from app.infrastructure.redis.publisher import publish_ride_event
 from app.domain.rides.model import Ride
+from app.infrastructure.redis.publisher import publish_ride_event
 
 logger = logging.getLogger(__name__)
 

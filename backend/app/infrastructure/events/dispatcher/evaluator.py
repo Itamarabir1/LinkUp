@@ -1,18 +1,19 @@
 from typing import Dict, List, Set, Tuple
+
+from app.core.exceptions.infrastructure import InfrastructureError
 from app.domain.events.enum import DispatchTarget
 from app.domain.events.schema import Event
-from app.core.exceptions.infrastructure import InfrastructureError
 
 
 class DispatchEvaluator:
-    def __init__(self, critical_targets: Set[DispatchTarget]):
+    def __init__(self, critical_targets: set[DispatchTarget]):
         self.critical_targets = critical_targets
 
     def evaluate(
         self,
         event: Event,
-        results: Dict[DispatchTarget, bool],
-        errors: List[Tuple[DispatchTarget, str]],
+        results: dict[DispatchTarget, bool],
+        errors: list[tuple[DispatchTarget, str]],
     ):
         """
         בודק האם התוצאות עומדות במדיניות הקריטיות של המערכת.

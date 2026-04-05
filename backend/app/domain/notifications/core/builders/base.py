@@ -1,7 +1,8 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Union
 from datetime import datetime
+from typing import Any, Dict, Optional, Union
+
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ class BaseContextBuilder(ABC):
     COLOR_INFO = "#17a2b8"  # כחול
 
     @abstractmethod
-    def build(self, data: Union[BaseModel, Any], event_key: str) -> Dict[str, Any]:
+    def build(self, data: BaseModel | Any, event_key: str) -> dict[str, Any]:
         """
         החוזה המחייב: מקבל נתונים (סכמה או אובייקט DB) ומחזיר מילון לעיבוד טמפלייט.
         """
@@ -82,7 +83,7 @@ class BaseContextBuilder(ABC):
             return dt.strftime("%d/%m/%Y %H:%M")
         return str(dt) if dt else "N/A"
 
-    def _determine_color(self, event_key: Optional[str]) -> str:
+    def _determine_color(self, event_key: str | None) -> str:
         """Visual logic shared across all notification types using professional hex codes."""
         if not event_key:
             return self.COLOR_SUCCESS

@@ -75,7 +75,7 @@ async def linkup_exception_handler(request: Request, exc: LinkupError):
 
 async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
     request_id = getattr(request.state, "request_id", None) or ""
-    fields: List[dict] = []
+    fields: list[dict] = []
     for err in exc.errors():
         loc = err.get("loc") or ()
         parts = [str(x) for x in loc if x not in ("body", "query", "path")]

@@ -1,6 +1,7 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from typing import List, Optional
+
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,11 +40,11 @@ class OutboxRepository:
                 event.event_name,
             )
         except Exception as e:
-            logger.error(f"❌ Failed to persist outbox event: {str(e)}")
+            logger.error(f"❌ Failed to persist outbox event: {e!s}")
             # כאן תוכל לעטוף ב-LinkupError אם תרצה
             raise
 
-    async def get_pending_events(self, db: AsyncSession, batch_size: int = BATCH_SIZE_DEFAULT) -> List[OutboxEvent]:
+    async def get_pending_events(self, db: AsyncSession, batch_size: int = BATCH_SIZE_DEFAULT) -> list[OutboxEvent]:
         """
         שליפת אירועים לעיבוד עבור ה-Worker.
         שימוש ב-skip_locked מונע התנגשויות בין מספר מופעים של השרת.
@@ -63,11 +64,11 @@ class OutboxRepository:
         מעדכן את האירוע כמעובד עם חותמת זמן של 'עכשיו'.
         ביצוע עדכון ישיר (In-place update) לטובת ביצועים מקסימליים.
         """
-        stmt = update(OutboxEvent).where(OutboxEvent.id == event_id).values(status="PROCESSED", processed_at=datetime.now(timezone.utc))
+        stmt = update(OutboxEvent).where(OutboxEvent.id == event_id).values(status="PROCESSED", processed_at=datetime.now(UTC))
         await db.execute(stmt)
         logger.info(f"✅ Event {event_id} marked as processed")
 
-    async def increment_retries(self, db: AsyncSession, event_id: str, error_msg: Optional[str] = None) -> None:
+    async def increment_retries(self, db: AsyncSession, event_id: str, error_msg: str | None = None) -> None:
         """מעלה מונה נסיונות ומעדכן last_error. לא משנה סטטוס (נשאר PENDING לניסיון חוזר)."""
         values = {"retry_count": OutboxEvent.retry_count + 1}
         if error_msg is not None:

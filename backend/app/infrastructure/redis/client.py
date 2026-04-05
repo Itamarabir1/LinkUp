@@ -1,6 +1,8 @@
-import redis.asyncio as redis
 import json
 import logging
+
+import redis.asyncio as redis
+
 from app.core.config import settings
 from app.core.exceptions.infrastructure import RedisUnavailable
 

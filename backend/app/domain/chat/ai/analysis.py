@@ -18,7 +18,7 @@ async def get_conversation_text_for_analysis(
     conversation_id: UUID,
     current_user_id: UUID,
     limit: int = 50,
-) -> Optional[str]:
+) -> str | None:
     """
     אוסף את טקסט השיחה לניתוח AI.
     מחזיר None אם המשתמש לא participant או השיחה לא קיימת.

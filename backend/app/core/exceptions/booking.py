@@ -2,6 +2,7 @@
 """שגיאות דומיין הזמנות ונהג/נוסע."""
 
 from typing import Optional
+
 from .base import LinkupError
 
 
@@ -12,7 +13,7 @@ class RideNotAvailableError(LinkupError):
     error_code = "BOOKING_RIDE_NOT_AVAILABLE"
     message = "הנסיעה אינה זמינה"
 
-    def __init__(self, ride_id: Optional[int] = None):
+    def __init__(self, ride_id: int | None = None):
         payload = {"ride_id": ride_id} if ride_id is not None else None
         super().__init__(payload=payload)
 
@@ -24,7 +25,7 @@ class BookingAlreadyExistsError(LinkupError):
     error_code = "BOOKING_ALREADY_EXISTS"
     message = "כבר ביקשת להצטרף לנסיעה הזו"
 
-    def __init__(self, ride_id: Optional[int] = None, request_id: Optional[int] = None):
+    def __init__(self, ride_id: int | None = None, request_id: int | None = None):
         payload = {}
         if ride_id is not None:
             payload["ride_id"] = ride_id
@@ -40,7 +41,7 @@ class PassengerRequestNotFoundError(LinkupError):
     error_code = "BOOKING_REQUEST_NOT_FOUND"
     message = "בקשת הנוסע לא נמצאה"
 
-    def __init__(self, request_id: Optional[int] = None):
+    def __init__(self, request_id: int | None = None):
         payload = {"request_id": request_id} if request_id is not None else None
         super().__init__(payload=payload)
 
@@ -52,7 +53,7 @@ class BookingNotFoundError(LinkupError):
     error_code = "BOOKING_NOT_FOUND"
     message = "הזמנה לא נמצאה"
 
-    def __init__(self, booking_id: Optional[int] = None):
+    def __init__(self, booking_id: int | None = None):
         payload = {"booking_id": booking_id} if booking_id is not None else None
         super().__init__(payload=payload)
 
@@ -75,5 +76,5 @@ class ForbiddenRideActionError(LinkupError):
     error_code = "BOOKING_ACCESS_DENIED"
     message = "גישה חסומה"
 
-    def __init__(self, detail: Optional[str] = None):
+    def __init__(self, detail: str | None = None):
         super().__init__(message=detail or self.message)

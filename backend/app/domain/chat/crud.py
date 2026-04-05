@@ -3,13 +3,14 @@ CRUD צ'אט 1:1 – שיחות והודעות.
 תמיד שומרים user_id_1 < user_id_2 ב־Conversation.
 """
 
+from datetime import UTC, datetime, timedelta, timezone
 from uuid import UUID
-from sqlalchemy import select, desc, or_, func
+
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from datetime import datetime, timedelta, timezone
 
-from app.domain.chat.model import Conversation, Message, ConversationParticipant, ChatAnalysis
+from app.domain.chat.model import ChatAnalysis, Conversation, ConversationParticipant, Message
 
 # --- Conversations ---
 
@@ -29,7 +30,7 @@ async def get_or_create_conversation(db: AsyncSession, user_id_a: UUID, user_id_
         select(Conversation).where(
             Conversation.user_id_1 == u1,
             Conversation.user_id_2 == u2,
-        )
+        ),
     )
     conv = result.scalars().first()
     if conv:
@@ -60,7 +61,7 @@ async def get_conversation_by_id(db: AsyncSession, conversation_id: UUID, partic
                 Conversation.user_id_1 == pid,
                 Conversation.user_id_2 == pid,
             ),
-        )
+        ),
     )
     return result.scalars().first()
 
@@ -80,9 +81,9 @@ async def list_conversations_for_user(db: AsyncSession, user_id: UUID) -> list[C
             or_(
                 Conversation.user_id_1 == uid,
                 Conversation.user_id_2 == uid,
-            )
+            ),
         )
-        .order_by(desc(Conversation.created_at))
+        .order_by(desc(Conversation.created_at)),
     )
     return list(result.scalars().unique().all())
 
@@ -125,7 +126,7 @@ async def get_conversations_with_timeout(
         )
         .join(subquery, Conversation.conversation_id == subquery.c.conversation_id)
         .outerjoin(ChatAnalysis, Conversation.conversation_id == ChatAnalysis.conversation_id)
-        .where(ChatAnalysis.conversation_id.is_(None))  # אין ניתוח קיים
+        .where(ChatAnalysis.conversation_id.is_(None)),  # אין ניתוח קיים
     )
     return list(result.scalars().unique().all())
 
@@ -204,12 +205,12 @@ async def mark_conversation_read(db: AsyncSession, conversation_id: UUID, user_i
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
     uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     result = await db.execute(
         select(ConversationParticipant).where(
             ConversationParticipant.conversation_id == cid,
             ConversationParticipant.user_id == uid,
-        )
+        ),
     )
     participant = result.scalars().first()
     if not participant:
@@ -262,7 +263,7 @@ async def has_unread_messages(db: AsyncSession, conversation_id: UUID, user_id: 
         select(ConversationParticipant.last_read_at).where(
             ConversationParticipant.conversation_id == cid,
             ConversationParticipant.user_id == uid,
-        )
+        ),
     )
     last_read_at = part_res.scalar_one_or_none()
 

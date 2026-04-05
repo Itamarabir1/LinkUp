@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Float
 from geoalchemy2 import Geometry
+from sqlalchemy import Column, Float
 from sqlalchemy.orm import declarative_mixin
 
 

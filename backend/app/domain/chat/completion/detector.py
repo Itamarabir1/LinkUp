@@ -5,7 +5,7 @@
 from typing import List
 
 # רשימת keywords שמעידים על סיום שיחה
-COMPLETION_KEYWORDS: List[str] = [
+COMPLETION_KEYWORDS: list[str] = [
     "תודה",
     "תודה רבה",
     "תודה לך",

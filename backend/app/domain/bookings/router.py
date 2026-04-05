@@ -1,40 +1,41 @@
 # app/domain/bookings/router.py
+from typing import List, Optional
+from uuid import UUID
+
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    status,
     WebSocket,
     WebSocketDisconnect,
+    status,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
-from uuid import UUID
 
+from app.api.dependencies.auth import WsUser, get_current_user, get_current_user_ws
+from app.core.exceptions.booking import ForbiddenRideActionError
 from app.db.session import get_db
-from app.api.dependencies.auth import get_current_user, get_current_user_ws, WsUser
-from app.domain.users.model import User
-from app.domain.bookings.service import BookingService
 from app.domain.bookings.crud import crud_booking
+from app.domain.bookings.enum import BookingStatus
 from app.domain.bookings.schema import (
-    BookingResponse,
     BookingCreate,
+    BookingResponse,
     RideManifestResponse,
 )
-from app.domain.bookings.enum import BookingStatus
-from app.domain.rides.enum import RideStatus
+from app.domain.bookings.service import BookingService
 from app.domain.geo.schema import (
     DriverLocationReport,
     LocationUpdate,
     PassengerLocationReport,
 )
+from app.domain.rides.enum import RideStatus
+from app.domain.users.model import User
 from app.infrastructure.location.location_service import (
     broadcast_location_to_participants,
     broadcast_passenger_location_to_driver,
 )
-from app.infrastructure.redis.keys import get_booking_channel
 from app.infrastructure.redis.broadcast import broadcast
-from app.core.exceptions.booking import ForbiddenRideActionError
+from app.infrastructure.redis.keys import get_booking_channel
 
 router = APIRouter(tags=["Bookings"])
 
@@ -92,9 +93,9 @@ async def cancel_booking(
     return await BookingService.cancel_booking(db, booking_id, current_user.user_id)
 
 
-@router.get("/my-bookings", response_model=List[BookingResponse])
+@router.get("/my-bookings", response_model=list[BookingResponse])
 async def get_user_bookings(
-    status: Optional[str] = None,
+    status: str | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -111,7 +112,7 @@ async def get_ride_manifest(
     return await BookingService.get_ride_manifest(db, ride_id, current_user.user_id)
 
 
-@router.get("/ride/{ride_id}/pending", response_model=List[BookingResponse])
+@router.get("/ride/{ride_id}/pending", response_model=list[BookingResponse])
 async def get_pending_requests(
     ride_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -163,7 +164,7 @@ async def report_driver_location(
         speed=body.speed or 0.0,
     )
     await broadcast_location_to_participants(location_in, booking.ride_id, involved)
-    return None
+    return
 
 
 @router.post("/{booking_id}/passenger-location", status_code=status.HTTP_204_NO_CONTENT)
@@ -191,14 +192,14 @@ async def report_passenger_location(
         heading=body.heading or 0.0,
         speed=body.speed or 0.0,
     )
-    return None
+    return
 
 
 @router.websocket("/ws/{booking_id}/location")
 async def booking_location_websocket(
     websocket: WebSocket,
     booking_id: UUID,
-    user: Optional[WsUser] = Depends(get_current_user_ws),
+    user: WsUser | None = Depends(get_current_user_ws),
     db: AsyncSession = Depends(get_db),
 ):
     """

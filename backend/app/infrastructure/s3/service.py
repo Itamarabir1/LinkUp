@@ -4,8 +4,8 @@
 תמונת קבוצה: GROUPS/<group_id>/<uuid>.webp — העלאה ישירה, קובץ יחיד per group.
 """
 
-import uuid
 import logging
+import uuid
 from typing import Optional, Union
 from uuid import UUID
 
@@ -23,7 +23,7 @@ class StorageService:
         self.client = s3_client
 
     async def generate_avatar_upload_url(
-        self, user_id: Union[UUID, int, str], filename: Optional[str] = None, expiration: int = 300
+        self, user_id: UUID | int | str, filename: str | None = None, expiration: int = 300,
     ) -> tuple[str, str]:
         """
         יוצר presigned URL להעלאה ישירה ל-S3 staging. תמיד webp.
@@ -53,14 +53,14 @@ class StorageService:
                 logger.error("S3 delete failed for key=%s: %s", key, e, exc_info=True)
                 raise S3DeleteFailed() from e
 
-    async def delete_user_avatar_folder(self, user_id: Union[UUID, str]) -> None:
+    async def delete_user_avatar_folder(self, user_id: UUID | str) -> None:
         """מוחק את כל תוכן התיקייה avatars/{user_id}/."""
         uid_str = str(user_id)
         prefix = f"avatars/{uid_str}/"
         await self.list_and_delete_prefix(prefix)
         logger.info("Deleted avatar folder for user %s", uid_str)
 
-    async def generate_group_image_upload_url(self, group_id: Union[UUID, str], expiration: int = 300) -> tuple[str, str]:
+    async def generate_group_image_upload_url(self, group_id: UUID | str, expiration: int = 300) -> tuple[str, str]:
         """
         יוצר presigned URL להעלאה ישירה ל-S3 לתמונת קבוצה.
         מפתח: GROUPS/<group_id>/<uuid>.webp
@@ -73,7 +73,7 @@ class StorageService:
         logger.info("Generated presigned URL for group image: key=%s", key)
         return presigned_url, key
 
-    async def delete_group_image_folder(self, group_id: Union[UUID, str]) -> None:
+    async def delete_group_image_folder(self, group_id: UUID | str) -> None:
         """מוחק את כל תוכן התיקייה GROUPS/<group_id>/."""
         gid_str = str(group_id)
         prefix = f"{GROUPS_PREFIX}{gid_str}/"

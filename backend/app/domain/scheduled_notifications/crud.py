@@ -48,7 +48,7 @@ class CRUDScheduledNotification:
         db: AsyncSession,
         now: datetime,
         limit: int = BATCH_SIZE_DEFAULT,
-    ) -> List[ScheduledNotification]:
+    ) -> list[ScheduledNotification]:
         """
         שולף תזכורות שעבר זמנן וטרם נשלחו.
         מנצל את ה-partial index idx_scheduled_notifications_deliver.
@@ -80,7 +80,7 @@ class CRUDScheduledNotification:
             delete(ScheduledNotification).where(
                 ScheduledNotification.ride_id == ride_id,
                 ScheduledNotification.sent_at.is_(None),
-            )
+            ),
         )
 
 

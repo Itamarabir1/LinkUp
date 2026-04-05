@@ -4,23 +4,15 @@
 """
 
 from uuid import UUID
-from fastapi import APIRouter, Depends, status, Query, Response
 
-from app.core.exceptions.base import LinkupError
-from app.core.exceptions.chat import ChatRoomNotFound
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
 from app.api.dependencies.auth import get_current_user
-from app.domain.users.model import User
-from app.domain.chat.service import (
-    get_or_create_conversation,
-    get_or_create_conversation_by_booking,
-    list_my_conversations,
-    get_conversation_detail,
-    send_message,
-    get_messages,
-)
+from app.core.exceptions.base import LinkupError
+from app.core.exceptions.chat import ChatRoomNotFound
+from app.db.session import get_db
+from app.domain.chat import crud as chat_crud
 from app.domain.chat.schema import (
     ConversationCreate,
     ConversationDetail,
@@ -29,8 +21,16 @@ from app.domain.chat.schema import (
     MessageResponse,
     PaginatedMessagesResponse,
 )
-from app.domain.chat import crud as chat_crud
+from app.domain.chat.service import (
+    get_conversation_detail,
+    get_messages,
+    get_or_create_conversation,
+    get_or_create_conversation_by_booking,
+    list_my_conversations,
+    send_message,
+)
 from app.domain.users.crud import crud_user
+from app.domain.users.model import User
 
 router = APIRouter(tags=["Chat"])
 

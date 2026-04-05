@@ -1,26 +1,24 @@
 # app/domain/bookings/service.py
 import logging
-from urllib.parse import quote
 from typing import List, Optional
+from urllib.parse import quote
 from uuid import UUID
+
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from app.core.exceptions.booking import (
-    RideNotAvailableError,
     BookingAlreadyExistsError,
-    PassengerRequestNotFoundError,
     BookingNotFoundError,
     ForbiddenRideActionError,
     NoSeatsAvailableError,
+    PassengerRequestNotFoundError,
+    RideNotAvailableError,
 )
 from app.domain.bookings.crud import crud_booking
-
-# ייבוא מה-Models וה-Enums
-from app.domain.passengers.model import PassengerRequest
-from app.domain.rides.model import Ride
-from app.domain.bookings.model import Booking
 from app.domain.bookings.enum import BookingStatus
-from app.domain.rides.enum import RideStatus
+from app.domain.bookings.model import Booking
 from app.domain.bookings.schema import (
     BookingManifestItem,
     BookingResponse,
@@ -28,13 +26,17 @@ from app.domain.bookings.schema import (
     PaginatedBookingsResponse,
     RideManifestResponse,
 )
+from app.domain.events.enum import DispatchTarget
 
 # אירועים – Outbox בלבד
 from app.domain.events.outbox import publish_to_outbox
-from app.domain.events.enum import DispatchTarget
 from app.domain.notifications.constants import NotificationEvent
-from sqlalchemy import select
-from sqlalchemy.orm import joinedload
+from app.infrastructure.redis.publisher import publish_user_event
+
+# ייבוא מה-Models וה-Enums
+from app.domain.passengers.model import PassengerRequest
+from app.domain.rides.enum import RideStatus
+from app.domain.rides.model import Ride
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +48,7 @@ class BookingService:
         ride_id: UUID,
         request_id: UUID,
         num_seats: int = 1,
-        current_user_id: Optional[UUID] = None,
+        current_user_id: UUID | None = None,
     ) -> Booking:
         """בקשת הצטרפות לנסיעה. אירוע ל-Outbox – ה-Worker ישלח מייל לנהג."""
         try:
@@ -64,7 +66,7 @@ class BookingService:
             if existing:
                 if existing.status in (BookingStatus.CANCELLED, BookingStatus.REJECTED):
                     new_booking = await crud_booking.reuse_booking_after_rejection_or_cancellation(
-                        db, ride_id, p_req.passenger_id, request_id, num_seats
+                        db, ride_id, p_req.passenger_id, request_id, num_seats,
                     )
                 else:
                     raise BookingAlreadyExistsError(ride_id=str(ride_id), request_id=str(request_id))
@@ -82,6 +84,11 @@ class BookingService:
                 new_booking.booking_id,
             )
             await db.commit()
+            await publish_user_event(
+                ride.driver_id,
+                "booking.passenger_join_request",
+                {"booking_id": str(new_booking.booking_id), "ride_id": str(ride_id)},
+            )
             # Reload booking with relationships loaded for proper serialization
             booking_with_relations = await crud_booking.get_async(db, new_booking.booking_id)
             return booking_with_relations or new_booking
@@ -154,7 +161,7 @@ class BookingService:
                     "pickup_name": b.pickup_name,
                     "pickup_time": b.pickup_time,
                     "destination_name": (b.passenger_request.destination_name if b.passenger_request else None),
-                }
+                },
             )
 
         available_seats_left = max(0, ride.available_seats)
@@ -205,6 +212,11 @@ class BookingService:
                 [DispatchTarget.RABBITMQ.value],
             )
             await db.commit()
+            await publish_user_event(
+                booking.passenger_id,
+                "booking.approved_by_driver",
+                {"booking_id": str(booking_id), "ride_id": str(booking.ride_id)},
+            )
             return await crud_booking.get_booking_by_id_async(db, booking_id)
         except (
             BookingNotFoundError,
@@ -234,6 +246,11 @@ class BookingService:
                 [DispatchTarget.RABBITMQ.value],
             )
             await db.commit()
+            await publish_user_event(
+                booking.passenger_id,
+                "booking.rejected_by_driver",
+                {"booking_id": str(booking_id), "ride_id": str(booking.ride_id)},
+            )
             return await crud_booking.get_booking_by_id_async(db, booking_id)
         except (BookingNotFoundError, ForbiddenRideActionError):
             await db.rollback()
@@ -266,7 +283,7 @@ class BookingService:
     async def get_user_bookings(
         db: AsyncSession,
         user_id: UUID,
-        status: Optional[str] = None,
+        status: str | None = None,
         page: int = 1,
         limit: int = 20,
     ):
@@ -305,7 +322,7 @@ class BookingService:
                         BookingStatus.EN_ROUTE,
                         BookingStatus.ARRIVED,
                         BookingStatus.TRIP_IN_PROGRESS,
-                    ]
+                    ],
                 ),
             )
         )
@@ -325,9 +342,9 @@ class BookingService:
         return {"trips": trips, "stats": stats}
 
     @staticmethod
-    async def get_notifications_for_user(db: AsyncSession, user_id: UUID) -> List[NotificationItemResponse]:
+    async def get_notifications_for_user(db: AsyncSession, user_id: UUID) -> list[NotificationItemResponse]:
         """אוסף כל ההתראות למשתמש: כנהג – בקשות להצטרפות; כנוסע – אישור/דחייה/ממתין."""
-        items: List[NotificationItemResponse] = []
+        items: list[NotificationItemResponse] = []
 
         # כנהג: בקשות ממתינות
         pending = await crud_booking.get_all_pending_bookings_for_driver(db, user_id)
@@ -349,7 +366,7 @@ class BookingService:
                     ride_origin=getattr(ride, "origin_name", None),
                     ride_destination=getattr(ride, "destination_name", None),
                     status=BookingStatus.PENDING.value,
-                )
+                ),
             )
 
         # כנוסע: ההזמנות שלי (אישור / דחייה / ממתין)
@@ -382,7 +399,7 @@ class BookingService:
                     ride_origin=getattr(ride, "origin_name", None) if ride else None,
                     ride_destination=getattr(ride, "destination_name", None) if ride else None,
                     status=status_val,
-                )
+                ),
             )
 
         items.sort(key=lambda x: x.created_at, reverse=True)

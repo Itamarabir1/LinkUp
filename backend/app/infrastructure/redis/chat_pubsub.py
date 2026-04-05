@@ -4,6 +4,7 @@ Pub/Sub לערוצי צ'אט ב-Redis — חייב להיות אותו מספר 
 """
 
 import logging
+
 import redis.asyncio as redis
 
 from app.core.config import settings

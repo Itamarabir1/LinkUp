@@ -16,7 +16,7 @@ async def get_conversation_for_calendar_export(
     db: AsyncSession,
     conversation_id: int,
     current_user_id: int,
-) -> Optional[dict]:
+) -> dict | None:
     """
     אוסף נתוני שיחה לייצוא ללוח שנה.
     מחזיר None אם המשתמש לא participant או השיחה לא קיימת.

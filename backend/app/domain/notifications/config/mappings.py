@@ -4,12 +4,10 @@
 """
 
 from app.domain.notifications.constants import NotificationEvent
-
-from app.domain.notifications.core.builders.user_builder import UserBuilder
-from app.domain.notifications.core.builders.ride_builder import RideBuilder
 from app.domain.notifications.core.builders.booking_builder import BookingBuilder
 from app.domain.notifications.core.builders.chat_builder import ChatBuilder
-
+from app.domain.notifications.core.builders.ride_builder import RideBuilder
+from app.domain.notifications.core.builders.user_builder import UserBuilder
 
 NOTIFICATION_STRATEGY = {
     # --- Auth & User Management ---
@@ -65,9 +63,10 @@ NOTIFICATION_STRATEGY = {
         "channels": ["email", "push", "websocket"],
     },
     # --- Reminders (מהסקדיולר) ---
+    # נמען מגיע מ-payload.user_id + ScheduledReminderSource; role לא נכנס ל-resolver בנתיב הזה.
     NotificationEvent.PICKUP_REMINDER_PASSENGER: {
         "role": "passenger",
-        "builder": BookingBuilder(),
+        "builder": RideBuilder(),
         "template": "reminder_passenger",
         "channels": ["email"],
     },

@@ -1,7 +1,9 @@
 import logging
-from typing import List, Set, Optional
+from typing import List, Optional, Set
+
 from app.domain.events.enum import DispatchTarget
 from app.infrastructure.events.publishers.base import EventPublisher
+
 from .base import EventDispatcher
 from .evaluator import DispatchEvaluator
 
@@ -11,8 +13,8 @@ logger = logging.getLogger(__name__)
 class DispatcherFactory:
     @staticmethod
     def create_standard_dispatcher(
-        publishers: List[EventPublisher],
-        critical_targets: Optional[Set[DispatchTarget]] = None,
+        publishers: list[EventPublisher],
+        critical_targets: set[DispatchTarget] | None = None,
     ) -> EventDispatcher:
         """
         בונה Dispatcher עם הגדרות סטנדרטיות.

@@ -1,6 +1,8 @@
-from .base import LinkupError
 from typing import Optional
+
 from fastapi import status
+
+from .base import LinkupError
 
 
 class InvalidEmailError(LinkupError):
@@ -8,7 +10,7 @@ class InvalidEmailError(LinkupError):
     error_code = "VAL_INVALID_EMAIL"
     message = "כתובת האימייל שהוזנה אינה תקינה"
 
-    def __init__(self, email: Optional[str] = None):
+    def __init__(self, email: str | None = None):
         super().__init__(
             message=self.message,
             status_code=self.status_code,
@@ -22,7 +24,7 @@ class InvalidPhoneError(LinkupError):
     error_code = "VAL_INVALID_PHONE"
     message = "מספר הטלפון שהוזן אינו תקין"
 
-    def __init__(self, phone: Optional[str] = None):
+    def __init__(self, phone: str | None = None):
         super().__init__(
             message=self.message,
             status_code=self.status_code,
@@ -50,7 +52,7 @@ class InvalidFileTypeError(LinkupError):
     error_code = "VAL_INVALID_FILE_TYPE"
     message = "סוג הקובץ אינו נתמך. יש להשתמש ב-JPG, PNG או WebP"
 
-    def __init__(self, content_type: Optional[str] = None):
+    def __init__(self, content_type: str | None = None):
         super().__init__(
             message=self.message,
             status_code=self.status_code,
@@ -64,7 +66,7 @@ class FileTooLargeError(LinkupError):
     error_code = "VAL_FILE_TOO_LARGE"
     message = "הקובץ גדול מדי עבור השרת"
 
-    def __init__(self, max_size_mb: int, current_size_mb: Optional[float] = None):
+    def __init__(self, max_size_mb: int, current_size_mb: float | None = None):
         super().__init__(
             message=self.message,
             status_code=self.status_code,
@@ -109,7 +111,7 @@ class SameOriginDestinationError(LinkupError):
     error_code = "VAL_SAME_ORIGIN_DESTINATION"
     message = "מוצא ויעד אינם יכולים להיות זהים"
 
-    def __init__(self, location_name: Optional[str] = None):
+    def __init__(self, location_name: str | None = None):
         super().__init__(
             message=self.message,
             status_code=self.status_code,

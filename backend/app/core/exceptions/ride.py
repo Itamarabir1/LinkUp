@@ -1,5 +1,6 @@
 from typing import Optional, Union
 from uuid import UUID
+
 from .base import LinkupError
 
 # --- Ride Discovery & General Errors ---
@@ -9,7 +10,7 @@ class RideNotFoundError(LinkupError):
     status_code = 404
     error_code = "RIDE_NOT_FOUND"
 
-    def __init__(self, ride_id: Union[int, str, UUID]):
+    def __init__(self, ride_id: int | str | UUID):
         super().__init__(
             message=f"נסיעה {ride_id} לא נמצאה",
             status_code=self.status_code,
@@ -22,7 +23,7 @@ class InvalidRideStatusError(LinkupError):
     status_code = 400
     error_code = "RIDE_INVALID_STATUS"
 
-    def __init__(self, status: str, action: Optional[str] = None):
+    def __init__(self, status: str, action: str | None = None):
         super().__init__(
             message=f"פעולה {f'({action}) ' if action else ''}לא חוקית לסטטוס הנסיעה הנוכחי: {status}",
             status_code=self.status_code,
@@ -41,9 +42,9 @@ class InvalidRouteError(LinkupError):
 
     def __init__(
         self,
-        detail: Optional[str] = None,
-        details: Optional[str] = None,
-        index: Optional[int] = None,
+        detail: str | None = None,
+        details: str | None = None,
+        index: int | None = None,
     ):
         msg = detail or details or self.message
         if index is not None:
@@ -57,7 +58,7 @@ class InvalidDateTimeError(LinkupError):
     error_code = "RIDE_INVALID_DATETIME"
     message = "זמן הנסיעה שנבחר אינו תקין"
 
-    def __init__(self, provided_dt: Optional[str] = None, details: Optional[str] = None):
+    def __init__(self, provided_dt: str | None = None, details: str | None = None):
         msg = details if details else self.message
         super().__init__(
             message=msg,
@@ -77,7 +78,7 @@ class NoConfirmedBookingsError(LinkupError):
     error_code = "RIDE_NO_CONFIRMED_BOOKINGS"
     message = "אין נוסעים מאושרים לנסיעה"
 
-    def __init__(self, ride_id: Optional[Union[UUID, str]] = None):
+    def __init__(self, ride_id: UUID | str | None = None):
         super().__init__(
             message=self.message,
             payload={"ride_id": str(ride_id)} if ride_id is not None else None,
@@ -89,7 +90,7 @@ class RideFullError(LinkupError):
     error_code = "RIDE_IS_FULL"
     message = "הנסיעה מלאה, לא ניתן להוסיף נוסעים נוספים"
 
-    def __init__(self, ride_id: Optional[int] = None):
+    def __init__(self, ride_id: int | None = None):
         msg = f"נסיעה {ride_id} לא נמצאה" if ride_id is not None else "הנסיעה לא נמצאה או שאינך מורשה לבצע פעולה זו"
         super().__init__(message=msg, payload={"ride_id": ride_id} if ride_id is not None else None)
 
@@ -101,7 +102,7 @@ class SessionExpiredError(LinkupError):
     error_code = "RIDE_SESSION_EXPIRED"
     message = "פג תוקף הצעת הנסיעה, אנא בצע חיפוש מחדש"
 
-    def __init__(self, session_id: Optional[str] = None):
+    def __init__(self, session_id: str | None = None):
         msg = f"הסשן {session_id} פג תוקף או אינו קיים." if session_id else self.message
         super().__init__(message=msg, payload={"session_id": session_id} if session_id else None)
 

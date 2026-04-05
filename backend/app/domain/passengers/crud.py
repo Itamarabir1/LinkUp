@@ -3,23 +3,24 @@ CRUD לבקשות נוסעים – מקור אמת יחיד, API עקבי.
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, cast, func, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
+
 from geoalchemy2 import Geography, Geometry
 from geoalchemy2.shape import from_shape
 from shapely.geometry import LineString
+from sqlalchemy import and_, cast, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
-from app.domain.passengers.model import PassengerRequest
-from app.domain.passengers.enum import PassengerStatus
-from app.domain.passengers.schema import PassengerRequestCreate
-from app.domain.rides.model import Ride
-from app.domain.rides.enum import RideStatus
-from app.domain.bookings.model import Booking
 from app.domain.bookings.enum import BookingStatus
+from app.domain.bookings.model import Booking
+from app.domain.passengers.enum import PassengerStatus
+from app.domain.passengers.model import PassengerRequest
+from app.domain.passengers.schema import PassengerRequestCreate
+from app.domain.rides.enum import RideStatus
+from app.domain.rides.model import Ride
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +45,12 @@ class CRUDPassenger:
 
     # --- שליפה ---
 
-    async def get_by_id(self, db: AsyncSession, request_id: UUID) -> Optional[PassengerRequest]:
+    async def get_by_id(self, db: AsyncSession, request_id: UUID) -> PassengerRequest | None:
         """שליפת בקשה לפי request_id (AsyncSession)."""
         rid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
         return await db.get(PassengerRequest, rid)
 
-    async def get(self, db: AsyncSession, *, id: UUID) -> Optional[PassengerRequest]:
+    async def get(self, db: AsyncSession, *, id: UUID) -> PassengerRequest | None:
         """שליפת בקשה לפי request_id (AsyncSession – לשימוש ב־handler). חתימה: get(db, id=...)."""
         return await db.get(PassengerRequest, id)
 
@@ -57,8 +58,8 @@ class CRUDPassenger:
         self,
         db: AsyncSession,
         passenger_id: UUID,
-        status: Optional[PassengerStatus] = None,
-    ) -> List[PassengerRequest]:
+        status: PassengerStatus | None = None,
+    ) -> list[PassengerRequest]:
         """שליפת בקשות לפי נוסע (למסך 'הבקשות שלי')."""
         pid = UUID(str(passenger_id)) if isinstance(passenger_id, str) else passenger_id
         stmt = select(PassengerRequest).where(PassengerRequest.passenger_id == pid)
@@ -83,7 +84,7 @@ class CRUDPassenger:
         """יצירת בקשה חדשה. passenger_id מהשרת (טוקן), לא מהגוף."""
         req_time = request.requested_departure_time
         if req_time is None:
-            req_time = datetime.now(timezone.utc)
+            req_time = datetime.now(UTC)
         # עמודה TIMESTAMP WITH TIME ZONE – מקבלת aware או naive
         db_request = PassengerRequest(
             passenger_id=passenger_id,
@@ -115,11 +116,11 @@ class CRUDPassenger:
         d_lon: float,
         radius: int,
         limit: int | None = None,
-        after_ride_id: Optional[UUID] = None,
-        min_departure_time: Optional[datetime] = None,
-        passenger_id: Optional[UUID] = None,
-        group_id: Optional[UUID] = None,
-    ) -> tuple[List[tuple[Ride, Optional[str]]], bool]:
+        after_ride_id: UUID | None = None,
+        min_departure_time: datetime | None = None,
+        passenger_id: UUID | None = None,
+        group_id: UUID | None = None,
+    ) -> tuple[list[tuple[Ride, str | None]], bool]:
         """
         מנוע חיפוש נסיעות לפי קואורדינטות ורדיוס. מיון קבוע: departure_time.asc(), ride_id.asc().
         מחזיר (רשימה, has_more). אם limit=None מחזיר את כל התוצאות ו-has_more=False.
@@ -182,7 +183,7 @@ class CRUDPassenger:
         rows = (await db.execute(stmt)).all()
 
         # נורמליזציה: Booking.status יכול להגיע כ-enum או string, רוצים str|None
-        normalized: List[tuple[Ride, Optional[str]]] = []
+        normalized: list[tuple[Ride, str | None]] = []
         for ride, status in rows:
             if status is None:
                 normalized.append((ride, None))
@@ -204,7 +205,7 @@ class CRUDPassenger:
         db: AsyncSession,
         route_coords: list,
         radius_meters: int = _FIND_PASSENGERS_ON_ROUTE_RADIUS_M,
-    ) -> List[PassengerRequest]:
+    ) -> list[PassengerRequest]:
         """נהג מחפש נוסעים לאורך המסלול שלו."""
         if not route_coords or len(route_coords) < 2:
             return []
@@ -221,7 +222,7 @@ class CRUDPassenger:
                         cast(route_geom, Geography),
                         radius_meters,
                     ),
-                )
+                ),
             )
             return list((await db.execute(stmt)).scalars().all())
         except Exception as e:
@@ -236,7 +237,7 @@ class CRUDPassenger:
         dest_lat: float,
         dest_lon: float,
         radius: int,
-    ) -> List[PassengerRequest]:
+    ) -> list[PassengerRequest]:
         """חיפוש נוסעים לפי מוצא ויעד של נהג."""
         now = datetime.now()
         driver_origin = func.ST_SetSRID(func.ST_MakePoint(origin_lon, origin_lat), 4326)
@@ -255,7 +256,7 @@ class CRUDPassenger:
                     cast(driver_dest, Geography),
                     radius,
                 ),
-            )
+            ),
         )
         return list((await db.execute(stmt)).scalars().all())
 
@@ -266,7 +267,7 @@ class CRUDPassenger:
         radius_destination_m: int = _RIDE_NOTIFICATION_RADIUS_DEST_M,
         radius_pickup_m: int = _RIDE_NOTIFICATION_RADIUS_PICKUP_M,
         limit: int = _RIDE_NOTIFICATION_PASSENGER_LIMIT,
-    ) -> List[PassengerRequest]:
+    ) -> list[PassengerRequest]:
         """
         נוסעים רלוונטיים להתראה על נסיעה חדשה.
         סדר פילטרים: סטטוס+זמן (אינדקס) → לא הנהג → יעד 5km → מוצא על המסלול.
@@ -317,7 +318,7 @@ class CRUDPassenger:
                         cast(route_geom, Geography),
                         radius_pickup_m,
                     ),
-                )
+                ),
             )
             .limit(limit)
         )
@@ -335,10 +336,10 @@ class CRUDPassenger:
     async def get_multi_rides(
         self,
         db: AsyncSession,
-        status: Optional[str] = None,
+        status: str | None = None,
         skip: int = 0,
         limit: int = _GET_MULTI_RIDES_DEFAULT_LIMIT,
-    ) -> List[Ride]:
+    ) -> list[Ride]:
         """שליפת רשימת נסיעות עם סינון אופציונלי לפי סטטוס."""
         stmt = select(Ride)
         if status:
@@ -357,7 +358,7 @@ class CRUDPassenger:
                 PassengerRequest.status == PassengerStatus.ACTIVE,
                 PassengerRequest.requested_departure_time < now,
             )
-            .values({PassengerRequest.status: PassengerStatus.EXPIRED.value})
+            .values({PassengerRequest.status: PassengerStatus.EXPIRED.value}),
         )
         return result.rowcount or 0
 

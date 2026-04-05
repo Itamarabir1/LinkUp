@@ -1,8 +1,8 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -10,6 +10,8 @@ from sqlalchemy.orm import selectinload
 from app.api.dependencies.admin import get_current_admin_user
 from app.api.dependencies.services import get_ride_service
 from app.db.session import get_db
+from app.domain.bookings.enum import BookingStatus
+from app.domain.bookings.model import Booking
 from app.domain.groups.model import Group, GroupMember
 from app.domain.rides.crud import crud_ride
 from app.domain.rides.enum import RideStatus
@@ -19,8 +21,6 @@ from app.domain.users.crud import crud_user
 from app.domain.users.model import User
 from app.infrastructure.health.health_service import check_health
 from app.infrastructure.outbox.model import OutboxEvent
-from app.domain.bookings.enum import BookingStatus
-from app.domain.bookings.model import Booking
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ def _audit(actor: User, action: str, detail: str) -> None:
         actor.email,
         action,
         detail,
-        datetime.now(timezone.utc).isoformat(),
+        datetime.now(UTC).isoformat(),
     )
 
 
@@ -77,13 +77,13 @@ async def admin_stats(
     current_user: User = Depends(get_current_admin_user),
 ):
     """Aggregates for admin dashboard (single round-trip)."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_ago = now - timedelta(days=_ADMIN_STATS_ACTIVE_USERS_DAYS)
 
     users_total = await db.scalar(select(func.count()).select_from(User))
     rides_active = await db.scalar(
-        select(func.count()).select_from(Ride).where(Ride.status.in_([RideStatus.OPEN, RideStatus.FULL, RideStatus.ACTIVE]))
+        select(func.count()).select_from(Ride).where(Ride.status.in_([RideStatus.OPEN, RideStatus.FULL, RideStatus.ACTIVE])),
     )
     bookings_total = await db.scalar(select(func.count()).select_from(Booking))
     outbox_pending = await db.scalar(select(func.count()).select_from(OutboxEvent).where(OutboxEvent.status == "PENDING"))
@@ -145,7 +145,7 @@ async def admin_users(
                 func.coalesce(User.email, "").ilike(qq),
                 func.coalesce(User.phone_number, "").ilike(qq),
                 func.coalesce(User.full_name, "").ilike(qq),
-            )
+            ),
         )
     if is_active is not None:
         stmt = stmt.where(User.is_active == is_active)
@@ -250,7 +250,7 @@ async def admin_rides(
                 "status": st,
                 "available_seats": r.available_seats,
                 "group_id": str(r.group_id) if r.group_id else None,
-            }
+            },
         )
     return out
 
@@ -311,7 +311,7 @@ async def admin_groups(
                 "admin_email": admin_email,
                 "is_active": bool(g.is_active),
                 "created_at": g.created_at.isoformat() if g.created_at else None,
-            }
+            },
         )
     return items
 
@@ -390,7 +390,7 @@ async def admin_outbox_requeue(
             status="PENDING",
             last_error=None,
             processed_at=None,
-        )
+        ),
     )
     await db.commit()
     _audit(current_user, "outbox_requeue", f"event_id={event_id}")

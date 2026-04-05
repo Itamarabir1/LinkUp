@@ -2,28 +2,28 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_current_user, get_current_user_optional
 from app.api.dependencies.group_membership import require_group_member
-from app.db.session import get_db
 from app.core.exceptions.booking import (
     BookingAlreadyExistsError,
     ForbiddenRideActionError,
     PassengerRequestNotFoundError,
     RideNotAvailableError,
 )
-
 from app.core.exceptions.infrastructure import GeocodingError
+from app.db.session import get_db
 from app.domain.bookings.schema import BookingResponse
 from app.domain.bookings.service import BookingService
 from app.domain.passengers.schema import (
     PassengerRequestCreate,
     PassengerRequestResponse,
     PassengerRequestWithMatches,
-    RideSearchRequest,
     RequestRideFromSearch,
+    RideSearchRequest,
     RideSearchResponse,
 )
 from app.domain.passengers.service import PassengerService
@@ -37,11 +37,11 @@ passenger_rides_router = APIRouter(prefix="/rides", tags=["Passenger"])
 
 
 # 0. הבקשות שלי (כנוסע)
-@router.get("/me", response_model=List[PassengerRequestResponse])
+@router.get("/me", response_model=list[PassengerRequestResponse])
 async def get_my_requests(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    request_status: Optional[str] = Query(
+    request_status: str | None = Query(
         None,
         description="סנן לפי סטטוס: pending, approved, cancelled, matched, expired, completed, rejected",
     ),
@@ -67,7 +67,7 @@ async def create_new_request(
     except HTTPException as he:
         raise he
     except Exception as e:
-        logger.error(f"Error in create_new_request: {str(e)}", exc_info=True)
+        logger.error(f"Error in create_new_request: {e!s}", exc_info=True)
         raise HTTPException(status_code=500, detail="שגיאת שרת פנימית ביצירת הבקשה")
 
 
@@ -157,12 +157,12 @@ async def search_available_rides(
     pickup_name: str,
     destination_name: str,
     search_radius: int = Query(1000, ge=100, description="רדיוס חיפוש במטרים (אחיד עם יצירת בקשה)"),
-    departure_time: Optional[datetime] = Query(None, description="אם ריק – יחפש מעכשיו"),
+    departure_time: datetime | None = Query(None, description="אם ריק – יחפש מעכשיו"),
     limit: int = Query(20, ge=1, le=50, description="כמות תוצאות"),
-    after: Optional[UUID] = Query(None, description="cursor: ride_id להמשך"),
-    group_id: Optional[UUID] = Depends(require_group_member),
+    after: UUID | None = Query(None, description="cursor: ride_id להמשך"),
+    group_id: UUID | None = Depends(require_group_member),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user_optional),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
     try:
         search_data = RideSearchRequest(
@@ -180,8 +180,8 @@ async def search_available_rides(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in search_available_rides: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"שגיאה בחיפוש נסיעות: {str(e)}")
+        logger.error(f"Error in search_available_rides: {e!s}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"שגיאה בחיפוש נסיעות: {e!s}")
 
 
 # 4. ביטול בקשה
@@ -203,7 +203,7 @@ async def cancel_request(
 # 5. מציאת התאמות לבקשה קיימת
 @router.get(
     "/{request_id}/matches",
-    response_model=List[RideResponse],
+    response_model=list[RideResponse],
     summary="שליפת התאמות עדכניות לבקשה קיימת",
 )
 async def get_latest_matches(
@@ -214,7 +214,7 @@ async def get_latest_matches(
     return await PassengerService.get_matches_by_request_id(db, request_id, current_user.user_id)
 
 
-@router.get("/all", response_model=List[RideResponse], summary="תצוגת כל הנסיעות (ניהול ובקרה)")
+@router.get("/all", response_model=list[RideResponse], summary="תצוגת כל הנסיעות (ניהול ובקרה)")
 async def get_all_rides_admin(
     filter_status: str = Query(None, description="סנן לפי סטטוס: open, cancelled, completed"),
     db: AsyncSession = Depends(get_db),

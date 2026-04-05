@@ -2,12 +2,13 @@
 import hmac
 import logging
 import secrets
-from app.infrastructure.redis.client import redis_client
-from app.infrastructure.redis.keys import OTP_VERIFICATION_TTL, get_otp_verification_key
+
 from app.core.exceptions.auth import (
     InvalidVerificationCodeError,
     VerificationCodeExpiredError,
 )
+from app.infrastructure.redis.client import redis_client
+from app.infrastructure.redis.keys import OTP_VERIFICATION_TTL, get_otp_verification_key
 
 logger = logging.getLogger(__name__)
 

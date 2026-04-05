@@ -74,6 +74,10 @@ export function useMyBookingsDriver(
   useEffect(() => {
     const onUserEvent = (evt: Event) => {
       const detail = (evt as CustomEvent<{ event?: string; ride_id?: string; status?: string }>).detail;
+      if (detail?.event === 'booking.passenger_join_request') {
+        void fetchDriverBookings();
+        return;
+      }
       if (!detail?.event || !detail.ride_id) return;
       if (detail.event === 'RIDE_FINISHED') {
         setDriverList((prev) =>
@@ -87,7 +91,7 @@ export function useMyBookingsDriver(
     };
     window.addEventListener('linkup:user-event', onUserEvent as EventListener);
     return () => window.removeEventListener('linkup:user-event', onUserEvent as EventListener);
-  }, []);
+  }, [fetchDriverBookings]);
 
   const handleShareStart = useCallback(
     async (rideId: string) => {
