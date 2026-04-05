@@ -1,7 +1,6 @@
 # app/core/exceptions/booking.py
 """שגיאות דומיין הזמנות ונהג/נוסע."""
 
-
 from .base import LinkupError
 
 

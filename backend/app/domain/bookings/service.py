@@ -65,7 +65,11 @@ class BookingService:
             if existing:
                 if existing.status in (BookingStatus.CANCELLED, BookingStatus.REJECTED):
                     new_booking = await crud_booking.reuse_booking_after_rejection_or_cancellation(
-                        db, ride_id, p_req.passenger_id, request_id, num_seats,
+                        db,
+                        ride_id,
+                        p_req.passenger_id,
+                        request_id,
+                        num_seats,
                     )
                 else:
                     raise BookingAlreadyExistsError(ride_id=str(ride_id), request_id=str(request_id))

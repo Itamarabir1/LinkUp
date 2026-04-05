@@ -22,7 +22,10 @@ class StorageService:
         self.client = s3_client
 
     async def generate_avatar_upload_url(
-        self, user_id: UUID | int | str, filename: str | None = None, expiration: int = 300,
+        self,
+        user_id: UUID | int | str,
+        filename: str | None = None,
+        expiration: int = 300,
     ) -> tuple[str, str]:
         """
         יוצר presigned URL להעלאה ישירה ל-S3 staging. תמיד webp.

@@ -1,4 +1,3 @@
-
 from app.core.exceptions.infrastructure import InfrastructureError
 from app.domain.events.enum import DispatchTarget
 from app.domain.events.schema import Event

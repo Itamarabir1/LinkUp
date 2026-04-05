@@ -2,7 +2,6 @@
 זיהוי הודעות סיום שיחה - keywords בעברית.
 """
 
-
 # רשימת keywords שמעידים על סיום שיחה
 COMPLETION_KEYWORDS: list[str] = [
     "תודה",

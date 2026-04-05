@@ -1,4 +1,3 @@
-
 from fastapi import status
 
 from .base import LinkupError
