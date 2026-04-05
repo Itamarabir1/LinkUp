@@ -12,6 +12,8 @@ sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '..'
 from app.core.config import settings
 from app.db.base import Base
 
+import app.db.models  # רישום כל המודלים ב-metadata לפני autogenerate
+
 # --- ייבוא מודלים לרישום ב-Metadata ---
 
 config = context.config

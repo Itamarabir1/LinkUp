@@ -69,6 +69,12 @@ line-length = 150
 [tool.ruff.lint]
 select = ["E", "F"]
 
+[tool.ruff.lint.per-file-ignores]
+"app/api/v1/api_router.py" = ["F401"]
+"app/db/models.py" = ["F401"]
+"app/workers/main_worker.py" = ["F401"]
+"alembic/env.py" = ["F401"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
