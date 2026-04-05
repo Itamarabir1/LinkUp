@@ -21,6 +21,6 @@ export function fetchMyNotifications() {
   return api.get<NotificationItem[]>('/users/me/notifications');
 }
 
-export function patchFcmToken(fcm_token: string) {
+export function patchFcmToken(fcm_token: string | null) {
   return api.patch('/users/fcm-token', { fcm_token });
 }

@@ -95,8 +95,8 @@ class CRUDUser:
             return True
         return False
 
-    async def update_fcm_token(self, db: AsyncSession, *, user: User, token: str) -> User:
-        """עדכון ה-FCM Token של המשתמש"""
+    async def update_fcm_token(self, db: AsyncSession, *, user: User, token: str | None) -> User:
+        """עדכון או ניקוי ה-FCM Token של המשתמש"""
         user.fcm_token = token
         db.add(user)
         await db.commit()

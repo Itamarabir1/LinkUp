@@ -13,7 +13,8 @@ import {
 } from '../api/auth';
 import { clearTokens, setTokens } from '../api/client';
 import { STORAGE_KEYS } from '../config/constants';
-import { fetchCurrentUser } from '../api/users';
+import { fetchCurrentUser, patchFcmToken } from '../api/users';
+import { cleanupFCM, initFCM } from '../services/fcm';
 import type { User } from '../types/api';
 
 type AuthState = {
@@ -86,7 +87,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     fetchCurrentUser()
       .then(({ data }) => {
-        if (mounted) setState({ user: data, isAuthenticated: true, isLoading: false });
+        if (mounted) {
+          setState({ user: data, isAuthenticated: true, isLoading: false });
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            void initFCM();
+          }
+        }
       })
       .catch(() => {
         clearTokens();
@@ -101,6 +107,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await loginWithPassword(email, password);
     setTokens(data.access_token, data.refresh_token);
     setState({ user: data.user, isAuthenticated: true, isLoading: false });
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      void initFCM();
+    }
   }, []);
 
   const register = useCallback(async (payload: RegisterData) => {
@@ -111,14 +120,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await signInWithGoogleToken(idToken);
     setTokens(data.access_token, data.refresh_token);
     setState({ user: data.user, isAuthenticated: true, isLoading: false });
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      void initFCM();
+    }
   }, []);
 
   const logout = useCallback(async () => {
+    // 1. נקה FCM token בשרת בזמן שה-JWT עדיין תקף
+    try {
+      await patchFcmToken(null);
+    } catch {
+      // ignore
+    }
+    cleanupFCM();
+    // 2. בטל סשן
     try {
       await logoutSession();
     } catch {
       // ignore
     }
+    // 3. נקה tokens מקומית
     clearTokens();
     setState({ user: null, isAuthenticated: false, isLoading: false });
   }, []);

@@ -117,7 +117,7 @@ class UserLocationUpdate(BaseModel):
 
 
 class FCMTokenUpdate(BaseModel):
-    fcm_token: str = Field(..., min_length=10)
+    fcm_token: str | None = Field(None)
 
 
 # --- תגובות גנריות ---

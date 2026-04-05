@@ -53,12 +53,6 @@ export function useLayoutShell() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      void initFCM();
-    }
-  }, []);
-
   const handleLogout = async () => {
     setProfileOpen(false);
     await logout();

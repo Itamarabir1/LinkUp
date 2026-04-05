@@ -148,7 +148,7 @@ class UserService:
         await db.refresh(db_user)
         return db_user
 
-    async def update_fcm_token(self, db: AsyncSession, user_id: int, fcm_token: str) -> bool:
+    async def update_fcm_token(self, db: AsyncSession, user_id: int, fcm_token: str | None) -> bool:
         db_user = await self.get_user_by_id(db, user_id=user_id)
         await self.crud.update_fcm_token(db, user=db_user, token=fcm_token)
         return True

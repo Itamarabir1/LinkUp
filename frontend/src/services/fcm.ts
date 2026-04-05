@@ -9,6 +9,13 @@ import { triggerNotificationToast } from '../components/NotificationToast/notifi
 
 let foregroundUnsubscribe: (() => void) | null = null;
 
+export function cleanupFCM(): void {
+  if (foregroundUnsubscribe) {
+    foregroundUnsubscribe();
+    foregroundUnsubscribe = null;
+  }
+}
+
 function showForegroundNotification(payload: MessagePayload): void {
   // Backend sends data-only FCM (title/body in `data` map). SDK may leave `notification` empty.
   const d = payload.data;
