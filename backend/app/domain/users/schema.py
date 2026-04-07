@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, fie
 from app.core.config import settings
 from app.core.exceptions.auth import PasswordTooWeakError
 from app.core.exceptions.validation import InvalidEmailError, InvalidPhoneError
+from app.infrastructure.s3.service import storage_service
 from app.core.utils.validators import (
     normalize_email_for_auth,
     validate_password_strength,
@@ -56,13 +57,18 @@ class UserBaseSchema(BaseModel):
 
 # --- קריאה (Response) ---
 def _avatar_url_from_key(avatar_key: str | None, filename: str) -> str | None:
-    """בונה URL מלא ל-S3. אם avatar_key הוא staging (avatars/staging/...) — מחזיר את ה-key כקובץ יחיד."""
+    """בונה presigned read URL ל-S3 (GET)."""
     if not avatar_key or not settings.S3_BUCKET_NAME:
         return None
-    base = f"https://{settings.S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/"
     if avatar_key.startswith("avatars/staging/"):
-        return f"{base}{avatar_key}"
-    return f"{base}{avatar_key}{filename}"
+        key = avatar_key
+    else:
+        key = f"{avatar_key}{filename}"
+    try:
+        return storage_service.generate_read_url(key)
+    except Exception:
+        # Best-effort: לא מפילים response בגלל בעיית חתימה רגעית.
+        return None
 
 
 class UserRead(BaseModel):
@@ -71,6 +77,7 @@ class UserRead(BaseModel):
     phone_number: str
     email: EmailStr | None = None
     avatar_key: str | None = None
+    avatar_status: str = "none"
     is_verified: bool = False
     is_admin: bool = False
 

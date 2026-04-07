@@ -145,7 +145,7 @@
 
 ## 5. Real-time נוסף (לא צ’אט)
 
-- **עדכוני נסיעה**: WS ב-FastAPI + Redis Pub/Sub; **מקור אמת לשמות ערוצים** — `app/infrastructure/redis/keys.py` (`get_ride_channel` וכו'). **נקודת כניסה אחת לשידור** — `publish_ride_event` ב-`app/domain/rides/broadcast.py` (אירועים כמו `RIDE_STARTED` / `RIDE_ENDED` / `RIDE_CANCELLED`). חיבור ל-`/rides/ws/{ride_id}` דורש `?token=JWT` (כמו שאר ה-WS ב-backend).
+- **עדכוני נסיעה**: WS ב-FastAPI + Redis Pub/Sub; **מקור אמת לשמות ערוצים** — `app/infrastructure/redis/keys.py` (`get_ride_channel` וכו'). **נקודת כניסה אחת לשידור אירועי נסיעה** — `publish_ride_event` ב־[`app/infrastructure/redis/publisher.py`](../backend/app/infrastructure/redis/publisher.py) (אירועים כמו `RIDE_STARTED` / `RIDE_ENDED` / `RIDE_CANCELLED`). חיבור ל-`/rides/ws/{ride_id}` דורש `?token=JWT` (כמו שאר ה-WS ב-backend).
 - **מיקום נהג / נוסעים**: ערוצים נפרדים (`booking_*`, `ride_*:passenger_locations`) + WS ייעודיים — הפרדת עומס ולוגיקה.
 - **פרונט (WS)**: **`useRideWebSocket`** — hook גנרי עם reconnect; **`useDriverLocation`** / **`usePassengerLocations`** — reconnect אוטומטי אחרי ניתוק; **`MyRides.tsx`** — מאזינים לערוץ נסיעה עם אותו חוזה JSON. כשנהג לוחץ **התחל נסיעה**, הנוסע רואה מיד את אפשרות **שתף מיקום** (רענון רשימה דרך אירועי סטטוס).
 - **אימות JSON (Zod)**: סכימות מרוכזות ב-**`frontend/src/types/wsEvents.ts`** — `RideEventSchema`, `DriverLocationEventSchema`, `PassengerLocationEventSchema`, **`ChatPresenceEventSchema`** (discriminated union: `user_online` / `user_offline` / `typing_*` / `unread_count`). ב-`onmessage` משתמשים ב-**`safeParse`**; פריימים לא צפויים → `console.warn` ודילוג (בלי לשבור את הלולאה). שימוש ב-**`useRideWebSocket`**, **`useDriverLocation`**, **`usePassengerLocations`**, **`MyRides`**, **`processChatWebSocketMessage`**.
@@ -255,7 +255,7 @@
 ### FCM + מייל (איפה בקוד)
 
 - **FCM (Backend)**: `app/domain/notifications/channels/push/client.py` — `messaging.Message` עם **`data` בלבד** (ללא `notification`), כולל `title` ו־`body` כמחרוזות + שדות metadata נוספים; `push_provider` שולח רק אם יש `fcm_token`; טיפול בטוקן לא תקף.
-- **FCM (Frontend)**: `frontend/src/services/fcm.ts` — הרשאות, רישום SW, `getToken` + `PATCH /users/fcm-token`; בחזית `onMessage` → קריאת `title`/`body` מ־**`payload.data`** (גיבוי ל־`notification`) → **Toast קופץ** + צליל; `firebase-messaging-sw.js` — **`push`** → `showNotification` כשהטאב ברקע. פירוט מלא: **`docs/FCM_SYSTEM_SUMMARY.md`**.
+- **FCM (Frontend)**: `frontend/src/services/fcm.ts` — הרשאות, רישום SW, `getToken` + `PATCH /users/fcm-token`; **`cleanupFCM()`** מבטל `onMessage`. **AuthContext** — `initFCM()` אחרי login / Google / hydrate אם הרשאה `granted`; ב־logout: `patchFcmToken(null)` (בזמן JWT תקף) → `cleanupFCM()` → `logoutSession` → `clearTokens`. Toast גלובלי ב־**`App.tsx`** (`NotificationToast`). תפריט פרופיל: הפעלת התראות דרך **`useLayoutShell`**. בחזית `onMessage` → `title`/`body` מ־**`payload.data`** → Toast + צליל; `firebase-messaging-sw.js` — **`push`** → `showNotification` ברקע. פירוט: **`docs/FCM_SYSTEM_SUMMARY.md`**.
 - **מייל**: **Brevo** דרך `EmailClient` / `email_provider` — אימות מייל, איפוס סיסמה, התראות עסקיות דרך ה-notification pipeline.
 
 ---

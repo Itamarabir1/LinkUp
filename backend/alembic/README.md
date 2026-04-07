@@ -1,6 +1,6 @@
 # Alembic – Linkup Backend
 
-מיגרציה אחת. הסכמה המלאה (users, rides, passenger_requests, bookings, groups, group_members, וכו') מוגדרת בקובץ יחיד.
+מיגרציות מרוכזות תחת `versions/`. **`env.py`** מייבא `app.db.models` אחרי `Base` כדי ש־`target_metadata` יכלול את כל מודלי הדומיין ל־**`revision --autogenerate`**.
 
 ## הרצה
 

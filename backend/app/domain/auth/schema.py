@@ -16,6 +16,7 @@ from app.core.utils.validators import (
     validate_password_strength,
     validate_phone_number,
 )
+from app.infrastructure.s3.service import storage_service
 
 # --- Request Schemas (DTOs) ---
 
@@ -150,7 +151,10 @@ class ChangePasswordRequest(BaseModel):
 def _avatar_url_medium_from_key(avatar_key: str | None) -> str | None:
     if not avatar_key or not settings.S3_BUCKET_NAME:
         return None
-    return f"https://{settings.S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/{avatar_key}400x400.webp"
+    try:
+        return storage_service.generate_read_url(f"{avatar_key}400x400.webp")
+    except Exception:
+        return None
 
 
 class UserOut(BaseModel):

@@ -27,9 +27,10 @@ FCM delivery has two connected paths:
 
 ### 2.1 Initialization trigger
 
-- `initFCM()` runs when the user has **granted** notification permission, from:
-  - [`frontend/src/components/Layout/index.tsx`](frontend/src/components/Layout/index.tsx) — on mount if `Notification.permission === 'granted'`, and from the profile menu action “הפעל התראות”.
-- [`frontend/src/pages/FCMCheck.tsx`](frontend/src/pages/FCMCheck.tsx) can call `initFCM()` manually for debugging.
+- **`AuthContext`** ([`frontend/src/context/AuthContext.tsx`](frontend/src/context/AuthContext.tsx)): after successful **password login**, **Google sign-in**, or **initial session hydrate** (`fetchCurrentUser`), if `Notification.permission === 'granted'`, the app calls `void initFCM()` so the backend receives a fresh token for the logged-in user.
+- **Logout order:** `PATCH /users/fcm-token` with `{ "fcm_token": null }` (while the access token is still valid), then **`cleanupFCM()`** (unsubscribes foreground `onMessage`), then server `logout` / local token clear — so push is not sent to a stale device registration after sign-out.
+- **Profile menu:** “הפעל התראות” / enable notifications — [`useLayoutShell.ts`](frontend/src/components/Layout/useLayoutShell.ts) calls `initFCM()` on user action (permission prompt + registration).
+- **Debug:** [`frontend/src/pages/FCMCheck.tsx`](frontend/src/pages/FCMCheck.tsx) can call `initFCM()` manually.
 
 ### 2.2 What `initFCM()` does
 
@@ -42,7 +43,7 @@ FCM delivery has two connected paths:
   5. Get messaging instance (`getMessagingSafe()` from [`frontend/src/config/firebase.ts`](frontend/src/config/firebase.ts)).
   6. Register **foreground** listener `onMessage` once (module-level guard).
   7. `getToken` with VAPID key and the same SW registration.
-  8. `PATCH /users/fcm-token` with `{ "fcm_token": "<token>" }`.
+  8. `PATCH /users/fcm-token` with `{ "fcm_token": "<token>" }` (or `{ "fcm_token": null }` on logout to clear `users.fcm_token` in the DB).
 
 ### 2.3 Foreground vs background
 
@@ -60,8 +61,8 @@ FCM delivery has two connected paths:
 
 ### 2.4 In-app toast shell
 
-- Component: [`frontend/src/components/NotificationToast/NotificationToast.tsx`](frontend/src/components/NotificationToast/NotificationToast.tsx) + CSS module.
-- Exported `triggerNotificationToast({ title, body })` sets global toast state; auto-dismiss ~5s and manual close.
+- Component: [`frontend/src/components/NotificationToast/NotificationToast.tsx`](frontend/src/components/NotificationToast/NotificationToast.tsx) + CSS module; **mounted once in** [`App.tsx`](frontend/src/App.tsx) (not inside `Layout` / `AdminLayout`).
+- Exported `triggerNotificationToast({ title, body })` from [`notificationToast.utils.ts`](frontend/src/components/NotificationToast/notificationToast.utils.ts) sets global toast state; auto-dismiss ~5s and manual close.
 
 ### 2.5 Firebase config (Vite env)
 
@@ -78,8 +79,9 @@ FCM delivery has two connected paths:
 
 ### 3.1 Token API
 
-- Route: [`backend/app/api/v1/routers/users.py`](backend/app/api/v1/routers/users.py) — `PATCH /users/fcm-token`
-- Persistence: `update_fcm_token` in users service/CRUD; column `users.fcm_token`.
+- Route: [`backend/app/domain/users/router.py`](../backend/app/domain/users/router.py) — `PATCH /users/fcm-token` (mounted under `/api/v1/users` via [`api_router.py`](../backend/app/api/v1/api_router.py)).
+- Body: `FCMTokenUpdate` — `fcm_token` may be a string or **`null`** to clear the stored token (logout / device change).
+- Persistence: `update_fcm_token` in users service/CRUD; column `users.fcm_token` (nullable).
 
 ### 3.2 Outbox → worker → push
 
@@ -144,13 +146,14 @@ messaging.Message(
 
 | Area | Files |
 |------|--------|
-| Frontend FCM | `frontend/src/services/fcm.ts`, `frontend/src/config/firebase.ts`, `frontend/public/firebase-messaging-sw.js` |
-| Toast UI | `frontend/src/components/NotificationToast/NotificationToast.tsx`, `NotificationToast.module.css` |
-| Init / shell | `frontend/src/components/Layout/index.tsx` |
+| Frontend FCM | `frontend/src/services/fcm.ts` (`initFCM`, **`cleanupFCM`**), `frontend/src/config/firebase.ts`, `frontend/public/firebase-messaging-sw.js` |
+| Toast UI | `NotificationToast.tsx`, `.module.css`, **`App.tsx`** (mount), `notificationToast.utils.ts` |
+| Auth + token lifecycle | `frontend/src/context/AuthContext.tsx`, `frontend/src/api/users.ts` (`patchFcmToken`) |
+| Profile “enable notifications” | `frontend/src/components/Layout/useLayoutShell.ts` |
 | Debug | `frontend/src/pages/FCMCheck.tsx`, `frontend/src/utils/notificationSound.ts` |
 | Backend push | `backend/app/domain/notifications/channels/push/client.py`, `render.py`, `push_provider.py` |
 | Firebase admin | `backend/app/infrastructure/firebase_core/firebase.py` |
-| User token | `backend/app/api/v1/routers/users.py`, users domain service/crud/model |
+| User token API | `backend/app/domain/users/router.py`, schema `FCMTokenUpdate`, service/crud/model |
 
 ## 7) Quick Validation Checklist
 

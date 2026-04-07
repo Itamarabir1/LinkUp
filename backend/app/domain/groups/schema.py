@@ -6,14 +6,17 @@ from pydantic import BaseModel, ConfigDict, computed_field
 from sqlalchemy import inspect as sa_inspect
 
 from app.core.config import settings
+from app.infrastructure.s3.service import storage_service
 
 
 def _group_avatar_url(avatar_key: str | None) -> str | None:
-    """בונה URL מלא לתמונת קבוצה מ-S3."""
+    """בונה presigned read URL לתמונת קבוצה מ-S3."""
     if not avatar_key or not settings.S3_BUCKET_NAME:
         return None
-    base = f"https://{settings.S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/"
-    return f"{base}{avatar_key}"
+    try:
+        return storage_service.generate_read_url(avatar_key)
+    except Exception:
+        return None
 
 
 class GroupCreate(BaseModel):

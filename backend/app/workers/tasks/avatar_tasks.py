@@ -66,6 +66,8 @@ async def _handle_avatar_upload(data: dict[str, Any]) -> None:
                 storage_service=storage_service,
             )
             user.avatar_key = avatar_key
+            user.avatar_staging_key = None
+            user.avatar_status = "ready"
             db.add(user)
 
             await db.commit()
@@ -74,6 +76,14 @@ async def _handle_avatar_upload(data: dict[str, Any]) -> None:
 
         except Exception as e:
             await db.rollback()
+            try:
+                user = await crud_user.get_by_id(db, id=user_id)
+                if user:
+                    user.avatar_status = "failed"
+                    db.add(user)
+                    await db.commit()
+            except Exception:
+                await db.rollback()
             logger.exception("Avatar upload processing failed: user_id=%s", user_id)
             raise WorkerTaskFailed() from e
 

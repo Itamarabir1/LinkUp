@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { confirmAvatar, deleteMyAvatar, getAvatarUploadUrl } from '../api/users';
+import { confirmAvatar, deleteMyAvatar, fetchCurrentUser, getAvatarUploadUrl } from '../api/users';
 import { compressImage } from '../utils/imageUtils';
 import { getApiErrorMessage } from '../utils/apiError';
 
@@ -10,14 +10,29 @@ export const MAX_SIZE_MB = 5;
 export function useProfile() {
   const { user, logout, refreshUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const prevAvatarUrlRef = useRef<string | null | undefined>(null);
-  const avatarCacheBusterRef = useRef<number>(0);
   const [uploading, setUploading] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarExpanded, setAvatarExpanded] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
+
+  const waitForAvatarReady = async () => {
+    // Poll short-term while worker finalizes staging -> final variants.
+    for (let i = 0; i < 12; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      try {
+        const { data } = await fetchCurrentUser();
+        if (data.avatar_status === 'ready' && data.avatar_url_medium) {
+          await refreshUser();
+          return true;
+        }
+      } catch {
+        // Ignore transient read errors while polling.
+      }
+    }
+    return false;
+  };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -48,8 +63,11 @@ export function useProfile() {
       });
       await confirmAvatar(uploadData.staging_key);
       await refreshUser();
-      URL.revokeObjectURL(newPreviewUrl);
-      setAvatarPreview(null);
+      const ready = await waitForAvatarReady();
+      if (ready) {
+        URL.revokeObjectURL(newPreviewUrl);
+        setAvatarPreview(null);
+      }
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'העלאת תמונה נכשלה'));
     } finally {
@@ -82,17 +100,10 @@ export function useProfile() {
   const hasValidAvatar = (profileAvatarUrl || avatarPreview) && !avatarLoadError;
   const avatarSrc = avatarPreview
     ? avatarPreview
-    : profileAvatarUrl
-      ? `${encodeURI(profileAvatarUrl)}${profileAvatarUrl.includes('?') ? '&' : '?'}_v=${avatarCacheBusterRef.current}`
-      : '';
+    : profileAvatarUrl ?? '';
 
   useEffect(() => {
-    const currentUrl = profileAvatarUrl ?? null;
-    if (prevAvatarUrlRef.current !== currentUrl) {
-      prevAvatarUrlRef.current = currentUrl;
-      avatarCacheBusterRef.current = Date.now();
-      setAvatarLoadError(false);
-    }
+    setAvatarLoadError(false);
   }, [profileAvatarUrl]);
 
   return {

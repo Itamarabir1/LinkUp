@@ -33,6 +33,8 @@ class User(Base):
 
     # פרופיל — מפתח S3 בלבד (prefix תיקייה), למשל avatars/{user_id}/. URLs מלאים נבנים ב-runtime.
     avatar_key = Column(String(255), nullable=True)
+    avatar_staging_key = Column(String(255), nullable=True)
+    avatar_status = Column(String(20), nullable=False, server_default="none", default="none")
     fcm_token = Column(Text, nullable=True)
     # Refresh Token (ארוך תוקף) – נשמר ב-DB כדי לאפשר ביטול (logout מכל המכשירים)
     refresh_token = Column(Text, nullable=True)

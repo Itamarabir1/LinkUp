@@ -159,6 +159,8 @@ alembic downgrade -1
 alembic revision --autogenerate -m "description"
 ```
 
+**Autogenerate ו-metadata:** ב־[`alembic/env.py`](../../backend/alembic/env.py) מיובא `app.db.models` אחרי `Base` כדי שכל טבלאות הדומיין יירשמו ב־`target_metadata` לפני השוואת סכמה. ב־API, אותו רישום מתחיל ב־[`app/api/v1/api_router.py`](../../backend/app/api/v1/api_router.py) (שורה ראשונה של ייבוא אפליקטיבי). Ruff: `per-file-ignores` ל־F401 על קבצי side-effect — [`backend/pyproject.toml`](../../backend/pyproject.toml).
+
 ---
 
 ## Project Structure
@@ -194,7 +196,8 @@ Linkup/
 
 - פרונט: משתני `VITE_FIREBASE_*` + `VITE_FIREBASE_VAPID_KEY` ב־`frontend/.env` (ראה `frontend/.env.example`).
 - בקאנד: `FIREBASE_CREDENTIALS_JSON` או `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env`.
-- זרימה מלאה (FCM מהשרת: `data` בלבד; Service Worker; Toast + צליל בחזית): **`docs/FCM_SYSTEM_SUMMARY.md`**.
+- מחזור חיים (Web): רישום טוקן אחרי התחברות / טעינת סשן אם הרשאת דפדפן `granted`; ניקוי `fcm_token` בשרת + `cleanupFCM` ב־logout — פירוט ב־**`docs/FCM_SYSTEM_SUMMARY.md`** (סעיף Initialization).
+- זרימה מלאה (FCM מהשרת: `data` בלבד; Service Worker; Toast ב־`App.tsx` + צליל בחזית): **`docs/FCM_SYSTEM_SUMMARY.md`**.
 
 ---
 

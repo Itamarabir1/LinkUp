@@ -7,6 +7,7 @@ export interface User {
   is_admin?: boolean;
   is_verified?: boolean;
   avatar_key?: string | null;
+  avatar_status?: 'none' | 'processing' | 'ready' | 'failed' | string;
   avatar_url?: string | null;
   avatar_url_small?: string | null;
   avatar_url_medium?: string | null;

@@ -123,11 +123,13 @@ Authorization: Bearer <access_token>
 |--------|------|------|--------|
 | GET | /me | כן | הפרופיל שלי (UserRead). |
 | GET | /me/notifications | כן | כל ההתראות שלי (כנהג/נוסע). |
-| PATCH | /fcm-token | כן | body: FCMTokenUpdate. עדכון FCM לפוש. |
+| PATCH | /fcm-token | כן | body: `FCMTokenUpdate` — `fcm_token` מחרוזת (רישום) או **`null`** (ניקוי ב-DB, למשל logout). |
 | GET | /me/avatar/upload-url | כן | query: filename?. מחזיר presigned URL + staging_key. |
 | POST | /me/avatar/confirm | כן | body: AvatarUploadConfirmRequest (staging_key). 202 — עיבוד ברקע. |
 | DELETE | /me/avatar | כן | הסרת תמונת פרופיל (202). |
 | PUT | /me | כן | body: UserUpdate. עדכון פרופיל. |
+
+הערת גישה לקבצים: `avatar_url*` בתגובות משתמש/קבוצה הם **presigned read URLs** קצרי-תוקף (GET), ולא URL ציבורי קבוע של S3.
 
 ---
 

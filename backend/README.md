@@ -32,7 +32,7 @@ Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 ## Tests & CI (quality)
 
 - **pytest:** מתוך `backend/` — `uv run pytest tests/ -v`. טסטי אינטגרציה עם DB דורשים **PostgreSQL + PostGIS** וסכמה מעודכנת (**`alembic upgrade head`** על אותו DB). ב־`tests/conftest.py` מקור ה-DSN: **`DATABASE_URL`** (עדיפות), או **`TEST_DATABASE_URL`** (תאימות לאחור), או ברירת מחדל ל-docker-compose המקומי.
-- **GitHub Actions** (`.github/workflows/backend-ci.yml`): שירות Postgres, **`DATABASE_URL` ברמת ה-job** (מיפוי אחיד ל־**Alembic** ול־**pytest**), שלב **`uv run alembic upgrade head`** לפני **`uv run pytest`**, ואז **Ruff** — `ruff check app/` ו־`ruff format --check app/` (אורך שורה 150 ב־`pyproject.toml`).
+- **GitHub Actions** (`.github/workflows/backend-ci.yml`): שירות Postgres, **`DATABASE_URL` ברמת ה-job** (מיפוי אחיד ל־**Alembic** ול־**pytest**), שלב **`uv run alembic upgrade head`** לפני **`uv run pytest`**, ואז **Ruff** — `ruff check app/` ו־`ruff format --check app/` (אורך שורה 150 ב־`pyproject.toml`). קבצים תחת `alembic/` נכללים ב־autogenerate דרך `env.py` (ייבוא `app.db.models`); אם CI ירחיב ל־`ruff check alembic/`, ה־`per-file-ignores` ל־`alembic/env.py` מכסה F401 על ייבוא registry.
 - **Settings:** משתני סביבה **`DATABASE_URL`** / **`REDIS_URL`** נקראים ל־`DATABASE_URL_RAW` / `REDIS_URL_RAW` דרך **`validation_alias=AliasChoices(...)`** ב־`app/core/config.py` (pydantic-settings) — כך Alembic (`settings.DATABASE_URL`) והריצה ב-CI מסתנכרנים.
 
 **Error responses (JSON, `error_code`, `trace_id`, handlers):** [`docs/ERRORS.md`](../docs/ERRORS.md).
@@ -53,6 +53,14 @@ Endpoints for operators only: FastAPI dependency **`get_current_admin_user`** (`
 - **Bookings are async-only** now (no `db.run_sync`): lock-critical paths use `select(...).with_for_update()` directly on `AsyncSession` to prevent races while keeping the call chain fully async.
 - **Workers:** notification handlers (e.g. `notification_tasks.py` — ride created, booking approved, **ride cancelled**) query with `await db.execute(select(...))`; `find_passengers_for_ride_notification` is async. No `db.run_sync` in application code (Alembic `env.py` still uses `connection.run_sync` for migrations).
 - Result: lower event-loop blocking risk, cleaner async call chains, and safer concurrency in booking/ride state transitions.
+
+## SQLAlchemy model registry (imports)
+
+- **[`app/api/v1/api_router.py`](app/api/v1/api_router.py)** begins with `import app.db.models` so every domain router loads after all ORM models are registered on `Base.metadata` (avoids string-relationship resolution errors and import-order surprises).
+- **[`alembic/env.py`](alembic/env.py)** imports `app.db.models` after `Base` so **`target_metadata`** includes all tables for **`alembic revision --autogenerate`**.
+- **`main.py`** may still import `app.db.models` before `api_router` for clarity; duplicate import is harmless.
+
+**Ruff:** side-effect imports are allowed via **`[tool.ruff.lint.per-file-ignores]`** for **`F401`** on `api_router.py`, `app/db/models.py`, `alembic/env.py`, and `app/workers/main_worker.py` — see [`pyproject.toml`](pyproject.toml).
 
 ## Migrations
 

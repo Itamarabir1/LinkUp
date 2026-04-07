@@ -9,7 +9,9 @@ PUT מ-origin של הפרונט (למשל http://localhost:5173 בפיתוח). �
 import logging
 from urllib.parse import quote
 
+import boto3
 from aioboto3 import Session
+from botocore.config import Config
 
 from app.core.config import settings
 from app.core.exceptions.infrastructure import (
@@ -135,6 +137,28 @@ class S3Client:
         except Exception as e:
             logger.error("Failed to generate presigned URL for key=%s: %s", key, e, exc_info=True)
             raise S3UploadFailed() from e
+
+    def generate_presigned_read_url(self, key: str, expiration: int = 900) -> str:
+        """
+        יוצר presigned URL לקריאה (GET) מ-S3.
+        מתאים גם לשימוש ממקומות סינכרוניים (כמו computed fields בסכמות).
+        """
+        try:
+            s3 = boto3.client(
+                "s3",
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                region_name=settings.AWS_REGION,
+                config=Config(signature_version="s3v4"),
+            )
+            return s3.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.bucket_name, "Key": key},
+                ExpiresIn=expiration,
+            )
+        except Exception as e:
+            logger.error("Failed to generate presigned read URL for key=%s: %s", key, e, exc_info=True)
+            raise ExternalServiceError() from e
 
 
 s3_client = S3Client()

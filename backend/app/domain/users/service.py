@@ -62,8 +62,16 @@ class UserService:
             )
             raise PermissionDeniedError(message="מפתח העלאה לא תואם למשתמש המחובר")
 
-        # עדכון מיידי ב-DB (אופטימי — הפרונט יכול להציג תמונה מ-staging עד שה-worker יסיים)
-        await self.crud.update(db, db_obj=user, obj_in={"avatar_key": staging_key})
+        # לא מחליפים avatar_key ל-staging כדי למנוע "appears then disappears" כשה-worker מוחק staging.
+        # במקום זאת שומרים staging בנפרד ומסמנים processing עד finalize מוצלח.
+        await self.crud.update(
+            db,
+            db_obj=user,
+            obj_in={
+                "avatar_staging_key": staging_key,
+                "avatar_status": "processing",
+            },
+        )
 
         await publish_to_outbox(
             db,
@@ -72,7 +80,7 @@ class UserService:
         )
         await db.commit()
         logger.info(
-            "Avatar upload confirmed for user %s (staging_key=%s)",
+            "Avatar upload confirmed for user %s (staging_key=%s, status=processing)",
             user.user_id,
             staging_key,
         )
@@ -94,7 +102,15 @@ class UserService:
         except S3DeleteFailed as e:
             logger.warning("Could not delete avatar folder for user %s: %s", user_id, e.message)
 
-        await self.crud.update(db, db_obj=user, obj_in={"avatar_key": None})
+        await self.crud.update(
+            db,
+            db_obj=user,
+            obj_in={
+                "avatar_key": None,
+                "avatar_staging_key": None,
+                "avatar_status": "none",
+            },
+        )
         await db.commit()
         logger.info("Avatar removed for user %s", user_id)
 

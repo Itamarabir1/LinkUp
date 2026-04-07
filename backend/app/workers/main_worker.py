@@ -4,8 +4,10 @@ import signal
 import sys
 
 # רישום כל המודלים לפני שימוש ב-ORM (מניעת "expression 'Group' failed to locate a name")
+import app.db.models  # noqa: F401
 
 # Firebase Admin SDK init (side-effect import; safe idempotent)
+import app.infrastructure.firebase_core.firebase  # noqa: F401
 from app.core.logging import setup_logging
 from app.domain.events.routing import (
     AVATAR_UPLOAD_EXCHANGES,

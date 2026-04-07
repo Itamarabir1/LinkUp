@@ -75,6 +75,10 @@ class StorageService:
         logger.info("Generated presigned URL for group image: key=%s", key)
         return presigned_url, key
 
+    def generate_read_url(self, key: str, expiration: int = 900) -> str:
+        """יוצר presigned URL לקריאה (GET) לאובייקט S3."""
+        return self.client.generate_presigned_read_url(key=key, expiration=expiration)
+
     async def delete_group_image_folder(self, group_id: UUID | str) -> None:
         """מוחק את כל תוכן התיקייה GROUPS/<group_id>/."""
         gid_str = str(group_id)
