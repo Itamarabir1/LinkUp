@@ -32,7 +32,7 @@ Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 ## Tests & CI (quality)
 
 - **pytest:** מתוך `backend/` — `uv run pytest tests/ -v`. טסטי אינטגרציה עם DB דורשים **PostgreSQL + PostGIS** וסכמה מעודכנת (**`alembic upgrade head`** על אותו DB). ב־`tests/conftest.py` מקור ה-DSN: **`DATABASE_URL`** (עדיפות), או **`TEST_DATABASE_URL`** (תאימות לאחור), או ברירת מחדל ל-docker-compose המקומי.
-- **GitHub Actions** (`.github/workflows/backend-ci.yml`): שירות Postgres, **`DATABASE_URL` ברמת ה-job** (מיפוי אחיד ל־**Alembic** ול־**pytest**), שלב **`uv run alembic upgrade head`** לפני **`uv run pytest`**, ואז **Ruff** — `ruff check app/` ו־`ruff format --check app/` (אורך שורה 150 ב־`pyproject.toml`). קבצים תחת `alembic/` נכללים ב־autogenerate דרך `env.py` (ייבוא `app.db.models`); אם CI ירחיב ל־`ruff check alembic/`, ה־`per-file-ignores` ל־`alembic/env.py` מכסה F401 על ייבוא registry.
+- **GitHub Actions** (`.github/workflows/backend-ci.yml`): שירות Postgres, **`DATABASE_URL` ברמת ה-job** (מיפוי אחיד ל־**Alembic** ול־**pytest**), שלבי איכות בסדר בפועל: **Ruff check** → **Ruff format --check** → **`uv run alembic upgrade head`** → **`uv run pytest`**. קבצים תחת `alembic/` נכללים ב־autogenerate דרך `env.py` (ייבוא `app.db.models`); אם CI ירחיב ל־`ruff check alembic/`, ה־`per-file-ignores` ל־`alembic/env.py` מכסה F401 על ייבוא registry.
 - **Settings:** משתני סביבה **`DATABASE_URL`** / **`REDIS_URL`** נקראים ל־`DATABASE_URL_RAW` / `REDIS_URL_RAW` דרך **`validation_alias=AliasChoices(...)`** ב־`app/core/config.py` (pydantic-settings) — כך Alembic (`settings.DATABASE_URL`) והריצה ב-CI מסתנכרנים.
 
 **Error responses (JSON, `error_code`, `trace_id`, handlers):** [`docs/ERRORS.md`](../docs/ERRORS.md).
@@ -56,7 +56,7 @@ Endpoints for operators only: FastAPI dependency **`get_current_admin_user`** (`
 
 ## SQLAlchemy model registry (imports)
 
-- **[`app/api/v1/api_router.py`](app/api/v1/api_router.py)** begins with `import app.db.models` so every domain router loads after all ORM models are registered on `Base.metadata` (avoids string-relationship resolution errors and import-order surprises).
+- **[`app/api/v1/api_router.py`](app/api/v1/api_router.py)** begins with `import app.db.models` so domain routers load after required ORM models are registered on `Base.metadata` (avoids string-relationship resolution errors and import-order surprises). This registry is intentionally focused on API/domain relationship loading and is not a claim that every ORM class in the repository is re-exported there.
 - **[`alembic/env.py`](alembic/env.py)** imports `app.db.models` after `Base` so **`target_metadata`** includes all tables for **`alembic revision --autogenerate`**.
 - **`main.py`** may still import `app.db.models` before `api_router` for clarity; duplicate import is harmless.
 
@@ -114,6 +114,13 @@ k6 run k6/scripts/load_test_auth.js
 **Summary output:** `handleSummary` prints to the console (no JSON file on disk). See `k6/README.md` and **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 
 **Pinned dependency:** `phonenumbers==8.13.48` in `pyproject.toml` / `uv.lock` — stable IL validation used by the API (see `app/core/utils/validators.py`).
+
+## Media (S3, CloudFront, avatars)
+
+- **Uploads:** clients use **presigned PUT** to S3 (see API routes for user avatar and group image); the API does not stream file bytes.
+- **Public URLs:** when **`CLOUDFRONT_DOMAIN`** is set in `backend/.env` (see `app/core/config.py`), the storage layer builds **`https://{CLOUDFRONT_DOMAIN}/{key}`** for reads; otherwise **presigned GET** to S3 (`app/infrastructure/s3/service.py`).
+- **Avatar pipeline:** staging key → RabbitMQ **`avatar_upload_queue`** → worker resizes to WebP and writes under a **new versioned prefix** `avatars/{user_id}/v{version}/` (`app/infrastructure/s3/image_processor.py`, `app/workers/tasks/avatar_tasks.py`). The DB stores that prefix in **`users.avatar_key`**. The previous version’s prefix is deleted **only after** a successful DB commit; failed commits trigger best-effort cleanup of the new prefix. **Remove-avatar** still deletes the whole `avatars/{user_id}/` tree in S3.
+- **CORS:** browser uploads — `docs/S3_CORS.md`. **Schema / field notes:** `docs/architecture/DATABASE.md` (`users.avatar_key`).
 
 ## Geo caching updates
 

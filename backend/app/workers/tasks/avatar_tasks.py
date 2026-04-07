@@ -34,9 +34,41 @@ async def handle_avatar_upload_event(data: dict[str, Any], routing_key: str) -> 
         logger.warning("Ignoring non-avatar event: %s", routing_key)
 
 
+def _should_delete_previous_avatar_prefix(old_key: str | None, new_key: str) -> bool:
+    if not old_key or old_key == new_key:
+        return False
+    if old_key.startswith("avatars/staging/"):
+        return False
+    return old_key.startswith("avatars/")
+
+
+async def _delete_previous_avatar_prefix_best_effort(old_key: str | None, new_key: str) -> None:
+    if not _should_delete_previous_avatar_prefix(old_key, new_key):
+        return
+    try:
+        await storage_service.delete_avatar_prefix(old_key)
+    except Exception:
+        logger.warning(
+            "Best-effort delete of previous avatar prefix failed: old=%s",
+            old_key,
+            exc_info=True,
+        )
+
+
+async def _cleanup_orphan_prefix_best_effort(prefix: str) -> None:
+    try:
+        await storage_service.delete_avatar_prefix(prefix)
+    except Exception:
+        logger.warning(
+            "Failed to cleanup orphan avatar prefix after DB error: %s",
+            prefix,
+            exc_info=True,
+        )
+
+
 async def _handle_avatar_upload(data: dict[str, Any]) -> None:
     """
-    מעבד אירוע העלאת אווטאר: הורדה מ-staging, resize ל-3 גדלים, העלאה ל-avatars/{user_id}/, עדכון avatar_key.
+    העלאה: העלאה ל-prefix גרסתי חדש → commit ב-DB → מחיקת גרסה קודמת (best-effort).
     payload: { "user_id": str/uuid, "staging_key": str }
     """
     user_id = data.get("user_id")
@@ -52,6 +84,9 @@ async def _handle_avatar_upload(data: dict[str, Any]) -> None:
     user_id = UUID(str(user_id))
     uid_str = str(user_id)
 
+    old_avatar_key: str | None = None
+    new_prefix: str | None = None
+
     async with SessionLocal() as db:
         try:
             user = await crud_user.get_by_id(db, id=user_id)
@@ -59,23 +94,31 @@ async def _handle_avatar_upload(data: dict[str, Any]) -> None:
                 logger.error("User not found for avatar finalize: user_id=%s", user_id)
                 raise WorkerTaskFailed(message=f"משתמש לא נמצא: {user_id}")
 
-            avatar_key = await process_and_save_avatar(
+            old_avatar_key = user.avatar_key
+
+            new_prefix = await process_and_save_avatar(
                 staging_key=staging_key,
                 user_id=uid_str,
                 s3_client=s3_client,
-                storage_service=storage_service,
             )
-            user.avatar_key = avatar_key
+            user.avatar_key = new_prefix
             user.avatar_staging_key = None
             user.avatar_status = "ready"
             db.add(user)
 
             await db.commit()
             await db.refresh(user)
-            logger.info("Avatar processed for user %s: avatar_key=%s", user_id, avatar_key)
+            logger.info(
+                "Avatar processed for user %s: avatar_key=%s (previous=%s)",
+                user_id,
+                new_prefix,
+                old_avatar_key,
+            )
 
         except Exception as e:
             await db.rollback()
+            if new_prefix:
+                await _cleanup_orphan_prefix_best_effort(new_prefix)
             try:
                 user = await crud_user.get_by_id(db, id=user_id)
                 if user:
@@ -87,10 +130,12 @@ async def _handle_avatar_upload(data: dict[str, Any]) -> None:
             logger.exception("Avatar upload processing failed: user_id=%s", user_id)
             raise WorkerTaskFailed() from e
 
+    await _delete_previous_avatar_prefix_best_effort(old_avatar_key, new_prefix or "")
+
 
 async def _handle_avatar_remove(data: dict[str, Any]) -> None:
     """
-    מעבד אירוע מחיקת אווטאר: מוחק מ-S3 את avatars/{user_id}/.
+    מעבד אירוע מחיקת אווטאר: מוחק מ-S3 את כל avatars/{user_id}/ (כל הגרסאות).
     payload: { "user_id": str/uuid }
     הערה: avatar_key כבר אופס ב-DB ב-API.
     """

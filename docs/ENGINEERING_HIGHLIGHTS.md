@@ -3,7 +3,7 @@
 **שם הקובץ:** `docs/ENGINEERING_HIGHLIGHTS.md` (בשורש הפרויקט, תחת `docs/`).
 
 מסמך זה אוסף **במקום אחד** את הפיצ’רים, הטכנולוגיות, הדפוסים וההחלטות שמיועדות ל**סקייל, אמינות ותחזוקה** — כדי להציג את הפרויקט ברמת מומחה.  
-*זה סיכום “להצגה”, לא מיפוי כל שורה בקוד; אחרי סקירה מול ה-repo הוכנסו גם workers, AI, FCM, Brevo, Google, **חיזוק auth ועומס מקבילי**, **k6**, **ריפקטור async משמעותי ב-passengers/bookings/rides**, **ריפקטור ארגון בפרונט**, ו**מסך אדמין פנימי (React + `/api/v1/admin`)**.*
+*זה סיכום “להצגה”, לא מיפוי כל שורה בקוד; אחרי סקירה מול ה-repo הוכנסו גם workers, AI, FCM, Brevo, Google, **חיזוק auth ועומס מקבילי**, **k6**, **ריפקטור async משמעותי ב-passengers/bookings/rides**, **ריפקטור ארגון בפרונט**, **מסך אדמין פנימי (React + `/api/v1/admin`)**, ו**מדיה: S3 + CloudFront (אופציונלי) ואווטארים ב-prefix גרסתי immutable**.*
 
 לפרטים טכניים עמוקים יותר: `../ARCHITECTURE.md`, `ERRORS.md`, `architecture/REALTIME.md`, `architecture/EVENTS.md`, `architecture/DATABASE.md`, `architecture/API.md`, `backend/docs/GOOGLE_OAUTH.md`.
 
@@ -19,7 +19,7 @@
 | **קבוצות** | יצירה, **קוד הזמנה** (`invite_code`), הצטרפות בקישור, ניהול admin |
 | **AI** | סיום שיחה → ניתוח (Groq) → שמירה + התראות |
 | **התראות** | מייל (**Brevo**), Push (**FCM** — מהשרת רק מפת `data` ב־FCM, בלי שדה `notification` של Firebase; בחזית **Toast קופץ + צליל**, ברקע התראת מערכת דרך SW), in-app |
-| **משתמשים** | JWT + Refresh ב-DB, **כניסה עם Google** (OAuth / `id_token`), אווטאר (S3 + worker); שדה **`is_admin`** לגישה ל־`/api/v1/admin/*` |
+| **משתמשים** | JWT + Refresh ב-DB, **כניסה עם Google** (OAuth / `id_token`), אווטאר (S3 + worker; **קריאה:** CloudFront כשמוגדר או presigned); שדה **`is_admin`** לגישה ל־`/api/v1/admin/*` |
 | **אדמין / תפעול** | ממשק ווב **`/admin`** (מודול `features/admin`): סטטיסטיקות, בריאות, משתמשים (הפעלה/הרשאת אדמין), נסיעות (ביטול), קבוצות, Outbox (requeue), lookup; **lazy routes**, מעטפת **דסקטופ** (ללא drawer מובייל), **`AdminRoute`** מינימלי (`is_admin` מ־AuthContext); אישור לפני מוטציות, toasts; בקאנד **`get_current_admin_user`** + לוג `[admin_audit]` — **`ADMIN_DASHBOARD.md`** |
 | **מפות** | Google: **Geocoding**, **Directions**, **Distance Matrix**, **Maps JS**; geocoding הוא **Google-only** עם cache ב-Redis (24h) |
 | **GPS בזמן אמת** | מיקום נהג לנוסעים, מיקום נוסעים לנהג (ערוצי Redis נפרדים + WS). **פרונט:** POST מותאם ב־throttle (~1.5s), `maximumAge: 0` לשידור, `useMapMarker` — יצירת marker פעם אחת ועדכון מיקום בלבד (בלי ריצוד), מפת Google. **Zod** על פריימי WS בכניסה — `frontend/src/types/wsEvents.ts`. פירוט: `docs/architecture/REALTIME.md`. |
@@ -38,7 +38,7 @@
 | DB | **PostgreSQL 15** + **PostGIS** (גיאומטריה, מרחקים) |
 | Cache / Pub-Sub | **Redis** — **הפרדה ל-DB 0 (API) ו-DB 1 (צ’אט + completion)** |
 | Broker | **RabbitMQ** — תורים לאירועים ומשימות כבדות |
-| אחסון | **S3** (אווטארים) |
+| אחסון / מדיה | **S3** (העלאות — presigned PUT); **קריאה ציבורית** — כשמוגדר **`CLOUDFRONT_DOMAIN`**, URLs יציבים דרך **Amazon CloudFront** (מקור: אותו bucket); בלי CDN — presigned GET ל-S3. אווטאר משתמש: prefix **גרסתי immutable** `avatars/{user_id}/v{version}/` — מחיקת גרסה קודמת ב-S3 רק **אחרי** commit ל-`users.avatar_key` (עם ניקוי orphan אם ה-commit נכשל). |
 | פריסה | **Docker Compose**; **Kubernetes** (למשל `k8s/chat-ws`) |
 | AI (צ’אט) | **Groq** — מודל Llama (למשל `llama-3.3-70b-versatile`) לניתוח שיחה |
 | מייל | **Brevo** (API transactional) |
@@ -291,7 +291,7 @@
 | ריפקטור פרונט (API, context, lazy, בדיקות) | **סעיף 14** + `frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md` |
 | Zod, WebSocket (נסיעות/מיקום/צ’אט), reconnect, `publish_ride_event` / `keys.py` | **סעיפים 1, 5, 14** + `frontend/src/types/wsEvents.ts` |
 | Google Maps (Directions + Distance Matrix) | **סעיף 2** (טבלת APIs) + סעיף 12 |
-| CI/CD, GHCR, S3, מובייל, pytest, Vitest מקומי, k6, phonenumbers | **סעיפים 9, 12** |
+| CI/CD, GHCR, S3 + CloudFront, מובייל, pytest, Vitest מקומי, k6, phonenumbers | **סעיפים 2, 9, 12** |
 | Unread WS, קבוצות, SQLAdmin, UUID, RTL, EIA | **סעיף 13** |
 | Defensive programming | **סעיף 7ב** |
 
@@ -305,9 +305,9 @@
 
 | מה | פירוט |
 |----|--------|
-| **GitHub Actions — 3 pipelines נפרדים** | `backend`: **Ruff** (`check` + `format --check`), **`DATABASE_URL` ברמת ה-job**, **`alembic upgrade head`** ואז **pytest** על Postgres שירות; `frontend` (**ESLint** + **build**); `chat-ws` (**go test** + **go vet** + build). טריגר לפי `paths`. |
+| **GitHub Actions — 3 pipelines נפרדים** | `backend`: **Ruff** (`check` + `format --check`), **`DATABASE_URL` ברמת ה-job**, **`alembic upgrade head`** ואז **pytest** על Postgres שירות; `frontend` (**ESLint** + **build**); `chat-ws` (**go build** + **go vet**). טריגר לפי `paths`. |
 | **דחיפת images ל-GHCR** | על push ל-`main`: build ו-push ל-`linkup-backend`, `linkup-frontend`, `linkup-chat-ws` — מוכן לפריסה מקונטיינרים. |
-| **uv ב-CI** | התקנת תלויות backend מהירה (`uv pip install`); **`uv.lock`** + **`pyproject.toml`** — כולל נעילת **`phonenumbers==8.13.48`** לאימות מספרים ישראליים עקבי. |
+| **uv ב-CI** | התקנת תלויות backend דרך `uv sync --frozen`; **`uv.lock`** + **`pyproject.toml`** — כולל נעילת **`phonenumbers==8.13.48`** לאימות מספרים ישראליים עקבי. |
 | **Settings ↔ env (DB/Redis)** | `DATABASE_URL` / `REDIS_URL` מהסביבה נכנסים ל־`DATABASE_URL_RAW` / `REDIS_URL_RAW` דרך **`validation_alias=AliasChoices`** (pydantic-settings) + **`populate_by_name=True`** — Alembic ו-runtime רואים את אותו override כמו ב-CI (לא `json_schema_extra`). |
 | **Redis broadcast — רשימת נסיעות** | שם ערוץ **`rides:list`** ב־`app/infrastructure/redis/keys.py` (`RIDES_LIST_CHANNEL`); ייבוא אחיד משירות הנסיעות. |
 | **בדיקות אבטחה JWT** | `backend/tests/test_security.py` — טוקן תקין, פג תוקף, חתימה שגויה (מקרים קריטיים ל-auth). |
@@ -319,7 +319,8 @@
 | מה | פירוט |
 |----|--------|
 | **Presigned URLs (S3)** | הלקוח מעלה **ישירות ל-S3** (אווטאר + תמונת קבוצה) — ה-API לא עובר בו זרימת bytes; פחות עומס ו-timeoutים. |
-| **Pipeline אווטאר** | staging ב-S3 → אירוע ל-RabbitMQ → worker (resize/WebP) → מיקום סופי תחת `avatars/{user_id}/`. |
+| **CloudFront (קריאה)** | כש־**`CLOUDFRONT_DOMAIN`** מוגדר ב-backend, בניית URL לתמונות (אווטאר/קבוצות) משתמשת ב-**HTTPS לדומיין CloudFront** מול מפתח האובייקט — URL יציב ללקוחות ול-cache ב-CDN; בלי דומיין — **presigned GET** ל-S3. |
+| **Pipeline אווטאר (גרסאות immutable)** | staging ב-S3 → תור **avatar_upload_queue** → worker (resize/WebP) → העלאה ל־**prefix חדש** `avatars/{user_id}/v{version}/` **בלי** מחיקת תיקיית משתמש לפני ההעלאה; עדכון `avatar_key` ב-DB; **מחיקת prefix הגרסה הקודמת** רק אחרי commit מוצלח; אם ה-commit נכשל — ניקוי best-effort של ה-prefix החדש (orphan). מחיקת אווטאר מה-API — מחיקת כל `avatars/{user_id}/` ב-S3. |
 | **תיעוד CORS ל-bucket** | `docs/S3_CORS.md` — תצורה מודעת לדפדפן. |
 
 ### גיאו — שילוב מקורות
@@ -406,4 +407,4 @@
 
 ---
 
-*עודכן כחלק מתיעוד הפרויקט — כולל מאגר DB ניתן להגדרה, **auth בעומס** (bcrypt ב-executor, pool, rate limit, outbox), חיזוק OTP, מניעת user enumeration בלוגין (OWASP), **pytest + GitHub Actions + GHCR** (כולל **`DATABASE_URL` אחיד**, **Alembic לפני pytest**, **Ruff** lint/format), **pydantic-settings** (`validation_alias` ל־`DATABASE_URL` / `REDIS_URL`), **Vitest + ריפקטור ארגון בפרונט** (`FRONTEND_REFACTOR_AND_QUALITY.md`), **Zod לאימות WebSocket** (`frontend/src/types/wsEvents.ts`), **מסך אדמין דסקטופ** (`ADMIN_DASHBOARD.md`, `/admin` + `/api/v1/admin`), **k6** עם דוגמת תוצאות, **phonenumbers==8.13.48**, ו-**Docker Compose** (שירות **migrate**, healthcheck ל-backend, `.env` בשורש + `backend/.env`, recreate לקונטיינר אחרי שינוי env).*
+*עודכן כחלק מתיעוד הפרויקט — כולל מאגר DB ניתן להגדרה, **auth בעומס** (bcrypt ב-executor, pool, rate limit, outbox), חיזוק OTP, מניעת user enumeration בלוגין (OWASP), **GitHub Actions + GHCR** (backend: **Ruff** → **Alembic upgrade head** → **pytest** עם **`DATABASE_URL` אחיד**; chat-ws: **go build** + **go vet**), **pydantic-settings** (`validation_alias` ל־`DATABASE_URL` / `REDIS_URL`), **Vitest + ריפקטור ארגון בפרונט** (`FRONTEND_REFACTOR_AND_QUALITY.md`), **Zod לאימות WebSocket** (`frontend/src/types/wsEvents.ts`), **מסך אדמין דסקטופ** (`ADMIN_DASHBOARD.md`, `/admin` + `/api/v1/admin`), **k6** עם דוגמת תוצאות, **phonenumbers==8.13.48**, **S3 + CloudFront (קריאה ציבורית) ואווטאר ב-prefix גרסתי immutable**, ו-**Docker Compose** (שירות **migrate**, healthcheck ל-backend, `.env` בשורש + `backend/.env`, recreate לקונטיינר אחרי שינוי env).*

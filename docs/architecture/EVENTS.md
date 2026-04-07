@@ -32,7 +32,7 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 | Queue | Exchanges | Consumer | Purpose |
 |-------|-----------|----------|---------|
 | notifications_queue | user, ride, booking, system_events | handle_notification_event | שליחת מייל (Brevo), פוש (Firebase) |
-| avatar_upload_queue | tasks | handle_avatar_upload_event | עיבוד S3 (resize), עדכון DB |
+| avatar_upload_queue | tasks | handle_avatar_upload_event | עיבוד S3 (resize), העלאה ל־`avatars/{user_id}/v{version}/`, commit ל-`avatar_key`, מחיקת גרסה קודמת (best-effort) אחרי commit |
 | scheduled_tasks_queue | scheduled | handle_scheduled_task | תזכורות, fuel scan, maintenance, chat timeout |
 
 ---
@@ -87,7 +87,7 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 |------|--------|
 | run_outbox_worker | Poll outbox_events (PENDING), publish ל-RabbitMQ לפי routing. |
 | notifications_consumer.consume(handle_notification_event) | צורך notifications_queue, מפעיל handler — מייל/פוש לפי NotificationEvent. `handle_ride_cancelled_by_driver` טוען הזמנות ב-async SQL ושולח התראה רק ל-**PENDING** / **CONFIRMED** (לא לבוקינג שכבר **CANCELLED**). |
-| avatar_upload_consumer.consume(handle_avatar_upload_event) | צורך avatar_upload_queue, עיבוד S3 ו-DB. |
+| avatar_upload_consumer.consume(handle_avatar_upload_event) | צורך avatar_upload_queue — עיבוד `avatar_tasks` (גרסתי immutable + cleanup). |
 | scheduled_tasks_consumer.consume(handle_scheduled_task) | צורך scheduled_tasks_queue, מפעיל reminders/fuel/maintenance/chat_timeout. |
 | run_scheduled_tasks_publisher | מפרסם משימות מתוזמנות ל-scheduled exchange. |
 | run_chat_completion_redis_listener | מאזין ל-Redis DB 1 (chat:completion:*), מפעיל ניתוח AI ושמירה. |

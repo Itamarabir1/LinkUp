@@ -1,5 +1,6 @@
 # app/db/models.py
-# הקובץ הזה לא מכיל לוגיקה, רק מבטיח שכל המודלים "רשומים" ב-Base
+# הקובץ הזה לא מכיל לוגיקה; הוא רושם את מודלי הדומיין שנדרשים לטעינת ה-API וה-relationships.
+# אין כאן כוונה לייצא "כל מודל אפשרי" בריפו (למשל מודלי תשתית פנימיים).
 # חייב להיות מיובא לפני ש-SQLAlchemy פותר relationship מחרוזות (למשל ב-User.owned_groups)
 
 from app.domain.bookings.model import Booking

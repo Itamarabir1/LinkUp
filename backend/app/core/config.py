@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
-from pydantic import AliasChoices, EmailStr, Field, computed_field
+from pydantic import AliasChoices, EmailStr, Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # תיקיית backend (היכן ש-.env נמצא) – כך שה-.env נטען גם כשמריצים מ-cwd אחר
@@ -195,6 +195,21 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str = Field("")
     AWS_REGION: str = "eu-central-1"
     S3_BUCKET_NAME: str = Field("")
+
+    CLOUDFRONT_DOMAIN: str | None = Field(
+        None,
+        description="CloudFront hostname for CDN-backed media GET URLs; if unset, presigned S3 GET is used.",
+    )
+
+    @field_validator("CLOUDFRONT_DOMAIN", mode="before")
+    @classmethod
+    def normalize_cloudfront_domain(cls, v: str | None) -> str | None:
+        if not v:
+            return None
+        if not isinstance(v, str):
+            return v
+        v = v.strip().removeprefix("https://").removeprefix("http://").rstrip("/")
+        return v or None
 
     # --- Upload temp directory (קבצים זמניים לפני העלאה ל-S3) ---
     # ברירת מחדל: תיקיית המערכת (tempfile.gettempdir()). אם מוגדר – משתמשים בתיקייה זו (נוצר אוטומטית אם חסר).

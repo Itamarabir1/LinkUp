@@ -8,6 +8,7 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 
 - **Driver**: asyncpg (`postgresql+asyncpg://`).
 - **Connection**: `backend/app/db/session.py` — `get_db()` מחזיר AsyncSession.
+- **מדיה (קשר ל-S3, לא עמודה נפרדת):** שדות `avatar_key` ב-`users` / `groups` מחזיקים prefix או מפתח אובייקט ב-bucket; ה-API בונה URL ציבורי — עם **`CLOUDFRONT_DOMAIN`** (ראו `app/core/config.py`, `app/infrastructure/s3/service.py`) או presigned. פירוט תהליך אווטאר גרסתי: `ARCHITECTURE.md` (Features), `docs/ENGINEERING_HIGHLIGHTS.md` (סעיף 12).
 
 ---
 
@@ -42,7 +43,7 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | google_id | VARCHAR(255) | קישור ל-Google |
 | is_active | BOOLEAN DEFAULT TRUE | |
 | is_admin | BOOLEAN DEFAULT FALSE | |
-| avatar_key | VARCHAR(255) | מפתח S3 (לאחר 002) |
+| avatar_key | VARCHAR(255) | מפתח/-prefix S3 לתמונות אווטאר (מיגרציה 002: `avatar_url` → `avatar_key`). **מומלץ בזרימה הנוכחית:** prefix גרסתי **`avatars/{user_id}/v{version}/`** אחרי worker; ערכים ישנים ללא `v{version}/` עדיין תקפים עד העלאה מחדש. |
 | fcm_token | TEXT | Firebase push |
 | refresh_token | TEXT | JWT refresh |
 | last_location | GEOGRAPHY(POINT) | PostGIS |
@@ -65,7 +66,7 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | max_members | INTEGER | |
 | invite_expires_at | TIMESTAMPTZ | |
 | created_at | TIMESTAMPTZ | |
-| avatar_key | VARCHAR(255) | (003) |
+| avatar_key | VARCHAR(255) | (003) prefix או מפתח S3 לתמונת קבוצה; בניית URL כמו ב־users (CloudFront או presigned) — `app/infrastructure/s3/service.py` |
 | description | VARCHAR(500) | (003) |
 
 ### group_members

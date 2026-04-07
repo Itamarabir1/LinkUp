@@ -78,6 +78,7 @@
 | AWS_SECRET_ACCESS_KEY | | |
 | AWS_REGION | — | eu-central-1 |
 | S3_BUCKET_NAME | | |
+| CLOUDFRONT_DOMAIN | מדיה ציבורית (אופציונלי) | דומיין CloudFront (ללא `https://`) — URLs ציבוריים לתמונות; בלי ערך — presigned GET ל-S3 |
 | UPLOAD_TEMP_DIR | — | תיקייה לקבצים זמניים |
 | FIREBASE_SERVICE_ACCOUNT_PATH | לפוש | |
 | FIREBASE_CREDENTIALS_JSON | לפוש (פרודקשן) | |
@@ -102,7 +103,7 @@
 
 - מתוך **`backend/`**: `uv run pytest tests/ -v`. דורש **PostgreSQL + PostGIS** עם סכמה מעודכנת — הרץ **`alembic upgrade head`** על אותו DB לפני הטסטים.
 - **משתני סביבה:** ב־`tests/conftest.py` — **`DATABASE_URL`** (מומלץ), או **`TEST_DATABASE_URL`** (תאימות לאחור), או ברירת מחדל ל-docker-compose המקומי.
-- **יישור עם CI:** ב-GitHub Actions מוגדר **`DATABASE_URL` ברמת ה-job**, אחריו **`alembic upgrade head`** ואז pytest — ראו `.github/workflows/backend-ci.yml` ו־`backend/README.md`.
+- **יישור עם CI:** ב-GitHub Actions הסדר בפועל הוא **Ruff check** → **Ruff format --check** → **`alembic upgrade head`** → **pytest** (עם **`DATABASE_URL` ברמת ה-job**) — ראו `.github/workflows/backend-ci.yml` ו־`backend/README.md`.
 
 ---
 

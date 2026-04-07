@@ -62,7 +62,7 @@ flowchart LR
 
 | Service   | Language        | Role |
 |----------|------------------|------|
-| backend  | Python (FastAPI) | REST API, auth, rides, bookings, chat CRUD, **groups**, passengers (requests/matches), **admin JSON API** (`/api/v1/admin/*`), AI summary (Celery), notifications, outbox worker |
+| backend  | Python (FastAPI) | REST API, auth, rides, bookings, chat CRUD, **groups**, passengers (requests/matches), **admin JSON API** (`/api/v1/admin/*`), AI summary pipeline (Redis completion + outbox-worker listener), notifications, outbox worker |
 | chat-ws  | Go               | WebSocket server; chat + typing + presence; Redis Pub/Sub including **`user:online` / `user:offline`** and **`user:*:events`** (ride/maintenance-style JSON to the logged-in client) |
 | frontend | React / TypeScript | Web app (Vite); Hebrew RTL |
 | mobile   | React Native / Expo | Mobile app (TypeScript) |
@@ -73,7 +73,7 @@ flowchart LR
 
 | Category      | Technologies |
 |---------------|--------------|
-| **Backend**   | Python, FastAPI, PostgreSQL, PostGIS, SQLAlchemy (async), Alembic, Redis, RabbitMQ, Celery, Firebase (FCM), S3, Groq (AI) |
+| **Backend**   | Python, FastAPI, PostgreSQL, PostGIS, SQLAlchemy (async), Alembic, Redis, RabbitMQ, Firebase (FCM), S3 (**optional CloudFront** for public media URLs via `CLOUDFRONT_DOMAIN`), Groq (AI) |
 | **Real-time** | Go (chat-ws), Redis Pub/Sub |
 | **Frontend**  | React, TypeScript, Vite, Google Maps |
 | **Mobile**    | React Native, Expo, TypeScript |
@@ -208,7 +208,7 @@ docker compose ps            # סטטוס (backend: healthy / ממתין)
 
 - **Redis DB separation (DB=0 vs DB=1).** Backend uses Redis for cache, rate limiting, and outbox-related state on DB=0. Chat traffic (pub/sub for messages and completion events) uses DB=1 so that chat-ws and the backend’s chat-completion listener can share the same Redis instance without key or namespace clashes and without backend cache evictions affecting chat.
 
-- **Celery (in backend) for AI chat summary (not a separate service).** The AI flow is “on conversation end, analyze and persist.” That fits a background task in the same process that already has the domain logic and DB access. A dedicated microservice would duplicate models, config, and deployment surface. The backend publishes a completion event to Redis DB=1; the outbox worker (same codebase) subscribes and runs the existing `handle_conversation_completion` logic. One less service to deploy and monitor.
+- **Redis completion listener + outbox-worker for AI chat summary (not a separate service).** The AI flow is “on conversation end, analyze and persist.” The backend publishes a completion event to Redis DB=1; the outbox-worker subscribes and runs `handle_conversation_completion`. This keeps deployment surface small while preserving async execution.
 
 - **Outbox pattern.** Notifications (email, push) and other side effects are triggered by domain events. Publishing directly to RabbitMQ in the same transaction as the DB write would risk losing events on crash or broker failure. Writing the event to an `outbox_events` table in the same transaction, then having a worker poll and publish to RabbitMQ, keeps “at-least-once” delivery and keeps the API response fast and independent of broker latency.
 
@@ -221,11 +221,19 @@ push to `main` or `develop` (only when relevant files change).
 
 | Service   | Workflow | Steps |
 |-----------|----------|-------|
-| backend   | `backend-ci.yml`  | lint (Ruff), format check, tests (pytest), Docker build → push to GHCR |
-| chat-ws   | `chat-ws-ci.yml`  | build, vet, go test, Docker build → push to GHCR |
+| backend   | `backend-ci.yml`  | lint (Ruff), format check, migrations (`alembic upgrade head`), tests (pytest), Docker build → push to GHCR |
+| chat-ws   | `chat-ws-ci.yml`  | build, vet, Docker build → push to GHCR |
 | frontend  | `frontend-ci.yml` | ESLint, build (`tsc -b` + Vite), Docker build → push to GHCR |
 
 Docker images are published to GitHub Container Registry on every push to `main`:
 - `ghcr.io/Itamarabir1/linkup-backend:latest`
 - `ghcr.io/Itamarabir1/linkup-chat-ws:latest`
 - `ghcr.io/Itamarabir1/linkup-frontend:latest`
+
+---
+
+## Known Gaps (Current State)
+
+- S3 reads are served via short-lived presigned GET URLs from API responses; there is no CDN-backed stable media URL layer yet.
+- `app.db.models` is a registry for domain/API model loading and Alembic autogenerate context; it is not intended to be an exhaustive export of every ORM/infrastructure model in the repo.
+- `chat-ws` CI currently runs `go build` + `go vet` (no `go test` step in the workflow yet).

@@ -65,6 +65,8 @@ Authorization: Bearer <access_token>
 | POST | /change-password | כן | body: ChangePasswordRequest (old_password, new_password, new_password_confirm). |
 | POST | /google-signin | לא | body: GoogleSignInRequest (id_token). מחזיר LoginResponse. Rate limited. |
 
+הערה חשובה: `LoginResponse.user` הוא payload מינימלי לזיהוי/הרשאות (למשל `user_id`, `full_name`, `email`, `is_admin`) ולא מקור פרטי פרופיל מלאים של משתמשים אחרים. שדות `partner.avatar_url` במסכי צ'אט מגיעים מ-endpoints של `chat` (`/chat/conversations*`), לא מ-login.
+
 ---
 
 ### Rides (`/api/v1/rides`)
@@ -129,7 +131,7 @@ Authorization: Bearer <access_token>
 | DELETE | /me/avatar | כן | הסרת תמונת פרופיל (202). |
 | PUT | /me | כן | body: UserUpdate. עדכון פרופיל. |
 
-הערת גישה לקבצים: `avatar_url*` בתגובות משתמש/קבוצה הם **presigned read URLs** קצרי-תוקף (GET), ולא URL ציבורי קבוע של S3.
+הערת גישה לקבצים: `avatar_url*` בתגובות משתמש/קבוצה — כשמוגדר **`CLOUDFRONT_DOMAIN`** ב-backend, URL ציבורי יציב דרך **CloudFront** (`https://{CLOUDFRONT_DOMAIN}/…`); אחרת **presigned GET** קצר-תוקף ל-S3. ראו `app/infrastructure/s3/service.py`.
 
 ---
 

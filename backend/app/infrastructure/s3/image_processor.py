@@ -1,10 +1,15 @@
 """
 עיבוד תמונת אווטאר — resize ל-3 גדלים והעלאה ל-S3.
 דורש: Pillow>=10.0.0
+
+כל העלאה נכתבת ל-prefix גרסתי immutable: avatars/{user_id}/v{version}/ — ללא מחיקה לפני העלאה
+(המחיקה של גרסה קודמת מתבצעת ב-worker אחרי commit ל-DB).
 """
 
 import io
 import logging
+import secrets
+import time
 from typing import TYPE_CHECKING
 
 from PIL import Image
@@ -39,40 +44,41 @@ def _resize_and_encode_webp(img: Image.Image, size: tuple[int, int], quality: in
     return buf.getvalue()
 
 
+def new_avatar_version_id() -> str:
+    """מזהה גרסה כמעט בלתי מתנגש לנתיב S3 (nanoseconds + random hex)."""
+    return f"{time.time_ns()}_{secrets.token_hex(4)}"
+
+
 async def process_and_save_avatar(
     staging_key: str,
     user_id: str,
     s3_client: "S3Client",
-    storage_service,
 ) -> str:
     """
     1. מוריד תמונה מ-staging_key
     2. משנה גודל ל-3 גדלים (ריבוע מרכזי), WebP
-    3. מוחק תיקייה ישנה avatars/{user_id}/
-    4. מעלה 3 גרסאות ל-avatars/{user_id}/
-    5. מוחק קובץ staging
-    מחזיר avatar_key = "avatars/{user_id}/"
+    3. מעלה ל-avatars/{user_id}/v{version}/ (immutable prefix חדש)
+    4. מוחק קובץ staging
+
+    לא מוחק גרסאות קודמות — זה נעשה ב-worker אחרי עדכון DB מוצלח.
+
+    מחזיר avatar_key = "avatars/{user_id}/v{version}/"
     """
     if not staging_key.startswith("avatars/staging/"):
         raise ValueError(f"Invalid staging key: {staging_key}")
 
-    # 1. הורדה מ-staging
     body = await s3_client.get_object_bytes(staging_key)
     img = Image.open(io.BytesIO(body)).convert("RGB")
 
-    # 2. חיתוך לריבוע ומערך של (filename, bytes) לכל גודל
     squared = _crop_center_square(img)
     uploads = []
     for filename, (w, h) in SIZES.items():
         blob = _resize_and_encode_webp(squared, (w, h))
         uploads.append((filename, blob))
 
-    prefix = f"avatars/{user_id}/"
+    version = new_avatar_version_id()
+    prefix = f"avatars/{user_id}/v{version}/"
 
-    # 3. מחיקת תיקייה ישנה
-    await storage_service.delete_user_avatar_folder(user_id)
-
-    # 4. העלאת 3 גרסאות
     for filename, blob in uploads:
         key = f"{prefix}{filename}"
         await s3_client.upload_fileobj(
@@ -82,7 +88,6 @@ async def process_and_save_avatar(
         )
         logger.info("Uploaded avatar variant: %s", key)
 
-    # 5. מחיקת staging
     await s3_client.delete_object(staging_key)
     logger.info("Deleted staging: %s", staging_key)
 

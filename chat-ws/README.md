@@ -69,12 +69,11 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 2. לקוח שולח הודעה דרך **REST** (POST ל־Python) → Python שומר ב־DB ומפרסם ל־Redis (`chat:conversation:{id}`).
 3. Go מקבל מ־Redis → שולח ל־WebSocket של ה־recipient (לפי `recipient_id` ב־payload).
 
-### זרימת ניתוח AI
+### זרימת ניתוח AI (מה שקיים בפועל)
 
-1. Python (backend) מפרסם הודעת צ'אט ל-Redis (`chat:conversation:{conversation_id}`).
-2. **שרת Go** מקבל מ-Redis → שולח ל-WebSocket (מיידי).
-3. **שירות Python AI** (נפרד) מקבל מ-Redis → שומר הודעה ב-cache → מנתח את כל השיחה → מפרסם תוצאה ל-Redis (`chat:analysis:{conversation_id}`).
-4. (אופציונלי) שרת Go יכול להאזין ל-`chat:analysis:*` → לשלוח תוצאות ניתוח ל-WebSocket.
+1. backend מפרסם אירוע completion ל-Redis DB 1 (`chat:completion:{conversation_id}`).
+2. outbox-worker (באותו שירות backend) מאזין לערוץ completion ומריץ את ניתוח השיחה.
+3. התוצאה נשמרת ב-DB; צריכה עתידית להעברה ב-WS תתווסף בנפרד אם תוגדר.
 
 ## Presence ו-last seen (תקציר)
 
@@ -84,12 +83,11 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ## ערוצי Redis
 
-- `chat:conversation:{conversation_id}` – הודעות צ'אט (נשלח מ-backend, נשמע ע"י Go WS + AI analyzer)
+- `chat:conversation:{conversation_id}` – הודעות צ'אט (נשלח מ-backend, נשמע ע"י Go WS)
 - `chat:typing:*` – אינדיקציית הקלדה
 - `chat:notification:*` – דחיפות in-app לפי נמען
 - **`user:*:events`** – אירועי דומיין מה-backend (`publish_user_event` דרך **`REDIS_CHAT_URL`** / DB כמו chat-ws, לא `broadcast`/DB0); Go מנתב ל-`SendToUser` לפי מזהה מהערוץ. הקבוע בקוד: `UserEventPattern` ב-`internal/redis/subscriber.go`
-- `chat:analysis:{conversation_id}` – תוצאות ניתוח AI (נשלח מ-AI analyzer)
-- `chat:conversation_cache:{conversation_id}` – cache של הודעות אחרונות (נשמר ע"י AI analyzer)
+- `chat:completion:{conversation_id}` – טריגר לניתוח AI בצד worker
 
 ## פיתוח
 

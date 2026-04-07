@@ -1,6 +1,7 @@
 # סכמת מבנה הפרויקט – Linkup
 
-מסמך זה מכיל את כל התיקיות, תתי־התיקיות והקבצים בפרויקט (למעט תוכן `node_modules` ו־`.venv` שהם תלויות חיצוניות).
+מסמך זה הוא snapshot תיעודי (לא מקור אמת מחייב לקובץ-לקובץ), ועלול לפגר אחרי שינויים בריפו.  
+למצב עדכני בזמן אמת עדיף להסתמך על העץ בפועל (`git ls-files` / IDE) ועל מסמכי ארכיטקטורה בשורש (`README.md`, `ARCHITECTURE.md`).
 
 ---
 
@@ -348,19 +349,32 @@ chat-ws/
 
 ```
 db/
-├── schema.sql
+├── schema.sql                 # snapshot ידני / דיבוג; מקור אמת לסכמה בפרודקשן — Alembic ב-backend/
 ├── scripts/
 │   └── check_match_distance.sql
 ```
+
+**הערה:** לתיאור עמודות וקשרים מעודכן — **`docs/architecture/DATABASE.md`**; להרצת מיגרציות — `backend/alembic/` ו-`backend/README.md`.
 
 ---
 
 ## docs/
 
+מקור אמת לסכמת DB (טבלאות, אינדקסים, מיגרציות): **`docs/architecture/DATABASE.md`**. סקירה הנדסית (פורטפוליו): **`docs/ENGINEERING_HIGHLIGHTS.md`**. שגיאות API: **`docs/ERRORS.md`**.
+
 ```
 docs/
-├── ARCHITECTURE.md
-└── HTTPS_SETUP.md
+├── ENGINEERING_HIGHLIGHTS.md
+├── ERRORS.md
+├── FCM_SYSTEM_SUMMARY.md
+├── S3_CORS.md
+├── architecture/
+│   ├── API.md
+│   ├── DATABASE.md          # טבלאות, indexes, היסטוריית Alembic
+│   ├── DEVELOPMENT.md
+│   ├── EVENTS.md
+│   └── REALTIME.md
+└── ...
 ```
 
 ---

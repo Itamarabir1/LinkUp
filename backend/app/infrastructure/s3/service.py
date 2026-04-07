@@ -1,13 +1,15 @@
 """
-שירות אחסון S3 – אווטאר: presigned upload ל-staging, worker מעבד ל-avatars/{user_id}/.
-מבנה: avatars/staging/{user_id}_{uuid}.webp → worker → avatars/{user_id}/original.webp, 400x400.webp, 150x150.webp.
+שירות אחסון S3 – אווטאר: presigned upload ל-staging, worker מעבד ל-prefix גרסתי:
+avatars/staging/{user_id}_{uuid}.webp → avatars/{user_id}/v{version}/ (immutable) + 3 גדלים.
 תמונת קבוצה: GROUPS/<group_id>/<uuid>.webp — העלאה ישירה, קובץ יחיד per group.
 """
 
 import logging
 import uuid
+from urllib.parse import quote
 from uuid import UUID
 
+from app.core.config import settings
 from app.core.exceptions.infrastructure import S3DeleteFailed
 from app.infrastructure.s3.client import s3_client
 
@@ -55,8 +57,18 @@ class StorageService:
                 logger.error("S3 delete failed for key=%s: %s", key, e, exc_info=True)
                 raise S3DeleteFailed() from e
 
+    async def delete_avatar_prefix(self, prefix: str) -> None:
+        """מוחק את כל האובייקטים עם prefix נתון (גרסה ישנה של אווטאר)."""
+        p = prefix.strip()
+        if not p:
+            return
+        if not p.endswith("/"):
+            p = f"{p}/"
+        await self.list_and_delete_prefix(p)
+        logger.info("Deleted avatar prefix: %s", p)
+
     async def delete_user_avatar_folder(self, user_id: UUID | str) -> None:
-        """מוחק את כל תוכן התיקייה avatars/{user_id}/."""
+        """מוחק את כל תוכן העץ avatars/{user_id}/ (כל הגרסאות + מבנה ישן ללא v/)."""
         uid_str = str(user_id)
         prefix = f"avatars/{uid_str}/"
         await self.list_and_delete_prefix(prefix)
@@ -76,7 +88,10 @@ class StorageService:
         return presigned_url, key
 
     def generate_read_url(self, key: str, expiration: int = 900) -> str:
-        """יוצר presigned URL לקריאה (GET) לאובייקט S3."""
+        """URL לקריאה: CloudFront אם מוגדר, אחרת presigned GET ל-S3."""
+        if settings.CLOUDFRONT_DOMAIN:
+            encoded_key = quote(key, safe="/")
+            return f"https://{settings.CLOUDFRONT_DOMAIN}/{encoded_key}"
         return self.client.generate_presigned_read_url(key=key, expiration=expiration)
 
     async def delete_group_image_folder(self, group_id: UUID | str) -> None:

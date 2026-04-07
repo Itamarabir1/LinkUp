@@ -60,10 +60,8 @@
 - ❌ אין שירות AI נפרד; ניתוח רץ ב-backend worker
 
 **למה לא ב-chat-ws?**
-- ה-AI Analyzer Service לא צריך לייצא ללוח שנה
-- הוא רק מנתח ומפרסם תוצאות
-- ה-backend משתמש בתוצאות הניתוח לייצוא ללוח שנה
-- שמירת קוד ב-chat-ws יוצרת code duplication מיותר
+- ייצוא iCal וניתוח שיחה הם לוגיקת API/DB; chat-ws הוא רק real-time fan-out
+- ניתוח רץ ב-outbox-worker אחרי `chat:completion:*`; התוצאה נשמרת ב-DB ונקראת דרך REST
 
 ## זרימה מומלצת
 
@@ -81,7 +79,7 @@ Client → POST /api/v1/chat/conversations/{id}/messages (backend)
 ### 2. קבלת ניתוח AI
 ```
 Client → GET /api/v1/chat/conversations/{id}/analysis (backend)
-       → Backend קורא מ-DB/Redis
+       → Backend קורא תוצאה מ-DB
        → מחזיר תוצאה
 ```
 
