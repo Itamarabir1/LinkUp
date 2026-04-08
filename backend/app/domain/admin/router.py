@@ -268,7 +268,7 @@ async def admin_cancel_ride(
 ):
     ride = await crud_ride.get_async(db, ride_id)
     if not ride:
-        raise HTTPException(status_code=404, detail="Ride not found")
+        raise RideNotFoundError(ride_id)
     await ride_svc.cancel_ride_by_driver(db, ride_id, ride.driver_id)
     _audit(current_user, "cancel_ride", f"ride_id={ride_id}")
     return {"ok": True, "ride_id": str(ride_id)}
