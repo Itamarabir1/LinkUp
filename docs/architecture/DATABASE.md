@@ -69,6 +69,8 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | avatar_key | VARCHAR(255) | (003) prefix או מפתח S3 לתמונת קבוצה; בניית URL כמו ב־users (CloudFront או presigned) — `app/infrastructure/s3/service.py` |
 | description | VARCHAR(500) | (003) |
 
+**יצירת `invite_code`:** Base62 (8 תווים), `flush` + retry על **`IntegrityError`** ייחודי ל־`invite_code`; אחרי ניסיונות חוזרים — `INVITE_CODE_GENERATION_FAILED` — [`app/domain/groups/crud.py`](../../backend/app/domain/groups/crud.py).
+
 ### group_members
 
 חברות בקבוצה.

@@ -381,6 +381,8 @@ docs/
 
 ## frontend/
 
+העץ הבא **מצומצם לדוגמה** ואינו משקף את כל `src/` (מודול אדמין, קבוצות, GPS hooks, `context/*` לצ’אט והתראות in-app, וכו’). מקור מעודכן: **`frontend/docs/ARCHITECTURE.md`**.
+
 ```
 frontend/
 ├── .env

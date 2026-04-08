@@ -9,6 +9,20 @@ class SessionExpiredError(LinkupError):
     message = "הסשן פג תוקף, אנא התחבר שוב"
 
 
+class InvalidAccessTokenError(LinkupError):
+    """JWT לא תקף, פג תוקף, או חסר `sub` — מקביל לבדיקות ב-`get_current_user`."""
+
+    status_code = 401
+    error_code = "INVALID_TOKEN"
+    message = "אסימון לא תקף או פג תוקף"
+
+
+class UserInactiveOrMissingError(LinkupError):
+    status_code = 401
+    error_code = "AUTH_USER_INACTIVE_OR_MISSING"
+    message = "המשתמש לא נמצא או אינו פעיל"
+
+
 class PermissionDeniedError(LinkupError):
     status_code = 403
     error_code = "AUTH_PERMISSION_DENIED"

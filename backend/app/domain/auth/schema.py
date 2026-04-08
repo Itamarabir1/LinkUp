@@ -10,7 +10,6 @@ from pydantic import (
     model_validator,
 )
 
-from app.core.config import settings
 from app.core.utils.validators import (
     normalize_email_for_auth,
     validate_password_strength,
@@ -149,12 +148,7 @@ class ChangePasswordRequest(BaseModel):
 
 
 def _avatar_url_medium_from_key(avatar_key: str | None) -> str | None:
-    if not avatar_key or not settings.S3_BUCKET_NAME:
-        return None
-    try:
-        return storage_service.generate_read_url(f"{avatar_key}400x400.webp")
-    except Exception:
-        return None
+    return storage_service.build_avatar_url(avatar_key, "400x400.webp")
 
 
 class UserOut(BaseModel):

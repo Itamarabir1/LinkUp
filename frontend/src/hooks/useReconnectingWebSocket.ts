@@ -6,6 +6,8 @@ interface Options {
   enabled?: boolean;
   reconnectDelayMs?: number;
   onMessage: (ev: MessageEvent) => void;
+  /** נקרא אחרי חיבור מוצלח (כולל reconnect) */
+  onOpen?: () => void;
   /** כשמשתנה (למשל rideId) — ה-effect מתחבר מחדש ל-URL הנכון */
   reconnectKey?: string | null;
 }
@@ -19,14 +21,19 @@ export function useReconnectingWebSocket({
   enabled = true,
   reconnectDelayMs = 3000,
   onMessage,
+  onOpen,
   reconnectKey,
 }: Options) {
   const onMessageRef = useRef(onMessage);
+  const onOpenRef = useRef(onOpen);
   const buildUrlRef = useRef(buildUrl);
 
   useEffect(() => {
     onMessageRef.current = onMessage;
   }, [onMessage]);
+  useEffect(() => {
+    onOpenRef.current = onOpen;
+  }, [onOpen]);
   useEffect(() => {
     buildUrlRef.current = buildUrl;
   }, [buildUrl]);
@@ -50,6 +57,9 @@ export function useReconnectingWebSocket({
         return;
       }
 
+      ws.onopen = () => {
+        onOpenRef.current?.();
+      };
       ws.onmessage = (ev) => onMessageRef.current(ev);
       ws.onclose = () => {
         ws = null;

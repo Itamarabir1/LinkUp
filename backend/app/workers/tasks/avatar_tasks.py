@@ -42,8 +42,29 @@ def _should_delete_previous_avatar_prefix(old_key: str | None, new_key: str) -> 
     return old_key.startswith("avatars/")
 
 
+def _is_versioned_avatar_prefix(key: str) -> bool:
+    """
+    True רק ל-layout גרסתי: avatars/{user_id}/v{version}/.
+    False ל-legacy avatars/{user_id}/ — מחיקת prefix כזה מוחקת את כל עץ המשתמש כולל גרסה חדשה.
+    """
+    p = key.strip().rstrip("/")
+    if not p.startswith("avatars/") or p.startswith("avatars/staging"):
+        return False
+    parts = p.split("/")
+    if len(parts) < 3:
+        return False
+    seg = parts[2]
+    return seg.startswith("v") and len(seg) > 1
+
+
 async def _delete_previous_avatar_prefix_best_effort(old_key: str | None, new_key: str) -> None:
     if not _should_delete_previous_avatar_prefix(old_key, new_key):
+        return
+    if not _is_versioned_avatar_prefix(old_key):
+        logger.warning(
+            "Skipping delete of previous avatar prefix (legacy non-versioned layout would delete entire user tree): old=%s",
+            old_key,
+        )
         return
     try:
         await storage_service.delete_avatar_prefix(old_key)

@@ -98,6 +98,13 @@ outbox-worker
 
 ---
 
+## In-app notifications (פיד התראות בווב)
+
+- **שרת:** WebSocket **`GET /api/v1/notifications/ws?token=JWT`** — `notification_streamer.stream_user_notifications` + Redis Pub/Sub (ערוץ פנימי `user_{user_id}`). אימות JWT בלבד ב-handshake (`get_current_user_ws`) — ללא DB בזמן החיבור; פירוט ב־[`docs/architecture/REALTIME.md`](docs/architecture/REALTIME.md).
+- **פרונט:** `ChatContext` מרכיב **`useChatNotificationsWebSocket`** מעל **`useReconnectingWebSocket`**; ב־**`onOpen`** (כולל אחרי reconnect) — רענון פיד התראות, טעינת unread מחדש, ודispatch לאירוע מותאם **`linkup-notifications-refresh`** כדי שמסכים יסתנכרנו. **`useChatNotificationsFeed`** מריץ **polling** ל־REST כל **~5 דקות** כגיבוי כשה-WS לא זמין או לא יציב.
+
+---
+
 ## Performance
 
 - **ASGI server (Docker Compose)**: `backend/entrypoint.sh` מריץ `uvicorn` עם `--workers` לפי **`UVICORN_WORKERS`** ב-`backend/.env` (ברירת מחדל **1** אם חסר; ראו `.env.example`: **4**). **מיגרציות** רצות בשירות נפרד **`migrate`** לפני עליית ה-backend. **Healthcheck** על המיכל: `GET /api/v1/health`. **פיתוח לוקאלי** (ללא Docker): בדרך כלל `uvicorn ... --reload` — תהליך יחיד; מיגרציה ידנית (`alembic upgrade head`) לפני הרצה.

@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, Query, status
+from fastapi import Depends, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions.auth import InvalidAccessTokenError, UserInactiveOrMissingError
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.domain.users.crud import crud_user
@@ -38,20 +39,20 @@ async def get_current_user(
     payload = decode_access_token(token)
     if not payload:
         logger.warning("❌ Token decode failed - invalid token or expired")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise InvalidAccessTokenError()
 
     logger.debug(f"✅ Token decoded successfully, payload: {payload}")
 
     user_id = payload.get("sub")
     if not user_id:
         logger.error("❌ Token payload missing 'sub' field")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise InvalidAccessTokenError()
 
     user = await crud_user.get_by_id(db, id=UUID(str(user_id)))
 
     if not user or not user.is_active:
         logger.warning(f"❌ User {user_id} not found or inactive")
-        raise HTTPException(status_code=401, detail="User not found or inactive")
+        raise UserInactiveOrMissingError()
 
     logger.debug(f"✅ User authenticated: {user.email}")
     return user

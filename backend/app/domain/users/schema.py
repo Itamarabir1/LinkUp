@@ -2,7 +2,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field, field_validator
 
-from app.core.config import settings
 from app.core.exceptions.auth import PasswordTooWeakError
 from app.core.exceptions.validation import InvalidEmailError, InvalidPhoneError
 from app.infrastructure.s3.service import storage_service
@@ -56,21 +55,6 @@ class UserBaseSchema(BaseModel):
 
 
 # --- קריאה (Response) ---
-def _avatar_url_from_key(avatar_key: str | None, filename: str) -> str | None:
-    """בונה presigned read URL ל-S3 (GET)."""
-    if not avatar_key or not settings.S3_BUCKET_NAME:
-        return None
-    if avatar_key.startswith("avatars/staging/"):
-        key = avatar_key
-    else:
-        key = f"{avatar_key}{filename}"
-    try:
-        return storage_service.generate_read_url(key)
-    except Exception:
-        # Best-effort: לא מפילים response בגלל בעיית חתימה רגעית.
-        return None
-
-
 class UserRead(BaseModel):
     user_id: UUID
     full_name: str
@@ -87,13 +71,13 @@ class UserRead(BaseModel):
     @property
     def avatar_url_small(self) -> str | None:
         """150x150 — רשימות צ'אט, אווטארים קטנים."""
-        return _avatar_url_from_key(self.avatar_key, "150x150.webp")
+        return storage_service.build_avatar_url(self.avatar_key, "150x150.webp")
 
     @computed_field
     @property
     def avatar_url_medium(self) -> str | None:
         """400x400 — תמונת פרופיל ראשית."""
-        return _avatar_url_from_key(self.avatar_key, "400x400.webp")
+        return storage_service.build_avatar_url(self.avatar_key, "400x400.webp")
 
 
 # app/domain/users/schema.py

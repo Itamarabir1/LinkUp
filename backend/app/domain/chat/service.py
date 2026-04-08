@@ -35,8 +35,8 @@ from app.domain.chat.schema import (
 )
 from app.domain.rides.model import Ride
 from app.domain.users.crud import crud_user
-from app.domain.users.schema import _avatar_url_from_key
 from app.infrastructure.events.publishers.redis import publish_chat_message
+from app.infrastructure.s3.service import storage_service
 from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 
 logger = logging.getLogger(__name__)
@@ -84,7 +84,7 @@ async def get_or_create_conversation(db: AsyncSession, current_user_id: UUID, ot
     partner = ConversationPartner(
         user_id=other.user_id,
         full_name=other.full_name,
-        avatar_url=_avatar_url_from_key(other.avatar_key, "150x150.webp"),
+        avatar_url=storage_service.build_avatar_url(other.avatar_key, "150x150.webp"),
     )
     return ConversationDetail(
         conversation_id=conv.conversation_id,
@@ -120,7 +120,7 @@ async def get_or_create_conversation_by_booking(db: AsyncSession, booking_id: UU
     partner = ConversationPartner(
         user_id=other.user_id,
         full_name=other.full_name,
-        avatar_url=_avatar_url_from_key(other.avatar_key, "150x150.webp"),
+        avatar_url=storage_service.build_avatar_url(other.avatar_key, "150x150.webp"),
     )
     return ConversationDetail(
         conversation_id=conv.conversation_id,
@@ -136,7 +136,7 @@ def _partner_from_conversation(conv, current_user_id: UUID) -> ConversationPartn
     return ConversationPartner(
         user_id=user.user_id,
         full_name=user.full_name,
-        avatar_url=_avatar_url_from_key(user.avatar_key, "150x150.webp"),
+        avatar_url=storage_service.build_avatar_url(user.avatar_key, "150x150.webp"),
     )
 
 
@@ -151,7 +151,7 @@ async def list_my_conversations(db: AsyncSession, current_user_id: UUID) -> list
         partner = ConversationPartner(
             user_id=partner_user.user_id,
             full_name=partner_user.full_name,
-            avatar_url=_avatar_url_from_key(partner_user.avatar_key, "150x150.webp"),
+            avatar_url=storage_service.build_avatar_url(partner_user.avatar_key, "150x150.webp"),
         )
         last = await chat_crud.get_last_message(db, conv.conversation_id)
         has_unread = False

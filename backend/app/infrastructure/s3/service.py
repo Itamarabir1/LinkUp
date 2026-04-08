@@ -94,6 +94,20 @@ class StorageService:
             return f"https://{settings.CLOUDFRONT_DOMAIN}/{encoded_key}"
         return self.client.generate_presigned_read_url(key=key, expiration=expiration)
 
+    def build_avatar_url(self, avatar_key: str | None, filename: str) -> str | None:
+        """מקור אמת יחיד לבניית URL לאווטאר משתמש (לא קבוצות)."""
+        if not avatar_key or not settings.S3_BUCKET_NAME:
+            return None
+        if avatar_key.startswith("avatars/staging/"):
+            key = avatar_key
+        else:
+            key = f"{avatar_key.rstrip('/')}/{filename}"
+        try:
+            return self.generate_read_url(key)
+        except Exception as e:
+            logger.warning("Failed to build avatar URL for key=%s: %s", avatar_key, e, exc_info=True)
+            return None
+
     async def delete_group_image_folder(self, group_id: UUID | str) -> None:
         """מוחק את כל תוכן התיקייה GROUPS/<group_id>/."""
         gid_str = str(group_id)

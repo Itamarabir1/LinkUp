@@ -17,7 +17,7 @@
 | בקשות נוסע | `api/passengers.ts` ← `MyRequests.tsx`, `useSearchRides.ts` | ✅ |
 | חיפוש נסיעות | `passengers` + `rides` + `geo` ב־`useSearchRides` | ✅ |
 | צ'אט (REST) | `api/chat.ts` ← MessageThread, ChatPopup, Messages, `useMyBookings` | ✅ |
-| התראות / unread | `users.fetchMyNotifications` + `chat.fetchUnreadMessageCount` ב־`ChatContext` | ✅ |
+| התראות / unread | `users.fetchMyNotifications` + `chat.fetchUnreadMessageCount` ב־`ChatContext`; פיד חי — `useChatNotificationsWebSocket` (`useReconnectingWebSocket`, **`onOpen`** מרענן פיד + unread); גיבוי — `useChatNotificationsFeed` (polling REST ~5 דקות) | ✅ |
 | מיקום | `bookings.postDriverBookingLocation` / `postPassengerBookingLocation` + `fetchRideManifest`; הוקים `useLocationBroadcast`, `usePassengerLocationBroadcast`, `useLocationWatcher` (throttle 1.5s, `maximumAge: 0`); WS `useDriverLocation`, `usePassengerLocations`; `useMapMarker` + `LiveMapModal` / `LiveRideMapModal` | ✅ |
 | WebSocket read | `chat.markConversationRead` (כולל `useChatWebSocket`) | ✅ |
 | מפתח מפות | `geo.fetchMapsKey` ב־`useGoogleMapsKey` (וב־`RouteMapModal`) | ✅ |
@@ -54,7 +54,7 @@
 
 | רכיב | סטטוס |
 |------|--------|
-| `ChatContext` + `chatReducer` + `useChatNotificationsFeed` (פיד התראות מסונכרן עם מצב צ’אט) | ✅ |
+| `ChatContext` + `chatReducer` + `useChatNotificationsFeed` + `useChatNotificationsWebSocket` (פיד התראות מסונכרן עם מצב צ’אט; WS ראשי, poll גיבוי) | ✅ |
 | `AuthContext` פיצול שירות session נפרד | ⬜ אופציונלי |
 | `GroupContext` — `myGroups`, **`activeChipId`** משותף ל־MyRides/MyRequests, `refreshGroups`; איפוס צ’יפ אחרי leave/close ב־`useGroupManageMutations` | ✅ |
 

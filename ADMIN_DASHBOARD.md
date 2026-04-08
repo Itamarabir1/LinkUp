@@ -29,15 +29,20 @@ frontend/src/features/admin/
 
 ## Screens & API
 
+כל הנתיבים עם קידומת **`/api/v1/admin`** (הטבלה מקוצרת ל-`/admin/...`).
+
 | Screen   | Endpoints |
 |----------|-----------|
-| Home     | `GET /admin/stats` (aggregates) |
-| Health   | `GET /admin/health` |
-| Users    | `GET /admin/users`, `PATCH .../users/{id}/active`, `PATCH .../users/{id}/admin` |
-| Rides    | `GET /admin/rides?status=`, `POST /admin/rides/{id}/cancel` |
-| Groups   | `GET /admin/groups` |
-| Outbox   | `GET /admin/outbox`, `GET .../outbox/{id}`, `POST .../outbox/{id}/requeue` (FAILED only) |
-| Lookup   | `GET /admin/rides/{id}`, `GET /admin/bookings/{id}` |
+| (API)    | `GET /admin/me` — אימות מצב אדמין בשרת (מיוצא ב-`frontend/src/features/admin/api/admin.ts` כ-`fetchAdminMe`; ה-UI נשען בעיקר על `AuthContext` + `AdminRoute`) |
+| Home     | `GET /admin/stats` (אגרגציות + `users_per_day`) |
+| Health   | `GET /admin/health` (אותו `check_health` כמו בריאות ציבורית, מאחורי אדמין) |
+| Users    | `GET /admin/users` (query: `limit`, עד 200), `PATCH /admin/users/{id}/active`, `PATCH /admin/users/{id}/admin` |
+| Rides    | `GET /admin/rides` (query: `status` = `active` \| `completed` \| `cancelled` או חסר לכל האחרונות; `limit` עד 500), `POST /admin/rides/{ride_id}/cancel` |
+| Groups   | `GET /admin/groups` (query: `limit` עד 500) |
+| Outbox   | `GET /admin/outbox`, `GET /admin/outbox/{event_id}`, `POST /admin/outbox/{event_id}/requeue` (רק **FAILED**) |
+| Lookup   | `GET /admin/rides/{ride_id}`, `GET /admin/bookings/{booking_id}` |
+
+**403 לא-אדמין:** `get_current_admin_user` מעלה **`AdminAccessRequiredError`** — **403** עם פורמט JSON אחיד (`error_code`: **`ADMIN_ACCESS_REQUIRED`**) — ראו [`docs/ERRORS.md`](docs/ERRORS.md).
 
 ## Step 5 — optional later
 

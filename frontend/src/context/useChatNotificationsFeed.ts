@@ -73,7 +73,7 @@ export function useChatNotificationsFeed(
       return;
     }
     queueMicrotask(() => void refreshUnreadNotifications());
-    const interval = setInterval(() => void refreshUnreadNotifications(), 30000);
+    const interval = setInterval(() => void refreshUnreadNotifications(), 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [userId, refreshUnreadNotifications, dispatch]);
 

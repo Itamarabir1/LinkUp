@@ -45,6 +45,8 @@ FCM delivery has two connected paths:
   7. `getToken` with VAPID key and the same SW registration.
   8. `PATCH /users/fcm-token` with `{ "fcm_token": "<token>" }` (or `{ "fcm_token": null }` on logout to clear `users.fcm_token` in the DB).
 
+- **Logging:** verbose registration / token paths use **`devLog`** and only emit when **`import.meta.env.DEV`** is true, so production consoles stay quiet; `console.warn` in some failure paths may still appear for operational diagnostics.
+
 ### 2.3 Foreground vs background
 
 - **Background**

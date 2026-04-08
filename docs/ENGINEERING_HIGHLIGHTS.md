@@ -16,7 +16,7 @@
 | **נסיעות** | פרסום נסיעות, חיפוש (כולל גיאו / PostGIS), סטטוסים, שיוך לקבוצה / ציבורי |
 | **הזמנות** | בקשה, אישור/דחייה, race-safe (locks) |
 | **צ’אט** | הודעות real-time, typing, נראות (online / last seen), **unread** (Redis→WS), קריאת שיחה; **Zod** על הודעה נכנסת ב־WS — `ChatMessageSchema` + מיפוי מפורש ל־`MessageResponse` ב־`processChatWebSocketMessage` |
-| **קבוצות** | יצירה, **קוד הזמנה** (`invite_code`), הצטרפות בקישור, ניהול admin |
+| **קבוצות** | יצירה, **קוד הזמנה** Base62 (8 תווים, `secrets`), יצירה עם **`flush` + retry על `IntegrityError`** רק ל־duplicate על `invite_code`, **`commit`** אחד לקבוצה + חבר admin יוצר; אחרי כשלונות חוזרים — `LinkupError` **`INVITE_CODE_GENERATION_FAILED`** (`app/domain/groups/crud.py`) |
 | **AI** | סיום שיחה → ניתוח (Groq) → שמירה + התראות |
 | **התראות** | מייל (**Brevo**), Push (**FCM** — מהשרת רק מפת `data` ב־FCM, בלי שדה `notification` של Firebase; בחזית **Toast קופץ + צליל**, ברקע התראת מערכת דרך SW), in-app |
 | **משתמשים** | JWT + Refresh ב-DB, **כניסה עם Google** (OAuth / `id_token`), אווטאר (S3 + worker; **קריאה:** CloudFront כשמוגדר או presigned); שדה **`is_admin`** לגישה ל־`/api/v1/admin/*` |
@@ -396,7 +396,7 @@
 | **שגיאות** | `getApiErrorMessage` / `getApiStatus` / `isTimeoutOrAbortError` ב־`utils/apiError.ts` + **Vitest** (`apiError.test.ts`). |
 | **Code splitting** | **`React.lazy` + `Suspense`** לדפים (טעינה עצלה), מסכי טעינה עקביים; **מסלולי `/admin/*`** נטענים עצלנית דרך מודול `features/admin`. |
 | **State גלובלי** | **`ChatContext`** + `chatReducer`; **`GroupContext`** — רשימת קבוצות, `activeChipId` משותף ל־**MyRides** / **MyRequests** (פילטר צ’יפים); איפוס צ’יפ אחרי leave/close קבוצה בזרימות ניהול. |
-| **התראות צ’אט** | **`useChatNotificationsFeed`** — טעינת פיד התראות מסונכרנת עם מצב הצ’אט (פחות רענונים מיותרים). |
+| **פיד התראות (in-app)** | **`useChatNotificationsWebSocket`** (`useReconnectingWebSocket`, **`onOpen`** → רענון פיד + unread + `linkup-notifications-refresh`) + **`useChatNotificationsFeed`** — polling REST **~5 דקות** כגיבוי; משולב ב־`ChatContext`. |
 | **בקשות נוסע** | הוק **`useMyRequests`** — לוגיקת MyRequests מרוכזת. |
 | **הזמנות שלי (VM)** | **`useMyBookings`** — אגרגציה מפורשת מ־`useMyBookingsPassenger` + `useMyBookingsDriver` (ללא spread), חוזה גלוי ל־`MyBookings/index.tsx`. |
 | **עיצוב** | **`tokens.css`**, `ThemeContext`, מצב כהה — פחות אינליין CSS בדפי auth. |

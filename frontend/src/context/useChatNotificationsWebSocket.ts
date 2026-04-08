@@ -21,6 +21,7 @@ export function useChatNotificationsWebSocket(
     enabled: !!userId,
     reconnectKey: userId ?? null,
     reconnectDelayMs: 4000,
+    onOpen: onRefresh,
     onMessage: (ev) => {
       try {
         const result = NotificationRefreshEventSchema.safeParse(JSON.parse(String(ev.data)) as unknown);

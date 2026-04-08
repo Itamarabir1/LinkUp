@@ -92,12 +92,19 @@ Client → GET /api/v1/chat/conversations/{id}/calendar.ics (backend)
        → מחזיר קובץ .ics
 ```
 
+## התראות: שני ערוצים (חשוב)
+
+- **`chat:notification:*` (Redis → chat-ws)** — דחיפות הקשורות ל**צ'אט**; chat-ws מנתב ללקוח על אותו חיבור WS של הצ'אט (`/ws`).
+- **פיד התראות האפליקציה (מסך / באדג')** — **לא** עובר ב-chat-ws. הלקוח (ווב) מתחבר ל־**FastAPI** — **`GET /api/v1/notifications/ws?token=JWT`** — Redis Pub/Sub פנימי (`user_{user_id}`). בפרונט: `useChatNotificationsWebSocket` + גיבוי polling ב־`useChatNotificationsFeed` — ראו [`ARCHITECTURE.md`](../ARCHITECTURE.md) בשורש ו־[`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md).
+
 ## סיכום
 
 | Feature | Location | Reason |
 |---------|----------|--------|
 | WebSocket connections | chat-ws (Go) | Real-time, performance |
 | REST API endpoints | backend (Python) | Standard API pattern |
+| In-app notification **feed** WS (app bell / list) | backend (FastAPI `/notifications/ws`) | אותו מחזור חיים כמו WS נסיעות; Redis נפרד מערוצי הצ'אט |
+| Chat-related notification fan-out | chat-ws (via `chat:notification:*`) | חיבור WS יחיד לשיחה |
 | Calendar export | backend (Python) | API endpoint |
 | AI analysis | backend worker (outbox-worker) | Async, Redis DB 1 listener |
 | AI analysis results API | backend (Python) | API endpoint |

@@ -1,10 +1,17 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_current_user, get_db
+from app.core.exceptions.group import (
+    GroupAdminRequiredError,
+    GroupInvalidImageKeyError,
+    GroupMemberNotFoundError,
+    GroupNotFoundError,
+    GroupNotMemberError,
+)
 from app.api.dependencies.services import get_ride_service
 from app.domain.groups import crud, service
 from app.domain.groups.schema import (
@@ -51,7 +58,7 @@ async def get_group_by_invite(
 ):
     group = await crud.get_group_by_invite_code(db, invite_code)
     if not group:
-        raise HTTPException(status_code=404, detail="קבוצה לא נמצאה")
+        raise GroupNotFoundError()
     count = await crud.get_member_count(db, group.group_id)
     return group_to_out(group, count)
 
@@ -73,7 +80,7 @@ async def get_members(
 ):
     membership = await crud.get_membership(db, group_id, current_user.user_id)
     if not membership:
-        raise HTTPException(status_code=403, detail="אינך חבר בקבוצה")
+        raise GroupNotMemberError()
     members = await crud.get_group_members(db, group_id)
     return [group_member_to_out(m) for m in members]
 
@@ -88,7 +95,7 @@ async def get_group_rides(
     """פיד נסיעות של הקבוצה. רק חברי הקבוצה יכולים לראות."""
     membership = await crud.get_membership(db, group_id, current_user.user_id)
     if not membership:
-        raise HTTPException(status_code=403, detail="אינך חבר בקבוצה")
+        raise GroupNotMemberError()
     return await ride_svc.get_rides_by_group_id(db, group_id)
 
 
@@ -101,9 +108,9 @@ async def get_group_image_upload_url(
     """מנהל בלבד. מחזיר presigned URL להעלאת תמונת קבוצה."""
     group = await crud.get_group_by_id(db, group_id)
     if not group:
-        raise HTTPException(status_code=404, detail="קבוצה לא נמצאה")
+        raise GroupNotFoundError(group_id)
     if group.admin_id != current_user.user_id:
-        raise HTTPException(status_code=403, detail="רק אדמין יכול להעלות תמונת קבוצה")
+        raise GroupAdminRequiredError()
     upload_url, key = await storage_service.generate_group_image_upload_url(group_id)
     return GroupImageUploadResponse(upload_url=upload_url, key=key)
 
@@ -118,12 +125,12 @@ async def confirm_group_image(
     """מנהל בלבד. מאשר העלאה ומעדכן את avatar_key של הקבוצה."""
     group = await crud.get_group_by_id(db, group_id)
     if not group:
-        raise HTTPException(status_code=404, detail="קבוצה לא נמצאה")
+        raise GroupNotFoundError(group_id)
     if group.admin_id != current_user.user_id:
-        raise HTTPException(status_code=403, detail="רק אדמין יכול לעדכן תמונת קבוצה")
+        raise GroupAdminRequiredError()
     expected_prefix = f"GROUPS/{group_id}/"
     if not data.key.startswith(expected_prefix):
-        raise HTTPException(status_code=400, detail="מפתח תמונה לא תקין")
+        raise GroupInvalidImageKeyError()
     group = await crud.update_group_avatar_key(db, group, data.key)
     count = await crud.get_member_count(db, group_id)
     return group_to_out(group, count)
@@ -138,9 +145,9 @@ async def delete_group_image(
     """מנהל בלבד. מוחק תמונת קבוצה מ-S3 ומאפס avatar_key."""
     group = await crud.get_group_by_id(db, group_id)
     if not group:
-        raise HTTPException(status_code=404, detail="קבוצה לא נמצאה")
+        raise GroupNotFoundError(group_id)
     if group.admin_id != current_user.user_id:
-        raise HTTPException(status_code=403, detail="רק אדמין יכול למחוק תמונת קבוצה")
+        raise GroupAdminRequiredError()
     try:
         await storage_service.delete_group_image_folder(group_id)
     except Exception as e:
@@ -159,7 +166,7 @@ async def remove_member(
 ):
     membership = await crud.get_membership(db, group_id, current_user.user_id)
     if not membership or membership.role != "admin":
-        raise HTTPException(status_code=403, detail="רק אדמין יכול להסיר חברים")
+        raise GroupAdminRequiredError()
     await crud.remove_member(db, group_id, user_id)
 
 
@@ -172,10 +179,10 @@ async def promote_member(
 ):
     membership = await crud.get_membership(db, group_id, current_user.user_id)
     if not membership or membership.role != "admin":
-        raise HTTPException(status_code=403, detail="רק אדמין יכול לקדם חברים")
+        raise GroupAdminRequiredError()
     member = await crud.update_member_role(db, group_id, user_id, "admin")
     if not member:
-        raise HTTPException(status_code=404, detail="חבר לא נמצא")
+        raise GroupMemberNotFoundError(user_id)
     return group_member_to_out(member)
 
 
@@ -196,9 +203,9 @@ async def close_group(
 ):
     group = await crud.get_group_by_id(db, group_id)
     if not group:
-        raise HTTPException(status_code=404, detail="קבוצה לא נמצאה")
+        raise GroupNotFoundError(group_id)
     if group.admin_id != current_user.user_id:
-        raise HTTPException(status_code=403, detail="רק אדמין יכול לסגור קבוצה")
+        raise GroupAdminRequiredError()
     await crud.close_group(db, group)
 
 
@@ -211,9 +218,9 @@ async def update_group(
 ):
     group = await crud.get_group_by_id(db, group_id)
     if not group:
-        raise HTTPException(status_code=404, detail="קבוצה לא נמצאה")
+        raise GroupNotFoundError(group_id)
     if group.admin_id != current_user.user_id:
-        raise HTTPException(status_code=403, detail="רק אדמין יכול לעדכן קבוצה")
+        raise GroupAdminRequiredError()
     if data.name is not None:
         group = await crud.rename_group(db, group, data.name)
     if data.description is not None:

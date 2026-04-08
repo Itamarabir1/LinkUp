@@ -60,3 +60,7 @@ npm run ios
 ## CORS
 
 - ב-Backend יש להגדיר ב-`CORS_ORIGINS` או `FRONTEND_URL` את כתובת האפליקציה (למשל `http://localhost:8081` ל-Expo ב-dev).
+
+## הערה על התראות (ווב לעומת מובייל)
+
+באפליקציית ה**ווב** פיד ההתראות הכללי משלב WebSocket ל־`/api/v1/notifications/ws` וגיבוי REST (ראו `ARCHITECTURE.md` / `frontend/docs/ARCHITECTURE.md`). באפליקציית **מובייל** יש לוודא מול הקוד ב־`mobile/src` אילו מסכים נשענים על REST בלבד או על ערוצים נוספים — לא להניח זהות מלאה עם הפרונט בלי בדיקה.

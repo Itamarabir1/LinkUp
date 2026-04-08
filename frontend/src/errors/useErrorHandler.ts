@@ -12,6 +12,7 @@ const CODE_MESSAGES: Record<string, string> = {
   CHAT_ROOM_NOT_FOUND: 'השיחה לא נמצאה',
   CHAT_UNAUTHORIZED_ACCESS: 'אין הרשאה לשיחה זו',
   CHAT_MESSAGE_SEND_FAILED: 'שליחת ההודעה נכשלה',
+  ADMIN_ACCESS_REQUIRED: 'נדרשות הרשאות מנהל',
 };
 
 export function useErrorHandler() {

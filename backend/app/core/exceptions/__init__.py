@@ -1,9 +1,17 @@
 # app/core/exceptions/__init__.py
 """ייצוא מרכזי של כל שגיאות הדומיין – שימוש: from app.core.exceptions import LinkupError, UserNotFoundError, ..."""
 
+# Admin
+from .admin import (
+    AdminAccessRequiredError,
+    OutboxEventNotFoundError,
+    OutboxRequeueInvalidStatusError,
+)
+
 # Auth
 from .auth import (
     GoogleAuthFailed,
+    InvalidAccessTokenError,
     InvalidCredentialsError,
     InvalidPasswordError,
     InvalidRefreshTokenError,
@@ -14,6 +22,7 @@ from .auth import (
     PasswordTooWeakError,
     PermissionDeniedError,
     SessionExpiredError,
+    UserInactiveOrMissingError,
     UserNotVerifiedError,
     VerificationCodeExpiredError,
 )
@@ -32,12 +41,23 @@ from .booking import (
 # Chat
 from .chat import ChatRoomNotFound, MessageSendFailed, UnauthorizedChatAccess
 
+# Group
+from .group import (
+    GroupAdminRequiredError,
+    GroupFilterAuthRequiredError,
+    GroupInvalidImageKeyError,
+    GroupMemberNotFoundError,
+    GroupNotFoundError,
+    GroupNotMemberError,
+)
+
 # Infrastructure
 from .infrastructure import (
     CacheConnectionError,
     ExternalServiceError,
     GeocodingError,
     InfrastructureError,
+    InternalServerError,
     QueueServiceError,
     RateLimitExceeded,
     RedisUnavailable,
@@ -84,6 +104,7 @@ from .user import (
 
 # Validation
 from .validation import (
+    BadRequestError,
     FileTooLargeError,
     InsufficientSeatsError,
     InvalidEmailError,
@@ -95,6 +116,8 @@ from .validation import (
 
 __all__ = [
     "ActiveBookingExistsError",
+    "AdminAccessRequiredError",
+    "BadRequestError",
     "BookingAlreadyExistsError",
     "BookingNotFoundError",
     "CacheConnectionError",
@@ -106,7 +129,15 @@ __all__ = [
     "ForbiddenRideActionError",
     "GeocodingError",
     "GoogleAuthFailed",
+    "GroupAdminRequiredError",
+    "GroupFilterAuthRequiredError",
+    "GroupInvalidImageKeyError",
+    "GroupMemberNotFoundError",
+    "GroupNotFoundError",
+    "GroupNotMemberError",
     "InfrastructureError",
+    "InternalServerError",
+    "InvalidAccessTokenError",
     "InsufficientPermissionsForRide",
     "InsufficientSeatsError",
     "InvalidCredentialsError",
@@ -126,6 +157,8 @@ __all__ = [
     "NewPasswordSameAsOldError",
     "NoSeatsAvailableError",
     "NotificationError",
+    "OutboxEventNotFoundError",
+    "OutboxRequeueInvalidStatusError",
     "PassengerRequestNotFoundError",
     "PasswordSameAsOldError",
     "PasswordTooWeakError",
@@ -148,6 +181,7 @@ __all__ = [
     "SessionExpiredError",
     "StorageServiceError",
     "UnauthorizedChatAccess",
+    "UserInactiveOrMissingError",
     "UserNotFoundError",
     "UserNotVerifiedError",
     "VerificationCodeExpiredError",

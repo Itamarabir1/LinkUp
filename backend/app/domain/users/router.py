@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_current_user
@@ -38,7 +38,7 @@ async def update_last_seen(
 ):
     ok = await crud_user.update_last_active(db, user_id=current_user.user_id)
     if not ok:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise UserNotFoundError(identifier=str(current_user.user_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

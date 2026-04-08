@@ -1,11 +1,32 @@
+import logging
 import secrets
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.exceptions.base import LinkupError
 from app.domain.groups.model import Group, GroupMember
+
+logger = logging.getLogger(__name__)
+
+_BASE62 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+
+def _generate_invite_code(length: int = 8) -> str:
+    return "".join(secrets.choice(_BASE62) for _ in range(length))
+
+
+def _is_invite_code_unique_violation(exc: IntegrityError) -> bool:
+    """התאמה ל-duplicate על invite_code (PostgreSQL / asyncpg)."""
+    parts: list[str] = []
+    if exc.orig is not None:
+        parts.append(str(exc.orig))
+    parts.append(str(exc))
+    msg = " ".join(parts).lower()
+    return "invite_code" in msg or getattr(exc.orig, "pgcode", None) == "23505"
 
 
 async def create_group(
@@ -15,22 +36,37 @@ async def create_group(
     max_members: int | None = None,
     description: str | None = None,
 ) -> Group:
-    invite_code = secrets.token_urlsafe(16)
     desc_trimmed = description[:500] if description else None
-    group = Group(
-        name=name,
-        invite_code=invite_code,
-        admin_id=admin_id,
-        max_members=max_members,
-        description=desc_trimmed,
-    )
-    db.add(group)
-    await db.commit()
-    await db.refresh(group)
-    # הוסף את ה-admin כ-member
+
+    for attempt in range(5):
+        invite_code = _generate_invite_code()
+        group = Group(
+            name=name,
+            invite_code=invite_code,
+            admin_id=admin_id,
+            max_members=max_members,
+            description=desc_trimmed,
+        )
+        db.add(group)
+        try:
+            await db.flush()
+            break
+        except IntegrityError as e:
+            await db.rollback()
+            if not _is_invite_code_unique_violation(e):
+                raise
+            if attempt == 4:
+                logger.warning("Failed to generate unique invite_code after 5 attempts")
+                raise LinkupError(
+                    message="שגיאה ביצירת קוד הזמנה",
+                    status_code=500,
+                    error_code="INVITE_CODE_GENERATION_FAILED",
+                )
+
     member = GroupMember(group_id=group.group_id, user_id=admin_id, role="admin")
     db.add(member)
     await db.commit()
+    await db.refresh(group)
     return group
 
 

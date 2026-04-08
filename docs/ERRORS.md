@@ -13,7 +13,7 @@
   "status": "error",
   "error_code": "BOOKING_NOT_FOUND",
   "message": "ההזמנה לא נמצאה",
-  "trace_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "trace_id": "a1b2c3d4",
   "details": {}
 }
 ```
@@ -21,8 +21,8 @@
 - **`status`**: תמיד `"error"` בתגובות מטופלות ע״י ה-handlers.
 - **`error_code`**: מזהה יציב ללקוחות וללוגים — **SCREAMING_SNAKE_CASE**.
 - **`message`**: טקסט להצגה למשתמש (בדרך כלל בעברית בדומיינים פנימיים).
-- **`trace_id`**: מזהה למעקב — ב-backend זה **`request_id`** מה-middleware (מופיע גם בכותרת `X-Request-ID` כשמוגדר). ב-chat-ws: אם נשלח `X-Request-ID` — משתמשים בו; אחרת מזהה קצר אקראי.
-- **`details`**: אופציונלי. לדוגמה ב-**`VALIDATION_ERROR`**: `details.fields` — מערך `{ "field", "message" }`.
+- **`trace_id`**: מזהה למעקב — ב-backend זה **`request_id`** מה-middleware (**8 תווים**, אותו ערך בכותרת **`X-Request-ID`**), כולל בתגובות **`LinkupError`**. אם לעת נדיר אין `request_id` על הבקשה — נופלים ל-UUID פנימי שנוצר בחריגה. ב-chat-ws: אם נשלח `X-Request-ID` — משתמשים בו; אחרת מזהה קצר אקראי.
+- **`details`**: אובייקט. ב-**`VALIDATION_ERROR`**: `details.fields` — מערך `{ "field", "message" }`. ב-**`LinkupError`**: תואם ל-**`payload`** של החריגה בשרת (יכול להיות `{}`).
 
 דוגמה ל-**validation** (422):
 
@@ -62,7 +62,11 @@
 | CHAT_UNAUTHORIZED_ACCESS | 403 | backend | צ׳אט |
 | CHAT_MESSAGE_SEND_FAILED | 500 | backend | צ׳אט |
 | NOTIFICATION_* | לפי המחלקה | backend | התראות |
+| GROUP_* / **INVITE_CODE_GENERATION_FAILED** | לפי המחלקה | backend | קבוצות (`GROUP_NOT_FOUND`, `GROUP_FULL`, …; יצירת קבוצה — כשל ייחוד `invite_code` אחרי retries) |
+| **ADMIN_ACCESS_REQUIRED** | 403 | backend | גישה ל-**`/api/v1/admin/*`** בלי `user.is_admin` — **`AdminAccessRequiredError`** ב-`app/api/dependencies/admin.py` |
 | METHOD_NOT_ALLOWED / UNAUTHORIZED / INVALID_TOKEN / BAD_REQUEST / REDIS_UNAVAILABLE | לפי הקוד | chat-ws | HTTP ב-presence / לפני WebSocket upgrade |
+
+**חריגים לפורמט אחיד:** נקודות שעדיין משתמשות ב-**`HTTPException`** של FastAPI מחזירות **`{"detail": ...}`** (למשל חלק מ-404 פנימיים בראוטר אדמין). רוב דומיין ה-API משתמש ב-**`LinkupError`**.
 
 רשימה מלאה: קבצים תחת `backend/app/core/exceptions/`.
 
@@ -70,7 +74,7 @@
 
 ## 3. `trace_id` לעומת `request_id`
 
-- ב-**backend**, ה-middleware מגדיר **`request.state.request_id`** (UUID) לכל בקשה. אותו ערך נשלח בגוף JSON כ-**`trace_id`** בתגובות שגיאה מטופלות, ולעיתים גם בכותרת **`X-Request-ID`**.
+- ב-**backend**, ה-middleware מגדיר **`request.state.request_id`** (**8 תווים**, קידומת מ-`uuid.uuid4()`) לכל בקשה. אותו ערך נשלח בכותרת **`X-Request-ID`** ובגוף JSON כ-**`trace_id`** בתגובות שגיאה מטופלות (**`LinkupError`**, validation, `IntegrityError`, `SQLAlchemyError`).
 - המונח **`trace_id`** ב-JSON הוא השדה הסטנדרטי ללקוח (כולל פרונט) כדי להציג למשתמש או לשלוח לתמיכה; ערכו בפועל הוא ה-**request id** של אותה בקשה.
 - ב-**chat-ws**, אם הלקוח שולח **`X-Request-ID`**, אותו ערך יופיע ב-**`trace_id`** בתגובת JSON; אחרת נוצר מזהה קצר.
 
@@ -94,7 +98,7 @@
 
 ### שלב ג — Frontend
 
-1. אם צריך מיפוי ייעודי בעברית ב-UI: הוסיפו `error_code` ל-`CODE_MESSAGES` ב-`src/errors/useErrorHandler.ts` (אופציונלי — ברירת המחדל היא להשתמש ב-`message` מהשרת).
+1. אם צריך מיפוי ייעודי בעברית ב-UI: הוסיפו `error_code` ל-`CODE_MESSAGES` ב-[`frontend/src/errors/useErrorHandler.ts`](../frontend/src/errors/useErrorHandler.ts) (אופציונלי — ברירת המחדל היא להשתמש ב-`message` מהשרת).
 2. ודאו שהבקשה עוברת דרך `api` מ-`src/api/client.ts` כדי שיופיעו לוגים/עתיד Sentry על שגיאות שאינן 401.
 
 ---
@@ -113,3 +117,5 @@
 
 - ארכיטקטורה כללית: [../ARCHITECTURE.md](../ARCHITECTURE.md)
 - Backend README: [../backend/README.md](../backend/README.md)
+- מסך אדמין + מפת API: [../ADMIN_DASHBOARD.md](../ADMIN_DASHBOARD.md)
+- Handler מרכזי (פורמט JSON): [`backend/app/core/exceptions/handlers.py`](../backend/app/core/exceptions/handlers.py)

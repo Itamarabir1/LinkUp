@@ -2,12 +2,16 @@ import logging
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.dependencies.admin import get_current_admin_user
+from app.core.exceptions.admin import OutboxEventNotFoundError, OutboxRequeueInvalidStatusError
+from app.core.exceptions.booking import BookingNotFoundError
+from app.core.exceptions.ride import RideNotFoundError
+from app.core.exceptions.user import UserNotFoundError
 from app.api.dependencies.services import get_ride_service
 from app.db.session import get_db
 from app.domain.bookings.enum import BookingStatus
@@ -181,7 +185,7 @@ async def admin_toggle_user_active(
 ):
     u = await crud_user.get_by_id(db, user_id)
     if not u:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise UserNotFoundError(identifier=str(user_id))
     u.is_active = not bool(u.is_active)
     await db.commit()
     await db.refresh(u)
@@ -201,7 +205,7 @@ async def admin_toggle_user_admin(
 ):
     u = await crud_user.get_by_id(db, user_id)
     if not u:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise UserNotFoundError(identifier=str(user_id))
     u.is_admin = not bool(u.is_admin)
     await db.commit()
     await db.refresh(u)
@@ -355,7 +359,7 @@ async def admin_outbox_by_id(
     result = await db.execute(stmt)
     e = result.scalars().first()
     if not e:
-        raise HTTPException(status_code=404, detail="Outbox event not found")
+        raise OutboxEventNotFoundError(event_id)
     return {
         "id": str(e.id),
         "event_name": e.event_name,
@@ -380,9 +384,9 @@ async def admin_outbox_requeue(
     result = await db.execute(stmt)
     e = result.scalars().first()
     if not e:
-        raise HTTPException(status_code=404, detail="Outbox event not found")
+        raise OutboxEventNotFoundError(event_id)
     if e.status != "FAILED":
-        raise HTTPException(status_code=400, detail="Only FAILED events can be requeued")
+        raise OutboxRequeueInvalidStatusError()
     await db.execute(
         update(OutboxEvent)
         .where(OutboxEvent.id == event_id)
@@ -407,7 +411,7 @@ async def admin_ride_by_id(
     result = await db.execute(stmt)
     r = result.scalars().first()
     if not r:
-        raise HTTPException(status_code=404, detail="Ride not found")
+        raise RideNotFoundError(ride_id)
     status_val = getattr(r.status, "value", None) or str(r.status)
     return {
         "ride_id": str(r.ride_id),
@@ -435,7 +439,7 @@ async def admin_booking_by_id(
     result = await db.execute(stmt)
     b = result.scalars().first()
     if not b:
-        raise HTTPException(status_code=404, detail="Booking not found")
+        raise BookingNotFoundError(booking_id)
     status_val = getattr(b.status, "value", None) or str(b.status)
     return {
         "booking_id": str(b.booking_id),

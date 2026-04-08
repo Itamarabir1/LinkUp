@@ -121,3 +121,12 @@ class ExternalServiceError(LinkupError):
     status_code = 502
     error_code = "EXTERNAL_SERVICE_ERROR"
     message = "שירות חיצוני אינו זמין או החזיר שגיאה"
+
+
+class InternalServerError(LinkupError):
+    status_code = 500
+    error_code = "INTERNAL_ERROR"
+    message = "שגיאת שרת פנימית"
+
+    def __init__(self, message: str | None = None):
+        super().__init__(message=message if message is not None else InternalServerError.message)

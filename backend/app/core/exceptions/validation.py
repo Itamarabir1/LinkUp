@@ -104,6 +104,16 @@ class InsufficientSeatsError(LinkupError):
         )
 
 
+class BadRequestError(LinkupError):
+    """בקשה לא תקינה כללית (למשל ValueError ממחלקת שירות)."""
+
+    status_code = 400
+    error_code = "BAD_REQUEST"
+
+    def __init__(self, message: str):
+        super().__init__(message=message)
+
+
 class SameOriginDestinationError(LinkupError):
     status_code = 400
     error_code = "VAL_SAME_ORIGIN_DESTINATION"

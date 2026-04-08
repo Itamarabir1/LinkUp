@@ -1,18 +1,12 @@
 # app/domain/bookings/router.py
 from uuid import UUID
 
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    WebSocket,
-    WebSocketDisconnect,
-    status,
-)
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import WsUser, get_current_user, get_current_user_ws
-from app.core.exceptions.booking import ForbiddenRideActionError
+from app.core.exceptions.booking import BookingNotFoundError, ForbiddenRideActionError
+from app.core.exceptions.validation import BadRequestError
 from app.db.session import get_db
 from app.domain.bookings.crud import crud_booking
 from app.domain.bookings.enum import BookingStatus
@@ -59,7 +53,7 @@ async def request_to_join(
             current_user_id=current_user.user_id,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(str(e)) from e
 
 
 @router.patch("/{booking_id}/approve", response_model=BookingResponse)
@@ -80,7 +74,7 @@ async def reject_booking(
     try:
         return await BookingService.reject_booking(db, booking_id=booking_id, driver_id=current_user.user_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(str(e)) from e
 
 
 @router.post("/{booking_id}/cancel", response_model=BookingResponse)
@@ -128,7 +122,7 @@ async def get_booking(
 ):
     booking = await BookingService.get_booking(db, booking_id)
     if str(booking.passenger_id) != str(current_user.user_id) and str(booking.ride.driver_id) != str(current_user.user_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="גישה חסומה")
+        raise ForbiddenRideActionError("גישה חסומה")
     return booking
 
 
@@ -145,14 +139,11 @@ async def report_driver_location(
     """
     booking = await BookingService.get_booking(db, booking_id)
     if not booking or not booking.ride:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+        raise BookingNotFoundError(booking_id)
     if str(booking.ride.driver_id) != str(current_user.user_id):
         raise ForbiddenRideActionError("גישה חסומה – רק נהג הנסיעה יכול לדווח מיקום")
     if booking.ride.status != RideStatus.ACTIVE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="ניתן לדווח מיקום רק בנסיעה פעילה (active)",
-        )
+        raise BadRequestError("ניתן לדווח מיקום רק בנסיעה פעילה (active)")
     confirmed = await crud_booking.get_ride_bookings_by_status_async(db, booking.ride_id, BookingStatus.CONFIRMED)
     involved = [b.booking_id for b in confirmed]
     location_in = LocationUpdate(
@@ -179,7 +170,7 @@ async def report_passenger_location(
     """
     booking = await BookingService.get_booking(db, booking_id)
     if not booking or not booking.ride:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+        raise BookingNotFoundError(booking_id)
     if str(booking.passenger_id) != str(current_user.user_id):
         raise ForbiddenRideActionError("גישה חסומה – רק הנוסע של ההזמנה יכול לדווח מיקום")
     await broadcast_passenger_location_to_driver(

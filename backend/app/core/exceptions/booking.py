@@ -1,6 +1,8 @@
 # app/core/exceptions/booking.py
 """שגיאות דומיין הזמנות ונהג/נוסע."""
 
+from uuid import UUID
+
 from .base import LinkupError
 
 
@@ -51,9 +53,12 @@ class BookingNotFoundError(LinkupError):
     error_code = "BOOKING_NOT_FOUND"
     message = "הזמנה לא נמצאה"
 
-    def __init__(self, booking_id: int | None = None):
-        payload = {"booking_id": booking_id} if booking_id is not None else None
-        super().__init__(payload=payload)
+    def __init__(self, booking_id: int | str | UUID | None = None):
+        if booking_id is None:
+            super().__init__()
+            return
+        bid = str(booking_id) if isinstance(booking_id, UUID) else booking_id
+        super().__init__(payload={"booking_id": bid})
 
 
 class NoSeatsAvailableError(LinkupError):

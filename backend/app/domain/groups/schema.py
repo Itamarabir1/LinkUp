@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -8,6 +9,8 @@ from sqlalchemy import inspect as sa_inspect
 from app.core.config import settings
 from app.infrastructure.s3.service import storage_service
 
+logger = logging.getLogger(__name__)
+
 
 def _group_avatar_url(avatar_key: str | None) -> str | None:
     """בונה presigned read URL לתמונת קבוצה מ-S3."""
@@ -15,7 +18,8 @@ def _group_avatar_url(avatar_key: str | None) -> str | None:
         return None
     try:
         return storage_service.generate_read_url(avatar_key)
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to build group image URL for key=%s: %s", avatar_key, e, exc_info=True)
         return None
 
 

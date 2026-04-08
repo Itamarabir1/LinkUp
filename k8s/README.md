@@ -122,6 +122,7 @@ kubectl create secret generic linkup-chat-ws-secret \
 
 - **Ingress** ([backend/ingress.yaml](backend/ingress.yaml)): requires an ingress controller; adjust `ingressClassName`, TLS, and cert-manager `ClusterIssuer` to your cluster.
 - **TLS secret** `linkup-tls`: created by cert-manager when using the annotation, or create manually.
+- **Stable public media URLs:** if you use CloudFront in front of the same S3 bucket as the API, set **`CLOUDFRONT_DOMAIN`** (hostname only, no `https://`) on the backend Deployment — same semantics as `backend/.env` / `Settings` in [`backend/app/core/config.py`](../backend/app/core/config.py). When unset, the API falls back to presigned S3 GET for avatars/group images.
 
 ## Files not in `kubectl apply -k` by default
 

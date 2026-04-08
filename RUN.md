@@ -6,11 +6,11 @@
 
 ## שלב 0: וידוא מיקום הפרויקט
 
-הנתיב אצלך:
+דוגמה לנתיב (החלף לנתיב אצלך):
 ```
 c:\Users\user\Desktop\Linkup
 ```
-בתוכו צריכות להיות תיקיות: `backend`, `frontend`.
+בתוכו צריכות להיות לפחות תיקיות: `backend`, `frontend`. ל**צ'אט בזמן אמת**, **התראות in-app** (פיד), **push דרך worker** וכו' — צריך גם תשתית (Postgres, Redis, RabbitMQ), ולרוב **chat-ws** על פורט **8081**; השורה המלאה: **`readme.md`** / **`docs/architecture/DEVELOPMENT.md`** עם `docker compose up -d`.
 
 ---
 
@@ -115,3 +115,13 @@ docker stop linkup_backend
 ```
 
 אם יש שגיאה 500, תופיע גם שורת `[Linkup] !!! שגיאה 500:` ואחריה פרטי השגיאה.
+
+---
+
+## הרחבות (אופציונלי)
+
+| צורך | מה להרים |
+|------|-----------|
+| צ'אט + typing + presence | **chat-ws** (למשל דרך Docker על **8081**) — ראו `chat-ws/README.md` |
+| פיד התראות חי בווב + WebSocket נסיעות/מיקום | **backend** על **8000** עם Redis; הפרונט מתחבר ל־`ws://localhost:8000/api/v1/...` — ראו `frontend/src/config/env.ts` |
+| מיגרציות DB | `cd backend && alembic upgrade head` או שירות **`migrate`** ב־Compose — `backend/alembic/README.md` |

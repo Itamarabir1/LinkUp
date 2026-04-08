@@ -38,13 +38,15 @@ async def linkup_exception_handler(request: Request, exc: LinkupError):
     """
     Handler מרכזי שתופס את כל סוגי השגיאות שלנו
     """
-    request_id = getattr(request.state, "request_id", None)
+    request_id = getattr(request.state, "request_id", None) or ""
+    # Align JSON trace_id with X-Request-ID / other handlers (validation, DB).
+    trace_id = request_id or exc.trace_id
     logger.error(
         "LinkupError: %s | trace_id=%s | message=%s",
         exc.error_code,
-        exc.trace_id,
+        trace_id,
         exc.message,
-        extra={"request_id": request_id or ""},
+        extra={"request_id": request_id},
     )
 
     # TODO: Sentry — להסיר הערה כשעוברים לפרודקשן
@@ -65,7 +67,7 @@ async def linkup_exception_handler(request: Request, exc: LinkupError):
             "status": "error",
             "message": exc.message,
             "error_code": exc.error_code,
-            "trace_id": exc.trace_id,
+            "trace_id": trace_id,
             "details": exc.payload,
         },
         headers=headers,

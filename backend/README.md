@@ -115,6 +115,12 @@ k6 run k6/scripts/load_test_auth.js
 
 **Pinned dependency:** `phonenumbers==8.13.48` in `pyproject.toml` / `uv.lock` — stable IL validation used by the API (see `app/core/utils/validators.py`).
 
+## Groups — invite codes
+
+- New groups receive a random **Base62** `invite_code` (8 characters, `secrets.choice` over `a-zA-Z0-9`).
+- **`create_group`** uses **`flush`**, catches **`IntegrityError`**, and retries only when the violation is on **`invite_code`** uniqueness (PostgreSQL `23505` / message match); after **5** failed attempts it raises **`LinkupError`** with **`INVITE_CODE_GENERATION_FAILED`**.
+- A single **`commit`** persists the group and the creator’s **admin** `GroupMember` row. Implementation: **`app/domain/groups/crud.py`**.
+
 ## Media (S3, CloudFront, avatars)
 
 - **Uploads:** clients use **presigned PUT** to S3 (see API routes for user avatar and group image); the API does not stream file bytes.

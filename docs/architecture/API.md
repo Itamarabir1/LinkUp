@@ -183,6 +183,8 @@ Authorization: Bearer <access_token>
 
 | Method | Path | Auth | תיאור |
 |--------|------|------|--------|
-| WS | /api/v1/notifications/ws | query token=JWT | WebSocket להתראות למשתמש. אימות: JWT בלבד (`get_current_user_ws` → `WsUser`, ללא DB ב-connect). |
+| WS | /api/v1/notifications/ws | query token=JWT | WebSocket לפיד **התראות האפליקציה** (מסך Notifications / סנכרון עם `ChatContext`). אימות: JWT בלבד (`get_current_user_ws` → `WsUser`, ללא DB ב-connect). Redis Pub/Sub — `docs/architecture/REALTIME.md`. **פרונט (ווב):** `useChatNotificationsWebSocket` + **`onOpen`** אחרי reconnect; גיבוי polling ~5 דקות ב־`useChatNotificationsFeed`. |
+
+רשימת התראות ב-REST: **`GET /api/v1/users/me/notifications`**.
 
 (ראוטר: `app/domain/notifications/router.py`, נרשם ב-`api/v1/api_router.py` תחת prefix `/notifications`.)
