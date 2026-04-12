@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class RedisBroadcast:
     def __init__(self):
-        # שימוש ב-settings.REDIS_URL כדי שהכל יהיה קונפיגורבילי
+        # Uses settings.REDIS_URL
         self.engine = Broadcast(settings.REDIS_URL)
 
     async def connect(self):
@@ -36,5 +36,5 @@ class RedisBroadcast:
         return self.engine.subscribe(channel=channel)
 
 
-# Instance יחיד לכל האפליקציה
+# Process-wide singleton
 broadcast = RedisBroadcast()

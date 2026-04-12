@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.middleware.base import BaseHTTPMiddleware
 
-# רישום כל המודלים לפני טעינת admin (מניעת "expression 'Group' failed to locate a name")
+# Import domain models before admin loads (avoids "expression 'Group' failed to locate a name")
 import app.db.models
 
 # Firebase Admin SDK init (side-effect import; safe idempotent)
@@ -33,7 +33,7 @@ from app.infrastructure.health.health_service import check_health
 setup_logging()
 logger = structlog.get_logger(__name__)
 
-# CORS: origins ממ-config או FRONTEND_URL (מחשבים לפני יצירת app)
+# CORS: origins from config or FRONTEND_URL (computed before app creation)
 _cors_origins = getattr(settings, "CORS_ORIGINS", None) or []
 if not _cors_origins:
     _cors_origins = [getattr(settings, "FRONTEND_URL", "https://linkup.co.il").rstrip("/")]
@@ -43,7 +43,7 @@ if getattr(settings, "DEBUG", False):
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
-    """מקצה request_id קצר (8 תווים) לכל בקשה; מוסיף ל-response header ול-context ללוגים."""
+    """Assign a short request_id (8 chars) per request; add to response header and log context."""
 
     async def dispatch(self, request: Request, call_next):
         request_id = str(uuid.uuid4())[:8]
@@ -57,7 +57,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
             request_id_ctx.reset(token)
 
 
-# Middleware שמוסיף CORS לכל תגובה (כולל 500) – רץ ראשון על התגובה
+# Middleware: add CORS headers to every response (including 500) — runs first on the response path
 class EnsureCORSHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -80,7 +80,7 @@ app = FastAPI(
     servers=[{"url": "http://127.0.0.1:8000", "description": "Local"}],
 )
 
-# CORS רגיל (לבקשות רגילות)
+# Standard CORS (preflight / normal requests)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -90,20 +90,20 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
-# גיבוי: הוספת CORS גם לתגובות שעשויות לדלג על ה-middleware (למשל 500)
+# Fallback: CORS on responses that might bypass middleware (e.g. some 500s)
 app.add_middleware(EnsureCORSHeadersMiddleware)
 
-# Request ID — ראשון כדי שכל לוג בתוך בקשה יקבל request_id
+# Request ID — early so all logs during a request share request_id
 app.add_middleware(RequestIDMiddleware)
 
-# Security headers (X-Content-Type-Options, X-Frame-Options, וכו')
+# Security headers (X-Content-Type-Options, X-Frame-Options, etc.)
 app.add_middleware(SecurityHeadersMiddleware)
 
-# HTTPS: הפנת HTTP → HTTPS כשמאחורי Proxy (להפעיל בפרודקשן עם FORCE_HTTPS_REDIRECT=True)
+# HTTPS: redirect HTTP → HTTPS when behind a proxy (enable in prod with FORCE_HTTPS_REDIRECT=True)
 if getattr(settings, "FORCE_HTTPS_REDIRECT", False):
     app.add_middleware(HTTPSRedirectMiddleware)
 
-# רישום ה-Admin וה-Exception Handlers (סדר: ספציפי → כללי)
+# Admin panel and exception handlers (order: specific → generic)
 setup_admin(app, engine)
 app.add_exception_handler(RequestValidationError, request_validation_exception_handler)
 app.add_exception_handler(IntegrityError, integrity_error_handler)
@@ -113,7 +113,7 @@ app.add_exception_handler(LinkupError, linkup_exception_handler)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """מחזיר 500 כ-JSON עם CORS headers. לא תופס HTTPException."""
+    """Return 500 as JSON with CORS headers. Does not catch HTTPException."""
     if isinstance(exc, HTTPException):
         raise exc
     request_id = getattr(request.state, "request_id", None)
@@ -144,7 +144,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# שים לב! שורה אחת במקום ארבע
+# Single include_router call
 app.include_router(api_router, prefix="/api/v1")
 
 
@@ -155,7 +155,7 @@ def read_root():
 
 @app.get("/api/v1/health", tags=["Health"])
 async def api_health(response: Response):
-    """בדיקת תשתיות: DB, Redis, RabbitMQ. 503 אם אחד מהם לא זמין."""
+    """Health check: DB, Redis, RabbitMQ. 503 if any dependency is down."""
     health = await check_health()
     response.status_code = 200 if health["status"] == "healthy" else 503
     return health

@@ -11,9 +11,9 @@ from app.domain.notifications.providers.websocket_provider import WebSocketProvi
 logger = logging.getLogger(__name__)
 
 
-# אובייקט הפקודה - החוזה בין ה-Handler למנג'ר
+# Command object — contract between Handler and Manager
 class NotificationCommand(BaseModel):
-    user: Any  # אובייקט המשתמש שהגיע מה-Resolver
+    user: Any  # User object from Resolver
     template: str
     channels: list[str]
     context: dict[str, Any]
@@ -22,7 +22,7 @@ class NotificationCommand(BaseModel):
 
 class NotificationManager:
     def __init__(self):
-        # אתחול ה-Providers (Lazy loading עדיף במערכות גדולות, אבל זה מצוין להתחלה)
+        # Provider registry (lazy loading scales better; eager init is fine here)
         self.providers = {
             "email": EmailProvider(),
             "push": PushProvider(),
@@ -31,7 +31,7 @@ class NotificationManager:
 
     async def process_and_send(self, cmd: NotificationCommand):
         """
-        הכניסה הראשית. מקבלת אובייקט פקודה ומפזרת לפרוויידרים.
+        Main entry: takes a command and fans out to providers.
         """
         email_provider = self.providers.get("email")
         can_email = email_provider.can_send(cmd.user) if email_provider else False
@@ -46,7 +46,7 @@ class NotificationManager:
         for channel in cmd.channels:
             provider = self.providers.get(channel)
 
-            # בדיקה: האם הפרוויידר קיים והאם המשתמש מאפשר שליחה בערוץ זה
+            # Skip if provider missing or user cannot use this channel
             if provider and provider.can_send(cmd.user):
                 tasks.append(self._safe_send(provider, channel, cmd))
             elif provider and not provider.can_send(cmd.user):
@@ -61,7 +61,7 @@ class NotificationManager:
             logger.info(f"ℹ️ No active channels to send for event {cmd.event_key}")
             return
 
-        # שליחה מקבילית - פה הכוח של המערכת
+        # Parallel send — main strength of this design
         await asyncio.gather(*tasks)
 
     async def _safe_send(self, provider, channel_name, cmd: NotificationCommand):
@@ -70,7 +70,7 @@ class NotificationManager:
             await provider.send(cmd.user, cmd.template, ctx)
             logger.info(f"✅ {channel_name} sent to user_id={getattr(cmd.user, 'user_id', getattr(cmd.user, 'id', 'N/A'))}")
         except Exception as e:
-            # אנחנו לא זורקים LinkupError כאן כדי לא להפיל ערוצים אחרים!
+            # Do not re-raise — other channels should still complete
             logger.error(f"❌ {channel_name} failed for {cmd.event_key}: {e!s}")
 
 

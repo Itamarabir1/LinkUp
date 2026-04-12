@@ -79,7 +79,7 @@ class InvalidLocationError(LinkupError):
     message = "המיקום שהוזן אינו תקין או מחוץ לטווח"
 
     def __init__(self, lat: float, lon: float, detail: str = None):
-        # בונה הודעה שמפרטת מה הבעיה
+        # Build a message that spells out what went wrong
         full_message = f"{self.message} ({lat}, {lon})"
         if detail:
             full_message += f": {detail}"
@@ -92,8 +92,8 @@ class InvalidLocationError(LinkupError):
 
 class InsufficientSeatsError(LinkupError):
     """
-    דוגמה לשגיאת ולידציה נוספת שתצטרך בהמשך -
-    נזרקת כשמנסים להזמין יותר מקומות ממה שיש בנסיעה.
+    Example of an additional validation error for later use —
+    raised when booking more seats than available on the ride.
     """
 
     def __init__(self, detail: str = "אין מספיק מקומות פנויים בנסיעה זו"):
@@ -105,7 +105,7 @@ class InsufficientSeatsError(LinkupError):
 
 
 class BadRequestError(LinkupError):
-    """בקשה לא תקינה כללית (למשל ValueError ממחלקת שירות)."""
+    """Generic bad request (e.g. ValueError from a service class)."""
 
     status_code = 400
     error_code = "BAD_REQUEST"

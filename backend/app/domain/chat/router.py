@@ -168,16 +168,16 @@ async def export_conversation_calendar(
     """
     from app.domain.chat.calendar_export import get_conversation_for_calendar_export
 
-    # איסוף נתוני שיחה
+    # Load conversation context
     conv_data = await get_conversation_for_calendar_export(db, conversation_id, current_user.user_id)
     if not conv_data:
         raise ChatRoomNotFound()
 
-    # TODO: כאן צריך לנתח את השיחה או להשתמש בתוצאות קיימות
-    # כרגע - placeholder - צריך לשלב עם AI analyzer
-    # בינתיים נחזיר שגיאה אם אין ניתוח
+    # TODO: analyze conversation or reuse cached analysis
+    # Placeholder — wire to AI analyzer
+    # For now: error if no analysis exists
 
-    # יצירת RideSummary מהודעות (placeholder - צריך ניתוח AI אמיתי)
+    # Build RideSummary from messages (placeholder — needs real AI analysis)
     # ride = RideSummary(...)
     # ical_bytes = export_rides_to_ical_bytes([ride])
 

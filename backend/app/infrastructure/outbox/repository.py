@@ -12,27 +12,27 @@ logger = logging.getLogger(__name__)
 
 class OutboxRepository:
     """
-    אחראי על ניהול הרישומים בטבלת ה-Outbox.
-    פועל כחלק מטרנזקציה קיימת (ACID).
+    Manages rows in the outbox table.
+    Runs inside an existing transaction (ACID).
     """
 
     async def save_event(
         self,
         db: AsyncSession,
-        event: OutboxEvent,  # מקבל אובייקט שלם
+        event: OutboxEvent,  # full event object
     ) -> None:
         """
         Saves a pre-constructed outbox event.
         Transaction is managed by the Service layer.
         """
         try:
-            # פשוט מוסיפים את האובייקט לסשן
+            # Add the ORM object to the session
             db.add(event)
-            # וודא שהסטטוס ברירת מחדל מוגדר (או במודל או כאן)
+            # Ensure default status (model or here)
             if not event.status:
                 event.status = "PENDING"
 
-            await db.flush()  # דוחף ל-DB בלי Commit כדי לקבל ID אם צריך
+            await db.flush()  # persist without commit (e.g. for generated ID)
             print(f"[NOTIF] Outbox repo: saved event_name={event.event_name}", flush=True)
             logger.info(
                 "[NOTIF] Outbox repo: saved event_name=%s (in API process)",
@@ -40,13 +40,13 @@ class OutboxRepository:
             )
         except Exception as e:
             logger.error(f"❌ Failed to persist outbox event: {e!s}")
-            # כאן תוכל לעטוף ב-LinkupError אם תרצה
+            # Could wrap in LinkupError if desired
             raise
 
     async def get_pending_events(self, db: AsyncSession, batch_size: int = BATCH_SIZE_DEFAULT) -> list[OutboxEvent]:
         """
-        שליפת אירועים לעיבוד עבור ה-Worker.
-        שימוש ב-skip_locked מונע התנגשויות בין מספר מופעים של השרת.
+        Fetch pending events for the worker.
+        skip_locked avoids contention across multiple server instances.
         """
         query = (
             select(OutboxEvent)
@@ -60,15 +60,15 @@ class OutboxRepository:
 
     async def mark_as_processed(self, db: AsyncSession, event_id: str) -> None:
         """
-        מעדכן את האירוע כמעובד עם חותמת זמן של 'עכשיו'.
-        ביצוע עדכון ישיר (In-place update) לטובת ביצועים מקסימליים.
+        Mark event processed with current timestamp.
+        Direct in-place update for performance.
         """
         stmt = update(OutboxEvent).where(OutboxEvent.id == event_id).values(status="PROCESSED", processed_at=datetime.now(UTC))
         await db.execute(stmt)
         logger.info(f"✅ Event {event_id} marked as processed")
 
     async def increment_retries(self, db: AsyncSession, event_id: str, error_msg: str | None = None) -> None:
-        """מעלה מונה נסיונות ומעדכן last_error. לא משנה סטטוס (נשאר PENDING לניסיון חוזר)."""
+        """Increment retry_count and set last_error. Status stays PENDING for retry."""
         values = {"retry_count": OutboxEvent.retry_count + 1}
         if error_msg is not None:
             values["last_error"] = error_msg
@@ -77,7 +77,7 @@ class OutboxRepository:
         logger.warning("Event %s retry incremented", event_id)
 
     async def mark_as_failed(self, db: AsyncSession, event_id: str, error_msg: str) -> None:
-        """מתעד תקלה ומסמן FAILED."""
+        """Record failure and set status FAILED."""
         stmt = (
             update(OutboxEvent)
             .where(OutboxEvent.id == event_id)

@@ -1,7 +1,7 @@
 # app/infrastructure/websocket_bus.py
 import logging
 
-# התיקון הקריטי: ייבוא ישיר מהתשתית של רדיס
+# Import Redis infra directly (avoid circular deps)
 from app.infrastructure.redis.broadcast import broadcast
 
 logger = logging.getLogger(__name__)
@@ -9,24 +9,22 @@ logger = logging.getLogger(__name__)
 
 class WebSocketInfrastructure:
     """
-    השכבה הטכנית ביותר.
-    מתווכת בין ה-Drivers (כמו Redis) לבין ה-Services של ה-Domain.
+    Thin adapter from Redis pub/sub to domain notification streaming.
     """
 
     @staticmethod
     async def get_subscriber(channel_name: str):
         """
-        פותחת את הצינור הפיזי ל-Redis Pub/Sub.
-        מחזירה אובייקט Context Manager של broadcaster.
+        Return Redis subscribe context manager for channel_name.
         """
         try:
-            # אנחנו מחזירים את ה-Context Manager עצמו
+            # Return async context manager as-is
             return broadcast.subscribe(channel=channel_name)
         except Exception as e:
             logger.error(f"❌ Failed to create subscriber for channel {channel_name}: {e}")
-            # כאן המקום להשתמש ב-LinkupError שלך אם תרצה לעטוף שגיאות תשתית
+            # Could wrap in LinkupError for consistent API errors
             raise
 
 
-# ייצוא Singleton
+# Singleton export
 ws_infra = WebSocketInfrastructure()

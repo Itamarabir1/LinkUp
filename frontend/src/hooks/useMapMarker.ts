@@ -12,7 +12,7 @@ export function useMapMarker(
 ) {
   const markerRef = useRef<google.maps.Marker | null>(null);
 
-  // יצירה חד-פעמית — רק כש-map או אופציות משתנים
+  // Create marker once when map or icon options change
   useEffect(() => {
     if (!map || !window.google?.maps) return;
 
@@ -37,7 +37,7 @@ export function useMapMarker(
     };
   }, [map, options.title, options.color, options.scale, options.strokeWeight]);
 
-  // עדכון מיקום בלבד — ללא יצירה מחדש
+  // Update position only — no marker recreation
   useEffect(() => {
     if (!markerRef.current) return;
     if (position) {

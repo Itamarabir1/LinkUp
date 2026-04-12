@@ -1,5 +1,5 @@
 """
-Scheduled task לבדיקת שיחות עם timeout 24 שעות ללא הודעות חדשות.
+Scheduled job: conversations idle 24h without new messages → completion flow.
 """
 
 import logging
@@ -13,12 +13,11 @@ logger = logging.getLogger(__name__)
 
 async def execute_chat_timeout_job():
     """
-    בודק שיחות שלא נשלח להן סיכום ושההודעה האחרונה בהן היא לפני 24 שעות.
-    מטפל בכל שיחה: ניתוח AI + שליחת event.
+    Find timed-out conversations and run AI completion + outbox for each.
     """
     async with SessionLocal() as db:
         try:
-            # שליפת שיחות עם timeout
+            # Conversations past idle timeout
             conversations = await chat_crud.get_conversations_with_timeout(db, timeout_hours=24)
 
             if not conversations:
@@ -27,11 +26,11 @@ async def execute_chat_timeout_job():
 
             logger.info(f"Found {len(conversations)} conversations with timeout, processing...")
 
-            # טיפול בכל שיחה
+            # Iterate conversations
             for conv in conversations:
                 try:
-                    # ניסיון לטפל בסיום השיחה (ניתוח AI + event)
-                    # נשתמש ב-user_id_1 כ-current_user_id (רק לבדיקת הרשאות)
+                    # Run completion flow (AI + outbox event)
+                    # Use user_id_1 only for auth guard inside service
                     success = await handle_conversation_completion(
                         db=db,
                         conversation_id=conv.conversation_id,
@@ -46,7 +45,7 @@ async def execute_chat_timeout_job():
                         f"Error processing conversation {conv.conversation_id}: {e}",
                         exc_info=True,
                     )
-                    # ממשיכים לשיחה הבאה גם אם יש שגיאה
+                    # Continue batch on single-conversation errors
                     continue
 
             logger.info(f"Completed processing {len(conversations)} conversations with timeout")

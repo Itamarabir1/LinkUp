@@ -13,7 +13,7 @@ class RabbitMQPublisher(EventPublisher):
 
     async def publish(self, event: Event) -> bool:
         try:
-            # שליפה מהמטא-דאטה או שימוש בשם האירוע כברירת מחדל
+            # Routing id from metadata or fall back to event name
             routing_key = event.metadata.get("routing_key", event.name) if event.metadata else event.name
             exchange = event.metadata.get("exchange", "system_events") if event.metadata else "system_events"
 

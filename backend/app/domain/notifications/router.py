@@ -29,4 +29,4 @@ async def websocket_endpoint(
         logger.info(f"👋 User {user_id} disconnected")
     except Exception as e:
         logger.error(f"❌ Unexpected error in WebSocket for user {user_id}: {e}")
-        # כאן אפשר להשתמש ב-LinkupError אם תרצה לעטוף שגיאות תשתית
+        # You could wrap infrastructure errors in LinkupError here if desired

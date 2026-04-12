@@ -1,6 +1,6 @@
 """
-משימות מתוזמנות דרך התור (גישה סניורית).
-מתזמן שולח הודעות ל־RabbitMQ; consumer מושך ומריץ את הלוגיקה.
+Scheduled tasks via the queue.
+Publisher sends messages to RabbitMQ; consumer pulls and runs handlers.
 """
 
 import asyncio
@@ -24,17 +24,17 @@ from app.workers.tasks.notification_tasks import execute_reminders_job
 
 logger = logging.getLogger(__name__)
 
-# מרווחים (שניות) – מתי לשלוח הודעה לתור
+# Intervals (seconds) — when to publish to the queue
 INTERVAL_MAINTENANCE = 1500
 INTERVAL_REMINDERS = 300
 INTERVAL_CHAT_TIMEOUT = 3600
-CHECK_INTERVAL = 60  # בדיקה כל דקה
+CHECK_INTERVAL = 60  # wake every minute
 
 
 async def run_scheduled_tasks_publisher():
     """
-    מתזמן: שולח הודעות ל־exchange "scheduled" כל X זמן.
-    לא מריץ את הלוגיקה – רק מפרסם; ה-consumer מריץ.
+    Publisher: sends to the "scheduled" exchange every N seconds.
+    Does not run business logic — only publishes; the consumer runs jobs.
     """
     last_fuel = last_maintenance = last_reminders = last_chat_timeout = time.monotonic()
     logger.info("📅 Scheduled tasks publisher started")
@@ -82,8 +82,8 @@ async def run_scheduled_tasks_publisher():
 
 async def handle_scheduled_task(data: dict[str, Any], routing_key: str) -> None:
     """
-    Callback של ה-consumer של scheduled_tasks_queue.
-    מפנה לפי routing_key ל־execute_* המתאים.
+    Consumer callback for scheduled_tasks_queue.
+    Dispatches to the matching execute_* by routing_key.
     """
     try:
         if routing_key == ROUTING_KEY_FUEL_SCAN:
@@ -106,6 +106,6 @@ async def handle_scheduled_task(data: dict[str, Any], routing_key: str) -> None:
             },
             exc_info=True,
         )
-        # לא עושים raise: משימות מתוזמנות הן תקופתיות, ו-requeue גורם ללולאה אינסופית (poison message).
-        # עדיף להיכשל פעם אחת, לכתוב לוג, והמתזמן כבר ישלח טריגר חדש בפעם הבאה.
+        # Do not raise: scheduled tasks are periodic; requeue can infinite-loop (poison message).
+        # Fail once, log, and the publisher will fire again on the next tick.
         return

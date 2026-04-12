@@ -2,7 +2,7 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { STORAGE_KEYS } from '../config/constants';
 import { API_BASE_URL, API_TIMEOUT_MS } from '../config/env';
 
-// לוודא לאן הבקשות הולכות (יופיע בקונסול של הדפדפן F12)
+// Log resolved API base (browser devtools console)
 console.log('[Linkup Frontend] API Base URL:', API_BASE_URL);
 
 export const api = axios.create({
@@ -122,8 +122,8 @@ api.interceptors.response.use(
         trace_id: (err.response?.data as { trace_id?: string } | undefined)?.trace_id,
         status: err.response?.status,
       });
-      // TODO: Sentry — להסיר הערה כשעוברים לפרודקשן
-      // רק 5xx — לא לשלוח 4xx עסקיים (מפחית רעש)
+      // TODO: Sentry — remove when enabling in production
+      // Only 5xx — skip business 4xx (less noise)
       // import * as Sentry from "@sentry/react";
       // if (import.meta.env.PROD && err.response?.status && err.response.status >= 500) {
       //   Sentry.captureException(err);

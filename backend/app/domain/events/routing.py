@@ -30,7 +30,7 @@
 
 from typing import Any
 
-# קידומת event_name → exchange
+# event_name prefix → exchange
 _EXCHANGE_BY_PREFIX: dict[str, str] = {
     "auth.": "user",
     "user.": "user",
@@ -42,13 +42,13 @@ _EXCHANGE_BY_PREFIX: dict[str, str] = {
 DEFAULT_EXCHANGE = "system_events"
 TASKS_EXCHANGE = "tasks"
 
-# משימות כבדות (העלאת תמונה וכו') – תור נפרד מ-notifications
+# Heavy tasks (image upload, etc.) — queue separate from notifications
 _TASK_EVENT_NAMES: list[str] = [
     "user.avatar_upload",
     "user.avatar_remove",
 ]
 
-# תור הנוטיפיקציות מקשיב לכל ה-exchanges האלו (תור אחד, וורקר אחד לכל המיילים/פוש)
+# Notification queue consumes these exchanges (one queue, one worker for mail/push)
 NOTIFICATION_EXCHANGES: list[str] = [
     "user",
     "ride",
@@ -56,15 +56,15 @@ NOTIFICATION_EXCHANGES: list[str] = [
     DEFAULT_EXCHANGE,
 ]
 
-# תור העלאת אווטאר (ותמונה/קבצים) מקשיב ל-tasks
+# Avatar / media upload queue binds to tasks exchange
 AVATAR_UPLOAD_EXCHANGES: list[str] = [TASKS_EXCHANGE]
 
-# משימות מתוזמנות (maintenance, reminders, fuel) – תור ייעודי, לא אירועים
+# Scheduled jobs (maintenance, reminders, fuel) — dedicated queue, not domain events
 SCHEDULED_EXCHANGE = "scheduled"
 SCHEDULED_TASKS_QUEUE = "scheduled_tasks_queue"
 SCHEDULED_EXCHANGES: list[str] = [SCHEDULED_EXCHANGE]
 
-# routing_key למשימות מתוזמנות (נשלח ע"י המתזמן, מפורש ע"י ה-consumer)
+# routing_key for scheduled tasks (publisher → consumer contract)
 ROUTING_KEY_FUEL_SCAN = "fuel_scan"
 ROUTING_KEY_MAINTENANCE = "maintenance"
 ROUTING_KEY_REMINDERS = "reminders"

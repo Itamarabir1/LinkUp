@@ -93,20 +93,19 @@ async def get_conversations_with_timeout(
     timeout_hours: int = 24,
 ) -> list[Conversation]:
     """
-    מחזיר שיחות שלא נשלח להן סיכום ושההודעה האחרונה בהן היא לפני timeout_hours שעות.
+    Conversations with no AI analysis yet whose last message is older than timeout_hours.
 
     Args:
         db: AsyncSession
-        timeout_hours: מספר שעות ללא הודעות חדשות (ברירת מחדל: 24)
+        timeout_hours: hours without a new message (default 24)
 
     Returns:
-        רשימת שיחות שצריכות ניתוח
+        Conversations that should be analyzed
     """
-    # זמן גבול: עכשיו פחות timeout_hours
+    # Cutoff: now minus timeout_hours
     timeout_threshold = datetime.utcnow() - timedelta(hours=timeout_hours)
 
-    # שאילתה: שיחות שיש להן הודעה אחרונה לפני timeout_threshold
-    # ואין להן ניתוח AI (chat_analysis)
+    # Last message before threshold and no chat_analysis row
     subquery = (
         select(
             Message.conversation_id,
@@ -117,7 +116,7 @@ async def get_conversations_with_timeout(
         .subquery()
     )
 
-    # שיחות שיש להן הודעה אחרונה לפני timeout, ואין להן ניתוח
+    # Join conversations to that subquery; outer join analysis and require none
     result = await db.execute(
         select(Conversation)
         .options(
@@ -126,7 +125,7 @@ async def get_conversations_with_timeout(
         )
         .join(subquery, Conversation.conversation_id == subquery.c.conversation_id)
         .outerjoin(ChatAnalysis, Conversation.conversation_id == ChatAnalysis.conversation_id)
-        .where(ChatAnalysis.conversation_id.is_(None)),  # אין ניתוח קיים
+        .where(ChatAnalysis.conversation_id.is_(None)),  # no analysis row
     )
     return list(result.scalars().unique().all())
 

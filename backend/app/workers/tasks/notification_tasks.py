@@ -1,10 +1,10 @@
 """
-notification_tasks.py — handlers לאירועי RabbitMQ + ביצוע תזכורות.
+notification_tasks.py — RabbitMQ event handlers + reminder execution.
 
-שינויים מהגרסה הקודמת:
-  - handle_ride_created: כעת גם כותב scheduled_notification לנהג (driver_reminder).
-  - handle_booking_approved: handler חדש — כותב scheduled_notification לנוסע (passenger_reminder).
-  - execute_reminders_job: עדיין קורא ל-reminder_scheduler, שעכשיו סורק scheduled_notifications.
+Changes from the previous version:
+  - handle_ride_created: also writes driver scheduled_notification (driver_reminder).
+  - handle_booking_approved: new handler — writes passenger scheduled_notification (passenger_reminder).
+  - execute_reminders_job: still calls reminder_scheduler, which now scans scheduled_notifications.
 """
 
 import logging
@@ -28,7 +28,7 @@ from app.domain.scheduled_notifications.model import ScheduledNotificationType
 
 logger = logging.getLogger(__name__)
 
-# כמה זמן לפני היציאה לשלוח תזכורת
+# How long before departure to send a reminder
 REMINDER_OFFSET = timedelta(minutes=30)
 
 
@@ -55,7 +55,7 @@ async def handle_ride_created(db, data: dict[str, Any]) -> None:
         getattr(ride, "driver_id", None),
     )
 
-    # 1. שליחת מייל לנוסעים רלוונטיים
+    # 1. Email relevant passengers
     passengers = await crud_passenger.find_passengers_for_ride_notification(db, ride)
     for pr in passengers:
         try:
@@ -71,7 +71,7 @@ async def handle_ride_created(db, data: dict[str, Any]) -> None:
                 e,
             )
 
-    # 2. תזכורת לנהג — 30 דקות לפני departure_time
+    # 2. Driver reminder — 30 minutes before departure_time
     if ride.departure_time:
         deliver_at = ride.departure_time - REMINDER_OFFSET
         await crud_scheduled_notification.create(
@@ -96,9 +96,9 @@ async def handle_ride_created(db, data: dict[str, Any]) -> None:
 
 async def handle_booking_approved(db, data: dict[str, Any]) -> None:
     """
-    אירוע booking.approved_by_driver:
-      1. שולח מייל+פוש לנוסע (כמקודם, דרך notification_handler).
-      2. כותב scheduled_notification לנוסע — תזכורת 30 דקות לפני האיסוף.
+    booking.approved_by_driver event:
+      1. Email+push to passenger (via notification_handler, as before).
+      2. Write passenger scheduled_notification — reminder 30 minutes before pickup.
     """
     booking_id_raw = data.get("booking_id")
     if not booking_id_raw:
@@ -111,7 +111,7 @@ async def handle_booking_approved(db, data: dict[str, Any]) -> None:
         logger.warning("booking.approved_by_driver: booking_id=%s not found", booking_id)
         return
 
-    # 1. מייל+פוש לנוסע
+    # 1. Email+push to passenger
     try:
         await notification_handler.handle_event(
             db,
@@ -125,7 +125,7 @@ async def handle_booking_approved(db, data: dict[str, Any]) -> None:
             e,
         )
 
-    # 2. תזכורת לנוסע — 30 דקות לפני pickup_time (אם קיים), אחרת departure_time
+    # 2. Passenger reminder — 30 minutes before pickup_time if set, else departure_time
     ride = booking.ride
     pickup_time = booking.pickup_time or (ride.departure_time if ride else None)
     if pickup_time:
@@ -146,9 +146,9 @@ async def handle_booking_approved(db, data: dict[str, Any]) -> None:
 
 async def handle_ride_cancelled_by_driver(db, data: dict[str, Any]) -> None:
     """
-    אירוע ride.cancelled_by_driver:
-    שולח מייל+פוש לכל נוסע שהיה בנסיעה.
-    ON DELETE CASCADE מטפל אוטומטית במחיקת scheduled_notifications של הנסיעה.
+    ride.cancelled_by_driver event:
+    Sends email+push to every passenger on the ride.
+    ON DELETE CASCADE removes scheduled_notifications for the ride automatically.
     """
     ride_id_raw = data.get("ride_id")
     if not ride_id_raw:
@@ -199,8 +199,8 @@ async def handle_notification_event(
     handler=notification_handler,
 ) -> None:
     """
-    Callback של ה-RabbitMQ consumer.
-    routing_key מתאים ל-NotificationEvent values.
+    RabbitMQ consumer callback.
+    routing_key matches NotificationEvent values.
     """
     logger.info(
         "[NOTIF] Consumer: routing_key=%s",
@@ -231,8 +231,8 @@ async def handle_notification_event(
 
 async def execute_reminders_job(service=reminder_scheduler) -> None:
     """
-    ביצוע batch תזכורות — נקרא מה-scheduler כל 5 דקות.
-    reminder_scheduler סורק scheduled_notifications במקום rides/bookings.
+    Run reminder batch — invoked by the scheduler every few minutes.
+    reminder_scheduler scans scheduled_notifications instead of rides/bookings.
     """
     logger.info("⏰ Scheduler: Triggering reminder batch...")
     async with SessionLocal() as db:

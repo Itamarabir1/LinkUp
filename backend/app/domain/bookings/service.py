@@ -27,12 +27,12 @@ from app.domain.bookings.schema import (
 )
 from app.domain.events.enum import DispatchTarget
 
-# אירועים – Outbox בלבד
+# Events — outbox only
 from app.domain.events.outbox import publish_to_outbox
 from app.domain.notifications.constants import NotificationEvent
 from app.infrastructure.redis.publisher import publish_user_event
 
-# ייבוא מה-Models וה-Enums
+# Models & enums
 from app.domain.passengers.model import PassengerRequest
 from app.domain.rides.enum import RideStatus
 from app.domain.rides.model import Ride
@@ -49,7 +49,7 @@ class BookingService:
         num_seats: int = 1,
         current_user_id: UUID | None = None,
     ) -> Booking:
-        """בקשת הצטרפות לנסיעה. אירוע ל-Outbox – ה-Worker ישלח מייל לנהג."""
+        """Create join request; outbox event notifies driver via worker."""
         try:
             ride = await crud_booking.get_ride_for_update(db, ride_id)
             if not ride or ride.status != RideStatus.OPEN:
@@ -111,8 +111,8 @@ class BookingService:
     @staticmethod
     async def cancel_ride_and_all_bookings(db: AsyncSession, ride_id: UUID, driver_id: UUID) -> None:
         """
-        לוגיקה עסקית לביטול נסיעה שלמה על ידי נהג.
-        חשוב: לא מפרסם Outbox. ה-caller אחראי על אירועים.
+        Driver cancels entire ride and related bookings.
+        Does not publish outbox — caller must emit domain events.
         """
         try:
             await crud_booking.cancel_ride_and_bookings(db, ride_id, driver_id)
@@ -127,7 +127,7 @@ class BookingService:
 
     @staticmethod
     async def get_ride_manifest(db: AsyncSession, ride_id: UUID, driver_id: UUID) -> RideManifestResponse:
-        """הפקת רשימת נוסעים עבור הנהג (כולל pending_approval + confirmed)."""
+        """Driver manifest: pending + confirmed bookings with contact hints."""
         ride = await db.get(Ride, ride_id)
         if not ride or ride.driver_id != driver_id:
             raise ForbiddenRideActionError("גישה חסומה")
@@ -177,7 +177,7 @@ class BookingService:
 
     @staticmethod
     async def cancel_all_bookings_for_request(db: AsyncSession, request_id: UUID) -> None:
-        """ביטול כל ההזמנות של בקשה (לשימוש סינכרוני מ־PassengerService)."""
+        """Cancel every booking tied to a passenger request (PassengerService hook)."""
         stmt = select(Booking).where(Booking.request_id == request_id)
         result = await db.execute(stmt)
         bookings = list(result.scalars().all())
@@ -187,7 +187,7 @@ class BookingService:
 
     @staticmethod
     async def get_booking(db: AsyncSession, booking_id: UUID) -> Booking:
-        """שליפת פרטי הזמנה בודדת"""
+        """Fetch single booking by id."""
         booking = await crud_booking.get_booking_by_id_async(db, booking_id)
         if not booking:
             raise BookingNotFoundError(booking_id=str(booking_id))
@@ -195,7 +195,7 @@ class BookingService:
 
     @staticmethod
     async def approve_booking(db: AsyncSession, booking_id: UUID, driver_id: UUID) -> Booking:
-        """אישור הזמנה על ידי נהג. מפרסם לאוטבוקס – הנוסע יקבל מייל ופוש."""
+        """Driver approves booking; outbox triggers passenger email/push."""
         try:
             booking = await crud_booking.get_booking_by_id_async(db, booking_id)
             if not booking:
@@ -232,7 +232,7 @@ class BookingService:
 
     @staticmethod
     async def reject_booking(db: AsyncSession, booking_id: UUID, driver_id: UUID) -> Booking:
-        """דחיית הזמנה על ידי נהג. מפרסם לאוטבוקס – הנוסע יקבל מייל ופוש."""
+        """Driver rejects booking; outbox notifies passenger."""
         try:
             booking = await crud_booking.get_booking_by_id_async(db, booking_id)
             if not booking:
@@ -261,7 +261,7 @@ class BookingService:
 
     @staticmethod
     async def cancel_booking(db: AsyncSession, booking_id: UUID, current_user_id: UUID) -> Booking:
-        """ביטול הזמנה (נוסע או נהג) – עם בדיקת הרשאות."""
+        """Passenger or driver cancels booking (authorization checked)."""
         try:
             booking = await crud_booking.get_booking_by_id_async(db, booking_id)
             if not booking:
@@ -290,7 +290,7 @@ class BookingService:
         page: int = 1,
         limit: int = 20,
     ):
-        """שליפת הזמנות משתמש עם page-based pagination."""
+        """Paginated list of bookings for a user."""
         total = await crud_booking.get_user_bookings_count_async(db, user_id, status)
         offset = (page - 1) * limit
         bookings = await crud_booking.get_user_bookings_filtered_async(db, user_id, status, offset=offset, limit=limit)
@@ -306,7 +306,7 @@ class BookingService:
 
     @staticmethod
     async def get_pending_requests(db: AsyncSession, ride_id: UUID, driver_id: UUID):
-        """שליפת בקשות הממתינות לאישור עבור נסיעה מסוימת"""
+        """Pending join requests for a ride (driver only)."""
         ride = await db.get(Ride, ride_id)
         if not ride or ride.driver_id != driver_id:
             raise ForbiddenRideActionError("גישה חסומה")
@@ -314,7 +314,7 @@ class BookingService:
 
     @staticmethod
     async def get_active_bookings_for_driver(db: AsyncSession, driver_id: UUID):
-        """בוקינגים שבהם הנהג כרגע בביצוע מול נוסע."""
+        """In-progress bookings for active trip phases (driver)."""
         stmt = (
             select(Booking)
             .join(Ride)
@@ -346,10 +346,10 @@ class BookingService:
 
     @staticmethod
     async def get_notifications_for_user(db: AsyncSession, user_id: UUID) -> list[NotificationItemResponse]:
-        """אוסף כל ההתראות למשתמש: כנהג – בקשות להצטרפות; כנוסע – אישור/דחייה/ממתין."""
+        """Unified notification feed: driver pending joins + passenger booking updates."""
         items: list[NotificationItemResponse] = []
 
-        # כנהג: בקשות ממתינות
+        # As driver: pending join requests
         pending = await crud_booking.get_all_pending_bookings_for_driver(db, user_id)
         for b in pending:
             ride = b.ride
@@ -372,7 +372,7 @@ class BookingService:
                 ),
             )
 
-        # כנוסע: ההזמנות שלי (אישור / דחייה / ממתין)
+        # As passenger: my bookings (approved / rejected / pending)
         my_bookings = await crud_booking.get_user_bookings_with_relations(db, user_id)
         for b in my_bookings:
             ride = b.ride

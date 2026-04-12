@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class WebSocketProvider(BaseNotificationProvider):
     """
     WebSocket Provider (Real-time UI Updates).
-    פרסום לערוץ Redis user_{id} — ה-API מזרים ל-WebSocket של המשתמש.
+    Publishes to Redis channel user_{id} — API streams to the user's WebSocket.
     """
 
     def can_send(self, user: Any) -> bool:
@@ -46,8 +46,8 @@ class WebSocketProvider(BaseNotificationProvider):
         channel = f"user_{user_id}"
 
         try:
-            # 2. שליחה ל-Redis
-            # סניור משתמש ב-default=str כדי שכל אובייקט (כמו UUID) יומר למחרוזת בבטחה
+            # 2. Publish to Redis
+            # default=str so values like UUID serialize safely to JSON strings
             message_json = json.dumps(payload, ensure_ascii=False, default=str)
 
             await broadcast.publish(channel=channel, message=message_json)
@@ -55,4 +55,4 @@ class WebSocketProvider(BaseNotificationProvider):
 
         except Exception as e:
             logger.error(f"❌ [WS Provider] Redis Publish Failed: {e!s}")
-            # לא זורקים שגיאה כדי שכישלון ב-WS לא יפיל שליחת מייל או פוש
+            # Swallow errors so WS failure does not break email or push

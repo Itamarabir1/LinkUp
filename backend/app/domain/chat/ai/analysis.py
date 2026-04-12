@@ -25,12 +25,12 @@ async def get_conversation_text_for_analysis(
     Returns:
         מחרוזת טקסט בפורמט: "User_{sender_id}: {body}\nUser_{sender_id}: {body}..."
     """
-    # וידוא שהמשתמש participant
+    # Ensure user is a participant
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
     if not conv:
         return None
 
-    # איסוף הודעות (פנימי – לא pagination)
+    # Load messages (internal — no pagination)
     messages = await chat_crud.get_all_messages_for_conversation(
         db,
         conversation_id=conversation_id,
@@ -40,7 +40,7 @@ async def get_conversation_text_for_analysis(
     if not messages:
         return None
 
-    # בניית טקסט שיחה
+    # Build conversation text
     conversation_lines = []
     for msg in messages:
         conversation_lines.append(f"User_{msg.sender_id}: {msg.body}")

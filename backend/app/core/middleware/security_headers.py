@@ -26,8 +26,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        # Cross-Origin-Opener-Policy: same-origin-allow-popups מאפשר ל-Google OAuth לעבוד
-        # זה נדרש כדי שה-popup של Google יוכל לתקשר עם ה-parent window
+        # COOP: same-origin-allow-popups keeps Google OAuth popups working
+        # Needed so the Google popup can postMessage back to the opener
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
         if _is_https(request):
             response.headers["Strict-Transport-Security"] = self.HSTS_VALUE

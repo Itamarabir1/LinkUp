@@ -1,5 +1,5 @@
 EMAIL_MAP = {
-    # --- אירועי נהג (Driver) ---
+    # --- Driver events ---
     "new_ride_request": {
         "template": "driver/new_ride_request.html",
         "subject": "בקשת הצטרפות לנסיעה",
@@ -15,7 +15,7 @@ EMAIL_MAP = {
         "subject": "תזכורת לנהג: יוצאים לדרך בעוד שעה! 🛣️",
         "body": "תזכורת: הנסיעה שלך ל{destination} יוצאת בעוד שעה.",
     },
-    # --- אירועי נוסע (Passenger) ---
+    # --- Passenger events ---
     "ride_created_for_passengers": {
         "template": "passenger/ride_created_for_passengers.html",
         "subject": "נסיעה חדשה שמתאימה לך – מ{origin} ל{destination} 🚗",
@@ -41,7 +41,7 @@ EMAIL_MAP = {
         "subject": "הנסיעה שלך יוצאת בעוד שעה! 🚗",
         "body": "היי {user_name}, תזכורת: הנסיעה שלך ל{destination} יוצאת בעוד שעה.",
     },
-    # --- אירועי מערכת ואימות (Auth & User) ---
+    # --- Auth & user lifecycle ---
     "welcome": {
         "template": "user/welcome.html",
         "subject": "ברוכים הבאים ל-LinkUp! 🎉",
@@ -57,7 +57,7 @@ EMAIL_MAP = {
         "subject": "קוד לאיפוס הסיסמה שלך - LinkUp 🔑",
         "body": "הקוד לאיפוס הסיסמה שלך הוא: {code}",
     },
-    # --- אירועי צ'אט (Chat) ---
+    # --- Chat events ---
     "conversation_summary": {
         "template": "chat/conversation_summary.html",
         "subject": "סיכום שיחה - LinkUp 📋",

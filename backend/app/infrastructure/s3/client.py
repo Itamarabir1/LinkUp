@@ -1,9 +1,9 @@
 """
-לקוח S3 (aioboto3) – העלאה, הורדה, העתקה ומחיקה.
-משמש את StorageService והעיבוד ברקע (presigned upload → worker מעבד ל-avatars/{user_id}/).
+S3 client (aioboto3) — upload, download, copy, delete.
+Used by StorageService and background workers (presigned upload → finalize under avatars/{user_id}/).
 
-הערה: כשהפרונט מעלה ישירות ל-S3 עם presigned URL, ה-bucket חייב להגדיר CORS שמאפשר
-PUT מ-origin של הפרונט (למשל http://localhost:5173 בפיתוח). ראה docs/S3_CORS.md.
+Note: for browser PUT to presigned URLs, the bucket must allow CORS from the frontend origin
+(e.g. http://localhost:5173 in dev). See docs/S3_CORS.md.
 """
 
 import logging
@@ -33,12 +33,12 @@ class S3Client:
         self.bucket_name = settings.S3_BUCKET_NAME
 
     def _public_url(self, key: str) -> str:
-        # חשוב: key יכול לכלול תווים בעברית. URL חייב להיות percent-encoded כדי שהדפדפן יטען אותו אמין.
+        # Keys may include non-ASCII; percent-encode path for reliable browser loads.
         encoded_key = quote(key, safe="/")
         return f"https://{self.bucket_name}.s3.{settings.AWS_REGION}.amazonaws.com/{encoded_key}"
 
     async def upload_fileobj(self, file_data, key: str, content_type: str) -> str:
-        """העלאה בסיסית – מחזיר URL ציבורי."""
+        """Basic upload — returns public URL."""
         try:
             async with self._session.client("s3") as s3:
                 await s3.upload_fileobj(
@@ -53,7 +53,7 @@ class S3Client:
             raise S3UploadFailed() from e
 
     async def copy_object(self, source_key: str, dest_key: str) -> str:
-        """העתקה בתוך אותו bucket (למשל staging → final). שומר content-type של המקור."""
+        """Copy within same bucket (e.g. staging → final). Preserves source content-type."""
         try:
             copy_source = {"Bucket": self.bucket_name, "Key": source_key}
             async with self._session.client("s3") as s3:
@@ -68,7 +68,7 @@ class S3Client:
             raise S3UploadFailed() from e
 
     async def delete_object(self, key: str) -> None:
-        """מחיקה לפי key."""
+        """Delete object by key."""
         try:
             async with self._session.client("s3") as s3:
                 await s3.delete_object(Bucket=self.bucket_name, Key=key)
@@ -84,7 +84,7 @@ class S3Client:
             raise S3DeleteFailed() from e
 
     async def get_object_bytes(self, key: str) -> bytes:
-        """מוריד אובייקט כ-bytes (לעיבוד תמונה ב-worker)."""
+        """Download object as bytes (image worker processing)."""
         try:
             async with self._session.client("s3") as s3:
                 resp = await s3.get_object(Bucket=self.bucket_name, Key=key)
@@ -95,7 +95,7 @@ class S3Client:
             raise ExternalServiceError() from e
 
     async def list_objects_by_prefix(self, prefix: str) -> list[str]:
-        """מחזיר רשימת keys עם prefix נתון."""
+        """List object keys under a prefix."""
         keys = []
         try:
             async with self._session.client("s3") as s3:
@@ -112,13 +112,12 @@ class S3Client:
 
     async def generate_presigned_upload_url(self, key: str, content_type: str, expiration: int = 300) -> str:
         """
-        יוצר presigned URL להעלאה ישירה ל-S3.
-        expiration: זמן תוקף בשניות (ברירת מחדל: 5 דקות).
-        מחזיר URL עם חתימה דיגיטלית שמאפשר העלאה ישירה מהלקוח.
+        Presigned PUT URL for direct client upload.
+        expiration: seconds until expiry (default 5 minutes).
         """
         try:
             async with self._session.client("s3") as s3:
-                # aiobotocore: generate_presigned_url הוא async (חייב await)
+                # aiobotocore: generate_presigned_url is async (must await)
                 presigned_url = await s3.generate_presigned_url(
                     "put_object",
                     Params={
@@ -140,8 +139,7 @@ class S3Client:
 
     def generate_presigned_read_url(self, key: str, expiration: int = 900) -> str:
         """
-        יוצר presigned URL לקריאה (GET) מ-S3.
-        מתאים גם לשימוש ממקומות סינכרוניים (כמו computed fields בסכמות).
+        Presigned GET URL (sync — safe for Pydantic computed fields and similar).
         """
         try:
             s3 = boto3.client(

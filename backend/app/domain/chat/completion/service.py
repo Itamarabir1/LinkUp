@@ -34,30 +34,30 @@ async def handle_conversation_completion(
         True אם הצליח, False אחרת
     """
     try:
-        # בדיקה שהשיחה קיימת והמשתמש participant
+        # Conversation exists and user is participant
         conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
         if not conv:
             logger.warning(f"Conversation {conversation_id} not found or user {current_user_id} not participant")
             return False
 
-        # בדיקה אם כבר נותח (idempotency)
+        # Idempotency: skip if already analyzed
         if await analysis_exists(db, conversation_id):
             logger.info(f"Conversation {conversation_id} already analyzed, skipping")
             return False
 
-        # איסוף טקסט השיחה
+        # Flatten messages to text
         chat_text = await get_conversation_text_for_analysis(db, conversation_id, current_user_id, limit=BATCH_SIZE_DEFAULT)
         if not chat_text:
             logger.warning(f"No messages found for conversation {conversation_id}")
             return False
 
-        # ניתוח AI
+        # AI analysis
         ride_summary = analyze_conversation(chat_text)
         if not ride_summary:
             logger.error(f"AI analysis failed for conversation {conversation_id}")
             return False
 
-        # שמירה ב-DB
+        # Persist analysis
         await create_analysis(
             db=db,
             conversation_id=conversation_id,
@@ -69,7 +69,7 @@ async def handle_conversation_completion(
             analysis_json=ride_summary.model_dump(),
         )
 
-        # שליחת event ל-RabbitMQ (דרך Outbox)
+        # Publish domain event via outbox → RabbitMQ
         await publish_to_outbox(
             db=db,
             event_name="chat.conversation.completed",

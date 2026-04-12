@@ -5,15 +5,14 @@ from urllib.parse import urlparse, urlunparse
 from pydantic import AliasChoices, EmailStr, Field, computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# תיקיית backend (היכן ש-.env נמצא) – כך שה-.env נטען גם כשמריצים מ-cwd אחר
+# Backend directory (where .env lives) so .env loads even when cwd differs
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 
 
 class Settings(BaseSettings):
     """
-    LinkUp System Settings - Architect Edition (2026).
-    ניהול ריכוזי של כל משתני הסביבה עם וולידציה בזמן עלייה.
-    מעודכן לתמיכה ב-Kafka KRaft וארכיטקטורת אירועים מלאה.
+    LinkUp system settings (2026).
+    Centralized env vars with validation at startup.
     """
 
     # --- Project Metadata ---
@@ -22,11 +21,11 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(False)
     ENVIRONMENT: str = Field(
         "development",
-        description="שם סביבה (Sentry, לוגים): development / staging / production",
+        description="Environment name (Sentry, logs): development / staging / production",
     )
     SENTRY_DSN: str | None = Field(
         None,
-        description="Sentry DSN; ריק = ללא שליחה ל-Sentry",
+        description="Sentry DSN; empty = no Sentry",
     )
     API_V1_STR: str = "/api/v1"
 
@@ -38,12 +37,12 @@ class Settings(BaseSettings):
     POSTGRES_PORT: str = Field("5432")
 
     # --- DB Connection Pool ---
-    DB_POOL_SIZE: int = Field(5, description="SQLAlchemy pool_size (חיבורים קבועים)")
-    DB_MAX_OVERFLOW: int = Field(10, description="חיבורים נוספים תחת עומס")
-    DB_POOL_TIMEOUT: int = Field(30, description="שניות המתנה לחיבור פנוי")
-    DB_POOL_RECYCLE: int = Field(1800, description="חידוש חיבורים כל 30 דקות")
+    DB_POOL_SIZE: int = Field(5, description="SQLAlchemy pool_size (persistent connections)")
+    DB_MAX_OVERFLOW: int = Field(10, description="Extra connections under load")
+    DB_POOL_TIMEOUT: int = Field(30, description="Seconds to wait for a free connection")
+    DB_POOL_RECYCLE: int = Field(1800, description="Recycle connections every 30 minutes")
 
-    # אופציונלי: חיבור מלא ל-Postgres משורת סביבה (למשל מ-K8s/פרודקשן)
+    # Optional: full Postgres URL from env (e.g. K8s / production)
     DATABASE_URL_RAW: str | None = Field(
         default=None,
         validation_alias=AliasChoices("DATABASE_URL", "DATABASE_URL_RAW"),
@@ -54,13 +53,13 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL(self) -> str:
         """
-        מקור אמת ל-DSN של ה-DB.
-        - לוקאלי / Docker: נבנה מ-POSTGRES_*
-        - פרודקשן: אם DATABASE_URL (RAW) קיים – משתמשים בו ומוודאים asyncpg.
+        Canonical DB DSN.
+        - Local / Docker: built from POSTGRES_*
+        - Production: if DATABASE_URL (RAW) is set, use it and ensure asyncpg driver.
         """
         if self.DATABASE_URL_RAW:
             url = self.DATABASE_URL_RAW
-            # postgresql:// או postgres:// – ממירים ל-postgresql+asyncpg
+            # postgresql:// or postgres:// → normalize to postgresql+asyncpg
             if url.startswith("postgres://"):
                 return "postgresql+asyncpg://" + url[len("postgres://") :]
             if url.startswith("postgresql://"):
@@ -74,9 +73,9 @@ class Settings(BaseSettings):
     REDIS_PORT: int = Field(6379)
     REDIS_DB: int = Field(0)
     REDIS_PASSWORD: str | None = Field(None)
-    # Redis DB נפרד לאירועי צ'אט (Pub/Sub completion)
+    # Separate Redis DB for chat events (Pub/Sub completion)
     REDIS_CHAT_DB: int = Field(1)
-    # אופציונלי: חיבור Redis מלא (למשל מ-K8s/פרודקשן)
+    # Optional: full Redis URL (e.g. K8s / production)
     REDIS_URL_RAW: str | None = Field(
         default=None,
         validation_alias=AliasChoices("REDIS_URL", "REDIS_URL_RAW"),
@@ -95,7 +94,7 @@ class Settings(BaseSettings):
     @property
     def REDIS_CHAT_URL(self) -> str:
         """
-        אותו host כמו REDIS_URL, DB=REDIS_CHAT_DB (חייב להתאים ל-chat-ws).
+        Same host as REDIS_URL, DB=REDIS_CHAT_DB (must match chat-ws).
         """
         if self.REDIS_URL_RAW:
             try:
@@ -119,7 +118,7 @@ class Settings(BaseSettings):
     @computed_field
     @property
     def RABBITMQ_URL(self) -> str:
-        """המקור היחיד לאמת עבור RabbitMQ - משמש את ה-Client ואת Celery"""
+        """Single source of truth for RabbitMQ — used by client and Celery."""
         return f"amqp://{self.RABBITMQ_USER}:{self.RABBITMQ_PASSWORD}@{self.RABBITMQ_HOST}:{self.RABBITMQ_PORT}/"
 
     @computed_field
@@ -127,20 +126,20 @@ class Settings(BaseSettings):
     def CELERY_BROKER_URL(self) -> str:
         return self.RABBITMQ_URL
 
-    # --- Frontend & API (לינקים במיילים / כפתורים) ---
+    # --- Frontend & API (email links / buttons) ---
     FRONTEND_URL: str = Field(
         "http://localhost:5173",
-        description="כתובת האפליקציה (פרונט). לוקאלי: localhost:5173; פרודקשן: הגדר ב-.env (למשל https://linkup.co.il).",
+        description="Frontend app URL. Local: localhost:5173; production: set in .env (e.g. https://linkup.co.il).",
     )
     API_PUBLIC_URL: str = Field(
         "",
-        description="כתובת הבקאנד בציבור (למשל https://api.linkup.co.il). אם מוגדר – כפתור אימות במייל יפתח לינק אימות בלחיצה אחת.",
+        description="Public backend URL (e.g. https://api.linkup.co.il). If set, email verify button opens one-click link.",
     )
 
     # --- External Services (Brevo / Sendinblue) ---
     BREVO_API_KEY: str = Field("")
     BREVO_SENDER_EMAIL: EmailStr = Field("support@itamarabir.com")
-    BREVO_SENDER_NAME: str = Field("LinkUp", description="שם השולח במיילים")
+    BREVO_SENDER_NAME: str = Field("LinkUp", description="Sender display name in emails")
 
     # --- EIA (U.S. fuel prices API) ---
     # Get free API key: https://www.eia.gov/opendata/register.php
@@ -150,31 +149,31 @@ class Settings(BaseSettings):
     GOOGLE_MAPS_API_KEY: str = Field(
         "",
         description=(
-            "Google Maps API key – Geocoding, Directions, Distance Matrix. גם נשלח לפרונט ל-Maps JavaScript API דרך GET /api/v1/geo/maps-key."
+            "Google Maps API key — Geocoding, Directions, Distance Matrix. Also returned to frontend for Maps JS via GET /api/v1/geo/maps-key."
         ),
     )
 
     # --- Google OAuth ---
     GOOGLE_CLIENT_ID: str = Field(
         "",
-        description="Google OAuth 2.0 Client ID מה-Google Cloud Console. נדרש לאימות ID tokens מ-Google Sign-In.",
+        description="Google OAuth 2.0 Client ID from Google Cloud Console. Required to verify ID tokens from Google Sign-In.",
     )
     GOOGLE_CLIENT_SECRET: str | None = Field(
         None,
-        description="Google OAuth 2.0 Client Secret (אופציונלי - נדרש רק אם צריך access tokens, לא ל-ID token verification).",
+        description="Google OAuth 2.0 Client Secret (optional — only if access tokens are needed, not for ID token verification).",
     )
 
-    # --- Security & Auth (חובה בפרודקשן – בפיתוח ברירת מחדל) ---
+    # --- Security & Auth (required in production; defaults in dev) ---
     SECRET_KEY: str = Field(
         "",
         description="Must be set in .env for production",
     )
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(30, description="תוקף Access Token בדקות")
-    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(7, description="תוקף Refresh Token בימים (לטוקן הארוך)")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(30, description="Access token TTL in minutes")
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(7, description="Refresh token TTL in days (long-lived token)")
     JWT_ISSUER: str = Field("linkup-api", description="JWT claim 'iss' (issuer)")
 
-    # --- HTTPS (פרודקשן מאחורי Proxy) ---
+    # --- HTTPS (production behind proxy) ---
     FORCE_HTTPS_REDIRECT: bool = Field(
         False,
         description="If True, redirect HTTP requests to HTTPS (set when behind a proxy that sets X-Forwarded-Proto).",
@@ -187,10 +186,10 @@ class Settings(BaseSettings):
     )
 
     # --- Rate limiting (auth endpoints) ---
-    RATE_LIMIT_AUTH_WINDOW_SECONDS: int = Field(60, description="חלון זמן ל-rate limit על auth (שניות)")
-    RATE_LIMIT_AUTH_MAX_REQUESTS: int = Field(10, description="מקסימום בקשות ל-auth ל-IP בחלון")
+    RATE_LIMIT_AUTH_WINDOW_SECONDS: int = Field(60, description="Auth rate-limit window (seconds)")
+    RATE_LIMIT_AUTH_MAX_REQUESTS: int = Field(10, description="Max auth requests per IP per window")
 
-    # --- Cloud Infrastructure (AWS & Firebase) – אופציונלי בפיתוח ---
+    # --- Cloud (AWS & Firebase) — optional in local dev ---
     AWS_ACCESS_KEY_ID: str = Field("")
     AWS_SECRET_ACCESS_KEY: str = Field("")
     AWS_REGION: str = "eu-central-1"
@@ -211,8 +210,8 @@ class Settings(BaseSettings):
         v = v.strip().removeprefix("https://").removeprefix("http://").rstrip("/")
         return v or None
 
-    # --- Upload temp directory (קבצים זמניים לפני העלאה ל-S3) ---
-    # ברירת מחדל: תיקיית המערכת (tempfile.gettempdir()). אם מוגדר – משתמשים בתיקייה זו (נוצר אוטומטית אם חסר).
+    # --- Upload temp directory (staging before S3 upload) ---
+    # Default: system temp (tempfile.gettempdir()). If set, use this path (created if missing).
     UPLOAD_TEMP_DIR: str | None = Field(
         None,
         description="Optional directory for upload temp files; default is system temp.",

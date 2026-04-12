@@ -24,7 +24,7 @@ func LoadConfig() Config {
 		}
 	}
 	redisURL := os.Getenv("REDIS_URL")
-	// ברירת מחדל DB=1 — תואם ל-backend REDIS_CHAT_DB (הודעות + chat-ws באותו DB)
+	// Default DB=1 — matches backend REDIS_CHAT_DB (chat + chat-ws share logical DB)
 	if redisURL == "" {
 		redisURL = "redis://localhost:6379/1"
 	}

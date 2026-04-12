@@ -6,12 +6,12 @@ from .base import BaseContextBuilder
 
 class UserBuilder(BaseContextBuilder):
     """
-    מטפל באירועים שבהם המקור (Source) הוא אובייקט User.
-    אירועים לדוגמה: USER_REGISTERED, PASSWORD_RESET_REQUESTED, EMAIL_VERIFICATION.
+    Events whose source entity is a User.
+    Examples: USER_REGISTERED, PASSWORD_RESET_REQUESTED, EMAIL_VERIFICATION.
     """
 
     def build(self, user: Any, event_key: str) -> dict[str, Any]:
-        # 1. חילוץ נתוני בסיס מהמשתמש (באופן בטוח)
+        # 1. Safe base fields from user
         first_name = getattr(user, "first_name", "אורח/ת")
         user_email = getattr(user, "email", "")
 
@@ -22,7 +22,7 @@ class UserBuilder(BaseContextBuilder):
             "support_email": "support@itamarabir.com",
         }
 
-        # 2. מיפוי תוכן לפי סוג האירוע
+        # 2. Map copy by event kind
         event_content_map = {
             "registered": {
                 "subject": f"ברוך הבא ל-Linkup, {first_name}!",
@@ -36,7 +36,7 @@ class UserBuilder(BaseContextBuilder):
                 "hero_text": "איפוס סיסמה",
                 "description": "קיבלנו בקשה לאיפוס הסיסמה שלך. אם לא ביקשת זאת, אפשר להתעלם מהמייל.",
                 "cta_label": "בחר סיסמה חדשה",
-                "cta_path": "/reset-password",  # במציאות כאן יבוא טוקן
+                "cta_path": "/reset-password",  # in production this would include token
             },
             "verify": {
                 "subject": "אמת את כתובת המייל שלך",
@@ -47,13 +47,13 @@ class UserBuilder(BaseContextBuilder):
             },
         }
 
-        # 3. התאמת התוכן
+        # 3. Pick matching content block
         matched_content = next(
             (content for key, content in event_content_map.items() if key in event_key.lower()),
             self._get_default_content(),
         )
 
-        # 4. בניית ה-URL הסופי ל-CTA
+        # 4. Final CTA URL
         context.update(matched_content)
         context["action_url"] = self._get_cta_url(matched_content.get("cta_path", ""))
 

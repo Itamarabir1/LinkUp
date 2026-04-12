@@ -3,7 +3,7 @@ import logging
 import signal
 import sys
 
-# רישום כל המודלים לפני שימוש ב-ORM (מניעת "expression 'Group' failed to locate a name")
+# Import models before ORM resolves string relationships (avoids "expression 'Group' failed to locate a name")
 import app.db.models  # noqa: F401
 
 # Firebase Admin SDK init (side-effect import; safe idempotent)
@@ -41,29 +41,29 @@ logger = logging.getLogger("WorkerMain")
 async def main():
     logger.info("🚀 Linkup Worker Engine is starting...")
 
-    # 1. ניהול Graceful Shutdown - הגדרה מוקדמת
+    # 1. Graceful shutdown — set up early
     stop_event = asyncio.Event()
     tasks = []
 
     def stop_handler():
-        """פונקציה שתקרא בזמן פקודת עצירה"""
+        """Called when a shutdown signal is received."""
         logger.info("🛑 Shutdown signal received. Signalizing tasks to stop...")
         stop_event.set()
 
-    # טיפול בסיגנלים - שבירת המוקש של Windows
+    # Signal handling — Windows behaves differently
     if sys.platform != "win32":
-        # לינוקס / מאק תומכים ב-add_signal_handler
+        # Linux/macOS: asyncio.add_signal_handler
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, stop_handler)
     else:
-        # ב-Windows אנחנו נסמוך על KeyboardInterrupt בתוך ה-try
+        # Windows: rely on KeyboardInterrupt inside try/except
         logger.info("ℹ️ Windows detected: Using standard interrupt handling.")
 
     broadcast_ok = False
     chat_pubsub_ok = False
     try:
-        # 2. אתחול תשתיות
+        # 2. Connect infrastructure
         await rabbit_client.connect()
         try:
             await broadcast.connect()
@@ -82,7 +82,7 @@ async def main():
         except Exception as e:
             logger.warning("⚠️ [Worker] Redis Chat Pub/Sub unavailable: %s", e)
 
-        # 3. הזרקת תלויות (Dependency Injection)
+        # 3. Wire dependencies (dispatcher + publisher)
         rmq_publisher = RabbitMQPublisher(rabbit_client=rabbit_client)
         dispatcher = DispatcherFactory.create_standard_dispatcher(publishers=[rmq_publisher])
 
@@ -102,7 +102,7 @@ async def main():
             exchange_names=SCHEDULED_EXCHANGES,
         )
 
-        # 4. הגדרת המשימות כ-Tasks עצמאיים (כולל משימות מתוזמנות דרך התור)
+        # 4. Spawn worker tasks (includes scheduled publisher + consumers)
         tasks = [
             asyncio.create_task(notifications_consumer.consume(callback=handle_notification_event)),
             asyncio.create_task(avatar_upload_consumer.consume(callback=handle_avatar_upload_event)),
@@ -114,21 +114,21 @@ async def main():
 
         logger.info(f"✅ All {len(tasks)} workers are running. Press Ctrl+C to stop.")
 
-        # 5. המתנה לסיום - או שמישהו סימן עצירה, או שאחת המשימות קרסה
+        # 5. Block until shutdown (or a task crashes before this)
         stop_task = asyncio.create_task(stop_event.wait())
 
-        # אנחנו מחכים ש-stop_event יופעל (ע"י ה-handler או ה-except)
+        # Wait until stop_event is set (signal handler or except path)
         await stop_task
 
     except (KeyboardInterrupt, SystemExit):
-        # תופס Ctrl+C ב-Windows
+        # Ctrl+C on Windows
         logger.info("⌨️ Keyboard Interrupt received.")
         stop_handler()
     except Exception as e:
         logger.error(f"❌ Critical error during worker startup: {e}", exc_info=True)
 
     finally:
-        # 6. ניקוי (Graceful Cleanup)
+        # 6. Graceful cleanup
         logger.info("👋 Shutting down: Cancelling all tasks...")
 
         for t in tasks:
@@ -136,7 +136,7 @@ async def main():
                 t.cancel()
 
         if tasks:
-            # המתנה של מקסימום 5 שניות לסגירת המשימות
+            # Wait up to 5s for tasks to finish cancelling
             await asyncio.wait(tasks, timeout=5)
 
         if broadcast_ok:
@@ -154,9 +154,9 @@ async def main():
 
 
 if __name__ == "__main__":
-    # שימוש ב-run בצורה בטוחה
+    # asyncio.run with clean KeyboardInterrupt
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        # מונע הדפסת Traceback מכוער כשסוגרים את הטרמינל
+        # Avoid noisy traceback when closing the terminal
         pass

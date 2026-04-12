@@ -115,14 +115,14 @@ async def remove_member(db: AsyncSession, group_id: UUID, user_id: UUID) -> None
 
     if group:
         if others:
-            # מנהל יוצא — העבר מנהלות לחבר אחר (הוותיק ביותר)
+            # Admin leaving — transfer admin to another member (longest-tenured)
             if group.admin_id == user_id:
                 others.sort(key=lambda m: m.joined_at)
                 new_admin = others[0]
                 group.admin_id = new_admin.user_id
                 new_admin.role = "admin"
         else:
-            # אין חברים אחרי היציאה — כמו סגירת קבוצה (לא נשארת קבוצה "ריקה" פעילה)
+            # No members left after exit — same as closing the group (no empty active group)
             group.is_active = False
 
     db.delete(member)

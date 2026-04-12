@@ -120,7 +120,7 @@ export function useLocationBroadcast(options: UseLocationBroadcastOptions) {
         hasStartedRef.current = true;
       } catch (error: unknown) {
         const status = getApiStatus(error);
-        // 400 = נסיעה כבר active (או סטטוס לא מאפשר start) — לא חוסם שידור מיקום
+        // 400 = ride already active or status disallows start — do not block location streaming
         if (status === 400) {
           hasStartedRef.current = true;
         }

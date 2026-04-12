@@ -40,7 +40,7 @@ class EventDispatcher:
                 errors.append((target, str(e)))
                 logger.error(f"❌ Failed dispatching {event.name} to {target}: {e}")
 
-        # העברת האחריות לבדיקת התוצאות ל-Evaluator
+        # Delegate success/failure policy to evaluator
         self._evaluator.evaluate(event, results, errors)
 
         return results

@@ -1,0 +1,57 @@
+# החלטות ארכיטקטוניות (ADR) — מדריך לראיונות
+
+מסמכים אלה מסכמים **למה** נבנתה Linkup כפי שהיא — לא רק **מה** קיים. מקור אמת טכני נשאר במסמכי הארכיטקטורה והקוד.
+
+## סדר קריאה מומלץ לפני ראיון
+
+1. [ARCHITECTURE_DECISIONS_BACKEND.md](ARCHITECTURE_DECISIONS_BACKEND.md) — DB, Redis, RabbitMQ, Outbox, workers, סקייל, אבטחה.
+2. [WEBSOCKETS.md](WEBSOCKETS.md) — **מתי** משתמשים ב-WebSocket, **איזה שרת**, למה לא רק REST/polling.
+3. [FCM_AND_PUSH.md](FCM_AND_PUSH.md) — **למה** push ב-data-only, מחזור חיים טוקן, UX foreground/background.
+4. [ARCHITECTURE_DECISIONS_CHAT_WS.md](ARCHITECTURE_DECISIONS_CHAT_WS.md) — למה Go, גבולות שירות.
+5. [ARCHITECTURE_DECISIONS_FRONTEND.md](ARCHITECTURE_DECISIONS_FRONTEND.md) — React/Vite, Zod, התראות, אדמין.
+
+## מפת מערכת (תזכורת)
+
+```mermaid
+flowchart TB
+  subgraph clients [Clients]
+    FE[Web React]
+    MO[Mobile Expo]
+  end
+  subgraph api [API Layer]
+    PY[FastAPI backend]
+    GO[chat-ws Go]
+  end
+  subgraph data [Data and Messaging]
+    PG[(PostgreSQL PostGIS)]
+    R0[Redis DB0]
+    R1[Redis DB1]
+    MQ[RabbitMQ]
+  end
+  FE --> PY
+  FE --> GO
+  MO --> PY
+  MO --> GO
+  PY --> PG
+  PY --> R0
+  PY --> R1
+  PY --> MQ
+  GO --> R1
+```
+
+## מסמכי מקור בפרויקט
+
+| נושא | מסמך |
+|------|------|
+| סקירה כללית | [../ARCHITECTURE.md](../ARCHITECTURE.md) (שורש), [../readme.md](../readme.md) (Architecture Decisions) |
+| פיצ'רים וסקייל | [../ENGINEERING_HIGHLIGHTS.md](../ENGINEERING_HIGHLIGHTS.md) |
+| אירועים ותורים | [../architecture/EVENTS.md](../architecture/EVENTS.md) |
+| Real-time / WS | [../architecture/REALTIME.md](../architecture/REALTIME.md) |
+| FCM | [../FCM_SYSTEM_SUMMARY.md](../FCM_SYSTEM_SUMMARY.md) |
+| שגיאות API | [../ERRORS.md](../ERRORS.md) |
+| פרונט | [../../frontend/docs/ARCHITECTURE.md](../../frontend/docs/ARCHITECTURE.md) |
+| chat-ws | [../../chat-ws/ARCHITECTURE.md](../../chat-ws/ARCHITECTURE.md) |
+
+## איך להשתמש בראיון
+
+לכל החלטה במסמכי ה-ADR יש בדרך כלל: **הקשר → מה בחרנו → למה (כולל סקייל/אמינות אם רלוונטי) → אלטרנטיבה → משפט קצר לסיכום**.

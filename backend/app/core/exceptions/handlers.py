@@ -36,7 +36,7 @@ def _error_json(
 
 async def linkup_exception_handler(request: Request, exc: LinkupError):
     """
-    Handler מרכזי שתופס את כל סוגי השגיאות שלנו
+    Central handler for all LinkupError subclasses.
     """
     request_id = getattr(request.state, "request_id", None) or ""
     # Align JSON trace_id with X-Request-ID / other handlers (validation, DB).
@@ -49,8 +49,8 @@ async def linkup_exception_handler(request: Request, exc: LinkupError):
         extra={"request_id": request_id},
     )
 
-    # TODO: Sentry — להסיר הערה כשעוברים לפרודקשן
-    # רק 5xx — לא לשלוח 401/404/422 עסקיים (מפחית רעש)
+    # TODO: Sentry — remove comment when enabling in production
+    # Only 5xx — do not send business 401/404/422 (reduces noise)
     # import sentry_sdk
     # if exc.status_code >= 500:
     #     sentry_sdk.capture_exception(exc)

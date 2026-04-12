@@ -28,10 +28,10 @@ from app.infrastructure.outbox.model import OutboxEvent
 
 logger = logging.getLogger(__name__)
 
-# סטטיסטיקות דשבורד — חלון "פעילים" וגרף הרשמות (ימים)
+# Dashboard stats: "active users" window and signups chart (days)
 _ADMIN_STATS_ACTIVE_USERS_DAYS = 7
 _ADMIN_STATS_CHART_DAYS = 7
-# ברירות מחדל ל-pagination ב-endpoints אדמין
+# Default pagination for admin endpoints
 _QUERY_DEFAULT_USERS_LIMIT = 50
 _QUERY_MAX_USERS_LIMIT = 200
 _QUERY_DEFAULT_RIDES_LIMIT = 100

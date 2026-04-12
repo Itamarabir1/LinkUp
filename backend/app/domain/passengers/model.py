@@ -49,7 +49,7 @@ class PassengerRequest(Base):
 
     request_id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    # FK למשתמש הפיזי
+    # User FK
     passenger_id = Column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.user_id", ondelete="CASCADE"),
@@ -62,22 +62,22 @@ class PassengerRequest(Base):
         nullable=True,
     )
 
-    # נתונים פיזיים
+    # Scalar columns
     num_passengers = Column(Integer, nullable=False, default=1)
     is_auto_generated = Column(Boolean, default=False, server_default="false")
     is_notification_active = Column(Boolean, default=True, server_default="true")
 
-    # PostGIS - Geography לחישובי מרחק במטרים
+    # PostGIS geography (meter-accurate distance)
     pickup_name = Column(String(255))
     pickup_geom = Column(Geography(geometry_type="POINT", srid=4326), nullable=False)
     destination_name = Column(String(255))
     destination_geom = Column(Geography(geometry_type="POINT", srid=4326), nullable=False)
 
     requested_departure_time = Column(DateTime(timezone=True), nullable=False)
-    # התאמה לשם העמודה ב-SQL: search_radius_meters
+    # Column name matches DB: search_radius_meters
     search_radius_meters = Column(Integer, default=500)
 
-    # נתונים נוספים מה-SQL
+    # Extra metadata from legacy SQL
     distance_km = Column(Numeric(10, 2), default=0)
     duration_min = Column(Numeric(10, 2), default=0)
 
@@ -105,11 +105,11 @@ class PassengerRequest(Base):
 
     # --- Relationships ---
 
-    # מקשר חזרה ל-User.passenger_requests
+    # User.passenger_requests back_populates
     user = relationship("User", back_populates="passenger_requests")
     group = relationship("Group")
 
-    # מקשר לבוקינגס שנוצרו מהבקשה הזו
+    # Bookings spawned from this request
     bookings = relationship("Booking", back_populates="passenger_request", cascade="all, delete-orphan")
 
     def __repr__(self):

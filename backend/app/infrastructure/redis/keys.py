@@ -1,9 +1,9 @@
 from app.core import constants
 
-# תוקף שמירת תצוגת המסלולים (כולל 3 המסלולים) ב-Redis – 24 שעות (מקור: app.core.constants)
+# Route preview cache TTL (all alternatives) — 24h; see app.core.constants
 RIDE_PREVIEW_TTL = constants.RIDE_PREVIEW_TTL
 
-# שם היסטורי לקוד אימות (אותו ערך כמו OTP_TTL)
+# Legacy key name for verification TTL (same as OTP_TTL)
 OTP_VERIFICATION_TTL = constants.OTP_TTL
 
 
@@ -16,7 +16,7 @@ def get_otp_verification_key(user_id: str, event_name: str) -> str:
     return f"otp:{event_name}:{user_id}"
 
 
-# --- ערוצי Redis — מקור אמת יחיד ---
+# --- Redis channel naming (single source of truth) ---
 
 RIDES_LIST_CHANNEL = "rides:list"
 

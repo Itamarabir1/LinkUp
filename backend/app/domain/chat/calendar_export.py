@@ -26,19 +26,19 @@ async def get_conversation_for_calendar_export(
         - messages (רשימת הודעות)
         - partner (הצד השני)
     """
-    # וידוא שהמשתמש participant
+    # Ensure user is a participant
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
     if not conv:
         return None
 
-    # איסוף הודעות (פנימי – לא pagination)
+    # Load messages (internal — no pagination)
     messages = await chat_crud.get_all_messages_for_conversation(
         db,
         conversation_id=conversation_id,
         limit=100,
     )
 
-    # זיהוי הצד השני
+    # Identify the other party
     partner_user = conv.user_2 if conv.user_id_1 == current_user_id else conv.user_1
 
     return {

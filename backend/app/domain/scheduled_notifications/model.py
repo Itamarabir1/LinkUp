@@ -25,7 +25,7 @@ class ScheduledNotification(Base):
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    # ride_id אופציונלי — נשלח גם לנוסע וגם לנהג
+    # Optional ride context (driver + passenger reminders)
     ride_id = Column(
         PG_UUID(as_uuid=True),
         ForeignKey("rides.ride_id", ondelete="CASCADE"),
@@ -42,10 +42,10 @@ class ScheduledNotification(Base):
     # 'passenger_reminder' | 'driver_reminder'
     type = Column(String(50), nullable=False)
 
-    # מתי לשלוח — 30 דקות לפני departure_time
+    # Scheduled fire time (e.g. 30 min before departure)
     deliver_at = Column(DateTime(timezone=True), nullable=False)
 
-    # מתי נשלח בפועל — NULL = טרם נשלח
+    # NULL until successfully sent
     sent_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

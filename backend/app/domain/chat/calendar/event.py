@@ -21,20 +21,20 @@ def create_calendar_event(ride: RideSummary, base_date: datetime | None = None) 
     Returns:
         Event object או None אם לא ניתן ליצור אירוע
     """
-    # פרסור זמן המפגש
+    # Parse meeting time
     meeting_datetime = parse_hebrew_time(ride.meeting_time, base_date)
     if not meeting_datetime:
         return None
 
-    # יצירת אירוע
+    # Build calendar event
     event = Event()
     event.add("summary", f"טרמפ: {ride.driver_name} → {ride.passenger_name}")
     event.add("dtstart", meeting_datetime)
 
-    # משך האירוע - שעה אחת (ניתן לשנות)
+    # Default duration: 1 hour
     event.add("dtend", meeting_datetime + timedelta(hours=1))
 
-    # תיאור האירוע
+    # Description
     description_parts = [
         f"נהג: {ride.driver_name}",
         f"נוסע: {ride.passenger_name}",
@@ -45,14 +45,14 @@ def create_calendar_event(ride: RideSummary, base_date: datetime | None = None) 
     ]
     event.add("description", "\n".join(description_parts))
 
-    # מיקום
+    # Location
     if ride.pickup_location and ride.pickup_location != "לא צוין":
         event.add("location", ride.pickup_location)
 
-    # זמן יצירה
+    # Created timestamp
     event.add("dtstamp", datetime.now())
 
-    # מזהה ייחודי לאירוע
+    # Event UID
     event.add(
         "uid",
         f"linkup-{ride.driver_name}-{ride.passenger_name}-{meeting_datetime.isoformat()}",

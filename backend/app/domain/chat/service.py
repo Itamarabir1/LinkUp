@@ -224,7 +224,7 @@ async def send_message(
     except Exception as e:
         logger.warning("Publish unread_count failed: %s", e, exc_info=True)
 
-    # בדיקה אם זו הודעת סיום — מפרסם ל-Redis DB=1; worker יטפל בניתוח AI
+    # If this is a conversation-end message — publish to Redis DB=1; worker runs AI analysis
     if is_conversation_completion_message(body):
         try:
             await publish_chat_completion_event(conversation_id, sender_id)

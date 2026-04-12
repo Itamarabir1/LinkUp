@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 async def handle_map_tasks(payload: dict[str, Any], routing_key: str):
     """
-    מנתב משימות מפות לפי ה-routing_key.
-    דוגמה למפתח: ride.maps.calculate_route
+    Routes map tasks by routing_key.
+    Example key: ride.maps.calculate_route
     """
     if routing_key == "ride.maps.calculate_route":
         await calculate_ride_route_task(payload)
@@ -26,7 +26,7 @@ async def handle_map_tasks(payload: dict[str, Any], routing_key: str):
 
 async def calculate_ride_route_task(data: dict[str, Any]):
     """
-    משימה כבדה: פנייה ל-Google Maps, עדכון DB והפצת אירוע סיום.
+    Heavy task: call Google Maps, update DB, dispatch completion event.
     """
     ride_id_raw = data.get("ride_id")
     origin = data.get("origin")
@@ -39,18 +39,18 @@ async def calculate_ride_route_task(data: dict[str, Any]):
     ride_id = UUID(str(ride_id_raw))
     logger.info(f"🗺️ Calculating route for Ride {ride_id}...")
 
-    # שימוש ב-Context Manager של סניור לניהול ה-DB
+    # Use context manager for DB lifecycle
     with SessionLocal() as db:
         try:
-            # 1. פנייה ל-API חיצוני (משימה שלוקחת זמן)
+            # 1. Call external API (slow)
             route_result = await maps_service.get_directions(origin, destination)
 
-            # 2. עדכון הנתונים ב-Database
+            # 2. Persist to database
             crud_ride.update_route_details(db, ride_id=ride_id, route_data=route_result)
 
             logger.info(f"✅ Route updated for Ride {ride_id}")
 
-            # 3. סניור לא שולח וובסוקט מכאן! הוא מפיץ אירוע שהמסלול מוכן.
+            # 3. No WebSocket from here — dispatch event that route is ready
             user_id_raw = data.get("user_id")
             await dispatch(
                 "RIDE_ROUTE_READY",
@@ -63,9 +63,9 @@ async def calculate_ride_route_task(data: dict[str, Any]):
             )
 
         except InfrastructureError as e:
-            # שגיאה מה-LinkupError שלך (למשל גוגל מפות למטה)
+            # InfrastructureError (e.g. Google Maps down)
             logger.error(f"⚠️ Maps API failure for ride {ride_id}: {e.message}")
-            raise  # גורם ל-RabbitMQ לנסות שוב (Retry) בעוד כמה דקות
+            raise  # RabbitMQ will retry after a delay
 
         except Exception as e:
             logger.error("Unexpected error in ride task: %s", e, exc_info=True)

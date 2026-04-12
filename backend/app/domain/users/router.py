@@ -21,13 +21,13 @@ from app.domain.users.schema import (
 )
 from app.domain.users.service import user_service
 
-router = APIRouter(tags=["Users"])  # prefix="/users" ניתן ב-api_router
+router = APIRouter(tags=["Users"])  # prefix="/users" is mounted in api_router
 
 
-# --- 1. הפרופיל שלי ---
+# --- 1. My profile ---
 @router.get("/me", response_model=UserRead)
 async def get_my_profile(current_user: User = Depends(get_current_user)):
-    """מחזיר את פרטי המשתמש המחובר (כולל מידע רגיש כמו אימות)"""
+    """Return the authenticated user's profile (including sensitive fields like verification state)."""
     return current_user
 
 
@@ -49,7 +49,7 @@ async def get_user_last_seen(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """מקור `last_seen` לצורך UI צ'אט; נקרא מ-chat-ws ב-GET /presence/{id}."""
+    """Source for chat UI `last_seen`; called from chat-ws on GET /presence/{id}."""
     user = await crud_user.get_by_id(db, user_id)
     if not user:
         return {"last_seen": None}
@@ -59,17 +59,17 @@ async def get_user_last_seen(
     }
 
 
-# --- התראות (מסך התראות) ---
+# --- Notifications (notifications screen) ---
 @router.get("/me/notifications", response_model=list[NotificationItemResponse])
 async def get_my_notifications(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """כל ההתראות של המשתמש: כנהג – בקשות להצטרפות; כנוסע – אישור/דחייה/ממתין."""
+    """All notifications for the user: as driver — join requests; as passenger — approve/reject/pending."""
     return await BookingService.get_notifications_for_user(db, current_user.user_id)
 
 
-# --- 2. עדכון טוקן FCM (פוש נוטיפיקציות) ---
+# --- 2. FCM token update (push notifications) ---
 @router.patch("/fcm-token", response_model=MessageResponse)
 async def update_fcm_token(
     data: FCMTokenUpdate,
@@ -78,7 +78,7 @@ async def update_fcm_token(
 ):
     await user_service.update_fcm_token(db, user_id=current_user.user_id, fcm_token=data.fcm_token)
 
-    # עדיף להחזיר מופע של הסכמה
+    # Prefer returning a response-model instance
     return MessageResponse(message="FCM Token updated successfully", status="success")
 
 
@@ -98,10 +98,10 @@ async def test_push(
     return {"result": str(result)}
 
 
-# --- 5. העלאת תמונת פרופיל (שתי דרכים) ---
+# --- 5. Profile photo upload (two paths) ---
 
 
-# דרך 1: Presigned URL (מומלץ - 202 מהיר יותר)
+# Path 1: presigned URL (recommended — 202 faster)
 @router.get(
     "/me/avatar/upload-url",
     response_model=AvatarUploadUrlResponse,
@@ -112,19 +112,19 @@ async def get_avatar_upload_url(
     current_user: User = Depends(get_current_user),
 ):
     """
-    מחזיר presigned URL להעלאה ישירה ל-S3.
-    התהליך:
-    1. הלקוח קורא endpoint זה → מקבל presigned URL + staging_key
-    2. הלקוח מעלה ישירות ל-S3 באמצעות ה-URL (5-8 שניות)
-    3. הלקוח קורא ל-POST /me/avatar/confirm עם staging_key
-    4. השרת דוחף לתור ומחזיר 202 מיד (שנייה)
-    5. Worker מעבד ברקע (finalize + DB update)
+    Return a presigned URL for direct upload to S3.
+    Flow:
+    1. Client calls this endpoint → receives presigned URL + staging_key
+    2. Client uploads directly to S3 via the URL (5–8s)
+    3. Client calls POST /me/avatar/confirm with staging_key
+    4. Server enqueues work and returns 202 immediately (~1s)
+    5. Worker processes in the background (finalize + DB update)
     """
     presigned_url, staging_key = await user_service.get_avatar_upload_url(user_id=current_user.user_id, filename=filename)
     return AvatarUploadUrlResponse(
         upload_url=presigned_url,
         staging_key=staging_key,
-        expires_in=300,  # 5 דקות
+        expires_in=300,  # 5 minutes
     )
 
 
@@ -139,8 +139,8 @@ async def confirm_avatar_upload(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    מאשר העלאה לאחר שהלקוח העלה ישירות ל-S3. מעדכן avatar_key ב-DB מיידית ודוחף אירוע לתור.
-    העיבוד (resize ל-3 גדלים) מתבצע ברקע. staging_key חייב להתחיל ב-avatars/staging/{user_id}_.
+    Confirm upload after the client uploaded directly to S3. Updates avatar_key in DB immediately and enqueues work.
+    Processing (resize to 3 sizes) runs in the background. staging_key must start with avatars/staging/{user_id}_.
     """
     await user_service.confirm_avatar_upload(db, current_user, data.staging_key)
     return AvatarUploadAcceptedResponse()
@@ -156,13 +156,13 @@ async def remove_my_avatar(
     current_user: User = Depends(get_current_user),
 ):
     """
-    מסיר תמונת פרופיל: מוחק את תיקיית avatars/{user_id}/ מ-S3 ומאפס avatar_key ב-DB.
+    Remove profile photo: deletes avatars/{user_id}/ from S3 and clears avatar_key in DB.
     """
     await user_service.remove_avatar(db, user_id=current_user.user_id)
     return AvatarUploadAcceptedResponse(message="Avatar removed", status="accepted")
 
 
-# --- עדכון פרטי פרופיל (שם, אימייל וכו') ---
+# --- Update profile fields (name, email, etc.) ---
 @router.put("/me", response_model=UserRead)
 async def update_my_profile(
     data: UserUpdate,
@@ -170,24 +170,24 @@ async def update_my_profile(
     current_user: User = Depends(get_current_user),
 ):
     """
-    עדכון פרטי המשתמש המחובר.
-    מקבל אובייקט UserUpdate ומעביר אותו כפי שהוא לסרוויס.
+    Update the authenticated user's profile.
+    Accepts a UserUpdate object and passes it through to the service unchanged.
     """
     return await user_service.update_user_info(
         db,
         user_id=current_user.user_id,
-        update_data=data,  # מעביר את כל הסכימה
+        update_data=data,  # pass the full schema through
     )
 
 
-# --- 3. עדכון מיקום (לחיפוש טרמפים בסביבה) ---
+# --- 3. Location update (for nearby ride search) ---
 # @router.patch("/me/location", response_model=MessageResponse)
 # async def update_my_location(
 #     data: UserLocationUpdate,
 #     db: AsyncSession = Depends(get_db),
 #     current_user: User = Depends(get_current_user),
 # ):
-#     # הלוגיקה וזריקת LinkupError יקרו בתוך הסרוויס
+#     # Logic and LinkupError raises live in the service
 #     await user_service.update_user_location(
 #         db,
 #         user_id=current_user.user_id,
@@ -199,14 +199,14 @@ async def update_my_profile(
 #         message="Location updated successfully",
 #         status="success"
 #     )
-# --- 4. צפייה בפרופיל ציבורי ---
+# --- 4. Public profile view ---
 # @router.get("/{user_id}", response_model=UserPublicRead)
 # async def get_user_public_profile(
 #     user_id: int,
 #     db: Session = Depends(get_db),
 #     current_user: User = Depends(get_current_user)
 # ):
-#     """צפייה בנהג/נוסע אחר - מחזיר רק שם, תמונה, דירוג ותאריך הצטרפות"""
+#     """View another driver/passenger — returns only name, photo, rating, join date"""
 #     user = await UserService.get_user_by_id(db, user_id=user_id)
 #     if not user:
 #         raise HTTPException(status_code=404, detail="User not found")

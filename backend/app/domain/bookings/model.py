@@ -51,21 +51,20 @@ class Booking(Base):
 
     booking_id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    # 1. הקשר לנסיעה
+    # 1. Ride FK
     ride_id = Column(PG_UUID(as_uuid=True), ForeignKey("rides.ride_id", ondelete="CASCADE"), nullable=False)
 
-    # 2. הקשר הישיר לנוסע (התיקון הקריטי!)
-    # ב-SQL שלך העמודה הזו קיימת, עכשיו היא קיימת גם כאן
+    # 2. Passenger user FK
     passenger_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
 
-    # 3. הקשר לבקשה המקורית (אופציונלי - ON DELETE SET NULL)
+    # 3. Source passenger request (optional, ON DELETE SET NULL)
     request_id = Column(
         PG_UUID(as_uuid=True),
         ForeignKey("passenger_requests.request_id", ondelete="SET NULL"),
         nullable=True,
     )
 
-    # נתונים נוספים מה-SQL שלך
+    # Booking details
     num_seats = Column(Integer, nullable=False, default=1)
     pickup_name = Column(String(255))
     pickup_point = Column(Geography(geometry_type="POINT", srid=4326), nullable=True)
@@ -88,23 +87,22 @@ class Booking(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    # --- Relationships (החיבורים שמונעים KeyError) ---
+    # --- Relationships ---
 
-    # מתחבר ל-Ride.bookings
+    # Ride.bookings
     ride = relationship("Ride", back_populates="bookings")
 
-    # מתחבר ל-User.bookings (הקשר שחיפשת!)
+    # User.bookings
     passenger = relationship("User", back_populates="bookings")
 
-    # מתחבר ל-PassengerRequest.bookings
+    # PassengerRequest.bookings
     passenger_request = relationship("PassengerRequest", back_populates="bookings")
 
     @property
     def passenger_name(self) -> str | None:
         """
-        שם הנוסע לתצוגה.
-        נגישות ל-relationships רק אם כבר נטענו — בלי lazy load ב-async.
-        סדר עדיפות: passenger_request.user, אחר כך passenger.
+        Display name for passenger without async lazy loads.
+        Priority: passenger_request.user, then passenger.
         """
 
         def _name_from_user(u) -> str | None:
@@ -136,7 +134,7 @@ class Booking(Base):
         return None
 
     __table_args__ = (
-        # הבטחת שלמות נתונים: נוסע לא יכול להזמין מקום פעמיים באותה נסיעה
+        # One booking per passenger per ride
         UniqueConstraint("ride_id", "passenger_id", name="unique_passenger_per_ride"),
         Index("idx_bookings_ride", "ride_id"),
         Index("idx_bookings_passenger", "passenger_id"),

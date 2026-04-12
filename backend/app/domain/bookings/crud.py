@@ -22,7 +22,7 @@ class CRUDBooking:
     מרכז את כל פונקציות השליפה והכתיבה שסופקו.
     """
 
-    # --- שליפות (Queries) ---
+    # --- Queries ---
 
     async def get_booking_by_id_async(self, db: AsyncSession, booking_id: UUID) -> Booking | None:
         """Async variant של get_booking_by_id."""
@@ -112,7 +112,7 @@ class CRUDBooking:
         existing.request_id = request_id
         existing.num_seats = num_seats
         existing.status = BookingStatus.PENDING
-        # העתקת פרטי תחנת העלייה מ-PassengerRequest
+        # Copy pickup stop details from PassengerRequest
         p_req = await db.get(PassengerRequest, request_id)
         if p_req:
             p_req.status = PassengerStatus.MATCHED
@@ -122,7 +122,7 @@ class CRUDBooking:
         await db.flush()
         return existing
 
-    # --- פעולות כתיבה (Operations) ---
+    # --- Writes ---
 
     async def create_booking_entry_async(
         self,
@@ -156,22 +156,22 @@ class CRUDBooking:
         ride = booking.ride
         booking.status = BookingStatus.CONFIRMED
 
-        # בדיקה כפולה — בין בקשה לאישור עוברים שעות/ימים,
-        # יכול להיות שהמקום האחרון ניתן לנוסע אחר בינתיים
+        # Re-check seat availability — time may have passed since request;
+        # last seat might have been taken by another passenger
         if ride.available_seats < booking.num_seats:
             raise NoSeatsAvailableError("אין מקומות פנויים לאישור הזמנה זו")
         ride.available_seats -= booking.num_seats
         if ride.available_seats <= 0:
             ride.status = RideStatus.FULL
 
-        # עדכון סטטוס PassengerRequest לפי כל ה-bookings
+        # Recompute PassengerRequest status from all bookings
         if booking.request_id:
             await self.update_passenger_request_status_from_bookings(db, booking.request_id)
 
     async def execute_booking_rejection(self, db: AsyncSession, booking: Booking):
         booking.status = BookingStatus.REJECTED
 
-        # עדכון סטטוס PassengerRequest לפי כל ה-bookings
+        # Recompute PassengerRequest status from all bookings
         if booking.request_id:
             await self.update_passenger_request_status_from_bookings(db, booking.request_id)
 
@@ -184,7 +184,7 @@ class CRUDBooking:
 
         booking.status = BookingStatus.CANCELLED
 
-        # עדכון סטטוס PassengerRequest לפי כל ה-bookings
+        # Recompute PassengerRequest status from all bookings
         if booking.request_id:
             await self.update_passenger_request_status_from_bookings(db, booking.request_id)
 
@@ -209,7 +209,7 @@ class CRUDBooking:
         )
         await db.flush()
 
-    # --- פונקציות נוספות שנדרשות על ידי ה-BookingService ---
+    # --- Helpers used by BookingService ---
 
     async def get_user_bookings_count_async(self, db: AsyncSession, user_id: UUID, status_filter: str | None = None) -> int:
         uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
@@ -316,8 +316,8 @@ class CRUDBooking:
 
         await self.bulk_update_bookings_status(db, ride_id, BookingStatus.CANCELLED)
 
-        # אחרי ביטול כל ה-bookings של הנסיעה, מחשבים מחדש סטטוס לכל בקשת נוסע
-        # (כדי לא לדרוס סטטוס אם לאותה בקשה יש bookings נוספים על נסיעות אחרות)
+        # After cancelling ride bookings, recompute status per passenger request
+        # (same request may have bookings on other rides)
         if req_ids:
             for rid in sorted(set([r for r in req_ids if r is not None])):
                 await self.update_passenger_request_status_from_bookings(db, rid)
@@ -341,26 +341,26 @@ class CRUDBooking:
         if not bookings:
             return PassengerStatus.ACTIVE
 
-        # בדיקה אם יש לפחות booking אחד מאושר
+        # At least one confirmed booking?
         has_confirmed = any(b.status == BookingStatus.CONFIRMED for b in bookings)
         if has_confirmed:
-            # בדיקה אם כל ה-bookings הושלמו
+            # All bookings completed?
             all_completed = all(b.status == BookingStatus.COMPLETED for b in bookings)
             if all_completed:
                 return PassengerStatus.COMPLETED
             return PassengerStatus.APPROVED
 
-        # בדיקה אם יש לפחות booking אחד ממתין לאישור
+        # Any booking still pending approval?
         has_pending = any(b.status == BookingStatus.PENDING for b in bookings)
         if has_pending:
             return PassengerStatus.PENDING
 
-        # בדיקה אם כל ה-bookings נדחו
+        # All bookings rejected?
         all_rejected = all(b.status == BookingStatus.REJECTED for b in bookings)
         if all_rejected:
             return PassengerStatus.REJECTED
 
-        # אם כל ה-bookings בוטלו או אין bookings פעילים
+        # All cancelled or no active bookings
         return PassengerStatus.ACTIVE
 
     async def update_passenger_request_status_from_bookings(self, db: AsyncSession, request_id: UUID) -> None:
@@ -370,7 +370,7 @@ class CRUDBooking:
 
         reqid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
         new_status = await self.determine_passenger_request_status(db, reqid)
-        # צריך להעביר את ה-value של ה-enum, לא את האובייקט עצמו
+        # Pass enum .value, not the enum instance
         status_value = new_status.value if hasattr(new_status, "value") else str(new_status)
         await db.execute(sa_update(PassengerRequest).where(PassengerRequest.request_id == reqid).values(status=status_value))
 
@@ -387,10 +387,9 @@ class CRUDBooking:
 
     # app/domain/bookings/crud.py
 
-    # סוף הקובץ app/domain/bookings/crud.py
 
     async def get_user_history(self, db: AsyncSession, user_id: UUID, role: str) -> list[Booking]:
-        # שימוש ב-joinedload כדי למנוע את בעיית ה-N+1 (שליפה יעילה)
+        # joinedload avoids N+1 queries
         uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
         stmt = select(Booking).options(joinedload(Booking.ride)).where(Booking.status != BookingStatus.CANCELLED)
 

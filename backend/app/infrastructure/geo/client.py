@@ -9,19 +9,19 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# --- Google Directions API (מסלולים) ---
+# --- Google Directions API (routes) ---
 GOOGLE_DIRECTIONS_URL = "https://maps.googleapis.com/maps/api/directions/json"
-# --- Google Distance Matrix API (זמן ומרחק ל־OD) ---
+# --- Google Distance Matrix API (time & distance O–D) ---
 GOOGLE_DISTANCE_MATRIX_URL = "https://maps.googleapis.com/maps/api/distancematrix/json"
-MAX_ROUTES = 3  # 2-3 מסלולים הכי טובים
+MAX_ROUTES = 3  # keep top 2–3 alternatives
 TIMEOUT_DIRECTIONS = 15.0
 TIMEOUT_DISTANCE_MATRIX = 10.0
 
 
 def _decode_polyline(encoded: str) -> list[list[float]]:
     """
-    מפענח Google encoded polyline לרשימת [lat, lon].
-    אלגוריתם סטנדרטי של Google (1e-5 degrees).
+    Decode Google encoded polyline to [[lat, lon], ...].
+    Standard Google algorithm (1e-5 degrees).
     """
     if not encoded:
         return []
@@ -51,13 +51,13 @@ def _decode_polyline(encoded: str) -> list[list[float]]:
 
 
 class GeoClient:
-    """אחריות: התממשקות טכנית (Infrastructure) מול API חיצוני ב-Async"""
+    """Infrastructure client for external geo APIs (async)."""
 
     OSRM_URL = "http://router.project-osrm.org/route/v1/driving"
 
     def __init__(self):
-        # נשאר לשמירת תאימות לאחור בבדיקות/קוד ותיק.
-        # אין שימוש ב-Nominatim; geocode מתבצע דרך Google (GeocodingService) או דרך patch בבדיקות.
+        # Legacy stub for backward compat in tests/old code paths.
+        # No Nominatim; geocoding uses GeocodingService or test patches.
         class _GeoLocator:
             def geocode(self, _: str):
                 return None
@@ -66,9 +66,9 @@ class GeoClient:
 
     async def fetch_coordinates(self, address: str) -> tuple[float | None, float | None]:
         """
-        הופך כתובת לקואורדינטות (Geocoding) — עם Redis cache.
+        Resolve address to coordinates with Redis cache.
 
-        מקור אמת: Google Geocoding (GeocodingService) + cache.
+        Source of truth: Google GeocodingService + cache.
         """
         if not address or not address.strip():
             return None, None
@@ -82,7 +82,7 @@ class GeoClient:
         if cached:
             return cached
 
-        # אם הוזרק geolocator בבדיקות/מונקי-פאצ׳ינג, השתמש בו.
+        # If tests inject geolocator / monkeypatch, use it first
         try:
             loc = self.geolocator.geocode(address)
             if loc and getattr(loc, "latitude", None) is not None and getattr(loc, "longitude", None) is not None:
@@ -101,8 +101,8 @@ class GeoClient:
 
     async def fetch_distance_matrix(self, start: tuple[float, float], end: tuple[float, float]) -> tuple[int, int] | None:
         """
-        קריאה ל-Google Distance Matrix API לזמן נסיעה ומרחק (מטרים) בין מוצא ליעד.
-        מחזיר (duration_sec, distance_m) או None אם נכשל.
+        Google Distance Matrix: travel time and distance (meters) between two points.
+        Returns (duration_sec, distance_m) or None on failure.
         """
         origin = f"{start[0]},{start[1]}"
         destination = f"{end[0]},{end[1]}"
@@ -142,9 +142,9 @@ class GeoClient:
         departure_time: datetime | None = None,
     ) -> list[dict]:
         """
-        שליפת 2-3 מסלולים מ-Google Directions API.
-        זמן ומרחק לכל מסלול מגיעים מ-Distance Matrix API (fallback ל-Directions אם נכשל).
-        מחזיר רשימת dict עם: summary, duration (שניות), distance (מטרים), coords [[lat,lon],...].
+        Fetch 2–3 routes from Google Directions.
+        Per-route time/distance enriched from Distance Matrix when available.
+        Returns dicts: summary, duration (sec), distance (m), coords [[lat,lon],...].
         """
         return await self.fetch_routes_google_directions(start, end, departure_time)
 
@@ -155,8 +155,8 @@ class GeoClient:
         departure_time: datetime | None = None,
     ) -> list[dict]:
         """
-        שליפת עד 3 מסלולים מ-Google Directions API (alternatives=true).
-        מחזיר רשימה בפורמט תואם ל-processor: summary, duration (שניות), distance (מטרים), coords.
+        Up to 3 routes from Google Directions (alternatives=true).
+        Output shape matches processor: summary, duration (sec), distance (m), coords.
         """
         origin = f"{start[0]},{start[1]}"
         destination = f"{end[0]},{end[1]}"
@@ -170,7 +170,7 @@ class GeoClient:
         if departure_time:
             ts = int(departure_time.timestamp())
             now_ts = int(time.time())
-            # Google דורש departure_time בעתיד (לפחות ~דקה מהעכשיו)
+            # Google requires departure_time in the future (~1 min ahead minimum)
             params["departure_time"] = max(ts, now_ts + 60)
         else:
             params["departure_time"] = "now"
@@ -184,7 +184,7 @@ class GeoClient:
                 if data.get("status") != "OK":
                     logger.warning(f"Google Directions status: {data.get('status')}")
                     return []
-                # גוגל מחזירה רשימת מסלולים (alternatives=true) – לוקחים עד MAX_ROUTES, בלי לחתוך אם יש פחות
+                # alternatives=true returns a list — take up to MAX_ROUTES
                 raw_list = data.get("routes")
                 if not isinstance(raw_list, list):
                     raw_list = [raw_list] if raw_list else []
@@ -205,7 +205,7 @@ class GeoClient:
                             "coords": coords,
                         },
                     )
-                # זמן ומרחק Distance Matrix API (זמן נסיעה וק"מ לכל מסלול)
+                # Override duration/distance from Distance Matrix when available
                 dm_result = await self.fetch_distance_matrix(start, end)
                 if dm_result:
                     duration_dm, distance_dm = dm_result

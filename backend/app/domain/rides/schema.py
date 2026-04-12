@@ -6,11 +6,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.utils.validators import validate_future_datetime
 
-# שים לב לתיקון הנתיב אם צריך - שמרתי על המקור שלך
+# Adjust import path if your layout differs
 from app.domain.geo.schema import RouteOptionData
 from app.domain.rides.enum import RideStatus
 
-# --- 0. אובייקטי עזר (Reusable Mixins) ---
+# --- 0. Reusable mixins ---
 
 
 class LocationMixin(BaseModel):
@@ -25,7 +25,7 @@ class CoordinatesMixin(BaseModel):
     dest_lon: float
 
 
-# --- 1. סכמות לקלט (Requests) ---
+# --- 1. Request bodies ---
 
 
 class RidePreviewCreate(BaseModel):
@@ -67,7 +67,7 @@ class RideUpdate(BaseModel):
         return validate_future_datetime(v)
 
 
-# --- 2. סכמות לתצוגה מקדימה (Preview) ---
+# --- 2. Preview / route selection ---
 
 
 class RouteOption(BaseModel):
@@ -117,7 +117,7 @@ class RidePreviewResponse(LocationMixin):
         )
 
 
-# --- 3. הליבה (Internal & DB Contract) ---
+# --- 3. Internal / DB contract ---
 
 
 class RideBase(LocationMixin):
@@ -147,7 +147,7 @@ class RideCreateInternal(RideBase, CoordinatesMixin):
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- 4. תגובות (Responses) ---
+# --- 4. Responses ---
 
 
 class RideResponse(RideBase):
@@ -161,7 +161,7 @@ class RideResponse(RideBase):
     group_name: str | None = None
     total_distance_km: float = Field(..., validation_alias="distance_km")
     total_duration_min: float = Field(..., validation_alias="duration_min")
-    # שימוש ב-Alias כדי למשוך מה-Property של SQLAlchemy
+    # Field alias from SQLAlchemy hybrid/property
     route_coords: list[list[float]] = Field(..., validation_alias="route_coords_list")
     route_summary: str | None = None
 

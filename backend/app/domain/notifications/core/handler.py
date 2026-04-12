@@ -18,7 +18,7 @@ from app.domain.notifications.core.scheduled_reminder_source import ScheduledRem
 from app.domain.notifications.manager import (
     NotificationCommand,
     notification_manager,
-)  # הוספנו את ה-Schema
+)
 from app.domain.passengers.crud import crud_passenger
 
 # Domain Imports
@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 class NotificationHandler:
     async def handle_event(self, db: AsyncSession, event_name: str, payload: dict):
         """
-        הפונקציה המרכזית שמנהלת את מחזור החיים של נוטיפיקציה.
-        מעודכן לשימוש ב-NotificationCommand.
+        Central entry: full notification lifecycle.
+        Uses NotificationCommand for dispatch.
         """
         try:
             logger.info(
@@ -40,20 +40,20 @@ class NotificationHandler:
                 event_name,
                 list(payload.keys()) if isinstance(payload, dict) else "?",
             )
-            # 1. ולידציה והמרה ל-Enum
+            # 1. Validate and map to Enum
             try:
                 event_key = NotificationEvent(event_name)
             except ValueError:
                 logger.warning("[NOTIF] Handler: event '%s' not registered. Skipping.", event_name)
                 return
 
-            # 2. שליפת האסטרטגיה המתאימה (The Blueprint)
+            # 2. Load strategy (blueprint)
             strategy = NOTIFICATION_STRATEGY.get(event_key)
             if not strategy:
                 logger.error("[NOTIF] Handler: no strategy for event=%s", event_key)
                 return
 
-            # 3. Hydration - הבאת הנתונים המלאים מה-DB
+            # 3. Hydration — load full entities from DB
             source_data = await self._fetch_source(db, payload)
             if not source_data:
                 logger.warning(
@@ -76,12 +76,12 @@ class NotificationHandler:
 
             builder = strategy["builder"]
 
-            # 4–5. Resolve נמען + Build context
+            # 4–5. Resolve recipient + build context
             if isinstance(source_data, ScheduledReminderSource):
                 resolved = await crud_user.get(db, id=source_data.recipient_user_id)
                 context = builder.build(source_data.ride, event_key.value)
             else:
-                # ride.created_for_passengers / ride.cancelled_by_driver: הנמען לפי passenger_id ב-payload
+                # ride.created_for_passengers / ride.cancelled_by_driver: recipient from passenger_id in payload
                 if payload.get("passenger_id") and event_key in (
                     NotificationEvent.RIDE_CREATED_FOR_PASSENGERS,
                     NotificationEvent.RIDE_CANCELLED_BY_DRIVER,
@@ -97,9 +97,9 @@ class NotificationHandler:
                 getattr(resolved, "user_id", getattr(resolved, "id", None)) if resolved else None,
                 getattr(resolved, "email", None) if resolved else None,
             )
-            # מיזוג נתונים מה-payload (קוד אימות, שם וכו') – נדרש למייל אימות / איפוס סיסמה
+            # Merge payload extras (verification code, name, etc.) — needed for auth emails
             data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
-            # תמיכה גם ב-payload שטוח (code/token ברמה הראשית) וגם ב-payload.data
+            # Support flat payload (code/token at top level) and nested payload.data
             code_val = (
                 context.get("code")
                 or (data.get("code") if data else None)
@@ -125,8 +125,8 @@ class NotificationHandler:
                     list(payload.keys()),
                 )
 
-            # אימות מייל: אם מוגדר API_PUBLIC_URL – כפתור במייל יפתח לינק אימות בלחיצה אחת
-            # (רק אם role != "both", כי אז נטפל בנפרד)
+            # Email verification: if API_PUBLIC_URL is set, one-click confirm link in email
+            # (unless role is both — handled separately)
             if event_key.value in ("auth.email_verification", "email_verification") and context.get("code") and not isinstance(resolved, dict):
                 try:
                     from app.core.config import settings
@@ -153,10 +153,10 @@ class NotificationHandler:
                 context["push_body"] = push_conf.get("body", "")
             template_path = email_conf["template"] if email_conf else template_key
 
-            # 7. Dispatch - בניית הפקודה ושליחה ל-Manager
-            # אם role="both", נשלח לשני משתמשים
+            # 7. Dispatch — build NotificationCommand and send via Manager
+            # role="both": send to two users
             if isinstance(resolved, dict) and "user_id_1" in resolved and "user_id_2" in resolved:
-                # שליחה לשני משתמשים
+                # Send to both users
                 uid1 = resolved["user_id_1"]
                 uid2 = resolved["user_id_2"]
                 user1 = await crud_user.get(db, id=UUID(str(uid1)) if not isinstance(uid1, UUID) else uid1)
@@ -192,7 +192,7 @@ class NotificationHandler:
                     f"✅ Notification dispatched to both users: {event_key} -> user_id_1={resolved['user_id_1']}, user_id_2={resolved['user_id_2']}",
                 )
             else:
-                # שליחה למשתמש אחד (התנהגות רגילה)
+                # Single user (normal path)
                 user = resolved
                 if not user:
                     logger.warning(
@@ -240,10 +240,10 @@ class NotificationHandler:
 
     async def _fetch_source(self, db: AsyncSession, payload: dict) -> Any:
         """
-        מחלץ את היישות הרלוונטית מה-DB על בסיס ה-Payload.
-        עבור chat.conversation.completed, מחזיר את ה-payload עצמו (מכיל user_id_1, user_id_2).
+        Load the relevant entity from DB from payload.
+        For chat.conversation.completed, returns payload as-is (includes user_id_1, user_id_2).
         """
-        # עבור chat events, נחזיר את ה-payload עצמו (ה-builder יקבל אותו)
+        # Chat events: return raw payload for the builder
         if payload.get("conversation_id") and payload.get("user_id_1") and payload.get("user_id_2"):
             return payload
 
@@ -303,5 +303,5 @@ class NotificationHandler:
         return payload
 
 
-# Instance יחיד לשימוש בוורקר
+# Single instance for worker / API
 notification_handler = NotificationHandler()

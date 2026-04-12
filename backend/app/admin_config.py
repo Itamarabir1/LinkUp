@@ -6,14 +6,14 @@ from app.domain.rides.model import Ride
 from app.domain.users.model import User
 
 
-# תצוגת משתמשים
+# Users admin view
 class UserAdmin(ModelView, model=User):
     column_list = [User.user_id, User.full_name, User.email, User.is_admin]
     column_searchable_list = [User.full_name, User.email]
     icon = "fa-solid fa-user"
 
 
-# תצוגת בקשות נוסע
+# Passenger requests admin view
 class RequestAdmin(ModelView, model=PassengerRequest):
     column_list = [
         PassengerRequest.request_id,
@@ -25,13 +25,13 @@ class RequestAdmin(ModelView, model=PassengerRequest):
     icon = "fa-solid fa-hand-holding-heart"
 
 
-# תצוגת נסיעות נהגים
+# Driver rides admin view
 class RideAdmin(ModelView, model=Ride):
     column_list = [Ride.ride_id, Ride.driver_id, Ride.departure_time, Ride.status]
     icon = "fa-solid fa-car"
 
 
-# תצוגת הזמנות (שידוכים)
+# Bookings admin view (matches)
 class BookingAdmin(ModelView, model=Booking):
     column_list = [Booking.booking_id, Booking.status, Booking.created_at]
     icon = "fa-solid fa-calendar-check"

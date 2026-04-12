@@ -11,7 +11,7 @@ from app.domain.notifications.core.builders.user_builder import UserBuilder
 
 NOTIFICATION_STRATEGY = {
     # --- Auth & User Management ---
-    # אחרי רישום שולחים רק מייל אימות (auth.email_verification) – ברוכים הבאים + קוד באותו מייל
+    # After signup: verification email only (auth.email_verification) — welcome + code in one mail
     NotificationEvent.USER_REGISTERED: {
         "role": "self",
         "builder": UserBuilder(),
@@ -62,8 +62,8 @@ NOTIFICATION_STRATEGY = {
         "template": "booking_rejected",
         "channels": ["email", "push", "websocket"],
     },
-    # --- Reminders (מהסקדיולר) ---
-    # נמען מגיע מ-payload.user_id + ScheduledReminderSource; role לא נכנס ל-resolver בנתיב הזה.
+    # --- Reminders (scheduler) ---
+    # Recipient from payload.user_id + ScheduledReminderSource; role bypasses normal resolver.
     NotificationEvent.PICKUP_REMINDER_PASSENGER: {
         "role": "passenger",
         "builder": RideBuilder(),

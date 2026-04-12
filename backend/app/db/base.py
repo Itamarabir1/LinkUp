@@ -2,6 +2,6 @@
 from sqlalchemy.orm import DeclarativeBase
 
 
-# הגדרת ה-Base המודרנית (SQLAlchemy 2.0 Style)
+# SQLAlchemy 2.0 declarative base
 class Base(DeclarativeBase):
     pass

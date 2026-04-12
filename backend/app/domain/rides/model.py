@@ -53,15 +53,14 @@ class RideStatusEnumType(TypeDecorator):
 
 class Ride(Base):
     """
-    Ride Entity - Senior Edition.
-    מייצג נסיעה שהוצעה ע"י נהג (User בתפקיד Driver).
+    Ride aggregate root: a trip offered by a driver user.
     """
 
     __tablename__ = "rides"
 
     ride_id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    # ה-FK שמחבר את הנסיעה ל-User הפיזי (הנהג)
+    # Driver user FK
     driver_id = Column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.user_id", ondelete="CASCADE"),
@@ -75,30 +74,30 @@ class Ride(Base):
         index=True,
     )
 
-    # --- זמנים ---
+    # --- Times ---
     departure_time = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     estimated_arrival_time = Column(DateTime(timezone=True), nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    # --- מיקומים (PostGIS) ---
+    # --- Locations (PostGIS) ---
     origin_name = Column(String(255))
     destination_name = Column(String(255))
     origin_geom = Column(Geography(geometry_type="POINT", srid=4326), nullable=False)
     destination_geom = Column(Geography(geometry_type="POINT", srid=4326), nullable=False)
     route_coords = Column(Geography(geometry_type="LINESTRING", srid=4326), nullable=True)
-    route_summary = Column(String(255), nullable=True)  # סיכום המסלול (כביש) מגוגל
+    route_summary = Column(String(255), nullable=True)  # Route summary label from Google
 
-    # --- נתונים פיזיים (מותאם ל-SQL שלך) ---
+    # --- Route metrics ---
     distance_km = Column(Numeric(10, 2), nullable=True)
     duration_min = Column(Numeric(10, 2), nullable=True)
 
-    # שים לב: שיניתי ל-available_seats כדי שיתאים לשם העמודה ב-SQL ששלחת
+    # Column name matches DB schema (available_seats)
     available_seats = Column(Integer, nullable=False, default=4)
 
     price = Column(Numeric(10, 2), default=0.0)
 
-    # --- סטטוס ---
+    # --- Status ---
     # RideStatusEnumType: result accepts both value ('open') and name ('OPEN') from DB
     status = Column(
         RideStatusEnumType(),
@@ -115,13 +114,11 @@ class Ride(Base):
 
     # --- Relationships (Senior Standard) ---
 
-    # הקשר ל-User: 'rides_as_driver' חייב להופיע ב-back_populates של מודל User
+    # Mirror User.rides_as_driver via back_populates
     driver = relationship("User", back_populates="rides_as_driver")
     group = relationship("Group")
 
-    # הקשר ל-Bookings: כל המושבים שנתפסו בנסיעה הזו
-    # (lazy=select – נטען רק בעת גישה, כדי ש-refresh אחרי יצירת נסיעה לא ייכשל
-    # אם טבלת bookings עדיין לא קיימת)
+    # Bookings for this ride (lazy=select avoids refresh issues mid-migration)
     bookings = relationship(
         "Booking",
         back_populates="ride",
@@ -133,34 +130,34 @@ class Ride(Base):
 
     @property
     def total_capacity(self) -> int:
-        """מחזיר את כמות המושבים המקורי שהנהג הציע"""
+        """Seats the driver originally offered."""
         return self.available_seats
 
     @property
     def occupied_seats(self) -> int:
-        """מחשב כמה מושבים תפוסים בפועל על בסיס הזמנות מאושרות בלבד"""
-        # אופטימיזציה: סכימת המושבים מתוך רשימת הבוקינגס בזיכרון
+        """Occupied seats from confirmed bookings only."""
+        # Sum in-memory bookings when already loaded
         return sum(b.num_seats for b in self.bookings if b.status not in ["cancelled", "rejected"])
 
     @property
     def seats_left(self) -> int:
-        """כמה מושבים פנויים באמת נשארו לנסיעה זו"""
+        """Remaining seats available."""
         return max(0, self.available_seats - self.occupied_seats)
 
     @property
     def is_full(self) -> bool:
-        """האם הרכב מלא?"""
+        """True if no seats left."""
         return self.seats_left <= 0
 
     # --- Utilities ---
 
     @property
     def route_coords_list(self):
-        """המרת קואורדינטות מה-DB לרשימת Python נוחה ל-Frontend"""
+        """DB linestring → list of [lat, lon] for API consumers."""
         return convert_db_route_to_list(self.route_coords)
 
     def can_be_cancelled(self) -> bool:
-        """בדיקה האם ניתן לבטל את הנסיעה (לוגיקה עסקית)"""
+        """Business rule: ride may be cancelled in these statuses."""
         return self.status in [RideStatus.OPEN, RideStatus.FULL]
 
     def __repr__(self):

@@ -126,20 +126,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    // 1. נקה FCM token בשרת בזמן שה-JWT עדיין תקף
+    // 1. Clear FCM token on server while JWT is still valid
     try {
       await patchFcmToken(null);
     } catch {
       // ignore
     }
     cleanupFCM();
-    // 2. בטל סשן
+    // 2. Invalidate server session
     try {
       await logoutSession();
     } catch {
       // ignore
     }
-    // 3. נקה tokens מקומית
+    // 3. Clear local tokens
     clearTokens();
     setState({ user: null, isAuthenticated: false, isLoading: false });
   }, []);

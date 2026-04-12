@@ -17,7 +17,7 @@ from structlog.types import EventDict, WrappedLogger
 
 from app.core.config import settings
 
-# מזהה בקשה — נקבע ב-RequestIDMiddleware, נגיש ללוגים
+# Request id from RequestIDMiddleware (logging context)
 request_id_ctx: ContextVar[str | None] = ContextVar("request_id", default=None)
 
 
@@ -46,7 +46,7 @@ def setup_logging() -> None:
     מגדיר structlog + stdlib logging.
     structlog processors רצים על כל log — גם מקוד האפליקציה וגם מ-uvicorn/sqlalchemy.
     """
-    # TODO: Sentry — להסיר הערה כשעוברים לפרודקשן ומוסיפים SENTRY_DSN ל-.env
+    # TODO: Sentry — enable when SENTRY_DSN is set in production
     # import sentry_sdk
     # from sentry_sdk.integrations.fastapi import FastApiIntegration
     # from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
@@ -65,9 +65,9 @@ def setup_logging() -> None:
     #         environment=getattr(settings, "ENVIRONMENT", "development"),
     #     )
     #
-    # TODO: Sentry — להוסיף sentry_sdk.init גם ב:
-    # - app/workers/main_worker.py (outbox-worker — תהליך נפרד, צריך init נפרד)
-    # - chat-ws: sentry-go SDK נפרד (github.com/getsentry/sentry-go)
+    # TODO: Sentry — also init in:
+    # - app/workers/main_worker.py (separate process)
+    # - chat-ws (sentry-go)
 
     shared_processors: list[Any] = [
         structlog.contextvars.merge_contextvars,

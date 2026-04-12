@@ -21,7 +21,7 @@ class VerificationService:
     async def create_verification_event(self, user_id: str, event_name: str) -> str:
         code = self.generate_otp()
         redis_key = get_otp_verification_key(user_id, event_name)
-        # שמירה גנרית לכל סוגי האירועים (מייל, סיסמה וכו')
+        # Generic store for all verification event types
         await redis_client.save(key=redis_key, data=code, expire=OTP_VERIFICATION_TTL)
         await redis_client.client.delete(f"otp_attempts:{user_id}:{event_name}")
         return code
@@ -31,12 +31,12 @@ class VerificationService:
         redis_key = get_otp_verification_key(user_id, event_name)
         attempts_key = f"otp_attempts:{user_id}:{event_name}"
 
-        # בדיקה שהקוד קיים
+        # Code must exist in Redis
         stored_code = await redis_client.get(redis_key)
         if not stored_code:
             raise VerificationCodeExpiredError()
 
-        # מונה ניסיונות — מקסימום 5 לפני ביטול הקוד
+        # Attempt counter — max 5 before invalidating
         attempts = await redis_client.client.incr(attempts_key)
         if attempts == 1:
             await redis_client.client.expire(attempts_key, OTP_VERIFICATION_TTL)
@@ -45,11 +45,11 @@ class VerificationService:
             logger.warning("OTP brute-force detected: user=%s event=%s", user_id, event_name)
             raise VerificationCodeExpiredError()
 
-        # השוואה בטוחה
+        # Constant-time compare
         if not hmac.compare_digest(str(stored_code), str(input_code)):
             raise InvalidVerificationCodeError()
 
-        # הצלחה — מחיקת הקוד והמונה
+        # Success — delete code and counter
         await redis_client.delete(redis_key)
         await redis_client.client.delete(attempts_key)
 

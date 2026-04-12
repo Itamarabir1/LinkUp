@@ -43,5 +43,5 @@ def initialize_firebase():
         logger.error(f"❌ Failed to initialize Firebase in Core: {e}")
 
 
-# מריצים את האתחול מיד כשמייבאים את הקובץ
+# Initialize Firebase on module import
 initialize_firebase()

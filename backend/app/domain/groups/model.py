@@ -19,9 +19,9 @@ class Group(Base):
     max_members = Column(Integer, nullable=True)
     invite_expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    # תמונת קבוצה — מפתח S3, למשל GROUPS/<group_id>/image.webp
+    # Group image S3 key, e.g. GROUPS/<group_id>/image.webp
     avatar_key = Column(String(255), nullable=True)
-    # תיאור קבוצה — עד 500 תווים, רק מנהל עורך
+    # Group description up to 500 chars (admin-edited)
     description = Column(String(500), nullable=True)
 
     admin = relationship("User", back_populates="owned_groups", foreign_keys=[admin_id])

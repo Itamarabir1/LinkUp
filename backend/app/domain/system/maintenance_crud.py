@@ -94,7 +94,7 @@ class MaintenanceCRUD:
 
             ride_ids = [r[0] for r in rows]
 
-            # שליפת נוסעים confirmed לנסיעות שפגו
+            # Confirmed passengers on expired rides
             passenger_stmt = select(Booking.ride_id, Booking.passenger_id).where(
                 Booking.ride_id.in_(ride_ids),
                 Booking.status == text("'confirmed'::booking_status"),

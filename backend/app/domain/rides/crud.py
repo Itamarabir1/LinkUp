@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# --- הייבואים שחסרים לך ---
+# --- Imports ---
 # ---------------------------
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -39,15 +39,13 @@ class CRUDRide:
         יצירת נסיעה - Clean Version:
         מקבל מילון מוכן (אחרי Mapper) ושומר אותו.
         """
-        # 1. יצירת האובייקט ישירות מהמילון
-        # המילון כבר מכיל origin_geom, destination_geom ו-route_coords כאובייקטים גיאומטריים
+        # 1. ORM from dict (geometries already materialized)
         db_obj = Ride(**obj_in)
 
-        # 2. שמירה
+        # 2. Persist
         db.add(db_obj)
 
-        # משתמשים ב-flush כדי שהאובייקט יקבל ID מבסיס הנתונים
-        # אבל ה-commit עצמו יקרה בסרוויס (בתוך ה-with db.begin())
+        # flush() assigns DB id; commit happens in service (e.g. with db.begin())
         db.flush()
 
         db.refresh(db_obj)
@@ -181,5 +179,5 @@ class CRUDRide:
         return result.scalars().first()
 
 
-# יצירת מופע יחיד (Singleton) לשימוש בכל האפליקציה
+# Singleton for app-wide use
 crud_ride = CRUDRide()

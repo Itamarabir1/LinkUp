@@ -2,7 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-# מייבאים את ה-Enum מהקובץ המרכזי שלו
+# Event enums live in domain.events.enum
 from app.domain.events.enum import DispatchTarget
 
 
@@ -18,7 +18,7 @@ class Event(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     class Config:
-        # הופך את האובייקט ל-Immutable (לקריאה בלבד)
+        # Immutable snapshot
         frozen = True
-        # מאפשר עבודה חלקה עם אובייקטים של SQLAlchemy
+        # Works with SQLAlchemy instances and plain dicts
         from_attributes = True

@@ -9,7 +9,7 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# מרווח בין סריקות (שניות). יומי = 86400 – משמש את המתזמן (scheduled_tasks)
+# Seconds between fuel scans (86400 = daily; used by scheduled_tasks publisher)
 FUEL_SCAN_INTERVAL = 86400
 
 

@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 class UserService:
     def __init__(self):
-        # הצמדת המופעים שהזרקנו מהייבוא ל-self
+        # Bind imported singletons to self
         self.s3 = storage_service
         self.crud = crud_user
 
@@ -39,8 +39,8 @@ class UserService:
 
     async def get_avatar_upload_url(self, user_id, filename: str | None = None, expiration: int = 300) -> tuple[str, str]:
         """
-        מחזיר presigned URL להעלאה ישירה ל-S3 staging.
-        מחזיר: (presigned_url, staging_key)
+        Return presigned URL for direct upload to S3 staging.
+        Returns: (presigned_url, staging_key)
         """
         presigned_url, staging_key = await self.s3.generate_avatar_upload_url(user_id=user_id, filename=filename, expiration=expiration)
         logger.info("Generated presigned URL for user %s: staging_key=%s", user_id, staging_key)
@@ -48,9 +48,9 @@ class UserService:
 
     async def confirm_avatar_upload(self, db: AsyncSession, user: User, staging_key: str) -> None:
         """
-        מאשר העלאה לאחר שהלקוח העלה ישירות ל-S3. מעדכן avatar_key ב-DB מיידית (אופטימי)
-        ודוחף אירוע לתור לעיבוד ברקע (resize + העלאה ל-avatars/{user_id}/).
-        ולידציית אבטחה: staging_key חייב להכיל את user_id של המשתמש המחובר.
+        Confirm upload after client PUT to S3. Updates DB optimistically and enqueues background
+        resize + copy to avatars/{user_id}/.
+        Security: staging_key must belong to the authenticated user_id.
         """
         expected_prefix = f"avatars/staging/{user.user_id}_"
         if not staging_key.startswith(expected_prefix):
@@ -62,8 +62,8 @@ class UserService:
             )
             raise PermissionDeniedError(message="מפתח העלאה לא תואם למשתמש המחובר")
 
-        # לא מחליפים avatar_key ל-staging כדי למנוע "appears then disappears" כשה-worker מוחק staging.
-        # במקום זאת שומרים staging בנפרד ומסמנים processing עד finalize מוצלח.
+        # Do not set avatar_key to staging — avoids flicker when worker removes staging objects.
+        # Keep staging_key separate and mark processing until finalize succeeds.
         await self.crud.update(
             db,
             db_obj=user,
@@ -87,8 +87,8 @@ class UserService:
 
     async def remove_avatar(self, db: AsyncSession, user_id) -> None:
         """
-        מסיר תמונת פרופיל: מוחק את תיקיית avatars/{user_id}/ מ-S3 ומאפס avatar_key ב-DB.
-        אם אין תמונה – no-op.
+        Remove profile photo: delete avatars/{user_id}/ on S3 and clear avatar_key in DB.
+        No-op if already empty.
         """
         user = await self.get_user_by_id(db, user_id=user_id)
 
@@ -135,14 +135,14 @@ class UserService:
             update_dict["is_verified"] = False
             email_changed = True
 
-        # עדכון השדות בפועל באותה טרנזקציה (commit אחד בלבד)
+        # Apply field updates in the same transaction (single commit)
         protected_fields = ["user_id", "created_at", "hashed_password"]
         for field, value in update_dict.items():
             if hasattr(db_user, field) and field not in protected_fields:
                 setattr(db_user, field, value)
         db.add(db_user)
 
-        # שמירה ב-DB בלי commit כדי ש-Outbox יקבל את הנתונים המעודכנים
+        # Flush without commit so outbox sees updated row state
         await db.flush()
 
         if email_changed:
@@ -169,5 +169,5 @@ class UserService:
         return True
 
 
-# יצירת המופע היחיד (Singleton)
+# Module-level singleton
 user_service = UserService()

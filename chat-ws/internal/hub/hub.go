@@ -14,10 +14,10 @@ import (
 	"linkup/chat-ws/internal/config"
 )
 
-// ChannelUserOffline — publish payload = user_id (string); כל מופעי chat-ws מקבלים ומשדרים WS ללקוחות.
+// ChannelUserOffline — publish payload = user_id (string); every chat-ws instance forwards to WS clients.
 const ChannelUserOffline = "user:offline"
 
-// ChannelUserOnline — payload = user_id (string); broadcast WS user_online לכל המחוברים.
+// ChannelUserOnline — payload = user_id (string); broadcast user_online to all connected clients.
 const ChannelUserOnline = "user:online"
 
 // Hub maps user_id (UUID string) -> list of connections (one user can have multiple devices).
@@ -228,7 +228,7 @@ func (h *Hub) PublishTypingMessage(payload []byte) {
 	h.SendToUser(msg.RecipientID, payload)
 }
 
-// RunUserOfflineSubscriber — לקוח Redis נפרד מ-PSubscribe של הצ'אט (מומלץ go-redis).
+// RunUserOfflineSubscriber — separate Redis client from chat PSubscribe (recommended with go-redis).
 func (h *Hub) RunUserOfflineSubscriber(ctx context.Context, subClient *redis.Client) {
 	if subClient == nil {
 		return

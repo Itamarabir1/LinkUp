@@ -1,5 +1,5 @@
 """
-CRUD לבקשות נוסעים – מקור אמת יחיד, API עקבי.
+CRUD for passenger requests — single source of truth for persistence.
 """
 
 import logging
@@ -23,11 +23,11 @@ from app.domain.rides.model import Ride
 
 logger = logging.getLogger(__name__)
 
-# חלון זמן יחסי ל-min_departure_time בחיפוש נסיעות (± שעות)
+# Relative window around min_departure_time for ride search (± hours)
 _DEPARTURE_FLEXIBILITY_HOURS = 2
-# נהג מחפש נוסעים לאורך המסלול — רדיוס ברירת מחדל (מטר)
+# Driver search along route — default radius (meters)
 _FIND_PASSENGERS_ON_ROUTE_RADIUS_M = 2000
-# התראת נסיעה חדשה: רדיוס יעד / מוצא על המסלול ומגבלת תוצאות
+# New ride notification: origin/destination corridor radius + result cap
 _RIDE_NOTIFICATION_RADIUS_DEST_M = 5000
 _RIDE_NOTIFICATION_RADIUS_PICKUP_M = 2000
 _RIDE_NOTIFICATION_PASSENGER_LIMIT = 200
@@ -38,19 +38,18 @@ _GET_MULTI_RIDES_DEFAULT_LIMIT = 100
 
 class CRUDPassenger:
     """
-    ניהול גישה לבקשות נוסעים (PassengerRequest).
-    כל הפעולות תחת מחלקה אחת – אין פונקציות מפוזרות.
+    All PassengerRequest DB access in one place (async + sync helpers).
     """
 
-    # --- שליפה ---
+    # --- Reads ---
 
     async def get_by_id(self, db: AsyncSession, request_id: UUID) -> PassengerRequest | None:
-        """שליפת בקשה לפי request_id (AsyncSession)."""
+        """Get request by primary key."""
         rid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
         return await db.get(PassengerRequest, rid)
 
     async def get(self, db: AsyncSession, *, id: UUID) -> PassengerRequest | None:
-        """שליפת בקשה לפי request_id (AsyncSession – לשימוש ב־handler). חתימה: get(db, id=...)."""
+        """get(db, id=...) style helper for notification handlers."""
         return await db.get(PassengerRequest, id)
 
     async def get_by_passenger_id(
@@ -59,7 +58,7 @@ class CRUDPassenger:
         passenger_id: UUID,
         status: PassengerStatus | None = None,
     ) -> list[PassengerRequest]:
-        """שליפת בקשות לפי נוסע (למסך 'הבקשות שלי')."""
+        """List requests for a passenger (e.g. my-requests screen)."""
         pid = UUID(str(passenger_id)) if isinstance(passenger_id, str) else passenger_id
         stmt = select(PassengerRequest).where(PassengerRequest.passenger_id == pid)
         if status is not None:
@@ -68,7 +67,7 @@ class CRUDPassenger:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
-    # --- יצירה ---
+    # --- Create ---
 
     async def create(
         self,
@@ -80,11 +79,11 @@ class CRUDPassenger:
         d_lon: float,
         passenger_id: UUID,
     ) -> PassengerRequest:
-        """יצירת בקשה חדשה. passenger_id מהשרת (טוקן), לא מהגוף."""
+        """Insert new request; passenger_id comes from auth, not body."""
         req_time = request.requested_departure_time
         if req_time is None:
             req_time = datetime.now(UTC)
-        # עמודה TIMESTAMP WITH TIME ZONE – מקבלת aware או naive
+        # TIMESTAMPTZ accepts aware or naive datetimes
         db_request = PassengerRequest(
             passenger_id=passenger_id,
             num_passengers=request.num_passengers,
@@ -104,7 +103,7 @@ class CRUDPassenger:
         await db.refresh(db_request)
         return db_request
 
-    # --- חיפוש נסיעות עבור נוסע ---
+    # --- Ride search (passenger) ---
 
     async def find_rides_by_coordinates(
         self,
@@ -121,8 +120,8 @@ class CRUDPassenger:
         group_id: UUID | None = None,
     ) -> tuple[list[tuple[Ride, str | None]], bool]:
         """
-        מנוע חיפוש נסיעות לפי קואורדינטות ורדיוס. מיון קבוע: departure_time.asc(), ride_id.asc().
-        מחזיר (רשימה, has_more). אם limit=None מחזיר את כל התוצאות ו-has_more=False.
+        Spatial ride search near pickup/destination corridor.
+        Ordered by departure_time, ride_id. Returns (rows, has_more); limit=None disables pagination.
         """
         pickup_geo = func.ST_SetSRID(func.ST_MakePoint(p_lon, p_lat), 4326)
         dest_geo = func.ST_SetSRID(func.ST_MakePoint(d_lon, d_lat), 4326)
@@ -167,7 +166,7 @@ class CRUDPassenger:
                 Booking,
                 and_(
                     Booking.ride_id == Ride.ride_id,
-                    # אם passenger_id=None → join condition לא יתאים → status יהיה NULL
+                    # passenger_id=None → join never matches → status NULL
                     Booking.passenger_id == passenger_id,
                     Booking.status.notin_([BookingStatus.CANCELLED, BookingStatus.REJECTED]),
                 ),
@@ -181,7 +180,7 @@ class CRUDPassenger:
             stmt = stmt.limit(limit + 1)
         rows = (await db.execute(stmt)).all()
 
-        # נורמליזציה: Booking.status יכול להגיע כ-enum או string, רוצים str|None
+        # Normalize Booking.status (enum or str) to str | None
         normalized: list[tuple[Ride, str | None]] = []
         for ride, status in rows:
             if status is None:
@@ -197,7 +196,7 @@ class CRUDPassenger:
         items = normalized[:limit]
         return (items, has_more)
 
-    # --- חיפוש נוסעים עבור נהג ---
+    # --- Passenger search (driver) ---
 
     async def find_passengers_on_route(
         self,
@@ -205,7 +204,7 @@ class CRUDPassenger:
         route_coords: list,
         radius_meters: int = _FIND_PASSENGERS_ON_ROUTE_RADIUS_M,
     ) -> list[PassengerRequest]:
-        """נהג מחפש נוסעים לאורך המסלול שלו."""
+        """Driver discovers passengers near their route polyline."""
         if not route_coords or len(route_coords) < 2:
             return []
         now = datetime.now()
@@ -237,7 +236,7 @@ class CRUDPassenger:
         dest_lon: float,
         radius: int,
     ) -> list[PassengerRequest]:
-        """חיפוש נוסעים לפי מוצא ויעד של נהג."""
+        """Match passenger requests near driver's origin/destination pair."""
         now = datetime.now()
         driver_origin = func.ST_SetSRID(func.ST_MakePoint(origin_lon, origin_lat), 4326)
         driver_dest = func.ST_SetSRID(func.ST_MakePoint(dest_lon, dest_lat), 4326)
@@ -268,8 +267,8 @@ class CRUDPassenger:
         limit: int = _RIDE_NOTIFICATION_PASSENGER_LIMIT,
     ) -> list[PassengerRequest]:
         """
-        נוסעים רלוונטיים להתראה על נסיעה חדשה.
-        סדר פילטרים: סטטוס+זמן (אינדקס) → לא הנהג → יעד 5km → מוצא על המסלול.
+        Passenger targets for ride-created notifications.
+        Filter pipeline: active + future window → exclude driver → dest proximity → pickup near route.
         """
         now = datetime.now()
         ride_date = ride.departure_time.date() if getattr(ride, "departure_time", None) else None
@@ -330,7 +329,7 @@ class CRUDPassenger:
         )
         return passengers
 
-    # --- נסיעות (שליפה לצורך UI/רשימות) ---
+    # --- Rides for lists/UI ---
 
     async def get_multi_rides(
         self,
@@ -339,7 +338,7 @@ class CRUDPassenger:
         skip: int = 0,
         limit: int = _GET_MULTI_RIDES_DEFAULT_LIMIT,
     ) -> list[Ride]:
-        """שליפת רשימת נסיעות עם סינון אופציונלי לפי סטטוס."""
+        """Admin-style ride listing with optional status filter."""
         stmt = select(Ride)
         if status:
             stmt = stmt.where(Ride.status == status)
@@ -347,10 +346,10 @@ class CRUDPassenger:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
-    # --- תחזוקה ---
+    # --- Maintenance ---
 
     def close_expired_requests(self, db: Session, now: datetime) -> int:
-        """סגירת בקשות שזמן היציאה עבר ולא שובצו. מחזיר מספר רשומות שעודכנו."""
+        """Expire active requests whose departure time passed; returns rows updated."""
         result = db.execute(
             update(PassengerRequest)
             .where(
@@ -362,5 +361,5 @@ class CRUDPassenger:
         return result.rowcount or 0
 
 
-# Singleton לשימוש באפליקציה
+# App-wide singleton
 crud_passenger = CRUDPassenger()

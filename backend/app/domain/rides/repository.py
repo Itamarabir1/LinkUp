@@ -20,7 +20,7 @@ class RideCacheRepository:
     async def save_preview(self, preview: RidePreviewResponse, preview_in: RidePreviewCreate) -> None:
         """שומר תצוגה מקדימה של נסיעה ב-Redis: 3 המסלולים (כולל זמן נסיעה וק\"מ) לתוקף 24 שעות."""
         try:
-            # הכנת הנתונים (Serialization)
+            # Serialize payload for cache
             cache_data = preview.model_dump()
             cache_data.update(
                 {
@@ -36,7 +36,7 @@ class RideCacheRepository:
             )
 
             key = get_ride_preview_key(preview.session_id)
-            # תוקף 24 שעות – חייב להיות בשניות (86400) כדי שהמשתמש יוכל לבחור מסלול בתוך 24 שעות
+            # 24h TTL in seconds (86400) so user can pick a route within a day
             ttl_seconds = max(RIDE_PREVIEW_TTL, 86400)  # מינימום 24h גם אם הקבוע שונה בטעות
             await redis_client.save(
                 key=key,
@@ -72,12 +72,12 @@ class RideCacheRepository:
     async def delete_preview(self, session_id: str) -> None:
         """ניקוי ידני של הקאש"""
         key = get_ride_preview_key(session_id)
-        # אם אין מתודת delete ב-client, נוסיף אותה או נשתמש ב-client.delete
+        # Use client.delete if no dedicated delete helper
         try:
             await redis_client.client.delete(key)
         except Exception as e:
             logger.warning(f"Could not delete cache key {key}: {e}")
 
 
-# מופע סינגלטון לשימוש ב-Service Layer
+# Singleton for service layer
 ride_cache_repo = RideCacheRepository()

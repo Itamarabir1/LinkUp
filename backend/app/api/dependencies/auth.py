@@ -11,7 +11,7 @@ from app.db.session import get_db
 from app.domain.users.crud import crud_user
 from app.domain.users.model import User
 
-# HTTPBearer מאפשר הזנת טוקן ישירה ב-Swagger (יותר נוח מ-OAuth2)
+# HTTPBearer: paste token directly in Swagger (more convenient than OAuth2)
 bearer_scheme = HTTPBearer()
 bearer_scheme_optional = HTTPBearer(auto_error=False)
 
@@ -81,9 +81,9 @@ async def get_current_user_ws(
     token: str | None = Query(None, alias="token"),
 ) -> WsUser | None:
     """
-    אימות WS לפי JWT בלבד (?token=...) — ללא קריאת DB.
-    decode_access_token מאמת חתימה, תוקף ו-base64 קנוני.
-    משתמש מושבת עדיין יכול להתחבר עד פקיעת הטוקן (trade-off מול עומס על ה-DB pool).
+    WebSocket auth via JWT only (?token=...) — no DB round-trip.
+    decode_access_token verifies signature, expiry, and canonical base64.
+    Disabled users may still connect until token expiry (trade-off vs DB pool load).
     """
     if not token:
         return None
@@ -96,4 +96,4 @@ async def get_current_user_ws(
     return WsUser(id=UUID(str(user_id)))
 
 
-# ה-WebSocket Dependency נשאר כאן כי הוא קשור ל-API
+# WebSocket dependency lives here because it is tied to the API layer

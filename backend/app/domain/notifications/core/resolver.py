@@ -87,13 +87,13 @@ class RecipientResolver:
 
     def _get_both(self, source: Any) -> Any | None:
         """
-        role=both: source הוא payload dict עם user_id_1 ו-user_id_2.
-        מחזיר list של שני משתמשים (או None אם לא ניתן לזהות).
+        role=both: source is a payload dict with user_id_1 and user_id_2.
+        Returns that dict (or None if not applicable); the handler sends to both users.
         """
         if source is None:
             return None
-        # אם source הוא dict עם user_id_1 ו-user_id_2, נחזיר את ה-dict עצמו
-        # ה-handler יטפל בשליחה לשני המשתמשים
+        # If source is a dict with user_id_1 and user_id_2, return the dict as-is
+        # The handler will send to both users
         if isinstance(source, dict) and "user_id_1" in source and "user_id_2" in source:
             return source
         return None

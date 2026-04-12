@@ -12,7 +12,7 @@ def convert_db_route_to_list(route_geom) -> list[list[float]]:
         return []
     try:
         shape = to_shape(route_geom)
-        # shape.coords מחזיר (lon, lat) – tuple או Point; המרה ל-[lat, lon]
+        # shape.coords is (lon, lat) as tuple or Point; convert to [lat, lon]
         out: list[list[float]] = []
         for pt in shape.coords:
             if hasattr(pt, "x") and hasattr(pt, "y"):

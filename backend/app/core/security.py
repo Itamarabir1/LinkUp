@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-# ייבוא האובייקט שטוען את ה-ENV
+# Import settings object that loads ENV
 from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

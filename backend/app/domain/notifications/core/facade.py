@@ -19,13 +19,13 @@ class NotificationContextFacade:
         builder = config["builder"]
         schema = config["schema"]
 
-        # ולידציה: אם יש סכמה, נשתמש בה. אם לא, נעביר את האובייקט כמו שהוא.
+        # Validate: use Pydantic schema when present; otherwise pass data through
         processed_data = data
         if schema and isinstance(data, dict):
             processed_data = schema(**data)
 
         try:
-            # הפעלת ה-build (שנשען על ה-BaseBuilder המצוין שלך)
+            # Run builder.build (uses BaseBuilder)
             return builder.build(processed_data, str(event_key))
         except Exception as e:
             logger.error(f"❌ Builder failed for {event_key}: {e}", exc_info=True)

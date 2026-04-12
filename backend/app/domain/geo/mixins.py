@@ -12,7 +12,7 @@ class GeoLocationMixin:
     dest_lat = Column(Float, nullable=False)
     dest_lon = Column(Float, nullable=False)
 
-    # השדות האלו קריטיים לשאילתות מרחק (Spatial Queries)
+    # Required for spatial distance queries
     origin_geom = Column(Geometry(geometry_type="POINT", srid=4326), index=True, nullable=False)
     destination_geom = Column(Geometry(geometry_type="POINT", srid=4326), index=True, nullable=False)
 

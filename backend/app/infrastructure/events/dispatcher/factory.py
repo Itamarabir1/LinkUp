@@ -16,22 +16,22 @@ class DispatcherFactory:
         critical_targets: set[DispatchTarget] | None = None,
     ) -> EventDispatcher:
         """
-        בונה Dispatcher עם הגדרות סטנדרטיות.
+        Build a dispatcher with standard wiring.
         """
-        # 1. מיפוי פבלישרים
+        # 1. Map targets to publishers
         mapping = {}
         for pub in publishers:
             for target in DispatchTarget:
                 if pub.supports_target(target):
                     mapping[target] = pub
 
-        # 2. הגדרת יעדים קריטיים (ברירת מחדל היא RabbitMQ אם לא הוגדר אחרת)
+        # 2. Critical targets (default: RabbitMQ)
         if critical_targets is None:
             critical_targets = {DispatchTarget.RABBITMQ}
 
-        # 3. יצירת ה-Evaluator
+        # 3. Build evaluator
         evaluator = DispatchEvaluator(critical_targets=critical_targets)
 
-        # 4. החזרת הדיספאצ'ר המורכב
+        # 4. Return composed dispatcher
         logger.info(f"🏗️ Dispatcher created with targets: {list(mapping.keys())}")
         return EventDispatcher(publishers_map=mapping, evaluator=evaluator)

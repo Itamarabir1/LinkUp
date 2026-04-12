@@ -12,7 +12,7 @@ RETRY_DELAYS_SEC = [5, 30, 300]  # 5s, 30s, 5min
 MAX_RETRIES = 3
 DLQ_EXCHANGE = "dlq_exchange"
 
-# תורים שמקבלים retry + DLQ (לא scheduled)
+# Queues with retry + DLQ (non-scheduled)
 RETRYABLE_QUEUES = {"notifications_queue", "avatar_upload_queue"}
 
 

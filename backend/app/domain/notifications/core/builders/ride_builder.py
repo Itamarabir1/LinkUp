@@ -9,7 +9,7 @@ class RideBuilder(BaseContextBuilder):
     """
 
     def build(self, ride: Any, event_key: str = "") -> dict[str, Any]:
-        # 1. הכנת נתוני הבסיס (הזרקה לכל סוגי ההודעות)
+        # 1. Base fields for all ride notification types
         driver_name = self._resolve_attr(ride, "driver.first_name", "נהג")
         origin = getattr(ride, "origin_name", "N/A")
         destination = getattr(ride, "destination_name", "N/A")
@@ -26,8 +26,8 @@ class RideBuilder(BaseContextBuilder):
             "color": self._determine_color(event_key),
         }
 
-        # 2. מיפוי התוכן לפי אירוע (במקום if/else)
-        # זה מאפשר להוסיף 20 אירועים בלי לשנות את הלוגיקה של הפונקציה
+        # 2. Declarative content map (no giant if/else)
+        # Easy to add many events without changing control flow
         event_content_map = {
             "created_for_passengers": {
                 "subject": "נסיעה חדשה שמתאימה לך",
@@ -55,8 +55,7 @@ class RideBuilder(BaseContextBuilder):
             },
         }
 
-        # 3. חילוץ התוכן המתאים או שימוש בברירת מחדל
-        # אנחנו מחפשים מילת מפתח בתוך ה-event_key (כמו cancelled או reminder)
+        # 3. Match by keyword in event_key (e.g. cancelled, reminder) or use default
         event_key_lower = (event_key or "").lower()
         matched_content = next(
             (content for key, content in event_content_map.items() if key in event_key_lower),

@@ -11,26 +11,26 @@ logger = logging.getLogger(__name__)
 
 class EmailProvider(BaseNotificationProvider):
     def _render_subject(self, subject: str, context: dict[str, Any]) -> str:
-        """מחליף placeholders בנושא (למשל {passenger_name}) בערכי context."""
+        """Replace subject placeholders (e.g. {passenger_name}) with context values."""
         if not subject or "{" not in subject:
             return subject or "Update from Linkup"
         result = subject
         for key, value in context.items():
             if key and value is not None:
                 result = result.replace("{" + key + "}", str(value).strip())
-        # השארת placeholders שלא ב-context כרשימה (למקרה שחסר ערך)
+        # Leave placeholders not in context as-is (if a value is missing)
         return result
 
     async def send(self, user: User, template_name: str, context: dict[str, Any]):
         try:
-            # ה-Subject יכול להגיע מהקונטקסט (הבילדר הכין אותו) – מחליפים placeholders
+            # Subject may come from context (builder prepared it) — substitute placeholders
             raw_subject = context.get("subject", "Update from Linkup")
             subject = self._render_subject(raw_subject, context)
 
-            # 1. רינדור ה-HTML
+            # 1. Render HTML
             html_content = render_email_template(template_name, **context)
 
-            # 2. שליחה דרך EmailClient (Brevo) – נמען = הנהג/משתמש; Brevo דורש name ב-to
+            # 2. Send via EmailClient (Brevo) — recipient = driver/user; Brevo requires non-empty name in to
             if html_content:
                 recipient_name = (
                     context.get("user_name") or context.get("driver_name") or getattr(user, "full_name", None) or getattr(user, "first_name", None)

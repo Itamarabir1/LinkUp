@@ -30,7 +30,7 @@ type lastSeenBackendBody struct {
 }
 
 // HandlePresence serves GET /presence/{userID}. Online from Redis key presence:{id}.
-// last_seen: אם ערך ב-last_seen:hold: הוא חותמת ISO — משתמשים בו; אחרת GET ל-backend (last_active_at או last_login).
+// last_seen: if last_seen:hold: holds an ISO timestamp, use it; else GET backend (last_active_at or last_login).
 func HandlePresence(cfg config.Config, rdb *redisv9.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		allowCORS(cfg, w, r)

@@ -54,7 +54,7 @@ class UserBaseSchema(BaseModel):
             raise PasswordTooWeakError()
 
 
-# --- קריאה (Response) ---
+# --- Read (response) ---
 class UserRead(BaseModel):
     user_id: UUID
     full_name: str
@@ -70,13 +70,13 @@ class UserRead(BaseModel):
     @computed_field
     @property
     def avatar_url_small(self) -> str | None:
-        """150x150 — רשימות צ'אט, אווטארים קטנים."""
+        """150x150 — chat lists, small avatars."""
         return storage_service.build_avatar_url(self.avatar_key, "150x150.webp")
 
     @computed_field
     @property
     def avatar_url_medium(self) -> str | None:
-        """400x400 — תמונת פרופיל ראשית."""
+        """400x400 — main profile image."""
         return storage_service.build_avatar_url(self.avatar_key, "400x400.webp")
 
 
@@ -85,23 +85,23 @@ class UserRead(BaseModel):
 
 class UserCreate(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=100)
-    phone_number: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")  # וולידציה לטלפון בינלאומי
-    password: str = Field(..., min_length=8)  # הסיסמה הגולמית מהמשתמש
+    phone_number: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")  # E.164-style phone validation
+    password: str = Field(..., min_length=8)  # Raw password from the client
     email: EmailStr | None = None
     fcm_token: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- עדכונים ---
+# --- Updates ---
 class UserUpdate(UserBaseSchema):
     full_name: str | None = Field(None, min_length=2, max_length=100)
     email: EmailStr | None = None
 
 
-# --- מיקום ו-FCM ---
+# --- Location & FCM ---
 class UserLocationUpdate(BaseModel):
-    # וולידציה גיאוגרפית כבר ברמת הסכמה - מעולה!
+    # Geographic bounds enforced at schema level
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
 
@@ -110,7 +110,7 @@ class FCMTokenUpdate(BaseModel):
     fcm_token: str | None = Field(None)
 
 
-# --- תגובות גנריות ---
+# --- Generic responses ---
 class MessageResponse(BaseModel):
     message: str
     status: str = "success"
@@ -118,34 +118,34 @@ class MessageResponse(BaseModel):
 
 
 class UserAvatarResponse(BaseModel):
-    """תגובה לאחר העלאת אווטאר – מחזיר מפתח או URL לפי צורך."""
+    """Response after avatar upload — returns key or URL as needed."""
 
     avatar_key: str | None = None
     avatar_url_medium: str | None = None
 
 
 class AvatarUploadAcceptedResponse(BaseModel):
-    """תגובה ל-202 – העלאת אווטאר התקבלה ועתידה לעבור עיבוד ברקע."""
+    """202 response — avatar upload accepted; processing happens in the background."""
 
     message: str = "Avatar upload accepted"
     status: str = "accepted"
 
 
 class AvatarUploadUrlRequest(BaseModel):
-    """בקשה ל-presigned URL להעלאת אווטאר."""
+    """Request a presigned URL for avatar upload."""
 
-    filename: str | None = Field(None, description="שם הקובץ (אופציונלי, לזיהוי סיומת)")
+    filename: str | None = Field(None, description="Optional filename (for extension hint)")
 
 
 class AvatarUploadUrlResponse(BaseModel):
-    """תגובה עם presigned URL להעלאת אווטאר."""
+    """Response with presigned URL for avatar upload."""
 
-    upload_url: str = Field(..., description="Presigned URL להעלאה ישירה ל-S3")
-    staging_key: str = Field(..., description="מפתח staging לשימוש באישור העלאה")
-    expires_in: int = Field(300, description="זמן תוקף URL בשניות")
+    upload_url: str = Field(..., description="Presigned URL for direct upload to S3")
+    staging_key: str = Field(..., description="Staging key for confirm step")
+    expires_in: int = Field(300, description="URL TTL in seconds")
 
 
 class AvatarUploadConfirmRequest(BaseModel):
-    """אישור העלאה לאחר שהלקוח העלה ישירות ל-S3."""
+    """Confirm upload after the client uploaded directly to S3."""
 
-    staging_key: str = Field(..., description="מפתח staging שקיבל ב-upload_url")
+    staging_key: str = Field(..., description="Staging key from upload_url response")

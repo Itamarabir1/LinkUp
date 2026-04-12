@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import settings
 
-# וודא ש-DATABASE_URL מתחיל ב-postgresql+asyncpg://
+# DATABASE_URL must use postgresql+asyncpg://
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
@@ -13,7 +13,7 @@ engine = create_async_engine(
     pool_pre_ping=True,
 )
 
-# שימוש ב-async_sessionmaker לרמה של סניור
+# async_sessionmaker factory
 SessionLocal = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
@@ -23,7 +23,7 @@ SessionLocal = async_sessionmaker(
 )
 
 
-# Dependency ל-FastAPI (אם צריך)
+# FastAPI dependency (optional pattern)
 async def get_db():
     async with SessionLocal() as db:
         try:

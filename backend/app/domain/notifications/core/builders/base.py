@@ -10,9 +10,9 @@ logger = logging.getLogger(__name__)
 
 def _get_base_url_for_links() -> str:
     """
-    בסיס ללינקים במייל – משתמש ב-FRONTEND_URL.
-    חשוב: כדי שלחיצה על הקישור במייל (מהטלפון) תפתח את האפליקציה בלי אזהרת אבטחה,
-    הגדר ב-.env את FRONTEND_URL לכתובת הציבורית של האפליקציה עם HTTPS תקין (למשל https://linkup.co.il).
+    Base URL for email links — uses FRONTEND_URL.
+    For mobile mail clients to open the app without security warnings, set FRONTEND_URL
+    in .env to the public HTTPS app URL (e.g. https://linkup.co.il).
     """
     try:
         from app.core.config import settings
@@ -21,7 +21,7 @@ def _get_base_url_for_links() -> str:
         base = (base or "").strip().rstrip("/")
         if not base:
             return "https://linkup.co.il"
-        # קישורים במייל חייבים HTTPS כדי שלא יופיע "החיבור שלך פרטי" (מלבד localhost לפיתוח)
+        # Email links should use HTTPS to avoid "connection not private" (except localhost dev)
         if base.startswith("http://") and "localhost" not in base and "127.0.0.1" not in base:
             base = "https://" + base[7:]
         return base
@@ -37,15 +37,15 @@ class BaseContextBuilder(ABC):
 
     BASE_URL = "https://itamarabir.com"
 
-    # שימוש ב-Hex Codes - חובה למיילים (Gmail/Outlook לא תמיד אוהבים "red")
-    COLOR_SUCCESS = "#28a745"  # ירוק
-    COLOR_DANGER = "#dc3545"  # אדום
-    COLOR_INFO = "#17a2b8"  # כחול
+    # Hex colors — reliable in email clients (named CSS colors are flaky)
+    COLOR_SUCCESS = "#28a745"  # green
+    COLOR_DANGER = "#dc3545"  # red
+    COLOR_INFO = "#17a2b8"  # blue
 
     @abstractmethod
     def build(self, data: BaseModel | Any, event_key: str) -> dict[str, Any]:
         """
-        החוזה המחייב: מקבל נתונים (סכמה או אובייקט DB) ומחזיר מילון לעיבוד טמפלייט.
+        Contract: accept schema or DB object, return dict for template rendering.
         """
         pass
 
@@ -53,9 +53,8 @@ class BaseContextBuilder(ABC):
 
     def _resolve_attr(self, obj: Any, path: str, default: Any = "") -> Any:
         """
-        Safe Navigation Utility.
-        סניור תומך גם ב-getattr (אובייקט) וגם ב-get (מילון/סכמה).
-        דוגמה: 'ride.driver.full_name' יעבוד גם אם זה Dict וגם אם זה Model.
+        Safe navigation: getattr on objects, .get on dicts/schemas.
+        Example: 'ride.driver.full_name' works for dict or ORM model.
         """
         if obj is None:
             return default
@@ -97,7 +96,7 @@ class BaseContextBuilder(ABC):
         return self.COLOR_SUCCESS
 
     def _get_cta_url(self, path: str) -> str:
-        """בונה לינק לכפתור במייל – משתמש ב-FRONTEND_URL כדי שהלינק יפתח את האפליקציה."""
+        """Build mail CTA URL from FRONTEND_URL so links open the web app."""
         clean_path = path.lstrip("/")
         base = _get_base_url_for_links()
         return f"{base.rstrip('/')}/{clean_path}" if base else f"{self.BASE_URL}/{clean_path}"

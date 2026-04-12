@@ -6,7 +6,7 @@ import os
 
 from groq import Groq
 
-# יצירת client (singleton)
+# Singleton OpenAI (or compatible) client
 _groq_client: Groq | None = None
 
 

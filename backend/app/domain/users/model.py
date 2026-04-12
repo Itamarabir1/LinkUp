@@ -1,6 +1,6 @@
 import uuid
 
-from geoalchemy2 import Geography  # שימוש ב-Geography עבור PostGIS
+from geoalchemy2 import Geography  # PostGIS geography type
 from sqlalchemy import Boolean, Column, DateTime, String, Text
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -12,37 +12,36 @@ from app.db.base import Base
 
 class User(Base):
     """
-    User Entity - Senior Edition.
-    הישות המרכזית במערכת. משתמש יכול להיות נהג, נוסע או שניהם.
+    User entity — core domain object; can act as driver, passenger, or both.
     """
 
     __tablename__ = "users"
 
-    # מזהה ייחודי
+    # Primary key
     user_id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     full_name = Column(String(100), nullable=False)
     phone_number = Column(String(20), unique=True, index=True, nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=True)
     hashed_password = Column(String(255), nullable=False)
 
-    # אימות וניהול חשבון
+    # Verification & account flags
     is_verified = Column(Boolean, default=False, nullable=False, server_default="false")
-    google_id = Column(String(255), nullable=True)  # Google OAuth 'sub' – קישור חשבון קיים ל-Google
+    google_id = Column(String(255), nullable=True)  # Google OAuth `sub` — link existing account
     is_active = Column(Boolean, default=True, server_default="true")
     is_admin = Column(Boolean, default=False, server_default="false")
 
-    # פרופיל — מפתח S3 בלבד (prefix תיקייה), למשל avatars/{user_id}/. URLs מלאים נבנים ב-runtime.
+    # Profile media — S3 key prefix only (e.g. avatars/{user_id}/); URLs built at runtime.
     avatar_key = Column(String(255), nullable=True)
     avatar_staging_key = Column(String(255), nullable=True)
     avatar_status = Column(String(20), nullable=False, server_default="none", default="none")
     fcm_token = Column(Text, nullable=True)
-    # Refresh Token (ארוך תוקף) – נשמר ב-DB כדי לאפשר ביטול (logout מכל המכשירים)
+    # Long-lived refresh token — stored in DB for revoke-all (logout)
     refresh_token = Column(Text, nullable=True)
 
-    # מיקום אחרון (PostGIS Geography) - לחישובי מרחק במטרים
+    # Last known location (PostGIS geography) — distance queries in meters
     last_location = Column(Geography(geometry_type="POINT", srid=4326), nullable=True)
 
-    # זמנים (Best Practice: שימוש ב-UTC)
+    # Timestamps (store in UTC)
     last_login = Column(DateTime(timezone=True), nullable=True)
     last_active_at = Column(DateTime(timezone=True), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -50,17 +49,15 @@ class User(Base):
 
     # --- Relationships (The "Glue" of the System) ---
 
-    # 1. נסיעות שהמשתמש יצר (כנהג)
-    # מתחבר ל-Ride.driver
+    # 1. Rides created as driver → Ride.driver
     rides_as_driver = relationship(
         "Ride",
         back_populates="driver",
         cascade="all, delete-orphan",
-        passive_deletes=True,  # אופטימיזציה לביצועי מחיקה ב-DB
+        passive_deletes=True,  # DB-level delete performance
     )
 
-    # 2. בקשות חיפוש (כנוסע מחפש / סוכן חכם)
-    # מתחבר ל-PassengerRequest.user
+    # 2. Passenger search requests → PassengerRequest.user
     passenger_requests = relationship(
         "PassengerRequest",
         back_populates="user",
@@ -68,8 +65,7 @@ class User(Base):
         passive_deletes=True,
     )
 
-    # 3. הזמנות מאושרות (כנוסע רשום בנסיעה)
-    # מתחבר ל-Booking.passenger
+    # 3. Bookings as passenger → Booking.passenger
     bookings = relationship(
         "Booking",
         back_populates="passenger",
@@ -77,9 +73,9 @@ class User(Base):
         passive_deletes=True,
     )
 
-    # 4. קבוצות שהמשתמש מנהל
+    # 4. Groups this user admins
     owned_groups = relationship("Group", back_populates="admin")
-    # 5. חברויות בקבוצות
+    # 5. Group memberships
     group_memberships = relationship("GroupMember", back_populates="user")
 
     def __repr__(self):
@@ -89,7 +85,7 @@ class User(Base):
 
     @property
     def is_driver(self) -> bool:
-        """האם יש למשתמש נסיעות כנהג. בלי lazy load אם ה-relationship לא נטען."""
+        """True if user has driver rides loaded (avoids lazy load if unloaded)."""
         try:
             if "rides_as_driver" not in sa_inspect(self).unloaded:
                 rides = self.__dict__.get("rides_as_driver")
@@ -100,7 +96,7 @@ class User(Base):
 
     @property
     def active_bookings_count(self) -> int:
-        """ספירת הזמנות שאינן cancelled/rejected — רק אם bookings נטען בזיכרון."""
+        """Count non-cancelled/rejected bookings when relationship is loaded."""
         try:
             if "bookings" not in sa_inspect(self).unloaded:
                 bookings = self.__dict__.get("bookings", [])
@@ -123,4 +119,3 @@ class User(Base):
             "is_verified": self.is_verified,
         }
 
-    # בתוך class User במודל שלך

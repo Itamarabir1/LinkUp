@@ -6,14 +6,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.domain.bookings.enum import BookingStatus
 
 
-# 1. יצירת בקשת הצטרפות
+# 1. Create join request body
 class BookingCreate(BaseModel):
     ride_id: UUID
     request_id: UUID
     num_seats: int = Field(default=1, ge=1)
 
 
-# 2. מה חוזר מהשרת (Response כללי) - עודכן!
+# 2. Generic server response shape
 class BookingResponse(BaseModel):
     booking_id: UUID
     ride_id: UUID
@@ -29,7 +29,7 @@ class BookingResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# 3. סכימה עבור הנהג (המניפסט) - עודכן!
+# 3. Driver manifest schema
 class BookingManifestItem(BaseModel):
     booking_id: UUID
     passenger_id: UUID
@@ -38,7 +38,7 @@ class BookingManifestItem(BaseModel):
     num_seats: int
     whatsapp_link: str | None = None
     status: BookingStatus
-    # פרטי תחנת עלייה ושעה
+    # Pickup stop details and time
     pickup_name: str | None = None
     pickup_time: datetime | None = None
     destination_name: str | None = None
@@ -46,7 +46,7 @@ class BookingManifestItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# 4. תגובה מרוכזת של המניפסט - ללא שינוי
+# 4. Full manifest response
 class RideManifestResponse(BaseModel):
     ride_id: UUID
     total_confirmed_passengers: int
@@ -56,7 +56,7 @@ class RideManifestResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# 5. סכימה קצרה לניהול בקשות - עודכן!
+# 5. Compact schema for request management
 class BookingShortInfo(BaseModel):
     booking_id: UUID
     request_id: UUID
@@ -91,7 +91,7 @@ class TripHistoryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# פריט התראה למסך ההתראות (נהג + נוסע)
+# Notification list item (driver + passenger views)
 class NotificationItemResponse(BaseModel):
     type: str  # ride_request | booking_confirmed | booking_rejected | pending_approval
     title: str

@@ -1,1 +1,1 @@
-# domain/chat – צ'אט 1:1 בין משתמשים
+# domain/chat — 1:1 messaging between users

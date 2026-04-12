@@ -24,7 +24,7 @@ class RedisClient:
         try:
             if self.client is None:
                 await self.connect()
-            # expire בשניות (Redis SETEX); ערך 0 או None – משתמשים בברירת מחדל
+            # TTL seconds for SETEX; None → default 3600
             if expire is None:
                 expire = 3600
             expire = max(1, int(expire))

@@ -33,13 +33,13 @@ class EmailClient:
             "name": settings.BREVO_SENDER_NAME,
             "email": settings.BREVO_SENDER_EMAIL,
         }
-        # Brevo דורש name ב-to – וודא תמיד מחרוזת לא ריקה
+        # Brevo requires non-empty name in to
         name = (str(recipient_name).strip() if recipient_name else None) or "User"
         to = [{"email": recipient, "name": name}]
 
         send_smtp_email = sib_api_v3_sdk.SendSmtpEmail(to=to, html_content=body, sender=sender, subject=subject)
 
-        # הרצה ב-Executor כדי לא לחסום את ה-Event Loop
+        # Run in executor to avoid blocking the event loop
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, lambda: self.api_instance.send_transac_email(send_smtp_email))
 

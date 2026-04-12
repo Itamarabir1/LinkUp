@@ -25,7 +25,7 @@ from app.domain.rides.mapper import RideMapper
 from app.domain.rides.schema import DriverInfoResponse, RideResponse
 from app.infrastructure.geo.geocode_cache import get_coordinates
 
-# הגדרת לוגר
+# Logger
 logger = logging.getLogger(__name__)
 
 _DEFAULT_SEARCH_RADIUS_M = 1000
@@ -52,7 +52,7 @@ class PassengerService:
             new_request = await crud_passenger.create(db, request_in, p_lat, p_lon, d_lat, d_lon, passenger_id=passenger_id)
             await db.commit()
 
-            # 3. מציאת נהגים רלוונטיים באופן מיידי (לא כולל נסיעות של המשתמש עצמו)
+            # 3. Immediate driver matches (exclude rides owned by same user)
             matches, _ = await crud_passenger.find_rides_by_coordinates(
                 db,
                 p_lat,
@@ -63,7 +63,7 @@ class PassengerService:
                 passenger_id=passenger_id,
             )
 
-            # matching_rides חייב להיות List[RideResponse] — find_rides מחזיר tuples (Ride, booking_status)
+            # matching_rides: List[RideResponse] — find_rides returns (Ride, booking_status) tuples
             new_request.matching_rides = [
                 RideResponse.model_validate(ride).model_copy(update={"user_booking_status": status}) for ride, status in matches
             ]
@@ -81,16 +81,16 @@ class PassengerService:
         if not p_req:
             raise PassengerRequestNotFoundError(request_id=str(request_id))
 
-        # הרשאות: רק בעל הבקשה יכול לבטל
+        # Auth: only request owner may cancel
         if p_req.passenger_id != passenger_id:
             raise ForbiddenRideActionError("גישה חסומה")
 
-        # 1. ביטול כל ההזמנות ושחרור מושבים
+        # 1. Cancel bookings and free seats
         bookings = list((await db.execute(select(Booking).where(Booking.request_id == request_id))).scalars().all())
         for b in bookings:
             await crud_booking.execute_booking_cancellation(db, b)
 
-        # 2. עדכון סטטוס הבקשה עצמה (ביטול בקשה = CANCELLED, לא כיבוי התראות)
+        # 2. Update request status (cancel = CANCELLED, not just muting alerts)
         p_req.status = PassengerStatus.CANCELLED
 
         await db.commit()

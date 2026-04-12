@@ -46,13 +46,13 @@ async def register(
     print("[Linkup] register endpoint – מתחיל register_new_user")
     new_user = await auth_svc.register_new_user(db=db, user_in=user_in)
 
-    # שמירת האימייל ב-cookie לאימות (תוקף 10 דקות)
+    # Stash email in cookie for verification (10 minutes)
     response.set_cookie(
         key="pending_verification_email",
         value=new_user.email,
-        max_age=600,  # 10 דקות
+        max_age=600,  # 10 minutes
         httponly=True,
-        secure=getattr(settings, "FORCE_HTTPS_REDIRECT", False),  # Secure רק ב-HTTPS
+        secure=getattr(settings, "FORCE_HTTPS_REDIRECT", False),  # Secure flag in HTTPS only
         samesite="lax",
     )
 
@@ -171,7 +171,7 @@ async def verify_email(
     אימות המייל מהפרונט (המשתמש מזין קוד בדף).
     האימייל יכול לבוא מה-cookie (אחרי רישום) או מה-body (אם לא נשמר ב-cookie).
     """
-    # ניסיון לקבל את האימייל מה-cookie
+    # Fallback email from cookie
     email = data.email
     if not email:
         email = request.cookies.get("pending_verification_email")
@@ -182,7 +182,7 @@ async def verify_email(
 
     result = await auth_svc.verify_user_email(db, email, data.code)
 
-    # מחיקת ה-cookie אחרי אימות מוצלח
+    # Clear pending cookie after success
     response.delete_cookie(
         key="pending_verification_email",
         httponly=True,
@@ -265,7 +265,7 @@ async def google_signin(
     מחזיר access_token + refresh_token + user (כמו /login רגיל).
     """
     try:
-        # בדיקה שה-GOOGLE_CLIENT_ID מוגדר
+        # Ensure GOOGLE_CLIENT_ID is configured
         if not settings.GOOGLE_CLIENT_ID:
             logger.error("GOOGLE_CLIENT_ID not configured in settings")
             raise GoogleAuthFailed(message="שירות Google לא מוגדר בשרת")

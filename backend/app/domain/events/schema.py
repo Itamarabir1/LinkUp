@@ -17,7 +17,7 @@ class Event(BaseModel):
     targets: list[DispatchTarget] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    # --- וולידציה ברמת סניור ---
+    # --- Validation ---
     @field_validator("name")
     @classmethod
     def validate_event_name(cls, v: str) -> str:
@@ -25,7 +25,7 @@ class Event(BaseModel):
             raise ValueError("Event name must follow the 'domain.action' format (e.g., user.created)")
         return v.lower()
 
-    # --- חילוץ נתונים חכם (Properties) ---
+    # --- Smart properties ---
 
     @property
     def user_id(self) -> UUID | None:
@@ -64,7 +64,7 @@ class Event(BaseModel):
         return self.metadata.get("exchange", "system_events")
 
     class Config:
-        # מאפשר ליצור את ה-DTO ישירות מאובייקט SQLAlchemy (מה-Outbox)
+        # Build DTO from SQLAlchemy row (e.g. outbox)
         from_attributes = True
-        # מונע שינוי של האובייקט אחרי שהוא נוצר (Immutability - מומלץ לאירועים)
+        # Immutable after creation (recommended for events)
         frozen = True

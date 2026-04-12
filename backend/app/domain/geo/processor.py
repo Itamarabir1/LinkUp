@@ -15,17 +15,17 @@ async def resolve_origin_address(name: str | None, lat: float | None, lon: float
     מבצע 'החלטה' גיאוגרפית: שם מקום או GPS.
     מחזיר כתובת טקסטואלית או זורק שגיאה אם אין כלום.
     """
-    # 1. עדיפות ראשונה: שם המקום שהמשתמש הקליד
+    # 1. Prefer explicit place name from user input
     if name and name.strip():
         return name
 
-    # 2. עדיפות שנייה: המרה מ-GPS לכתובת (Reverse Geocoding)
+    # 2. Else reverse-geocode GPS to address
     if lat is not None and lon is not None:
         address = await GeocodingService.get_address_from_gps(lat, lon)
         if address:
             return address
 
-    # 3. Fallback: אם אין שם ואין GPS תקין
+    # 3. Fallback when name and GPS are missing/invalid
     raise InvalidLocationError(detail="חובה לספק כתובת מוצא או מיקום GPS תקין")
 
 
@@ -37,7 +37,7 @@ async def get_full_routing_data(
     """
     מתזמר שליפת נתונים מ-API חיצוני והמרתם לסכימות של הדומיין.
     """
-    # 1. שליפת קואורדינטות מ-GeocodingService
+    # 1. Coordinates from GeocodingService
     lat_o, lon_o = await GeocodingService.get_coordinates_from_address(origin_name)
     lat_d, lon_d = await GeocodingService.get_coordinates_from_address(dest_name)
 
@@ -45,20 +45,20 @@ async def get_full_routing_data(
         logger.warning(f"Could not find coordinates for: {origin_name} or {dest_name}")
         return None
 
-    # 2. שליפת עד 3 מסלולים מ-Google Directions API (GeoClient) – מחזיר כמה שגוגל מחזירה (1–3)
+    # 2. Up to 3 routes from GeoClient / Directions (1–3 as returned)
     raw_routes = await geo_client.fetch_raw_routes((lat_o, lon_o), (lat_d, lon_d), departure_time)
 
     if not raw_routes:
         logger.error(f"No routes found between {origin_name} and {dest_name}")
         return None
 
-    # וידוא ש-routes היא רשימה (לא אובייקט בודד)
+    # Normalize routes to a list
     if not isinstance(raw_routes, list):
         raw_routes = [raw_routes] if raw_routes else []
 
     logger.info(f"Passing {len(raw_routes)} route(s) to preview for {origin_name} -> {dest_name}")
 
-    # 3. טרנספורמציה לסכימות Pydantic (פורמט מ-Directions: duration שניות, distance מטרים, coords [lat,lon])
+    # 3. Map to Pydantic (Directions: duration sec, distance m, coords [lat,lon])
     processed_routes = [
         RouteOptionData(
             summary=r.get("summary", "מסלול"),

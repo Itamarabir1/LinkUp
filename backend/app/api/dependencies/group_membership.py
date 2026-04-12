@@ -16,11 +16,11 @@ async def require_group_member(
     db: AsyncSession = Depends(get_db),
 ) -> UUID | None:
     """
-    Dependency לשימוש בראוטרים.
-    - אם אין group_id → מחזיר None (זרימה ציבורית רגילה)
-    - אם יש group_id אבל אין משתמש מחובר → 401
-    - אם יש group_id אבל המשתמש לא חבר → 403
-    - אם חבר → מחזיר את ה-group_id
+    Router dependency.
+    - No group_id → return None (normal public flow)
+    - group_id but no logged-in user → 401
+    - group_id but user is not a member → 403
+    - Member → return group_id
     """
     if group_id is None:
         return None
@@ -38,9 +38,9 @@ async def verify_group_membership(
     user_id: UUID,
 ) -> None:
     """
-    בדיקת חברות ישירה (לא Dependency).
-    משמשת ב־POST /rides/ שם group_id מגיע מה־body.
-    זורקת 403 אם המשתמש אינו חבר בקבוצה.
+    Direct membership check (not a FastAPI dependency).
+    Used by POST /rides/ where group_id comes from the body.
+    Raises 403 if the user is not a group member.
     """
     member = await get_membership(db, group_id, user_id)
     if not member:

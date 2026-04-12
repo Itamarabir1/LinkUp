@@ -8,7 +8,7 @@ from app.core.utils.validators import validate_future_datetime
 from app.domain.passengers.enum import PassengerStatus
 from app.domain.rides.schema import RideResponse
 
-# --- 1. סכמות בסיס ליצירת בקשה ---
+# --- 1. Base schemas: create request ---
 
 
 class Passenger(BaseModel):
@@ -59,13 +59,13 @@ class PassengerRequestResponse(BaseModel):
     status: PassengerStatus
     created_at: datetime
     booking_id: UUID | None = None
-    # מחזירים את מצב הכפתור בתשובה מהשרת
+    # Button state echoed from server
     is_notification_active: bool
 
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- הוספה חדשה: תשובה הכוללת התאמות מיידיות ---
+# --- Response including immediate matches ---
 
 
 class PassengerRequestWithMatches(PassengerRequestResponse):
@@ -77,7 +77,7 @@ class PassengerRequestWithMatches(PassengerRequestResponse):
     matching_rides: list[RideResponse] = Field(default=[], description="רשימת נהגים רלוונטיים שנמצאו מיד")
 
 
-# --- 2. סכמות לעדכון (Partial Update) ---
+# --- 2. Partial update schemas ---
 
 
 class PassengerRequestUpdateNotifications(BaseModel):
@@ -86,7 +86,7 @@ class PassengerRequestUpdateNotifications(BaseModel):
     is_notification_active: bool
 
 
-# --- 3. סכמות לחיפוש (Request Parameters) ---
+# --- 3. Search / query params ---
 
 
 class RideSearchRequest(BaseModel):

@@ -47,6 +47,6 @@ def to_geo_line(coords: list[tuple[float, float]], srid: int = 4326):
     """
     Technical utility to convert a list of points to a PostGIS LineString.
     """
-    # המרה ל-Lon/Lat עבור תקן GeoJSON/PostGIS
+    # Convert to lon/lat for GeoJSON/PostGIS
     fmt_coords = [(p[1], p[0]) for p in coords]
     return from_shape(LineString(fmt_coords), srid=srid)

@@ -7,34 +7,33 @@ from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-# ייבוא המודל והסכימות
+# Model and schemas
 from app.domain.users.model import User
 from app.domain.users.schema import UserCreate, UserUpdate
 
 
 class CRUDUser:
     """
-    מחלקה המרכזת את כל הפעולות מול מסד הנתונים עבור מודל User.
-    מימוש אסינכרוני מלא (SQLAlchemy 2.0) התואם לשיטת DDD.
+    Async CRUD for User (SQLAlchemy 2.0), DDD-style service boundary.
     """
 
     async def get_by_id(self, db: AsyncSession, id: UUID | str) -> User | None:
-        """שליפת משתמש לפי ID (UUID)"""
+        """Get user by ID (UUID)."""
         uid = UUID(str(id)) if isinstance(id, str) else id
         result = await db.execute(select(User).filter(User.user_id == uid))
         return result.scalars().first()
 
     async def get(self, db: AsyncSession, *, id: UUID | str) -> User | None:
-        """שליפת משתמש לפי ID – חתימה get(db, id=...) לשימוש ב־NotificationHandler. id יכול להיות UUID או str."""
+        """get(db, id=...) alias for NotificationHandler; id may be UUID or str."""
         return await self.get_by_id(db, id)
 
     async def get_by_email(self, db: AsyncSession, email: str) -> User | None:
-        """שליפת משתמש לפי אימייל (case-insensitive)"""
+        """Get user by email (case-insensitive)."""
         result = await db.execute(select(User).filter(func.lower(User.email) == func.lower(email)))
         return result.scalars().first()
 
     async def get_by_phone(self, db: AsyncSession, phone: str) -> User | None:
-        """שליפת משתמש לפי מספר טלפון"""
+        """Get user by phone number."""
         result = await db.execute(select(User).filter(User.phone_number == phone))
         return result.scalars().first()
 
@@ -49,9 +48,8 @@ class CRUDUser:
             is_verified=False,
         )
         db.add(db_obj)
-        # שים לב: הורדנו את ה-commit!
-        # אנחנו עושים flush כדי לקבל את ה-ID (user_id) שנוצר מה-DB
-        # מבלי לסיים את הטרנזקציה.
+        # No commit here — caller owns the transaction.
+        # flush() assigns DB-generated user_id without committing.
         await db.flush()
         await db.refresh(db_obj)
         return db_obj
@@ -64,16 +62,15 @@ class CRUDUser:
         obj_in: UserUpdate | dict[str, Any],
     ) -> User:
         """
-        עדכון דינמי וחסין.
-        משתמש ב-model_dump כדי לעדכן רק שדות שנשלחו בבקשה.
+        Partial update: only fields present in the request (model_dump exclude_unset).
         """
         if isinstance(obj_in, dict):
             update_data = obj_in
         else:
-            # exclude_unset=True מבטיח שלא נדרוס שדות שלא נשלחו ב-JSON
+            # exclude_unset=True avoids overwriting omitted JSON fields
             update_data = obj_in.model_dump(exclude_unset=True)
 
-        # שדות שאסור לעדכן דרך פונקציה כללית
+        # Fields not allowed through this generic update
         protected_fields = ["user_id", "created_at", "hashed_password"]
 
         for field, value in update_data.items():
@@ -86,8 +83,8 @@ class CRUDUser:
         return db_obj
 
     async def update_location(self, db: AsyncSession, *, user_id: UUID | str, lat: float, lon: float) -> bool:
-        """עדכון מיקום גיאוגרפי (GIS)"""
-        point_wkt = f"POINT({lon} {lat})"  # סטנדרט PostGIS: Longitude קודם
+        """Update user's last_location (PostGIS)."""
+        point_wkt = f"POINT({lon} {lat})"  # PostGIS WKT: longitude first
         user = await self.get_by_id(db, user_id)
         if user:
             user.last_location = ST_GeomFromText(point_wkt, srid=4326)
@@ -96,7 +93,7 @@ class CRUDUser:
         return False
 
     async def update_fcm_token(self, db: AsyncSession, *, user: User, token: str | None) -> User:
-        """עדכון או ניקוי ה-FCM Token של המשתמש"""
+        """Set or clear FCM token."""
         user.fcm_token = token
         db.add(user)
         await db.commit()
@@ -104,7 +101,7 @@ class CRUDUser:
         return user
 
     async def update_refresh_token(self, db: AsyncSession, *, user: User, refresh_token: str | None) -> User:
-        """עדכון או ניקוי Refresh Token (לשימוש ב-login וב-logout)."""
+        """Set or clear refresh token (login/logout)."""
         user.refresh_token = refresh_token
         db.add(user)
         await db.commit()
@@ -112,7 +109,7 @@ class CRUDUser:
         return user
 
     async def update_password(self, db: AsyncSession, *, user: User, hashed_password: str) -> User:
-        """עדכון סיסמה (מוצפנת בלבד)"""
+        """Update hashed password only."""
         user.hashed_password = hashed_password
         db.add(user)
         await db.commit()
@@ -120,7 +117,7 @@ class CRUDUser:
         return user
 
     async def mark_as_verified(self, db: AsyncSession, user: User) -> User:
-        """סימון משתמש כמאומת"""
+        """Mark user verified."""
         user.is_verified = True
         db.add(user)
         await db.commit()
@@ -128,7 +125,7 @@ class CRUDUser:
         return user
 
     async def update_last_active(self, db: AsyncSession, *, user_id: UUID | str) -> bool:
-        """עדכון זמן פעילות אחרונה (צ'אט וכו') — לא משנה last_login."""
+        """Bump last_active_at (chat, etc.); does not touch last_login."""
         user = await self.get_by_id(db, user_id)
         if not user:
             return False
@@ -138,5 +135,5 @@ class CRUDUser:
         return True
 
 
-# יצירת מופע יחיד (Singleton) שישמש את ה-Services
+# Singleton for services
 crud_user = CRUDUser()

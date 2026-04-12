@@ -10,7 +10,7 @@ class SessionExpiredError(LinkupError):
 
 
 class InvalidAccessTokenError(LinkupError):
-    """JWT לא תקף, פג תוקף, או חסר `sub` — מקביל לבדיקות ב-`get_current_user`."""
+    """JWT invalid, expired, or missing `sub` — mirrors checks in `get_current_user`."""
 
     status_code = 401
     error_code = "INVALID_TOKEN"
@@ -41,7 +41,7 @@ class InvalidCredentialsError(LinkupError):
     message = "אימייל או סיסמה שגויים"
 
     def __init__(self):
-        # לא שולחים Payload כדי לא לחשוף מידע לתוקפים
+        # No payload — avoid leaking info to attackers
         super().__init__(
             message=self.message,
             status_code=self.status_code,
@@ -55,7 +55,7 @@ class UserNotVerifiedError(LinkupError):
     message = "החשבון עדיין לא עבר אימות"
 
     def __init__(self, email: str):
-        # שולחים את המייל כדי שהמשתמש ידע לאן נשלח הקוד
+        # Include email so the user knows which address the code was sent to
         super().__init__(
             message=self.message,
             status_code=self.status_code,

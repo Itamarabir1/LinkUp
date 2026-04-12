@@ -23,10 +23,10 @@ def parse_hebrew_time(time_str: str, base_date: datetime | None = None) -> datet
     if base_date is None:
         base_date = datetime.now()
 
-    # ניקוי המחרוזת
+    # Normalize input string
     time_str = time_str.strip()
 
-    # חיפוש תאריך - "מחר", "היום", "מחרתיים"
+    # Relative date tokens (Hebrew): tomorrow, today, day after tomorrow
     days_offset = 0
     if "מחר" in time_str:
         days_offset = 1
@@ -38,7 +38,7 @@ def parse_hebrew_time(time_str: str, base_date: datetime | None = None) -> datet
         days_offset = 0
         time_str = time_str.replace("היום", "").strip()
 
-    # חיפוש יום בשבוע - "בראשון", "בשני", וכו'
+    # Weekday names (Hebrew)
     weekday_map = {
         "ראשון": 6,  # Sunday
         "שני": 0,  # Monday
@@ -51,7 +51,7 @@ def parse_hebrew_time(time_str: str, base_date: datetime | None = None) -> datet
 
     for day_name, weekday_num in weekday_map.items():
         if day_name in time_str:
-            # חישוב יום בשבוע הבא
+            # Next occurrence of that weekday
             current_weekday = base_date.weekday()
             days_until = (weekday_num - current_weekday) % 7
             if days_until == 0:
@@ -60,7 +60,7 @@ def parse_hebrew_time(time_str: str, base_date: datetime | None = None) -> datet
             time_str = re.sub(rf"ב?{day_name}\s*", "", time_str).strip()
             break
 
-    # חיפוש שעה בפורמט HH:MM או HH:MM:SS
+    # Time patterns HH:MM or HH:MM:SS
     time_match = re.search(r"(\d{1,2}):(\d{2})(?::(\d{2}))?", time_str)
     if not time_match:
         return None
@@ -69,16 +69,16 @@ def parse_hebrew_time(time_str: str, base_date: datetime | None = None) -> datet
     minute = int(time_match.group(2))
     second = int(time_match.group(3)) if time_match.group(3) else 0
 
-    # חיפוש "בוקר", "צהריים", "ערב" לתיקון שעה
+    # Hebrew time-of-day words (morning/noon/evening)
     if "בוקר" in time_str or 'אחה"צ' in time_str or "אחר הצהריים" in time_str:
-        # אם השעה קטנה מ-12, זה בבוקר/אחר הצהריים
+        # Hour < 12: treat as morning / afternoon disambiguation
         pass
     elif "ערב" in time_str or "לילה" in time_str:
-        # אם השעה קטנה מ-12, זה בערב
+        # Hour < 12: evening disambiguation
         if hour < 12:
             hour += 12
 
-    # חישוב התאריך הסופי
+    # Final combined datetime
     target_date = base_date + timedelta(days=days_offset)
     target_datetime = target_date.replace(hour=hour, minute=minute, second=second, microsecond=0)
 

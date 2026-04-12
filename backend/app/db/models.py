@@ -1,7 +1,7 @@
 # app/db/models.py
-# הקובץ הזה לא מכיל לוגיקה; הוא רושם את מודלי הדומיין שנדרשים לטעינת ה-API וה-relationships.
-# אין כאן כוונה לייצא "כל מודל אפשרי" בריפו (למשל מודלי תשתית פנימיים).
-# חייב להיות מיובא לפני ש-SQLAlchemy פותר relationship מחרוזות (למשל ב-User.owned_groups)
+# No logic here — registers domain models needed for API loading and relationships.
+# Not intended to export every possible model in the repo (e.g. internal infra models).
+# Must be imported before SQLAlchemy resolves string-based relationships (e.g. User.owned_groups).
 
 from app.domain.bookings.model import Booking
 from app.domain.groups.model import Group, GroupMember

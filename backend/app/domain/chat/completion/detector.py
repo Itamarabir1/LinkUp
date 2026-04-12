@@ -1,8 +1,8 @@
 """
-זיהוי הודעות סיום שיחה - keywords בעברית.
+Detect conversation-end messages using Hebrew keyword list (product data, not comments).
 """
 
-# רשימת keywords שמעידים על סיום שיחה
+# Keywords that indicate the user ended the conversation (Hebrew UI copy)
 COMPLETION_KEYWORDS: list[str] = [
     "תודה",
     "תודה רבה",
@@ -26,23 +26,23 @@ COMPLETION_KEYWORDS: list[str] = [
 
 def is_conversation_completion_message(message_body: str) -> bool:
     """
-    בודק אם הודעה היא הודעת סיום שיחה.
+    Return True if the message body contains a completion keyword (substring match).
 
     Args:
-        message_body: תוכן ההודעה
+        message_body: Raw message text
 
     Returns:
-        True אם ההודעה מכילה keyword שמעיד על סיום
+        True if a completion keyword appears in the message
     """
     if not message_body:
         return False
 
-    # ניקוי והמרה לאותיות קטנות
+    # Normalize and lowercase
     message_lower = message_body.strip().lower()
 
-    # בדיקה אם אחד מה-keywords מופיע בהודעה (חלקי או מלא)
+    # Substring match against each keyword
     for keyword in COMPLETION_KEYWORDS:
-        # בדיקה case-insensitive + חלקי (למשל "תודה רבה" יעבור גם אם כתוב "תודה רבה לך")
+        # Case-insensitive partial match (e.g. keyword matches longer sentence)
         if keyword.lower() in message_lower:
             return True
 

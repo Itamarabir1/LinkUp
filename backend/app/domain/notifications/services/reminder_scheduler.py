@@ -1,12 +1,12 @@
 """
-reminder_scheduler.py — שולח תזכורות לפי scheduled_notifications.
+reminder_scheduler.py — sends reminders based on scheduled_notifications.
 
-שינוי מהותי לעומת הגרסה הקודמת:
-  לפני: סרק את כל טבלת rides ו-bookings עם חלון זמן — O(n) על כל הנסיעות.
-  עכשיו: סורק scheduled_notifications WHERE sent_at IS NULL AND deliver_at <= now
-          — O(k) על מספר התזכורות הממתינות בלבד, בזכות partial index.
+Compared to the previous version:
+  Before: scanned all rides and bookings with a time window — O(n) over all rides.
+  Now: scans scheduled_notifications WHERE sent_at IS NULL AND deliver_at <= now
+       — O(k) over pending reminders only, thanks to a partial index.
 
-reminder_sent flag הוסר מ-Ride ו-Booking (migration 008).
+reminder_sent was removed from Ride and Booking (migration 008).
 """
 
 import logging
@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 class ReminderScheduler:
     async def run_batch_reminders(self, db: AsyncSession) -> None:
         """
-        מריץ batch של תזכורות שעבר זמנן.
-        מגבלת batch (BATCH_SIZE_DEFAULT) מגנה מפני עומס — אם יש יותר, הריצה הבאה תטפל בשאר.
+        Runs a batch of reminders that are due.
+        Batch limit (BATCH_SIZE_DEFAULT) avoids overload — if there are more, the next run handles the rest.
         """
         now = datetime.now(UTC)
         due = await crud_scheduled_notification.get_due(db, now, limit=BATCH_SIZE_DEFAULT)
@@ -71,7 +71,7 @@ class ReminderScheduler:
                     e,
                     exc_info=True,
                 )
-                # ממשיכים לתזכורת הבאה — כישלון אחד לא עוצר את ה-batch
+                # Continue to the next reminder — one failure does not stop the batch
 
         await self._safe_commit(db)
 

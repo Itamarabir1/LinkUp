@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class NotificationOrchestrator:
     async def notify_ride_cancelled(self, ride: Ride):
-        # לוגיקה עסקית: בודקים למי באמת מגיע לקבל נוטיפיקציה
+        # Business filter: who should actually be notified
         active_bookings = [b for b in ride.bookings if b.status != "cancelled"]
 
         if not active_bookings:
@@ -18,13 +18,12 @@ class NotificationOrchestrator:
             return
 
         try:
-            # שים לב: אנחנו שולחים את שם האירוע בדיוק כפי שה-Handler מצפה לקבל
+            # Event name must match handler registry strings
             await dispatch(
                 event_name="ride.cancelled",  # תואם ל-NotificationEvent.RIDE_CANCELLED
                 payload={
                     "ride_id": ride.id,
-                    # ה-Handler שלנו יודע לעשות Hydration לפי ride_id
-                    # ה-Resolver ידע לשלוף את ה-Passengers מה-Ride
+                    # Handler hydrates from ride_id; resolver loads passengers
                 },
             )
         except Exception as e:

@@ -5,7 +5,7 @@ import { getAnalyticsSafe } from './config/firebase'
 
 getAnalyticsSafe()
 
-// TODO: Sentry — להסיר הערה כשעוברים לפרודקשן ומוסיפים VITE_SENTRY_DSN ל-.env
+// TODO: Sentry — remove when adding VITE_SENTRY_DSN in production .env
 // import * as Sentry from "@sentry/react";
 // if (import.meta.env.PROD && import.meta.env.VITE_SENTRY_DSN) {
 //   Sentry.init({

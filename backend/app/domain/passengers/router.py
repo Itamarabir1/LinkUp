@@ -35,7 +35,7 @@ router = APIRouter(prefix="/passengers", tags=["Passenger"])
 passenger_rides_router = APIRouter(prefix="/rides", tags=["Passenger"])
 
 
-# 0. הבקשות שלי (כנוסע)
+# 0. My requests (passenger)
 @router.get("/me", response_model=list[PassengerRequestResponse])
 async def get_my_requests(
     db: AsyncSession = Depends(get_db),
@@ -49,7 +49,7 @@ async def get_my_requests(
     return await PassengerService.get_my_requests(db, current_user.user_id, status=request_status)
 
 
-# 1. רישום בקשה רשמית (הסוכן החכם)
+# 1. Create official request (smart flow)
 @router.post(
     "/",
     response_model=PassengerRequestWithMatches,
@@ -88,7 +88,7 @@ async def get_ride_driver_info(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-# --- בקשת הצטרפות מתוך חיפוש ---
+# --- Join request from search ---
 @router.post(
     "/request-ride-from-search",
     response_model=BookingResponse,
@@ -146,7 +146,7 @@ async def request_ride_from_search(
         raise HTTPException(status_code=500, detail=detail)
 
 
-# 3. חיפוש חופשי (אם המשתמש מחובר, נשמרת בקשה ב-DB)
+# 3. Free search (persisted when authenticated)
 @router.get(
     "/search-rides",
     response_model=RideSearchResponse,
@@ -183,7 +183,7 @@ async def search_available_rides(
         raise HTTPException(status_code=500, detail=f"שגיאה בחיפוש נסיעות: {e!s}")
 
 
-# 4. ביטול בקשה
+# 4. Cancel request
 @router.delete("/{request_id}/cancel", summary="ביטול בקשת נסיעה ושחרור שריונים")
 async def cancel_request(
     request_id: UUID,
@@ -199,7 +199,7 @@ async def cancel_request(
         raise HTTPException(status_code=403, detail=str(e))
 
 
-# 5. מציאת התאמות לבקשה קיימת
+# 5. Refresh matches for existing request
 @router.get(
     "/{request_id}/matches",
     response_model=list[RideResponse],

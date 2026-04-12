@@ -3,7 +3,7 @@ from typing import Any
 
 
 class LinkupError(Exception):
-    """בסיס לכל שגיאות הדומיין – מאפשר handler מרכזי ומעקב (trace_id)."""
+    """Base for all domain errors — enables a central handler and trace_id."""
 
     message: str = "שגיאת מערכת"
     status_code: int = 400
@@ -17,7 +17,7 @@ class LinkupError(Exception):
         payload: dict[str, Any] | None = None,
         **kwargs,
     ):
-        # תאימות לאחור: detail נחשב כ-message
+        # Backward compatibility: detail is treated as message
         if kwargs.get("detail") is not None and message is None:
             message = kwargs["detail"] if isinstance(kwargs["detail"], str) else str(kwargs["detail"])
         self.message = message or getattr(self, "message", "שגיאת מערכת")

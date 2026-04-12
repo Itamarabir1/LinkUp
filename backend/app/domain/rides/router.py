@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# --- Routes רגילים (HTTP) ---
+# --- HTTP routes ---
 @router.post("/preview-routes", response_model=RidePreviewResponse)
 async def preview_ride_options(
     preview_in: RidePreviewCreate,
@@ -131,7 +131,7 @@ async def read_ride(
     return ride
 
 
-# --- הצינור החי (WebSocket) ---
+# --- WebSocket ---
 
 
 @router.websocket("/ws/{ride_id}")
