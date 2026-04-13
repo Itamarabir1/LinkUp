@@ -20,12 +20,15 @@
 }
 
 .header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: 0 1.25rem;
+  height: 64px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
 }
 
 .title {
@@ -33,27 +36,44 @@
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  grid-column: 2;
+}
+
+.title::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+  animation: livePulse 2s infinite;
 }
 
 .close {
   width: 36px;
   height: 36px;
-  border: none;
-  background: var(--surface);
-  color: var(--text-primary);
-  font-size: 1.5rem;
-  line-height: 1;
+  border: 1.5px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
   border-radius: var(--radius-md);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: background 0.2s;
+  transition: all 180ms ease;
 }
 
 .close:hover {
-  background: var(--border);
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger-text);
 }
 
 .mapContainer {
@@ -64,12 +84,20 @@
 }
 
 .statusBar {
-  padding: 0.5rem 1rem;
-  font-size: 0.85rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.8125rem;
   color: var(--text-secondary);
   border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+  text-align: center;
 }
 
 .statusBarError {
   color: var(--danger-text);
+  background: var(--danger-bg);
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }

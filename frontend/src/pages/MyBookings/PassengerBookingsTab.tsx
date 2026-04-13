@@ -40,8 +40,16 @@ export default function PassengerBookingsTab({
     (item) => item.bookingStatus === 'cancelled' || item.bookingStatus === 'completed'
   );
 
-  const renderItem = ({ ride, bookingId, bookingStatus, driverName }: PassengerBookingItem) => (
-    <div key={bookingId} className={styles.bookingCard}>
+  const renderItem = ({ ride, bookingId, bookingStatus, driverName }: PassengerBookingItem) => {
+    const cardClass = [
+      styles.bookingCard,
+      bookingStatus === 'pending_approval' ? styles.bookingCardPending :
+      bookingStatus === 'confirmed' ? styles.bookingCardConfirmed :
+      styles.bookingCardCancelled
+    ].join(' ');
+
+    return (
+    <div key={bookingId} className={cardClass}>
       <div className={styles.cardRoute}>
         {ride.origin_name ?? '?'} ← {ride.destination_name ?? '?'}
       </div>
@@ -120,7 +128,8 @@ export default function PassengerBookingsTab({
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <div className={styles.cardList}>

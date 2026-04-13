@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import { useLocationBroadcast } from '../../hooks/useLocationBroadcast';
 import { usePassengerLocations } from '../../hooks/usePassengerLocations';
 import { useGoogleMapInstance } from '../../hooks/useGoogleMapInstance';
@@ -7,8 +8,8 @@ import { useMapMarker } from '../../hooks/useMapMarker';
 import ErrorBanner from '../ErrorBanner';
 import styles from './LiveRideMapModal.module.css';
 
-const DRIVER_MARKER_BLUE = '#1d6fe8';
-const PASSENGER_MARKER_GREEN = '#059669';
+const DRIVER_COLOR = '#1a1a2e';
+const PASSENGER_COLOR = '#4F46E5';
 
 type LiveRideMapModalProps = {
   rideId: string;
@@ -25,7 +26,7 @@ export default function LiveRideMapModal({
   broadcastToServer = true,
 }: LiveRideMapModalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const passengerMarkersRef = useRef<google.maps.Marker[]>([]);
+  const passengerMarkersRef = useRef<any[]>([]);
   const { resolvedKey, loadError: keyError } = useGoogleMapsKey();
   const { map, loadError: mapError } = useGoogleMapInstance(containerRef, resolvedKey);
   const loadError = keyError || mapError;
@@ -59,27 +60,29 @@ export default function LiveRideMapModal({
     return () => navigator.geolocation.clearWatch(watchId);
   }, [map]);
 
-  useMapMarker(map, myPosition, { title: 'המיקום שלי (נהג)', color: DRIVER_MARKER_BLUE, scale: 12, strokeWeight: 3 });
+  useMapMarker(map, myPosition, { title: 'המיקום שלי (נהג)', color: DRIVER_COLOR, isDriver: true });
 
   useEffect(() => {
-    if (!map || !window.google?.maps) return;
+    const markerApi = (window.google?.maps as any)?.marker;
+    if (!map || !markerApi?.AdvancedMarkerElement) return;
 
-    const passIcon: google.maps.Symbol = {
-      path: google.maps.SymbolPath.CIRCLE,
-      scale: 10,
-      fillColor: PASSENGER_MARKER_GREEN,
-      fillOpacity: 1,
-      strokeColor: '#ffffff',
-      strokeWeight: 2,
-    };
-
-    passengerMarkersRef.current.forEach((m) => m.setMap(null));
+    passengerMarkersRef.current.forEach((m) => m.map = null);
     passengerMarkersRef.current = passengerLocations.map((loc) => {
-      return new google.maps.Marker({
+      const el = document.createElement('div');
+      el.style.cssText = `
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: ${PASSENGER_COLOR};
+      border: 3px solid white;
+      box-shadow: 0 2px 8px rgba(79,70,229,0.4);
+      animation: markerPulse 2s infinite;
+    `;
+      return new markerApi.AdvancedMarkerElement({
         position: { lat: loc.lat, lng: loc.lng },
         map,
         title: 'נוסע',
-        icon: passIcon,
+        content: el,
       });
     });
 
@@ -89,7 +92,7 @@ export default function LiveRideMapModal({
       hasInitialPosition.current = true;
     }
     return () => {
-      passengerMarkersRef.current.forEach((m) => m.setMap(null));
+      passengerMarkersRef.current.forEach((m) => m.map = null);
       passengerMarkersRef.current = [];
     };
   }, [map, passengerLocations]);
@@ -104,10 +107,11 @@ export default function LiveRideMapModal({
     <div className={styles.backdrop} role="dialog" aria-modal="true" aria-label="מפה חיה - נסיעה פעילה">
       <div className={styles.modal}>
         <div className={styles.header}>
-          <h2 className={styles.title}>מפה חיה</h2>
           <button type="button" className={styles.close} onClick={onClose} aria-label="סגור">
-            ×
+            <X size={16} strokeWidth={2.5} />
           </button>
+          <h2 className={styles.title}>מפה חיה</h2>
+          <div />
         </div>
         {resolvedKey === null && !loadError && <p className={styles.statusBar}>טוען מפתח מפה...</p>}
         {loadError ? (

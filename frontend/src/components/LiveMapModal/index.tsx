@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import { useDriverLocation } from '../../hooks/useDriverLocation';
 import { useGoogleMapInstance } from '../../hooks/useGoogleMapInstance';
 import { useGoogleMapsKey } from '../../hooks/useGoogleMapsKey';
@@ -6,8 +7,8 @@ import { useMapMarker } from '../../hooks/useMapMarker';
 import ErrorBanner from '../ErrorBanner';
 import styles from './LiveMapModal.module.css';
 
-const DRIVER_BLUE = '#1d6fe8';
-const PASSENGER_GREEN = '#059669';
+const DRIVER_COLOR = '#1a1a2e';
+const PASSENGER_COLOR = '#4F46E5';
 
 type LiveMapModalProps = {
   bookingId: string;
@@ -43,11 +44,11 @@ export default function LiveMapModal({ bookingId, onClose }: LiveMapModalProps) 
     return () => navigator.geolocation.clearWatch(watchId);
   }, [map]);
 
-  useMapMarker(map, myPosition, { title: 'המיקום שלי', color: PASSENGER_GREEN, scale: 12, strokeWeight: 3 });
+  useMapMarker(map, myPosition, { title: 'המיקום שלי', color: PASSENGER_COLOR, isDriver: false });
   useMapMarker(
     map,
     driverPosition ? { lat: driverPosition.lat, lng: driverPosition.lng } : null,
-    { title: 'מיקום הנהג', color: DRIVER_BLUE, scale: 12, strokeWeight: 3 }
+    { title: 'מיקום הנהג', color: DRIVER_COLOR, isDriver: true }
   );
 
   const statusMsg = driverError
@@ -62,10 +63,11 @@ export default function LiveMapModal({ bookingId, onClose }: LiveMapModalProps) 
     <div className={styles.backdrop} role="dialog" aria-modal="true" aria-label="עקוב אחר הנהג">
       <div className={styles.modal}>
         <div className={styles.header}>
-          <h2 className={styles.title}>עקוב אחר הנהג</h2>
           <button type="button" className={styles.close} onClick={onClose} aria-label="סגור">
-            ×
+            <X size={15} strokeWidth={2.5} />
           </button>
+          <h2 className={styles.title}>עקוב אחר הנהג</h2>
+          <div />
         </div>
         {resolvedKey === null && !loadError && <p className={styles.statusBar}>טוען מפתח מפה...</p>}
         {loadError ? (

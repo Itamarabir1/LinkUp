@@ -46,6 +46,7 @@ export function useGoogleMapInstance(
     const m = new google.maps.Map(el, {
       center: DEFAULT_CENTER,
       zoom: 10,
+      mapId: import.meta.env.VITE_GOOGLE_MAPS_MAP_ID ?? 'linkup_map',
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: true,
