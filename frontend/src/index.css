@@ -1,6 +1,44 @@
 @import './styles/tokens.css';
 @import './styles/react-datepicker-overrides.css';
 
+/* Premium global polish */
+button {
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: 0.9375rem;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--focus-ring-primary);
+}
+
+/* Smooth page transitions */
+.main > * {
+  animation: fadeUp 220ms ease both;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -44,16 +82,6 @@ a {
 
 a:hover {
   text-decoration: underline;
-}
-
-button {
-  font-family: inherit;
-  cursor: pointer;
-}
-
-input,
-button {
-  font-size: 1rem;
 }
 
 /* Focus visible for accessibility */

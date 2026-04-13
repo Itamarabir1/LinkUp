@@ -21,7 +21,7 @@ export function useSearchRides() {
   const { groupId } = useParams<{ groupId?: string }>();
   const [pickup, setPickup] = useState('');
   const [destination, setDestination] = useState('');
-  const [searchRadius, setSearchRadius] = useState(1000);
+  const [searchRadius, setSearchRadius] = useState(1);
   const [selectedDate, setSelectedDate] = useState<Date>(defaultDepartureDate);
   const [results, setResults] = useState<Ride[]>([]);
   const [resultsNextCursor, setResultsNextCursor] = useState<string | null>(null);

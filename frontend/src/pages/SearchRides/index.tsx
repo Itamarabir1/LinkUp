@@ -18,7 +18,7 @@ export default function SearchRides() {
     <div className={styles.page}>
       <h1 className={styles.pageTitle}>חפש טרמפ</h1>
       <p className={styles.pageMeta}>
-        מוצא, יעד, רדיוס חיפוש (מטרים) וזמן יציאה אופציונלי – כמו בבקאנד.
+        מוצא, יעד, רדיוס חיפוש (בק"מ) וזמן יציאה אופציונלי – כמו בבקאנד.
       </p>
       {activeGroupName ? (
         <div className={styles.groupBanner}>

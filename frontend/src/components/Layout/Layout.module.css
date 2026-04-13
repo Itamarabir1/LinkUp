@@ -6,15 +6,19 @@
 }
 
 .nav {
-  height: 56px;
+  height: 64px;
   flex-shrink: 0;
   background: var(--bg-card);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 32px;
   gap: 1rem;
+  box-shadow: 0 1px 0 var(--border), 0 2px 8px rgba(0, 0, 0, 0.04);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 .navTabs {
@@ -24,8 +28,8 @@
 }
 
 .navLink {
-  padding: 0 1rem;
-  height: 56px;
+  padding: 0 1.1rem;
+  height: 64px;
   display: inline-flex;
   align-items: center;
   text-decoration: none;
@@ -34,11 +38,13 @@
   font-size: 14px;
   font-weight: 500;
   border-bottom: 2px solid transparent;
-  transition: color 150ms ease, border-color 150ms ease;
+  transition: color 180ms ease, border-color 180ms ease;
+  letter-spacing: 0.01em;
 }
 
 .navLink:hover {
   color: var(--text-primary);
+  text-decoration: none;
 }
 
 .navLinkActive {
@@ -54,20 +60,23 @@
 }
 
 .iconBtn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--bg-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-primary);
-  transition: background 150ms ease;
+  color: var(--text-secondary);
+  transition: all 180ms ease;
 }
 
 .iconBtn:hover {
-  background: var(--border);
+  background: var(--bg-card);
+  border-color: var(--primary-soft-border);
+  color: var(--primary);
+  box-shadow: 0 0 0 3px var(--focus-ring-primary);
 }
 
 .iconBtnWrapper {
@@ -79,40 +88,40 @@
   color: inherit;
 }
 
-/* Badge: מספר שיחות/התראות שלא נקראו — 18px, פינה עליונה שמאלית (RTL) */
 .badge {
   position: absolute;
-  top: -6px;
-  left: -6px;
+  top: -5px;
+  left: -5px;
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
   border-radius: 50%;
-  background: var(--unread-dot, #ef4444);
+  background: var(--unread-dot);
   color: white;
   font-family: "Heebo", sans-serif;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
+  box-shadow: 0 0 0 2px var(--bg-card);
 }
 
 .navDivider {
   width: 1px;
-  height: 20px;
+  height: 24px;
   background: var(--border);
-  margin: 0 4px;
+  margin: 0 6px;
 }
 
 .btnSearch {
-  height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--primary);
-  background: var(--bg-card);
-  color: var(--primary);
-  border-radius: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
   font-family: "Heebo", sans-serif;
   font-size: 13px;
   font-weight: 500;
@@ -120,21 +129,23 @@
   align-items: center;
   gap: 6px;
   text-decoration: none;
-  transition: background 150ms ease;
+  transition: all 180ms ease;
 }
 
 .btnSearch:hover {
-  background: var(--primary-light);
+  border-color: var(--primary-soft-border);
   color: var(--primary);
+  background: var(--primary-light);
+  text-decoration: none;
 }
 
 .btnCreateRide {
-  height: 36px;
-  padding: 0 16px;
+  height: 38px;
+  padding: 0 18px;
   border: none;
   background: var(--primary);
   color: white;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-family: "Heebo", sans-serif;
   font-size: 13px;
   font-weight: 600;
@@ -142,12 +153,17 @@
   align-items: center;
   gap: 6px;
   text-decoration: none;
-  transition: background 150ms ease;
+  transition: all 180ms ease;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+  letter-spacing: 0.01em;
 }
 
 .btnCreateRide:hover {
   background: var(--primary-hover);
   color: white;
+  text-decoration: none;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+  transform: translateY(-1px);
 }
 
 .profileWrap {
@@ -156,22 +172,22 @@
 
 .profileDropdown {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 8px);
   right: 0;
-  margin-top: 4px;
-  min-width: 180px;
+  min-width: 200px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-dropdown);
   z-index: 50;
-  padding: 4px 0;
+  padding: 6px;
+  overflow: hidden;
 }
 
 .profileDropdownItem {
   display: block;
   width: 100%;
-  padding: 10px 16px;
+  padding: 10px 14px;
   text-align: right;
   border: none;
   background: none;
@@ -180,6 +196,8 @@
   color: var(--text-primary);
   cursor: pointer;
   text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: background 150ms ease;
 }
 
 .profileDropdownItem:hover {

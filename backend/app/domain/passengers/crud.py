@@ -91,7 +91,7 @@ class CRUDPassenger:
             pickup_name=request.pickup_name,
             destination_name=request.destination_name,
             requested_departure_time=req_time,
-            search_radius_meters=request.search_radius,
+            search_radius_meters=int(round(float(request.search_radius) * 1000)),
             is_auto_generated=request.is_auto_generated,
             is_notification_active=request.is_notification_active,
             pickup_geom=func.ST_SetSRID(func.ST_MakePoint(p_lon, p_lat), 4326),

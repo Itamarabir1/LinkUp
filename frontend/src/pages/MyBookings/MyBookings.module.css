@@ -1,6 +1,6 @@
 .page {
-  padding: 20px 24px;
-  max-width: 800px;
+  padding: 32px 24px;
+  max-width: 860px;
   margin: 0 auto;
   text-align: right;
 }
@@ -8,14 +8,14 @@
 .pageTabs {
   display: flex;
   gap: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
   border-bottom: 1px solid var(--border);
 }
 
 .tab,
 .tabActive {
   height: 44px;
-  padding: 0 1rem;
+  padding: 0 1.1rem;
   border: none;
   border-bottom: 2px solid transparent;
   background: transparent;
@@ -25,6 +25,7 @@
   font-weight: 500;
   cursor: pointer;
   margin-bottom: -1px;
+  transition: color 180ms ease;
 }
 
 .tab:hover {
@@ -46,7 +47,7 @@
 .emptyText {
   text-align: center;
   color: var(--text-secondary);
-  padding: 2rem;
+  padding: 3rem;
 }
 
 .cardList {
@@ -57,26 +58,35 @@
 
 .bookingCard {
   background: var(--bg-card);
-  padding: 1rem 1.25rem;
-  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+
+.bookingCard:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
 }
 
 .cardRoute {
-  font-weight: 600;
-  font-size: 1rem;
+  font-weight: 700;
+  font-size: 1.05rem;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 .cardMeta {
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   color: var(--text-secondary);
-  margin-top: 0.25rem;
+  margin-top: 0.35rem;
+  line-height: 1.6;
 }
 
 .bookingCardActions {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
   border-top: 1px solid var(--border);
   display: flex;
   flex-wrap: wrap;
@@ -96,31 +106,34 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 40px;
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-size: 14px;
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
   font-weight: 500;
   font-family: "Heebo", sans-serif;
-  background: var(--bg-card);
+  background: var(--bg-secondary);
   color: var(--text-primary);
   border: 1px solid var(--border);
   cursor: pointer;
-  transition: background 150ms, border-color 150ms, color 150ms;
+  transition: all 180ms ease;
 }
 
 .btnOutline:hover:not(:disabled) {
-  background: var(--bg-secondary);
+  background: var(--bg-card);
+  border-color: var(--primary-soft-border);
+  color: var(--primary);
 }
 
 .btnOutline:disabled {
-  opacity: 0.65;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .btnAccentBlue {
-  border-color: var(--primary);
+  border-color: var(--primary-soft-border);
   color: var(--primary);
+  background: var(--primary-light);
 }
 
 .btnAccentBlue:hover:not(:disabled) {
@@ -139,7 +152,7 @@
 }
 
 .btnAccentGreen {
-  border-color: var(--success-text);
+  border-color: var(--success-border);
   color: var(--success-text);
   background: var(--success-bg);
 }
@@ -149,25 +162,32 @@
 }
 
 .btnDangerOutline {
-  border-color: var(--unread-dot);
-  color: var(--unread-dot);
-}
-
-.btnDangerOutline:hover:not(:disabled) {
+  border-color: var(--danger-border);
+  color: var(--danger-text);
   background: var(--danger-bg);
 }
 
-/* Driver block */
+.btnDangerOutline:hover:not(:disabled) {
+  background: var(--danger-border);
+}
+
 .driverBlock {
   background: var(--bg-card);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
+  transition: box-shadow 200ms ease;
+}
+
+.driverBlock:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .driverBlockHeader {
-  padding: 1rem 1.25rem;
+  padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
 }
 
 .driverBlockCounts {
@@ -178,32 +198,35 @@
 
 .groupTag {
   font-size: 11px;
-  color: var(--text-secondary);
-  background: var(--surface);
-  padding: 2px 8px;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-light);
+  padding: 3px 10px;
   border-radius: 999px;
+  border: 1px solid var(--primary-soft-border);
 }
 
 .groupTagPublic {
   font-size: 11px;
   color: var(--text-tertiary);
-  background: transparent;
-  padding: 2px 8px;
+  background: var(--neutral-bg);
+  padding: 3px 10px;
+  border-radius: 999px;
 }
 
 .cardTagWrap,
 .driverBlockTagWrap {
-  margin-top: 0.5rem;
+  margin-top: 0.6rem;
 }
 
 .driverBlockActions {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
+  padding: 1rem 1.5rem;
   border-top: 1px solid var(--border);
   flex-wrap: wrap;
+  background: var(--bg-secondary);
 }
 
 .countSep {
@@ -220,26 +243,32 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 1.25rem;
+  padding: 0.875rem 1.5rem;
   border-bottom: 1px solid var(--border);
+  transition: background 150ms ease;
 }
 
 .passengerRow:last-child {
   border-bottom: none;
 }
 
+.passengerRow:hover {
+  background: var(--bg-secondary);
+}
+
 .passengerAvatar {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-inverse);
-  font-weight: 600;
-  font-size: 1rem;
+  font-weight: 700;
+  font-size: 0.95rem;
   flex-shrink: 0;
-  background-color: var(--avatar-bg, #64748b);
+  background-color: var(--avatar-bg, #4F46E5);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
 }
 
 .passengerInfo {
@@ -248,8 +277,9 @@
 }
 
 .passengerName {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
+  font-size: 0.9375rem;
 }
 
 .passengerMeta {
@@ -268,10 +298,17 @@
 .statusConfirmed {
   font-size: 13px;
   color: var(--success-text);
-  font-weight: 500;
+  font-weight: 600;
+  background: var(--success-bg);
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--success-border);
 }
 
 .statusRejected {
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
+  background: var(--neutral-bg);
+  padding: 3px 10px;
+  border-radius: 999px;
 }

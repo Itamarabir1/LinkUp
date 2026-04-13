@@ -4,12 +4,14 @@
   border-radius: var(--radius-lg);
   padding: 16px;
   cursor: pointer;
-  transition: box-shadow 200ms ease, border-color 200ms ease;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 200ms ease, transform 200ms ease, border-color 200ms ease;
 }
 
 .card:hover {
   box-shadow: var(--shadow-card-hover);
-  border-color: var(--input-border);
+  border-color: var(--primary-soft-border);
+  transform: translateY(-2px);
 }
 
 .route {

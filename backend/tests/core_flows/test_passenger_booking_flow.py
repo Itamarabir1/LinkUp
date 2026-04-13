@@ -55,7 +55,7 @@ async def test_flow_create_request_join_approve_reject(db_session: AsyncSession)
             num_passengers=1,
             pickup_name="Tel Aviv, Israel",
             destination_name="Jerusalem, Israel",
-            search_radius=5000,
+            search_radius=5.0,
             is_notification_active=True,
         )
         created = await PassengerService.create_passenger_request(db=db_session, request_in=req_in, passenger_id=passenger1.user_id)
@@ -93,7 +93,7 @@ async def test_flow_create_request_join_approve_reject(db_session: AsyncSession)
             num_passengers=1,
             pickup_name="Tel Aviv, Israel",
             destination_name="Jerusalem, Israel",
-            search_radius=5000,
+            search_radius=5.0,
             is_notification_active=True,
         )
         created2 = await PassengerService.create_passenger_request(db=db_session, request_in=req2_in, passenger_id=passenger2.user_id)

@@ -88,7 +88,7 @@ async def test_request_then_join_cross_request_regression_guard(
                 "pickup_name": "Tel Aviv, Israel",
                 "destination_name": "Jerusalem, Israel",
                 "requested_departure_time": "2032-01-01T10:00:00Z",
-                "search_radius": 5000,
+                "search_radius": 5.0,
                 "is_notification_active": True,
                 "pickup_lat": 32.0853,
                 "pickup_lon": 34.7818,

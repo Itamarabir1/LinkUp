@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { useGroup } from '../context/GroupContext';
 import { useMyRequests } from './useMyRequests';
 import type { ChipItem } from '../components/Chips/Chips';
@@ -89,7 +89,7 @@ export default function MyRequests() {
                   aria-label="הסר בקשת טרמפ"
                   title="הסר בקשה"
                 >
-                  ×
+                  <X size={14} strokeWidth={2.5} />
                 </button>
                 <RideCard
                   route={`${r.pickup_name ?? '?'} ← ${r.destination_name ?? '?'}`}

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { he } from 'date-fns/locale';
-import { ArrowUpDown } from 'lucide-react';
+import { MapPin, ArrowUpDown } from 'lucide-react';
 import ErrorBanner from '../../components/ErrorBanner';
 import styles from './SearchRides.module.css';
 
@@ -53,21 +53,38 @@ export function SearchRidesForm({
           ) : null}
         </ErrorBanner>
       ) : null}
-      <div className={styles.formRowWithBtn}>
+      <div style={{ position: 'relative' }}>
         <input
           type="text"
           placeholder="מוצא (כתובת איסוף)"
           value={pickup}
           onChange={(e) => setPickup(e.target.value)}
           className={styles.formInput}
+          style={{ paddingLeft: '2.5rem' }}
         />
         <button
           type="button"
-          className={`${styles.btn} ${styles.btnOutline}`}
           onClick={onFillLocation}
           disabled={locationLoading}
+          title="מיקום עצמי"
+          style={{
+            position: 'absolute',
+            left: '0.75rem',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--primary)',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+          }}
         >
-          {locationLoading ? '...' : 'מיקום עצמי'}
+          {locationLoading
+            ? <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>...</span>
+            : <MapPin size={18} strokeWidth={2} />
+          }
         </button>
       </div>
       <div className={styles.swapWrap}>
@@ -88,12 +105,14 @@ export function SearchRidesForm({
         onChange={(e) => setDestination(e.target.value)}
         className={styles.formInput}
       />
-      <label className={styles.formLabel}>רדיוס חיפוש (מטרים)</label>
+      <label className={styles.formLabel}>רדיוס חיפוש (ק"מ)</label>
       <input
         type="number"
-        min={100}
+        min={0.1}
+        max={50}
+        step={0.1}
         value={searchRadius}
-        onChange={(e) => setSearchRadius(parseInt(e.target.value, 10) || 1000)}
+        onChange={(e) => setSearchRadius(parseFloat(e.target.value) || 1)}
         className={styles.formInput}
       />
       <label className={styles.formLabel}>תאריך ושעת יציאה</label>

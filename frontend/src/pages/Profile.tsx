@@ -94,22 +94,24 @@ export default function Profile() {
             </div>
           </div>
 
-      <div className={styles.profileRow}>
-            <span className={styles.profileLabel}>שם</span>
-            <span className={styles.profileValue}>
-              {user.full_name || user.first_name || user.email}
-            </span>
-          </div>
-          <div className={styles.profileRow}>
-            <span className={styles.profileLabel}>אימייל</span>
-            <span className={styles.profileValue}>{user.email}</span>
-          </div>
-          {user.phone_number && (
+          <div className={styles.profileBody}>
             <div className={styles.profileRow}>
-              <span className={styles.profileLabel}>טלפון</span>
-              <span className={styles.profileValue}>{user.phone_number}</span>
+              <span className={styles.profileLabel}>שם</span>
+              <span className={styles.profileValue}>
+                {user.full_name || user.first_name || user.email}
+              </span>
             </div>
-          )}
+            <div className={styles.profileRow}>
+              <span className={styles.profileLabel}>אימייל</span>
+              <span className={styles.profileValue}>{user.email}</span>
+            </div>
+            {user.phone_number && (
+              <div className={styles.profileRow}>
+                <span className={styles.profileLabel}>טלפון</span>
+                <span className={styles.profileValue}>{user.phone_number}</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

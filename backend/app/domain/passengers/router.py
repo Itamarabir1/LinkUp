@@ -155,7 +155,7 @@ async def request_ride_from_search(
 async def search_available_rides(
     pickup_name: str,
     destination_name: str,
-    search_radius: int = Query(1000, ge=100, description="רדיוס חיפוש במטרים (אחיד עם יצירת בקשה)"),
+    search_radius: float = Query(1.0, ge=0.1, le=50, description="רדיוס חיפוש בקילומטרים (אחיד עם יצירת בקשה)"),
     departure_time: datetime | None = Query(None, description="אם ריק – יחפש מעכשיו"),
     limit: int = Query(20, ge=1, le=50, description="כמות תוצאות"),
     after: UUID | None = Query(None, description="cursor: ride_id להמשך"),

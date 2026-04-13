@@ -22,7 +22,7 @@ class Passenger(BaseModel):
         None,
         description="אופציונלי – אם ריק יחפש 'מעכשיו'",
     )
-    search_radius: int = Field(default=1000, ge=100, description="רדיוס חיפוש במטרים (אחיד עם חיפוש)")
+    search_radius: float = Field(default=1.0, ge=0.1, le=50, description="רדיוס חיפוש בקילומטרים (אחיד עם חיפוש)")
     is_notification_active: bool = Field(default=True, description="התראות מייל ופוש לבקשה זו")
     pickup_lat: float | None = Field(None, ge=-90, le=90)
     pickup_lon: float | None = Field(None, ge=-180, le=180)
@@ -95,7 +95,7 @@ class RideSearchRequest(BaseModel):
     passenger_id: UUID | None = Field(None, description="ממולא בשרת כשמשתמש מחובר")
     pickup_name: str = Field(..., min_length=2)
     destination_name: str = Field(..., min_length=2)
-    search_radius: int = Field(default=1000, ge=100, description="רדיוס חיפוש במטרים (אחיד)")
+    search_radius: float = Field(default=1.0, ge=0.1, le=50, description="רדיוס חיפוש בקילומטרים (אחיד)")
     departure_time: datetime | None = Field(
         None,
         description="מתי הנוסע צריך לצאת (אם ריק – יחפש מעכשיו)",
@@ -126,6 +126,6 @@ class RequestRideFromSearch(BaseModel):
 class PassengerSearchRequest(BaseModel):
     origin_name: str = Query(..., min_length=2)
     destination_name: str = Query(..., min_length=2)
-    radius: int = Query(2000, ge=100, le=10000)
+    radius: float = Query(2.0, ge=0.1, le=50)
 
     model_config = ConfigDict(from_attributes=True)

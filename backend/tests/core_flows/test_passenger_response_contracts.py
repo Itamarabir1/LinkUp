@@ -41,7 +41,7 @@ async def test_passenger_request_matching_rides_is_ride_response(db_session: Asy
         num_passengers=1,
         pickup_name="Tel Aviv, Israel",
         destination_name="Jerusalem, Israel",
-        search_radius=5000,
+        search_radius=5.0,
         is_notification_active=True,
     )
 
@@ -76,7 +76,7 @@ async def test_passenger_request_with_matches_model_validate_roundtrip(
         num_passengers=1,
         pickup_name="Tel Aviv, Israel",
         destination_name="Jerusalem, Israel",
-        search_radius=5000,
+        search_radius=5.0,
         is_notification_active=True,
     )
     with patch(

@@ -28,7 +28,21 @@ from app.infrastructure.geo.geocode_cache import get_coordinates
 # Logger
 logger = logging.getLogger(__name__)
 
+_DEFAULT_SEARCH_RADIUS_KM = 1.0
 _DEFAULT_SEARCH_RADIUS_M = 1000
+
+
+def _radius_km_to_meters(radius_km: float | int | None) -> int:
+    """
+    API accepts kilometers; spatial queries run in meters.
+    Backward compatibility: old clients may still send large meter-like values.
+    """
+    if radius_km is None:
+        return _DEFAULT_SEARCH_RADIUS_M
+    value = float(radius_km)
+    if value > 100:
+        return int(round(value))
+    return int(round(value * 1000))
 
 
 class PassengerService:
@@ -59,7 +73,7 @@ class PassengerService:
                 p_lon,
                 d_lat,
                 d_lon,
-                request_in.search_radius,
+                _radius_km_to_meters(request_in.search_radius),
                 passenger_id=passenger_id,
             )
 
@@ -149,7 +163,9 @@ class PassengerService:
             p_lat, p_lon = pickup_coords
             d_lat, d_lon = dest_coords
 
-            radius = getattr(search_data, "search_radius", None) or getattr(search_data, "radius", _DEFAULT_SEARCH_RADIUS_M)
+            radius = _radius_km_to_meters(
+                getattr(search_data, "search_radius", None) or getattr(search_data, "radius", _DEFAULT_SEARCH_RADIUS_KM)
+            )
 
             matches, has_more = await crud_passenger.find_rides_by_coordinates(
                 db,
@@ -224,7 +240,7 @@ class PassengerService:
             pickup_name=pickup_name,
             destination_name=destination_name,
             num_passengers=num_seats,
-            search_radius=_DEFAULT_SEARCH_RADIUS_M,
+            search_radius=_DEFAULT_SEARCH_RADIUS_KM,
             is_notification_active=True,
             is_auto_generated=True,
         )

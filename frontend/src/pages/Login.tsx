@@ -54,48 +54,57 @@ export default function Login() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.title}>התחברות</h1>
-      {verifiedMessage && (
-        <p className={styles.verifiedBanner}>החשבון אומת. התחבר כעת.</p>
-      )}
-      <form onSubmit={handleLogin} className={styles.form}>
-        {error ? <ErrorBanner message={error} className={styles.error} /> : null}
-        <input
-          type="email"
-          placeholder="אימייל"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className={styles.input}
-          autoComplete="email"
-        />
-        <input
-          type="password"
-          placeholder="סיסמה"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className={styles.input}
-          autoComplete="current-password"
-        />
-        <LoadingButton
-          type="submit"
-          className={styles.button}
-          loading={loading}
-          loadingLabel="מתחבר..."
-        >
-          התחבר
-        </LoadingButton>
-      </form>
-      
-      <div className={styles.divider}>
-        <div className={styles.dividerLine} aria-hidden />
-        <span className={styles.dividerLabel}>או</span>
+      <div className={styles.card}>
+        <div className={styles.logoWrap}>
+          <div className={styles.logoIcon}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h11l4 4h1a2 2 0 0 1 2 2v2h-2" />
+              <circle cx="7" cy="17" r="2" />
+              <circle cx="17" cy="17" r="2" />
+            </svg>
+          </div>
+        </div>
+        <h1 className={styles.title}>ברוך הבא</h1>
+        <p className={styles.subtitle}>התחבר לחשבון שלך כדי להמשיך</p>
+        {verifiedMessage && (
+          <p className={styles.verifiedBanner}>✓ האימייל אומת בהצלחה. התחבר כעת.</p>
+        )}
+        <form onSubmit={handleLogin} className={styles.form}>
+          {error ? <ErrorBanner message={error} className={styles.error} /> : null}
+          <input
+            type="email"
+            placeholder="אימייל"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={styles.input}
+            autoComplete="email"
+          />
+          <input
+            type="password"
+            placeholder="סיסמה"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={styles.input}
+            autoComplete="current-password"
+          />
+          <LoadingButton
+            type="submit"
+            className={styles.button}
+            loading={loading}
+            loadingLabel="מתחבר..."
+          >
+            התחבר
+          </LoadingButton>
+        </form>
+        <div className={styles.divider}>
+          <div className={styles.dividerLine} aria-hidden />
+          <span className={styles.dividerLabel}>או</span>
+        </div>
+        <GoogleSignIn onError={setError} disabled={loading} />
+        <p className={styles.link}>
+          <Link to="/register">אין חשבון? <strong>הירשם</strong></Link>
+        </p>
       </div>
-
-      <GoogleSignIn onError={setError} disabled={loading} />
-
-      <p className={styles.link}>
-        <Link to="/register">אין חשבון? הירשם</Link>
-      </p>
     </div>
   );
 }
