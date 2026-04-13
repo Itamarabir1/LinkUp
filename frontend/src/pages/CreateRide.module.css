@@ -1,18 +1,22 @@
 .page {
-  padding: 1rem 1.5rem;
-  max-width: 800px;
+  padding: 2rem 1.5rem;
+  max-width: 680px;
   margin: 0 auto;
   text-align: right;
 }
 
 .pageTitle {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem;
+  letter-spacing: -0.02em;
 }
 
 .pageMeta {
   color: var(--text-secondary);
-  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  margin: 0 0 1.5rem;
 }
 
 .groupBanner {
@@ -20,17 +24,16 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: var(--color-primary-subtle, #e8f4ff);
-  border-right: 4px solid var(--color-primary, #2563eb);
-  border-radius: 8px;
-  margin-bottom: 16px;
-  font-size: 0.95rem;
-  color: var(--color-text-primary, var(--text-primary));
-  direction: rtl;
+  background: var(--primary-light);
+  border-right: 3px solid var(--primary);
+  border-radius: var(--radius-md);
+  margin-bottom: 1.25rem;
+  font-size: 0.9rem;
+  color: var(--text-primary);
 }
 
 .groupBanner strong {
-  color: var(--color-primary, #2563eb);
+  color: var(--primary);
 }
 
 .pageError {
@@ -39,14 +42,20 @@
 }
 
 .formBlock {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 1.75rem;
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
   margin-bottom: 1.5rem;
 }
 
 .formLabel {
-  font-size: 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
   color: var(--text-secondary);
   margin: 0;
 }
@@ -64,73 +73,70 @@
 
 .swapWrap {
   display: flex;
-  justify-content: flex-start;
-  width: 100%;
-  max-width: 400px;
-  margin: -8px auto;
-  position: relative;
-  z-index: 1;
+  justify-content: center;
+  margin: -4px 0;
 }
 
 .swapBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  border: 1.5px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text-secondary);
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
   cursor: pointer;
-  margin: -8px 0 -8px auto;
-  position: relative;
-  z-index: 1;
-  transition: all 150ms ease;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  transition: all 180ms ease;
+  padding: 0;
 }
 
 .swapBtn:hover {
-  border-color: var(--primary);
   color: var(--primary);
   transform: rotate(180deg);
-  box-shadow: 0 2px 8px var(--focus-ring-primary);
 }
 
 .formInput {
   width: 100%;
-  max-width: 400px;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--input-border);
+  padding: 0.8rem 1rem;
+  border: 1.5px solid var(--input-border);
   border-radius: var(--radius-md);
-  font-size: 1rem;
+  font-size: 0.9375rem;
   box-sizing: border-box;
   text-align: right;
-  background: var(--input-bg);
+  background: var(--bg-secondary);
   color: var(--text-primary);
+  font-family: "Heebo", sans-serif;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
 
 .formInput:focus {
   outline: none;
-  border-color: var(--border-focus);
+  border-color: var(--primary);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3px var(--focus-ring-primary);
+}
+
+.formInput::placeholder {
+  color: var(--text-tertiary);
 }
 
 .datetimeWrapper {
   width: 100%;
-  max-width: 400px;
 }
 
 .datetimeInput {
   width: 100%;
-  padding: 12px 16px;
-  border: 1.5px solid var(--border);
-  border-radius: 10px;
-  font-size: 15px;
-  font-family: 'Heebo', sans-serif;
+  padding: 0.8rem 1rem;
+  border: 1.5px solid var(--input-border);
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-family: "Heebo", sans-serif;
   color: var(--text-primary);
-  background: var(--input-bg);
+  background: var(--bg-secondary);
   cursor: pointer;
-  transition: border-color 150ms, box-shadow 150ms;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
   outline: none;
   text-align: right;
   direction: rtl;
@@ -139,93 +145,113 @@
 
 .datetimeInput:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-light);
+  box-shadow: 0 0 0 3px var(--focus-ring-primary);
+  background: var(--bg-card);
 }
 
 .btn {
-  display: inline-block;
-  padding: 0.6rem 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.8rem 1.25rem;
   border-radius: var(--radius-md);
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 600;
+  font-family: "Heebo", sans-serif;
   text-decoration: none;
   border: none;
   cursor: pointer;
-  text-align: center;
+  transition: all 180ms ease;
 }
 
 .btnPrimary {
   background: var(--primary);
-  color: var(--text-inverse);
+  color: white;
+  width: 100%;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
 }
 
-.btnPrimary:hover {
+.btnPrimary:hover:not(:disabled) {
   background: var(--primary-hover);
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+  transform: translateY(-1px);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btnOutline {
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--input-border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1.5px solid var(--border);
 }
 
 .btnOutline:hover {
-  background: var(--surface);
+  border-color: var(--primary-soft-border);
+  color: var(--primary);
+  background: var(--primary-light);
 }
 
 .btnSuccess {
-  background: var(--success-text);
-  color: var(--text-inverse);
+  background: var(--primary);
+  color: white;
+  width: 100%;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
 }
 
-.btnSuccess:hover {
-  background: var(--success-hover);
+.btnSuccess:hover:not(:disabled) {
+  background: var(--primary-hover);
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+  transform: translateY(-1px);
 }
 
 .emptyText {
   text-align: center;
   color: var(--text-secondary);
-  padding: 2rem;
+  padding: 2.5rem;
 }
 
 .routesEmptyHint {
-  margin-top: 1rem;
   text-align: center;
   color: var(--text-secondary);
   padding: 1rem 1.5rem;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 .pageSubtitle {
-  font-size: 1.2rem;
-  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+  color: var(--text-primary);
 }
 
 .previewCard {
   margin-top: 1.5rem;
 }
 
-.previewCard .btn {
-  margin-top: 1rem;
-}
-
 .card {
   background: var(--bg-card);
-  padding: 1rem 1.25rem;
+  padding: 1.25rem 1.5rem;
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  border-right: 4px solid var(--primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .cardRoute {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 1rem;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 .cardMeta {
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   color: var(--text-secondary);
-  margin-top: 0.25rem;
+  margin-top: 0.35rem;
+  line-height: 1.6;
 }
 
 .routeOptions {
@@ -238,12 +264,17 @@
 .routeOption {
   cursor: pointer;
   text-align: right;
-  transition: border-color 0.2s, background 0.2s;
+  transition: all 200ms ease;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .routeOptionContent {
@@ -252,57 +283,64 @@
 }
 
 .routeOption:hover {
-  background: var(--bg-secondary);
+  border-color: var(--primary-soft-border);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
 }
 
 .routeOptionSelected,
 .routeOptionSelected:hover {
-  border-right-width: 6px;
-  border-right-color: var(--success-text);
-  background: var(--success-bg);
-  border-color: var(--success-text);
+  border-color: var(--primary);
+  background: var(--primary-light);
+  box-shadow: 0 0 0 3px var(--focus-ring-primary);
+  transform: none;
 }
 
 .btnRouteMap {
   flex-shrink: 0;
-  font-size: 0.9rem;
-  padding: 0.45rem 0.85rem;
-  background: var(--info-tint-bg);
-  color: var(--primary);
-  border: 1px solid var(--primary-soft-border);
+  font-size: 0.875rem;
+  padding: 0.5rem 1rem;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
 }
 
 .btnRouteMap:hover {
+  border-color: var(--primary-soft-border);
+  color: var(--primary);
   background: var(--primary-light);
 }
 
 .seatsControl {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 1rem;
   direction: ltr;
   width: fit-content;
 }
 
 .seatBtn {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: 1.5px solid var(--border);
-  background: var(--bg-card);
+  background: var(--bg-secondary);
   color: var(--text-primary);
-  font-size: 20px;
+  font-size: 1.25rem;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 150ms;
+  transition: all 180ms ease;
   line-height: 1;
 }
 
 .seatBtn:hover:not(:disabled) {
   border-color: var(--primary);
   color: var(--primary);
+  background: var(--primary-light);
+  box-shadow: 0 0 0 3px var(--focus-ring-primary);
 }
 
 .seatBtn:disabled {
@@ -311,10 +349,10 @@
 }
 
 .seatsValue {
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: 1.5rem;
+  font-weight: 700;
   font-family: 'Rubik', sans-serif;
   color: var(--text-primary);
-  min-width: 24px;
+  min-width: 28px;
   text-align: center;
 }

@@ -2,7 +2,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { he } from 'date-fns/locale';
 import { formatDurationMinutes } from '../utils/duration';
-import { ArrowUpDown } from 'lucide-react';
+import { MapPin, ArrowUpDown } from 'lucide-react';
 import ErrorBanner from '../components/ErrorBanner';
 import LoadingButton from '../components/LoadingButton';
 import RouteMapModal from '../components/RouteMapModal';
@@ -54,21 +54,37 @@ export default function CreateRide() {
       <form onSubmit={requestPreview} className={styles.formBlock}>
         {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
         <div className={styles.formRowWithBtn}>
-          <input
-            type="text"
-            placeholder="מוצא (כתובת)"
-            value={originName}
-            onChange={(e) => setOriginName(e.target.value)}
-            className={styles.formInput}
-          />
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnOutline}`}
-            onClick={fillOriginFromMyLocation}
-            disabled={locationLoading}
-          >
-            {locationLoading ? '...' : 'מיקום עצמי'}
-          </button>
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              placeholder="מוצא (כתובת)"
+              value={originName}
+              onChange={(e) => setOriginName(e.target.value)}
+              className={styles.formInput}
+              style={{ paddingLeft: '2.5rem' }}
+            />
+            <button
+              type="button"
+              onClick={fillOriginFromMyLocation}
+              disabled={locationLoading}
+              title="מיקום עצמי"
+              style={{
+                position: 'absolute',
+                left: '0.75rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--primary)',
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              {locationLoading ? '...' : <MapPin size={18} strokeWidth={2} />}
+            </button>
+          </div>
         </div>
         <div className={styles.swapWrap}>
           <button

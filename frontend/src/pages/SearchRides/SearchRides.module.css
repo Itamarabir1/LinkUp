@@ -87,22 +87,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  border: 1.5px solid var(--border);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
+  border: none;
+  background: none;
+  color: var(--text-tertiary);
   cursor: pointer;
   transition: all 180ms ease;
+  padding: 0;
 }
 
 .swapBtn:hover {
-  border-color: var(--primary);
   color: var(--primary);
-  background: var(--primary-light);
   transform: rotate(180deg);
-  box-shadow: 0 0 0 3px var(--focus-ring-primary);
 }
 
 .formInput {
