@@ -1,5 +1,5 @@
 """
-כותרות אבטחה ל־HTTP response – מפחיתות סיכוני XSS, clickjacking, MIME sniffing.
+HTTP response security headers — reduce XSS, clickjacking, and MIME sniffing risks.
 """
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -15,7 +15,7 @@ def _is_https(request: Request) -> bool:
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """מוסיף כותרות אבטחה לכל תגובה."""
+    """Adds security headers to every response."""
 
     # HSTS: max-age=1 year, includeSubDomains
     HSTS_VALUE = "max-age=31536000; includeSubDomains"

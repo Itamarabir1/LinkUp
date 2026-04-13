@@ -1,4 +1,4 @@
-"""טסטים לשירות קבוצות — mock ל-CRUD, ללא DB."""
+"""Group service tests with mocked CRUD (no DB)."""
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -13,7 +13,7 @@ from app.domain.groups.service import create_group, join_by_invite
 
 
 def _mock_group(**kwargs):
-    """מימוש קל ללא ORM — נמנע מטעינת מיפוי Group↔User בזמן בניית אובייקט."""
+    """Lightweight namespace stand-in without ORM relationships."""
     defaults = {
         "max_members": None,
         "invite_expires_at": None,
@@ -27,7 +27,7 @@ def _mock_group(**kwargs):
 
 @pytest.mark.asyncio
 async def test_create_group_returns_group_with_admin():
-    """יצירת קבוצה — בדיקה שהקבוצה נוצרת עם admin_id נכון."""
+    """create_group sets admin_id on the returned DTO."""
     with patch("app.domain.groups.service.crud") as mock_crud:
         admin_id = uuid4()
         group_id = uuid4()
@@ -53,7 +53,7 @@ async def test_create_group_returns_group_with_admin():
 
 @pytest.mark.asyncio
 async def test_join_by_invite_adds_member():
-    """הצטרפות לקבוצה — בדיקה שמשתמש מצטרף בהצלחה."""
+    """join_by_invite increments member count."""
     with patch("app.domain.groups.service.crud") as mock_crud:
         user_id = uuid4()
         group_id = uuid4()
@@ -81,7 +81,7 @@ async def test_join_by_invite_adds_member():
 
 @pytest.mark.asyncio
 async def test_join_full_group_raises_error():
-    """קבוצה מלאה — בדיקה שלא ניתן להצטרף."""
+    """Full group rejects new joins."""
     with patch("app.domain.groups.service.crud") as mock_crud:
         user_id = uuid4()
         group_id = uuid4()

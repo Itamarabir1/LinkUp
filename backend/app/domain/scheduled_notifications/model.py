@@ -1,9 +1,9 @@
 """
-ScheduledNotification — רשומת תזכורת מתוזמנת.
+ScheduledNotification — scheduled reminder row.
 
-מחליפה את reminder_sent flag על rides ו-bookings.
-נכתבת ע"י outbox worker אחרי ride.created / booking.approved_by_driver.
-נסרקת ע"י reminder_scheduler כל 5 דקות — query קטן ויעיל בזכות partial index.
+Replaces reminder_sent flags on rides and bookings.
+Written by outbox worker after ride.created / booking.approved_by_driver.
+Scanned by reminder_scheduler every 5 minutes — small efficient query thanks to partial index.
 """
 
 import uuid

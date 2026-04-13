@@ -1,7 +1,7 @@
 """
-טסטי אינטגרציה ל-BookingService.
+Integration tests for BookingService.
 
-דורשים DATABASE_URL (PostgreSQL + asyncpg + PostGIS) — ראו tests/conftest.py.
+Requires DATABASE_URL (PostgreSQL + asyncpg + PostGIS); see tests/conftest.py.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import app.db.models  # noqa: F401 — רישום מודלים ב-Base
+import app.db.models  # noqa: F401 — register models on Base
 from app.core.exceptions.booking import BookingAlreadyExistsError
 from app.domain.bookings.enum import BookingStatus
 from app.domain.bookings.service import BookingService
@@ -21,7 +21,7 @@ from tests.helpers.db_factories import make_passenger_request, make_ride, make_u
 
 @pytest.mark.asyncio
 async def test_request_to_join_creates_pending_booking(db_session: AsyncSession):
-    """זרימת הזמנה — נוצר booking עם status pending_approval ונקרא outbox."""
+    """request_to_join creates pending booking and publishes outbox."""
     driver = await make_user(db_session, "driver", email_suffix="bookings")
     passenger = await make_user(db_session, "passenger", email_suffix="bookings")
     ride = await make_ride(db_session, driver.user_id)
@@ -47,7 +47,7 @@ async def test_request_to_join_creates_pending_booking(db_session: AsyncSession)
 
 @pytest.mark.asyncio
 async def test_duplicate_booking_raises_error(db_session: AsyncSession):
-    """אותו נוסע לא יכול להזמין פעמיים לאותה נסיעה (בקשה שנייה)."""
+    """Same passenger cannot book the same ride twice."""
     driver = await make_user(db_session, "driver2", email_suffix="bookings")
     passenger = await make_user(db_session, "passenger2", email_suffix="bookings")
     ride = await make_ride(db_session, driver.user_id)
@@ -78,7 +78,7 @@ async def test_duplicate_booking_raises_error(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_approve_booking_changes_status(db_session: AsyncSession):
-    """אישור הזמנה — status הופך ל-confirmed ונקרא outbox."""
+    """approve_booking moves status to confirmed and publishes outbox."""
     driver = await make_user(db_session, "driver3", email_suffix="bookings")
     passenger = await make_user(db_session, "passenger3", email_suffix="bookings")
     ride = await make_ride(db_session, driver.user_id, seats=4)
@@ -112,7 +112,7 @@ async def test_approve_booking_changes_status(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_reject_booking_changes_status_and_outbox(db_session: AsyncSession):
-    """דחיית הזמנה — סטטוס rejected ואירוע outbox."""
+    """reject_booking sets rejected and publishes outbox."""
     driver = await make_user(db_session, "driver4", email_suffix="bookings")
     passenger = await make_user(db_session, "passenger4", email_suffix="bookings")
     ride = await make_ride(db_session, driver.user_id, seats=4)

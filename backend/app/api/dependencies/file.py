@@ -5,8 +5,8 @@ from app.core.utils.validators import validate_avatar_file
 
 async def validate_avatar(file: UploadFile) -> UploadFile:
     """
-    Dependency: בודק שאווטאר תקין (סוג קובץ + גודל מקסימלי).
-    הכללים מוגדרים ב-core/utils/validators (MAX_AVATAR_SIZE_MB, ALLOWED_AVATAR_CONTENT_TYPES).
+    Dependency: validates avatar (file type + maximum size).
+    Rules are defined in core/utils/validators (MAX_AVATAR_SIZE_MB, ALLOWED_AVATAR_CONTENT_TYPES).
     """
     validate_avatar_file(file)
     return file
@@ -14,7 +14,7 @@ async def validate_avatar(file: UploadFile) -> UploadFile:
 
 # Generic upload validator (size/MIME) for documents and other files
 def file_validator(allowed_types: tuple[str, ...], max_size_mb: int):
-    """מחזיר Dependency שבודק סוג קובץ וגודל (למשל למסמכים)."""
+    """Returns a Dependency that validates file type and size (e.g. for documents)."""
     from app.core.exceptions.validation import FileTooLargeError, InvalidFileTypeError
 
     async def _validate(file: UploadFile) -> UploadFile:

@@ -1,7 +1,7 @@
 """
-Redis Pub/Sub – פרסום לערוצים (Publish).
-שימוש: צ'אט real-time – Python מפרסם, שרת ה-WS (Go) מאזין (Subscribe).
-נפרד מ־redis/client.py שמיועד ל-cache ו-rate limit.
+Redis Pub/Sub — publish to channels.
+Used for real-time chat: Python publishes, WS server (Go) subscribes.
+Separate from redis/client.py which handles cache and rate limiting.
 """
 
 import logging
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class RedisPubSub:
-    """חיבור Redis ייעודי ל-Pub/Sub (publish)."""
+    """Dedicated Redis connection for Pub/Sub (publish)."""
 
     def __init__(self):
         self.client: redis.Redis | None = None
@@ -33,8 +33,8 @@ class RedisPubSub:
 
     async def publish(self, channel: str, message: str) -> int:
         """
-        מפרסם הודעה לערוץ. כל מנוי (subscribe) יקבל אותה.
-        מחזיר מספר clients שקיבלו את ההודעה (0 אם אין מנויים).
+        Publishes a message to a channel. Every subscriber receives it.
+        Returns the number of clients that received the message (0 if none).
         """
         if self.client is None:
             logger.warning("Redis Pub/Sub not connected, skip publish to %s", channel)

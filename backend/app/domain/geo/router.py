@@ -1,6 +1,6 @@
 """
-ראוטר גיאו משותף – מקור אמת יחיד למיקום נוכחי (reverse geocode).
-נהג ונוסע קוראים ל־GET /geo/address כשהמשתמש לוחץ "השתמש במיקום שלי".
+Shared geo router — single source of truth for current location (reverse geocode).
+Driver and passenger call GET /geo/address when the user chooses “use my location”.
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -21,7 +21,7 @@ router = APIRouter(tags=["Geo"])
     description="מחזיר את מפתח ה-API המוגדר בבקאנד (GOOGLE_MAPS_API_KEY). הפרונט משתמש בו ל-Maps JavaScript API.",
 )
 async def get_maps_api_key(current_user: User = Depends(get_current_user)):
-    """מפתח המפות מוגדר ב-.env של הבקאנד – מקור אמת יחיד."""
+    """Maps API key is set in backend .env — single source of truth."""
     return {"google_maps_api_key": settings.GOOGLE_MAPS_API_KEY or ""}
 
 
@@ -37,8 +37,8 @@ async def get_address_from_coords(
     current_user: User = Depends(get_current_user),
 ):
     """
-    ממיר קואורדינטות GPS לכתובת קריאה.
-    דורש משתמש מחובר (authentication).
+    Converts GPS coordinates to a human-readable address.
+    Requires an authenticated user.
     """
     address = await get_address_from_gps(lat, lon)
     if not address:

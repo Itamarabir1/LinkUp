@@ -42,7 +42,7 @@ class GroupMemberNotFoundError(LinkupError):
 
 
 class GroupFilterAuthRequiredError(LinkupError):
-    """חיפוש/פעולה עם group_id דורשת משתמש מחובר."""
+    """Search or operation with group_id requires a logged-in user."""
 
     status_code = 401
     error_code = "GROUP_AUTH_REQUIRED"

@@ -22,7 +22,7 @@ Authorization: Bearer <access_token>
 
 ### Cursor-based (נסיעות חיפוש, הודעות צ'אט)
 
-- **נסיעות** (`GET /passenger/search-rides`): `after` (UUID של ride_id אחרון בעמוד הקודם), `limit`. תגובה: `items`, `next_cursor` (= ride_id להמשך), `has_more`.
+- **נסיעות (חיפוש נוסע)** (`GET /api/v1/passenger/passengers/search-rides`): `after` (UUID של `ride_id` אחרון בעמוד הקודם), `limit`. תגובה: `items`, `next_cursor` (= `ride_id` להמשך), `has_more`.
 - **הודעות** (`GET /chat/conversations/{id}/messages`): `before` (message_id — טעינת הודעות ישנות יותר), `limit`. תגובה: `items`, `next_cursor`, `has_more`.
 
 ### Page-based (הזמנות שלי)
@@ -88,16 +88,18 @@ Authorization: Bearer <access_token>
 
 ### Passenger (`/api/v1/passenger`)
 
+שני prefix-ים: **`/passenger/passengers/*`** (בקשות נוסע, חיפוש) ו-**`/passenger/rides/*`** (פרטי נהג לנסיעה).
+
 | Method | Path | Auth | תיאור |
 |--------|------|------|--------|
-| GET | /passengers/me | כן | הבקשות שלי כנוסע. query: request_status. |
-| POST | /passengers/ | כן | יצירת בקשה — body: PassengerRequestCreate. מחזיר PassengerRequestWithMatches (201). |
-| GET | /passengers/rides/{ride_id}/driver-info | כן | פרטי נהג לנסיעה. |
-| POST | /passengers/request-ride-from-search | כן | body: RequestRideFromSearch (ride_id, request_id?, num_seats, pickup_name, ...). יוצר/משתמש ב-request + booking. |
-| GET | /passengers/search-rides | אופציונלי | חיפוש נסיעות. query: pickup_name, destination_name, search_radius (default 1000), departure_time?, limit (default 20), after (cursor). **Pagination**: cursor-based, תגובה: items, next_cursor, has_more. |
-| DELETE | /passengers/{request_id}/cancel | כן | ביטול בקשת נסיעה (204). |
-| GET | /passengers/{request_id}/matches | כן | התאמות עדכניות לבקשה. |
-| GET | /passengers/all | כן | כל הנסיעות (admin). query: filter_status. |
+| GET | /passengers/me | כן | הבקשות שלי כנוסע. query: `request_status` (pending, approved, cancelled, matched, expired, completed, rejected). |
+| POST | /passengers/ | כן | יצירת בקשה קבועה — body: `PassengerRequestCreate` (pickup/destination, `num_passengers`, `search_radius`, `requested_departure_time` אופציונלי, `pickup_lat`/`pickup_lon` זוגיים, **`is_notification_active`** — האם לכלול את הבקשה בהתאמות אימייל/פוש כשנהג יוצר נסיעה מתאימה, **`group_id`** אופציונלי — התאמה רק לנסיעות באותה קבוצה, `is_auto_generated`). מחזיר `PassengerRequestWithMatches` (201) כולל `matching_rides` מיידי. **זהו גם מסלול “שמירת התראה”** אחרי חיפוש: אותם פרמטרי מסלול כמו בחיפוש, בלי תלות ב-`GET search-rides` (החיפוש עצמו **לא** יוצר שורה ב-DB). |
+| GET | /rides/{ride_id}/driver-info | כן | פרטי נהג לנסיעה (מנותב תחת `/api/v1/passenger/rides/...`). |
+| POST | /passengers/request-ride-from-search | כן | body: `RequestRideFromSearch` (`ride_id`, `request_id?`, `num_seats`, כתובות). אם אין `request_id` — יוצר בקשה זמנית לחיפוש; אז `BookingService.request_to_join` + אירועי outbox (התראה לנהג). |
+| GET | /passengers/search-rides | אופציונלי | חיפוש נסיעות **ללא שמירה** ב-DB. query: `pickup_name`, `destination_name`, `search_radius` (ברירת מחדל 1000 מ׳), `departure_time?`, `limit` (ברירת מחדל 20, עד 50), `after` (cursor), **`group_id?`** — רק אם המשתמש מחובר וחבר בקבוצה (dependency `require_group_member`). **Pagination**: cursor-based — `items`, `next_cursor`, `has_more`. |
+| DELETE | /passengers/{request_id}/cancel | כן | ביטול בקשת נסיעה ושחרור שריונים (204). |
+| GET | /passengers/{request_id}/matches | כן | התאמות עדכניות לבקשה קיימת. |
+| GET | /passengers/all | כן | כל הנסיעות במערכת — **רק `is_admin`**; query: `filter_status`. |
 
 ---
 
@@ -124,8 +126,11 @@ Authorization: Bearer <access_token>
 | Method | Path | Auth | תיאור |
 |--------|------|------|--------|
 | GET | /me | כן | הפרופיל שלי (UserRead). |
+| PATCH | /me/last-seen | כן | עדכון `last_active_at` (204). |
+| GET | /{user_id}/last-seen | כן | מקור ל-`last_seen` ב-UI צ'אט; נקרא מ-chat-ws ב-`GET /presence/{id}` כשצריך. |
 | GET | /me/notifications | כן | כל ההתראות שלי (כנהג/נוסע). |
 | PATCH | /fcm-token | כן | body: `FCMTokenUpdate` — `fcm_token` מחרוזת (רישום) או **`null`** (ניקוי ב-DB, למשל logout). |
+| POST | /me/test-push | כן | בדיקת FCM (דורש `fcm_token` בפרופיל). |
 | GET | /me/avatar/upload-url | כן | query: filename?. מחזיר presigned URL + staging_key. |
 | POST | /me/avatar/confirm | כן | body: AvatarUploadConfirmRequest (staging_key). 202 — עיבוד ברקע. |
 | DELETE | /me/avatar | כן | הסרת תמונת פרופיל (202). |
@@ -145,7 +150,9 @@ Authorization: Bearer <access_token>
 | GET | /conversations/{conversation_id} | כן | פרטי שיחה. |
 | POST | /conversations/{conversation_id}/messages | כן | body: MessageCreate (body). שליחת הודעה (201). |
 | GET | /conversations/{conversation_id}/messages | כן | הודעות. query: limit (default 30), before (message_id ל-cursor). **Pagination**: cursor-based. תגובה: items, next_cursor, has_more. |
-| GET | /conversations/{conversation_id}/calendar.ics | כן | ייצוא ללוח שנה — כרגע 501. |
+| POST | /conversations/{conversation_id}/read | כן | סימון שיחה כנקראה (204). |
+| GET | /unread-count | כן | `{ "count": number }` — מספר שיחות עם הודעות שלא נקראו. |
+| GET | /conversations/{conversation_id}/calendar.ics | כן | ייצוא ללוח שנה — כרגע `LinkupError` **501** (`CHAT_CALENDAR_NOT_IMPLEMENTED`). |
 
 ---
 
@@ -188,3 +195,28 @@ Authorization: Bearer <access_token>
 רשימת התראות ב-REST: **`GET /api/v1/users/me/notifications`**.
 
 (ראוטר: `app/domain/notifications/router.py`, נרשם ב-`api/v1/api_router.py` תחת prefix `/notifications`.)
+
+---
+
+### Admin (`/api/v1/admin`)
+
+דורש משתמש עם **`users.is_admin`** — `get_current_admin_user`. פעולות רגישות נרשמות בלוג **`[admin_audit]`**.
+
+| Method | Path | Auth | תיאור |
+|--------|------|------|--------|
+| GET | /me | אדמין | זהות מחובר (`user_id`, `email`, `full_name`, `is_admin`). |
+| GET | /health | אדמין | סיכום בריאות (כמו שירות ה-health הפנימי). |
+| GET | /stats | אדמין | אגרגטים לדשבורד (משתמשים, נסיעות, בוקינגים, outbox, קבוצות וכו'). |
+| GET | /users | אדמין | רשימת משתמשים. query: `q` (חיפוש email/phone/name), `is_active`, `is_admin`, `is_verified`, `limit` (עד 200). |
+| PATCH | /users/{user_id}/active | אדמין | toggle `is_active` (היפוך בוליאני). |
+| PATCH | /users/{user_id}/admin | אדמין | toggle `is_admin`. |
+| GET | /rides | אדמין | רשימת נסיעות אחרונות. query: `status` (`active` \| `completed` \| `cancelled` \| ריק), `limit` (עד 500). |
+| GET | /rides/{ride_id} | אדמין | פרטי נסיעה (lookup). |
+| POST | /rides/{ride_id}/cancel | אדמין | ביטול נסיעה מתפעול. |
+| GET | /groups | אדמין | רשימת קבוצות. |
+| GET | /outbox | אדמין | אירועי outbox. query: `status`, `event_name`, `limit`. |
+| GET | /outbox/{event_id} | אדמין | פרטי אירוע. |
+| POST | /outbox/{event_id}/requeue | אדמין | רק אם `status=FAILED` — מחזיר ל-`PENDING` לסריקת ה-worker. |
+| GET | /bookings/{booking_id} | אדמין | פרטי הזמנה (lookup). |
+
+ממשק React תואם: **`ADMIN_DASHBOARD.md`** (בשורש הפרויקט).

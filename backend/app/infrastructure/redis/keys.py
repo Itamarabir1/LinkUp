@@ -12,7 +12,7 @@ def get_ride_preview_key(session_id: str) -> str:
 
 
 def get_otp_verification_key(user_id: str, event_name: str) -> str:
-    """מייצר מפתח אחיד לקוד אימות ב-Redis"""
+    """Build Redis key for OTP / verification codes."""
     return f"otp:{event_name}:{user_id}"
 
 
@@ -22,20 +22,20 @@ RIDES_LIST_CHANNEL = "rides:list"
 
 
 def get_ride_channel(ride_id) -> str:
-    """אירועי סטטוס נסיעה → נוסעים ונהג."""
+    """Pub/sub channel for ride status (driver + passengers)."""
     return f"ride_{ride_id}"
 
 
 def get_ride_passengers_channel(ride_id) -> str:
-    """מיקומי נוסעים → נהג."""
+    """Channel for passenger live locations toward driver."""
     return f"ride_{ride_id}:passenger_locations"
 
 
 def get_booking_channel(booking_id) -> str:
-    """מיקום נהג → נוסע ספציפי."""
+    """Channel for driver location updates for a booking."""
     return f"booking_{booking_id}"
 
 
 def get_user_channel(user_id) -> str:
-    """אירועי משתמש אישיים → chat-ws → WS client."""
+    """Per-user events fan-out (chat-ws / WebSocket clients)."""
     return f"user:{user_id}:events"

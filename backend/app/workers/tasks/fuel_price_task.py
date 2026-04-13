@@ -1,6 +1,6 @@
 """
-סורק מחירי דלק (EIA US) – מופעל מהתור המתוזמן.
-כרגע בלי שמירה: רק מריץ את הלוגיקה/קריאת API; לא שומר ל־DB או Redis.
+Scans US EIA fuel prices — invoked from the scheduled queue.
+Currently no persistence: only runs logic/API call; does not write to DB or Redis.
 """
 
 import logging
@@ -15,8 +15,8 @@ FUEL_SCAN_INTERVAL = 86400
 
 async def execute_fuel_scan_job():
     """
-    ביצוע סריקת דלק (נקרא מה-consumer של התור המתוזמן).
-    כרגע: לא שומר נתונים – רק מריץ ומתעד.
+    Runs fuel price scan (called from scheduled-queue consumer).
+    Currently does not persist data — only runs and logs.
     """
     try:
         if not settings.EIA_API_KEY:

@@ -1,5 +1,5 @@
 # app/core/exceptions/__init__.py
-"""ייצוא מרכזי של כל שגיאות הדומיין – שימוש: from app.core.exceptions import LinkupError, UserNotFoundError, ..."""
+"""Central re-exports for domain errors: ``from app.core.exceptions import LinkupError, ...``."""
 
 # Admin
 from .admin import (

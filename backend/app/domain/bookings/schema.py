@@ -73,7 +73,7 @@ class TripStats(BaseModel):
 
 
 class PaginatedBookingsResponse(BaseModel):
-    """הזמנות משתמש עם page-based pagination."""
+    """User bookings with page-based pagination."""
 
     items: list[BookingResponse] = Field(default_factory=list)
     total: int = 0

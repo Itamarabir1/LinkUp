@@ -10,7 +10,7 @@ from app.infrastructure.geo.client import GeoClient
 
 @pytest.mark.asyncio
 async def test_geocode_cache_set_and_get_roundtrip():
-    """כתובת נשמרת ונשלפת מה-cache עם ערכי lat/lon תקינים."""
+    """Address round-trips through cache with valid lat/lon."""
     store: dict[str, dict] = {}
 
     async def fake_save(key, value, expire=None):
@@ -30,7 +30,7 @@ async def test_geocode_cache_set_and_get_roundtrip():
 
 @pytest.mark.asyncio
 async def test_geocode_cache_fail_open_on_redis_error():
-    """אם Redis נופל, הקריאה לא נופלת — מחזירה None (fail-open)."""
+    """Redis errors fail open (returns None, no crash)."""
     with patch.object(
         geocode_cache.redis_client,
         "get",
@@ -42,7 +42,7 @@ async def test_geocode_cache_fail_open_on_redis_error():
 
 @pytest.mark.asyncio
 async def test_fetch_coordinates_uses_cache_without_external_lookup():
-    """כאשר יש cache hit, לא קוראים ל-Nominatim בכלל."""
+    """Cache hit skips external geocoder."""
     client = GeoClient()
     with patch(
         "app.infrastructure.geo.geocode_cache.get_cached_coords",
@@ -56,7 +56,7 @@ async def test_fetch_coordinates_uses_cache_without_external_lookup():
 
 @pytest.mark.asyncio
 async def test_fetch_coordinates_writes_cache_after_lookup():
-    """כאשר אין cache hit ויש תוצאת geocode, נשמר cache חדש."""
+    """Miss then successful geocode writes a new cache entry."""
     client = GeoClient()
 
     class Location:

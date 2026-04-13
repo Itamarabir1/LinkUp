@@ -27,7 +27,7 @@ class VerificationService:
         return code
 
     async def verify_otp(self, user_id: str, event_name: str, input_code: str) -> None:
-        """מאמת קוד וזורק שגיאה מתאימה אם נכשל"""
+        """Verifies the OTP code and raises the appropriate error on failure."""
         redis_key = get_otp_verification_key(user_id, event_name)
         attempts_key = f"otp_attempts:{user_id}:{event_name}"
 

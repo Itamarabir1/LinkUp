@@ -1,5 +1,5 @@
 # app/core/exceptions/booking.py
-"""שגיאות דומיין הזמנות ונהג/נוסע."""
+"""Booking / ride-participation domain errors."""
 
 from uuid import UUID
 
@@ -7,7 +7,7 @@ from .base import LinkupError
 
 
 class RideNotAvailableError(LinkupError):
-    """הנסיעה אינה פתוחה להצטרפות או לא נמצאה."""
+    """Ride is not open for joins or was not found."""
 
     status_code = 404
     error_code = "BOOKING_RIDE_NOT_AVAILABLE"
@@ -19,7 +19,7 @@ class RideNotAvailableError(LinkupError):
 
 
 class BookingAlreadyExistsError(LinkupError):
-    """כבר קיימת בקשת הצטרפות לאותה נסיעה."""
+    """Passenger already has a join request for this ride."""
 
     status_code = 400
     error_code = "BOOKING_ALREADY_EXISTS"
@@ -35,7 +35,7 @@ class BookingAlreadyExistsError(LinkupError):
 
 
 class PassengerRequestNotFoundError(LinkupError):
-    """בקשת הנוסע לא נמצאה."""
+    """Passenger request id does not exist."""
 
     status_code = 404
     error_code = "BOOKING_REQUEST_NOT_FOUND"
@@ -47,7 +47,7 @@ class PassengerRequestNotFoundError(LinkupError):
 
 
 class BookingNotFoundError(LinkupError):
-    """הזמנה לא נמצאה."""
+    """Booking id does not exist."""
 
     status_code = 404
     error_code = "BOOKING_NOT_FOUND"
@@ -62,7 +62,7 @@ class BookingNotFoundError(LinkupError):
 
 
 class NoSeatsAvailableError(LinkupError):
-    """אין מקומות פנויים בנסיעה — בבקשה או באישור."""
+    """No free seats on the ride (request or approval flow)."""
 
     status_code = 409
     error_code = "NO_SEATS_AVAILABLE"
@@ -73,7 +73,7 @@ class NoSeatsAvailableError(LinkupError):
 
 
 class ForbiddenRideActionError(LinkupError):
-    """אין הרשאה לבצע פעולה על נסיעה/הזמנה זו."""
+    """Caller may not perform this action on the ride or booking."""
 
     status_code = 403
     error_code = "BOOKING_ACCESS_DENIED"

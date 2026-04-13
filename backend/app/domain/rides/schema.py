@@ -29,7 +29,7 @@ class CoordinatesMixin(BaseModel):
 
 
 class RidePreviewCreate(BaseModel):
-    """יצירת תצוגה מקדימה לנסיעה. מוצא: טקסט (origin_name) או מיקום נוכחי (origin_lat/origin_lon) – כמו אצל נוסע."""
+    """Create ride preview: origin as text (origin_name) or current GPS (origin_lat/origin_lon), like passenger flow."""
 
     driver_id: UUID
     origin_name: str | None = None  # טקסט או ריק כשנשלחים origin_lat/origin_lon (מיקום נוכחי)
@@ -54,7 +54,7 @@ class RideCreate(BaseModel):
 
 
 class RideUpdate(BaseModel):
-    """עדכון חלקי לנסיעה – רק זמן יציאה ומספר מושבים (כל השדות אופציונליים)."""
+    """Partial ride update: departure time and/or seat count (all fields optional)."""
 
     departure_time: datetime | None = None
     available_seats: int | None = Field(None, ge=1)
@@ -92,9 +92,9 @@ class RidePreviewResponse(LocationMixin):
         origin_address: str,
     ) -> "RidePreviewResponse":
         """
-        Factory Method מקצועית.
-        1. מייצרת את ה-session_id פנימית (Encapsulation).
-        2. מקבלת את ה-origin_address המוחלט מה-Service.
+        Factory: build preview response from geo processor output.
+        1. session_id is assigned here (encapsulation).
+        2. origin_address is the resolved label from the service layer.
         """
         routes_data: list[RouteOptionData] = geo_data["routes"]
         routes = [
@@ -108,7 +108,7 @@ class RidePreviewResponse(LocationMixin):
             for i, r in enumerate(routes_data)
         ]
         return cls(
-            session_id=str(uuid4()),  # היצירה עברה לכאן!
+            session_id=str(uuid4()),  # assigned in factory
             origin_name=origin_address,
             destination_name=preview_in.destination_name,
             origin_coords=[geo_data["origin"].lat, geo_data["origin"].lon],
@@ -121,7 +121,7 @@ class RidePreviewResponse(LocationMixin):
 
 
 class RideBase(LocationMixin):
-    """בסיס לנסיעה – בלי וולידציית 'זמן עתידי' (תשובות מה-DB כוללות נסיעות בעבר)."""
+    """Ride base without future-time validation (DB responses may include past rides)."""
 
     driver_id: UUID
     departure_time: datetime
@@ -131,7 +131,7 @@ class RideBase(LocationMixin):
 
 
 class RideCreateInternal(RideBase, CoordinatesMixin):
-    """הסכימה הסופית שעוברת ל-CRUD – וולידציית זמן עתידי רק ביצירה."""
+    """Schema passed to CRUD on create; future departure validation applies only here."""
 
     route_coords: list[list[float]]
     total_distance_km: float
@@ -151,7 +151,7 @@ class RideCreateInternal(RideBase, CoordinatesMixin):
 
 
 class RideResponse(RideBase):
-    """מחזיר נסיעה מלאה מה-DB"""
+    """Full ride row from the database."""
 
     ride_id: UUID
     status: RideStatus
@@ -169,7 +169,7 @@ class RideResponse(RideBase):
 
 
 class RideSearchResponse(BaseModel):
-    """תצוגה מקוצרת לחיפוש"""
+    """Compact ride shape for search listings."""
 
     ride_id: UUID
     origin_name: str
@@ -181,7 +181,7 @@ class RideSearchResponse(BaseModel):
 
 
 class DriverInfoResponse(BaseModel):
-    """פרטי נהג לתצוגה (לנוסע) – רק כשהנוסע לוחץ 'הצג פרטי הנהג'."""
+    """Driver contact info for passengers (explicit reveal action)."""
 
     full_name: str
     phone_number: str | None = None

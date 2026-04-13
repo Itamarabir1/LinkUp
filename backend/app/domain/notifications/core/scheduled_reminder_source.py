@@ -1,13 +1,13 @@
 """
-מקור הידרציה לתזכורות מתוזמנות (ReminderScheduler).
+Hydration source for scheduled reminders (ReminderScheduler).
 
-חוזה payload (מול handler._fetch_source):
-  scheduled_notification_id — מזהה רשומת scheduled_notifications
-  user_id — הנמען (UUID)
-  ride_id — הנסיעה לבניית קונטקסט תבנית (UUID)
+Payload contract (for handler._fetch_source):
+  scheduled_notification_id — scheduled_notifications row id
+  user_id — recipient (UUID)
+  ride_id — ride used to build template context (UUID)
 
-כאשר שלושת השדות קיימים, ה-handler מחזיר ScheduledReminderSource במקום Ride גולמי,
-כדי להפריד בין ישות התבנית (Ride + RideBuilder) לבין המשתמש שאליו שולחים.
+When all three fields are present, the handler returns ScheduledReminderSource instead of a raw Ride,
+to separate template entity (Ride + RideBuilder) from the user who receives the notification.
 """
 
 from dataclasses import dataclass
@@ -18,7 +18,7 @@ from app.domain.rides.model import Ride
 
 @dataclass(frozen=True)
 class ScheduledReminderSource:
-    """Ride לתבנית; recipient_user_id לשליחה — בלי לכפות passenger resolver על Ride."""
+    """Ride for template context; recipient_user_id for delivery — without forcing passenger resolver on Ride."""
 
     ride: Ride
     recipient_user_id: UUID

@@ -1,10 +1,10 @@
 """
-CRUD לתזכורות מתוזמנות.
+CRUD for scheduled reminders.
 
-get_due — שולב partial index על deliver_at WHERE sent_at IS NULL.
-           query קטן ויעיל — סורק רק רשומות שטרם נשלחו ועבר זמנן.
-mark_sent — מסמן רשומה כנשלחה (sent_at = now).
-create — כותב רשומה חדשה (נקרא מה-outbox worker).
+get_due — uses partial index on deliver_at WHERE sent_at IS NULL.
+           small efficient query — only due unsent rows.
+mark_sent — marks a row sent (sent_at = now).
+create — inserts a new row (called from outbox worker).
 """
 
 import logging
@@ -31,7 +31,7 @@ class CRUDScheduledNotification:
         type: str,
         deliver_at: datetime,
     ) -> ScheduledNotification:
-        """יוצר רשומת תזכורת. נקרא מה-outbox worker — לא מתוך core flow."""
+        """Creates a reminder row. Called from outbox worker — not from core request flow."""
         obj = ScheduledNotification(
             ride_id=ride_id,
             user_id=user_id,
@@ -49,9 +49,9 @@ class CRUDScheduledNotification:
         limit: int = BATCH_SIZE_DEFAULT,
     ) -> list[ScheduledNotification]:
         """
-        שולף תזכורות שעבר זמנן וטרם נשלחו.
-        מנצל את ה-partial index idx_scheduled_notifications_deliver.
-        BATCH_SIZE_DEFAULT — מגן מפני עומס בריצה בודדת.
+        Fetches due reminders that have not been sent yet.
+        Uses partial index idx_scheduled_notifications_deliver.
+        BATCH_SIZE_DEFAULT caps work per run.
         """
         stmt = (
             select(ScheduledNotification)
@@ -66,14 +66,14 @@ class CRUDScheduledNotification:
         return list(result.scalars().all())
 
     async def mark_sent(self, db: AsyncSession, notification_id: UUID) -> None:
-        """מסמן תזכורת כנשלחה — sent_at = now()."""
+        """Marks a reminder as sent — sent_at = now()."""
         stmt = update(ScheduledNotification).where(ScheduledNotification.id == notification_id).values(sent_at=func.now())
         await db.execute(stmt)
 
     async def delete_by_ride(self, db: AsyncSession, ride_id: UUID) -> None:
         """
-        מוחק תזכורות של נסיעה שבוטלה.
-        ON DELETE CASCADE ב-DB מטפל בזה אוטומטית — זו פונקציה לשימוש ידני אם צריך.
+        Deletes reminders for a cancelled ride.
+        ON DELETE CASCADE in the DB usually handles this — manual helper when needed.
         """
         await db.execute(
             delete(ScheduledNotification).where(

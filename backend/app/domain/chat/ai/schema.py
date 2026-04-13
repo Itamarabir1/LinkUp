@@ -1,12 +1,12 @@
 """
-Schema לניתוח AI של שיחות צ'אט.
+Schemas for AI analysis of chat conversations.
 """
 
 from pydantic import BaseModel
 
 
 class RideSummary(BaseModel):
-    """סיכום ניתוח AI של שיחת טרמפ."""
+    """AI analysis summary for a rideshare chat."""
 
     driver_name: str
     passenger_name: str

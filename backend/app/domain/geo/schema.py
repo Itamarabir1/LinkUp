@@ -7,7 +7,7 @@ class GeoLocation(BaseModel):
 
 
 class AddressFromCoordsResponse(BaseModel):
-    """תשובה משותפת ל־reverse geocoding – נהג ונוסע ממלאים שדה מקום ממיקום נוכחי."""
+    """Shared reverse-geocode response — driver and passenger fill place from current location."""
 
     address: str = Field(..., description="כתובת קריאה (reverse geocode)")
     lat: float = Field(..., ge=-90, le=90)
@@ -22,7 +22,7 @@ class RouteOptionData(BaseModel):
 
 
 class DriverLocationReport(BaseModel):
-    """גוף בקשה לדיווח מיקום נהג (POST /bookings/{booking_id}/location)."""
+    """Request body for driver location report (POST /bookings/{booking_id}/location)."""
 
     lat: float = Field(..., ge=-90, le=90)
     lng: float = Field(..., ge=-180, le=180)
@@ -31,7 +31,7 @@ class DriverLocationReport(BaseModel):
 
 
 class PassengerLocationReport(BaseModel):
-    """גוף בקשה לדיווח מיקום נוסע (POST /bookings/{booking_id}/passenger-location)."""
+    """Request body for passenger location report (POST /bookings/{booking_id}/passenger-location)."""
 
     lat: float = Field(..., ge=-90, le=90)
     lng: float = Field(..., ge=-180, le=180)

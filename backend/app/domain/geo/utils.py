@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 def convert_db_route_to_list(route_geom) -> list[list[float]]:
-    """המרת אובייקט Geometry מה-DB לרשימת [lat, lon] ל-Frontend."""
+    """Converts a DB Geometry object to a list of [lat, lon] for the frontend."""
     if not route_geom:
         return []
     try:
@@ -28,14 +28,14 @@ def convert_db_route_to_list(route_geom) -> list[list[float]]:
 
 
 def calculate_eta(start_time: datetime, duration_seconds: float, buffer_percent: float = 0.15) -> str:
-    """חישוב שעת הגעה משוערת עם בופר."""
+    """Computes estimated arrival time with a buffer."""
     total_seconds = duration_seconds * (1 + buffer_percent)
     eta_datetime = start_time + timedelta(seconds=total_seconds)
     return eta_datetime.strftime("%H:%M")
 
 
 def format_duration(seconds: float) -> str:
-    """הופך שניות לטקסט קריא בעברית."""
+    """Formats seconds as human-readable Hebrew duration text for the UI."""
     minutes = round(seconds / 60)
     if minutes < 60:
         return f"{minutes} דקות"

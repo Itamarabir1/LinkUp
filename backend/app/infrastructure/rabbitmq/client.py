@@ -18,7 +18,7 @@ class RabbitMQClient:
         self._lock = asyncio.Lock()
 
     async def connect(self):
-        """חיבור ראשוני - נקרא מה-Lifespan"""
+        """Initial connection — called from application lifespan."""
         async with self._lock:
             if self._connection is None or self._connection.is_closed:
                 try:
@@ -69,7 +69,7 @@ class RabbitMQClient:
                 logger.info("🛑 RabbitMQ Connection closed")
 
     def is_connected(self) -> bool:
-        """לשימוש ב-health checks (ללא await)."""
+        """For health checks (no await)."""
         if self._connection is None:
             return False
         try:

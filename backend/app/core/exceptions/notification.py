@@ -3,7 +3,7 @@ from .base import LinkupError
 
 
 class NotificationError(LinkupError):
-    """שגיאת בסיס לכל עולם ההתראות"""
+    """Base class for notification pipeline errors."""
 
     status_code = 500
     error_code = "NOTIFICATION_GENERAL_ERROR"
@@ -18,7 +18,7 @@ class NotificationError(LinkupError):
 
 
 class RecipientResolverError(NotificationError):
-    """שגיאה כשלא ניתן למצוא נמען (טלפון/מייל) להתראה"""
+    """Could not resolve notification recipient (phone/email)."""
 
     status_code = 404
     error_code = "NOTIFICATION_RECIPIENT_NOT_FOUND"
@@ -34,7 +34,7 @@ class RecipientResolverError(NotificationError):
 
 
 class ContextBuilderError(NotificationError):
-    """שגיאה כשבניית הנתונים (Context) נכשלה"""
+    """Failed to build notification template context."""
 
     status_code = 500
     error_code = "NOTIFICATION_CONTEXT_FAILED"

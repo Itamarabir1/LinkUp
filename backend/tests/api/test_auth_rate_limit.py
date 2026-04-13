@@ -18,7 +18,7 @@ from app.main import app
 async def auth_rate_limit_client(
     e2e_session_factory: async_sessionmaker,
 ) -> AsyncGenerator[AsyncClient, None]:
-    """אותו DB כמו טסטי API אחרים — לא תלוי ב-DATABASE_URL של הסביבה בלבד."""
+    """Reuse same DB setup as other API tests (not env DATABASE_URL only)."""
 
     async def _get_db_override():
         async with e2e_session_factory() as s:
@@ -38,7 +38,7 @@ async def test_rate_limit_blocks_after_max_requests(
     auth_rate_limit_client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """429 אחרי חריגה מהמכסה; payload ו-Retry-After."""
+    """429 after exceeding limit; body includes retry hint / Retry-After."""
     call_count = 0
 
     async def mock_rate_limit(key, window_seconds, max_count):

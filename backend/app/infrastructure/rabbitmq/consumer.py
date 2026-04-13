@@ -18,7 +18,8 @@ RETRYABLE_QUEUES = {"notifications_queue", "avatar_upload_queue"}
 
 class RabbitMQConsumer:
     """
-    צרכן RabbitMQ. אם מועברת רשימת exchanges – התור נקשרת לכולם (תור אחד לכל המיילים/פוש).
+    RabbitMQ consumer. If a list of exchanges is passed, the queue is bound to all of them
+    (one queue for all notification mail/push traffic).
     """
 
     def __init__(
@@ -36,7 +37,7 @@ class RabbitMQConsumer:
             self._exchange_names = [exchange_name or "system_events"]
 
     async def _setup(self) -> aio_pika.abc.AbstractQueue:
-        """מכריז על תור וקושר אותו לכל ה-exchanges (תור אחד מקבל הודעות מכל הדומיינים)."""
+        """Declares the queue and binds it to every exchange (one queue receives messages from all domains)."""
         channel = await self._client.get_channel()
         self._channel = channel
         await channel.set_qos(prefetch_count=10)
@@ -80,7 +81,7 @@ class RabbitMQConsumer:
         return queue
 
     async def consume(self, callback: Callable[[dict[str, Any], str], Awaitable[None]]):
-        """אחראי רק על לופ ההאזנה והעברת הודעות ל-Callback"""
+        """Owns only the listen loop and forwarding messages to the callback."""
         self._callback = callback
         queue = await self._setup()
         logger.info(f"✅ Consumer ready on '{self.queue_name}'")
@@ -152,7 +153,7 @@ class RabbitMQConsumer:
                 await message.nack(requeue=False)
 
     async def _process_message(self, message: aio_pika.IncomingMessage) -> None:
-        """ניהול לוגיקת העיבוד של הודעה בודדת. תורים ב-RETRYABLE_QUEUES מקבלים retry + DLQ."""
+        """Handles processing logic for a single message. Queues in RETRYABLE_QUEUES get retry + DLQ."""
         if self.queue_name in RETRYABLE_QUEUES:
             await self._handle_with_retry(message, self._callback, self.queue_name)
         else:

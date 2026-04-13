@@ -14,6 +14,7 @@
 | תחום | יכולות |
 |------|--------|
 | **נסיעות** | פרסום נסיעות, חיפוש (כולל גיאו / PostGIS), סטטוסים, שיוך לקבוצה / ציבורי |
+| **נוסעים / התראות חיפוש** | חיפוש **`GET …/passenger/passengers/search-rides`** — ללא שורת DB; **שמירת בקשה + התראה** — **`POST …/passengers/`** עם `is_notification_active`, `group_id` אופציונלי; בעת יצירת נסיעה — worker מתאים בקשות פעילות (`find_passengers_for_ride_notification`) |
 | **הזמנות** | בקשה, אישור/דחייה, race-safe (locks) |
 | **צ’אט** | הודעות real-time, typing, נראות (online / last seen), **unread** (Redis→WS), קריאת שיחה; **Zod** על הודעה נכנסת ב־WS — `ChatMessageSchema` + מיפוי מפורש ל־`MessageResponse` ב־`processChatWebSocketMessage` |
 | **קבוצות** | יצירה, **קוד הזמנה** Base62 (8 תווים, `secrets`), יצירה עם **`flush` + retry על `IntegrityError`** רק ל־duplicate על `invite_code`, **`commit`** אחד לקבוצה + חבר admin יוצר; אחרי כשלונות חוזרים — `LinkupError` **`INVITE_CODE_GENERATION_FAILED`** (`app/domain/groups/crud.py`) |

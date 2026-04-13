@@ -18,14 +18,14 @@ from app.domain.rides.model import Ride
 
 class CRUDBooking:
     """
-    אחריות: ניהול הגישה למסד הנתונים עבור ישות ההזמנות (Booking).
-    מרכז את כל פונקציות השליפה והכתיבה שסופקו.
+    Database access layer for Booking entities.
+    Centralizes read/write helpers used by the domain.
     """
 
     # --- Queries ---
 
     async def get_booking_by_id_async(self, db: AsyncSession, booking_id: UUID) -> Booking | None:
-        """Async variant של get_booking_by_id."""
+        """Async variant of get_booking_by_id."""
         bid = UUID(str(booking_id)) if isinstance(booking_id, str) else booking_id
         stmt = (
             select(Booking)
@@ -46,14 +46,14 @@ class CRUDBooking:
         id: UUID | None = None,
         booking_id: UUID | None = None,
     ) -> Booking | None:
-        """שליפה אסינכרונית להזמנה (לנוטיפיקציות). מקבל id= או booking_id=."""
+        """Async fetch for a booking (notifications). Accepts id= or booking_id=."""
         bid = id or booking_id
         if bid is None:
             return None
         return await self.get_booking_by_id_async(db, bid)
 
     async def get_async(self, db: AsyncSession, booking_id: UUID) -> Booking | None:
-        """שליפה אסינכרונית להזמנה עם טעינת יחסים (לשימוש ב-API endpoints)."""
+        """Async fetch for a booking with relationships loaded (for API endpoints)."""
         bid = UUID(str(booking_id)) if isinstance(booking_id, str) else booking_id
         stmt = (
             select(Booking)
@@ -102,7 +102,7 @@ class CRUDBooking:
         request_id: UUID,
         num_seats: int,
     ) -> Booking | None:
-        """מעדכן booking קיים (CANCELLED/REJECTED) לבקשה חדשה – מאפשר 'בקשת הצטרפות מחדש' בלי להפר את unique_passenger_per_ride."""
+        """Reuses an existing booking (CANCELLED/REJECTED) for a new request — allows re-request without breaking unique_passenger_per_ride."""
         existing = await self.get_booking_by_ride_and_passenger_async(db, ride_id, passenger_id)
         if not existing or existing.status not in (
             BookingStatus.CANCELLED,
@@ -190,9 +190,9 @@ class CRUDBooking:
 
     async def cancel_all_bookings_for_ride(self, db: AsyncSession, ride_id: UUID):
         """
-        ביטול רוחבי ומקצועי:
-        1. מבטל את כל ההזמנות (Bookings) של הנסיעה.
-        2. מחזיר את כל בקשות הנוסעים (PassengerRequests) לסטטוס PENDING.
+        Broad ride cancellation:
+        1. Cancels all bookings for the ride.
+        2. Sets linked passenger requests (PassengerRequests) to ACTIVE.
         """
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         stmt = select(Booking.request_id).where(Booking.ride_id == rid, Booking.request_id.isnot(None))
@@ -245,7 +245,7 @@ class CRUDBooking:
         return list(result.scalars().all())
 
     async def get_user_bookings_with_relations(self, db: AsyncSession, user_id: UUID) -> list[Booking]:
-        """הזמנות של הנוסע עם נסיעה ונהג (למסך התראות)."""
+        """Passenger bookings with ride and driver loaded (notifications UI)."""
         uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
         stmt = (
             select(Booking)
@@ -266,7 +266,7 @@ class CRUDBooking:
         return list(result.scalars().all())
 
     async def get_all_pending_bookings_for_driver(self, db: AsyncSession, driver_id: UUID) -> list[Booking]:
-        """כל הבקשות הממתינות לאישור עבור נסיעות של הנהג (למסך התראות)."""
+        """All pending approval requests for the driver’s rides (notifications UI)."""
         did = UUID(str(driver_id)) if isinstance(driver_id, str) else driver_id
         stmt = (
             select(Booking)
@@ -298,13 +298,13 @@ class CRUDBooking:
 
     async def cancel_ride_and_bookings(self, db: AsyncSession, ride_id: UUID, driver_id: UUID) -> list:
         """
-        ביטול נסיעה על ידי נהג (לוגיקה אסינכרונית מלאה).
-        - שומר הרשאות (רק נהג הנסיעה)
-        - מבטל את כל ה-bookings של הנסיעה (CANCELLED)
-        - מחשב מחדש סטטוס PassengerRequest לכל request_id של הנסיעה
-        - מבטל את הנסיעה עצמה (Ride.status=cancelled)
+        Driver cancels a ride (full async logic).
+        - Enforces permissions (ride driver only)
+        - Sets all bookings on the ride to CANCELLED
+        - Recomputes PassengerRequest status for each request_id on the ride
+        - Sets the ride itself to cancelled
 
-        חשוב: אין כאן commit. ה-caller אחראי על commit/rollback.
+        Note: no commit here; caller owns commit/rollback.
         """
         stmt = select(Ride).where(Ride.ride_id == ride_id).with_for_update()
         result = await db.execute(stmt)
@@ -332,7 +332,7 @@ class CRUDBooking:
 
     async def determine_passenger_request_status(self, db: AsyncSession, request_id: UUID) -> PassengerStatus:
         """
-        קובע את הסטטוס המתאים של PassengerRequest לפי מצב ה-bookings שלו.
+        Derives the appropriate PassengerRequest status from its bookings.
         """
         reqid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
         result = await db.execute(select(Booking).where(Booking.request_id == reqid))
@@ -364,7 +364,7 @@ class CRUDBooking:
         return PassengerStatus.ACTIVE
 
     async def update_passenger_request_status_from_bookings(self, db: AsyncSession, request_id: UUID) -> None:
-        """מעדכן את סטטוס ה-PassengerRequest לפי מצב ה-bookings שלו."""
+        """Updates PassengerRequest status based on its bookings."""
         if not request_id:
             return
 
@@ -375,7 +375,7 @@ class CRUDBooking:
         await db.execute(sa_update(PassengerRequest).where(PassengerRequest.request_id == reqid).values(status=status_value))
 
     async def complete_bookings_by_ride_ids(self, db: AsyncSession, ride_ids: list):
-        """מעדכן סטטוס לכל הבוקינגס ששייכים לרשימת נסיעות"""
+        """Updates status for all bookings belonging to the given ride ids."""
         await db.execute(
             sa_update(Booking)
             .where(

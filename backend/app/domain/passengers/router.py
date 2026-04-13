@@ -45,7 +45,7 @@ async def get_my_requests(
         description="סנן לפי סטטוס: pending, approved, cancelled, matched, expired, completed, rejected",
     ),
 ):
-    """רשימת הבקשות שלי כנוסע."""
+    """List the current user's passenger requests."""
     return await PassengerService.get_my_requests(db, current_user.user_id, status=request_status)
 
 
@@ -81,7 +81,7 @@ async def get_ride_driver_info(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """מחזיר שם וטלפון של הנהג – רק לנסיעות פתוחות. דורש התחברות."""
+    """Return driver name and phone for open rides; requires authentication."""
     try:
         return await PassengerService.get_ride_driver_info(db, ride_id)
     except ValueError as e:
@@ -100,7 +100,7 @@ async def request_ride_from_search(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """משתמש ב-request_id מהחיפוש (אם קיים) או יוצר חדש. יוצר Booking, כותב אירוע ל-Outbox; ה-Worker שולח מייל לנהג."""
+    """Use request_id from search if present, else create one. Creates booking and outbox event; worker emails driver."""
     logger.info(
         "[NOTIF] API: request_ride_from_search called ride_id=%s, request_id=%s",
         body.ride_id,
@@ -146,11 +146,11 @@ async def request_ride_from_search(
         raise HTTPException(status_code=500, detail=detail)
 
 
-# 3. Free search (persisted when authenticated)
+# 3. Free search (does not persist; use POST / to save alerts)
 @router.get(
     "/search-rides",
     response_model=RideSearchResponse,
-    summary="חיפוש טרמפים (אם מחובר, נשמרת בקשה ב-DB)",
+    summary="חיפוש טרמפים (ללא שמירת בקשה; שמירת התראה ב-POST /)",
 )
 async def search_available_rides(
     pickup_name: str,
@@ -190,7 +190,7 @@ async def cancel_request(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """מבטל את הבקשה ומשחרר אוטומטית את כל המושבים שנתפסו מול נהגים (רק לבעל הבקשה)."""
+    """Cancel the request and release all seat holds against drivers (request owner only)."""
     try:
         return await PassengerService.cancel_request(db, request_id, current_user.user_id)
     except PassengerRequestNotFoundError as e:
@@ -219,7 +219,7 @@ async def get_all_rides_admin(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """מחזיר את כל הנסיעות במערכת. אם נשלח סטטוס, יחזיר רק נסיעות בסטטוס הזה."""
+    """Return all rides in the system; optional status filter."""
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="גישה מנהלים בלבד")
     return await PassengerService.get_all_rides_for_admin(db, status=filter_status)

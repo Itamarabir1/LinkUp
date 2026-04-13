@@ -1,6 +1,5 @@
 """
-מקור אמת יחיד לולידציות: אימות (מייל, סיסמה, טלפון), קבצים (אווטאר), ועוד.
-משמש את domain/auth/schema, api/dependencies/file וכל מקום שדורש ולידציה אחידה בלי כפילות.
+Shared validation helpers (email, password, phone, uploads) for auth schemas and API deps.
 """
 
 import re
@@ -21,7 +20,7 @@ EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 
 
 def validate_email_format(email: str) -> str:
-    """מאמת פורמט אימייל (אנגלית/מספרים/תווים סטנדרטיים, ללא עברית)."""
+    """Validate ASCII-style email format."""
     if not email:
         raise ValueError("אימייל לא יכול להיות ריק")
     email = email.strip().lower()
@@ -31,7 +30,7 @@ def validate_email_format(email: str) -> str:
 
 
 def normalize_email_for_auth(value: str) -> str:
-    """נורמליזציה + ולידציה למייל ברישום/התחברות/אימות – strip, lower, validate."""
+    """Strip, lower, and validate email for auth flows."""
     v = (value or "").strip().lower()
     return validate_email_format(v)
 
@@ -45,7 +44,7 @@ PASSWORD_ERROR = (
 
 
 def validate_password_strength(password: str) -> str:
-    """בודק חוזק סיסמה: 8+ תווים, אות גדולה/קטנה, מספר, תו מיוחד."""
+    """Checks password strength: 8+ characters, upper/lowercase, digit, special character."""
     if not password:
         raise ValueError("סיסמה לא יכולה להיות ריקה")
     if not PASSWORD_REGEX.match(password):
@@ -57,7 +56,7 @@ def validate_password_strength(password: str) -> str:
 
 
 def validate_phone_number(value: str) -> str:
-    """מאמת טלפון בינלאומי ומנרמל לפורמט E.164 (למשל +972...)."""
+    """Parse international phone numbers to E.164 (default region IL)."""
     if not value or not value.strip():
         raise ValueError("מספר טלפון הוא שדה חובה")
     if phonenumbers is None:
@@ -72,7 +71,7 @@ def validate_phone_number(value: str) -> str:
 
 
 def validate_israeli_phone_number(phone: str) -> str:
-    """מנקה ומאמת טלפון ישראלי לפורמט 05XXXXXXXX."""
+    """Normalize Israeli mobile numbers to 05XXXXXXXX."""
     if not phone:
         raise ValueError("מספר טלפון הוא שדה חובה")
 
@@ -91,7 +90,7 @@ def validate_israeli_phone_number(phone: str) -> str:
 
 
 def validate_future_datetime(dt: datetime) -> datetime:
-    """בודק שהזמן שנבחר הוא עתידי (UTC)."""
+    """Ensure datetime is in the future (UTC-aware)."""
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
 
@@ -103,7 +102,7 @@ def validate_future_datetime(dt: datetime) -> datetime:
 
 
 def validate_israeli_license_plate(plate: str) -> str:
-    """מאמת לוחית רישוי (7 או 8 ספרות)."""
+    """Validate Israeli license plate as 7–8 digits."""
     clean_plate = re.sub(r"[\s\-]", "", plate)
     if not re.match(r"^\d{7,8}$", clean_plate):
         raise ValueError("מספר רכב לא תקין - יש להזין 7 או 8 ספרות")
@@ -122,9 +121,9 @@ ALLOWED_AVATAR_CONTENT_TYPES: tuple[str, ...] = (
 
 def validate_avatar_file(file: "UploadFile") -> None:
     """
-    בודק סוג קובץ וגודל מקסימלי לאווטאר.
-    משליך InvalidFileTypeError / FileTooLargeError.
-    משמש כ-Dependency (api/dependencies/file) או קריאה ישירה.
+    Validates avatar file type and maximum size.
+    Raises InvalidFileTypeError / FileTooLargeError.
+    Used as a Dependency (api/dependencies/file) or called directly.
     """
     from app.core.exceptions.validation import FileTooLargeError, InvalidFileTypeError
 
@@ -140,8 +139,8 @@ def validate_avatar_file(file: "UploadFile") -> None:
 
 def slugify_for_avatar(name: str | None) -> str:
     """
-    מחזיר slug בטוח לשם קובץ אווטאר: אותיות קטנות, מקפים, תומך בעברית.
-    אם ריק – מחזיר מחרוזת ריקה (הקריאה תשתמש ב-user_id כ-fallback).
+    Returns a safe filename slug for avatar names: lowercase, hyphens, Hebrew characters allowed.
+    If empty — returns an empty string (caller should fall back to user_id).
     """
     if not name or not (s := name.strip()):
         return ""

@@ -71,7 +71,7 @@ class InvalidDateTimeError(LinkupError):
 
 
 class NoConfirmedBookingsError(LinkupError):
-    """נזרקת כאשר מנסים להתחיל נסיעה בלי אף נוסע מאושר."""
+    """Raised when starting a ride without any confirmed booking."""
 
     status_code = 400
     error_code = "RIDE_NO_CONFIRMED_BOOKINGS"
@@ -95,7 +95,7 @@ class RideFullError(LinkupError):
 
 
 class SessionExpiredError(LinkupError):
-    """נזרקת כאשר ה-Session ID ברדיס פג תוקף או לא קיים."""
+    """Ride preview session missing or expired in Redis."""
 
     status_code = 410
     error_code = "RIDE_SESSION_EXPIRED"

@@ -5,7 +5,7 @@ from sqlalchemy.orm import declarative_mixin
 
 @declarative_mixin
 class GeoLocationMixin:
-    """מוסיף שדות מיקום בסיסיים ויכולות גיאומטריות לכל מודל"""
+    """Adds baseline location fields and geometry columns to a model."""
 
     origin_lat = Column(Float, nullable=False)
     origin_lon = Column(Float, nullable=False)
@@ -18,5 +18,5 @@ class GeoLocationMixin:
 
     @staticmethod
     def create_point(lat: float, lon: float):
-        """עוזר ליצירת נקודה בפורמט ש-PostGIS אוהב"""
+        """Builds a WKT POINT string in the format PostGIS expects."""
         return f"POINT({lon} {lat})"

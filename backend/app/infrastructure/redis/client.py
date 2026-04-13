@@ -58,8 +58,8 @@ class RedisClient:
 
     async def delete(self, key: str) -> bool:
         """
-        מוחק מפתח מה-Cache.
-        מחזיר True אם המפתח נמחק, False אם לא היה קיים.
+        Deletes a key from the cache.
+        Returns True if the key was removed, False if it did not exist.
         """
         try:
             result = await self.client.delete(key)
@@ -71,8 +71,8 @@ class RedisClient:
 
     async def rate_limit_check(self, key: str, window_seconds: int, max_count: int) -> bool:
         """
-        בודק rate limit: מגדיל מונה ב-Redis, מחזיר True אם מותר, False אם חרג.
-        אם Redis לא מחובר או שגיאה – מחזיר True (fail open).
+        Rate limit check: increments a counter in Redis, returns True if allowed, False if exceeded.
+        If Redis is disconnected or an error occurs — returns True (fail open).
         """
         if not self.client:
             logger.warning("Rate limit skipped — Redis not connected | key=%s", key)

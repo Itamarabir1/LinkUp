@@ -1,11 +1,11 @@
 """
-maintenance_crud.py — עדכון סטטוסים פגי תוקף.
+maintenance_crud.py — expire and complete stale entity statuses.
 
-עיקרון: הפונקציות מחזירות רשימת events לשליחה — לא שולחות בעצמן.
-        ה-MaintenanceService עושה commit ואז שולח את ה-events.
-        כך נמנע race condition: events נשלחים רק אחרי commit מוצלח.
+Principle: functions return a list of events to send — they do not publish themselves.
+        MaintenanceService commits, then dispatches those events.
+        Avoids race conditions: events only after a successful commit.
 
-שימוש ב-RETURNING: UPDATE אטומי שמחזיר IDs בלי SELECT נוסף.
+Uses RETURNING: atomic UPDATE that returns IDs without an extra SELECT.
 """
 
 import logging
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PendingUserEvent:
-    """Event שממתין לשליחה אחרי commit."""
+    """Event queued for dispatch after commit."""
 
     user_id: UUID
     event: str
@@ -40,15 +40,15 @@ def _table_missing(exc: BaseException) -> bool:
 
 class MaintenanceCRUD:
     """
-    תחזוקה רוחבית — SQLAlchemy 2.0 async.
-    מחזיר PendingUserEvent לשליחה אחרי commit — לא שולח Redis בעצמו.
+    Cross-cutting maintenance — SQLAlchemy 2.0 async.
+    Returns PendingUserEvent rows for post-commit dispatch — does not touch Redis directly.
     """
 
     async def bulk_update_expired_entities(self, db: AsyncSession, now: datetime) -> tuple[dict, list[PendingUserEvent]]:
         """
-        מריץ את כל עדכוני הסטטוס ומחזיר:
-          - stats: מילון עם ספירות לכל entity
-          - pending_events: רשימת events לשליחה אחרי commit
+        Runs all status maintenance updates and returns:
+          - stats: per-entity counts
+          - pending_events: events to send after commit
         """
         pending_events: list[PendingUserEvent] = []
 
@@ -72,9 +72,9 @@ class MaintenanceCRUD:
 
     async def _update_expired_rides(self, db: AsyncSession, now: datetime) -> tuple[list, list[PendingUserEvent]]:
         """
-        open → completed לנסיעות שעבר זמנן.
-        RETURNING ride_id, driver_id — אטומי, ללא race condition.
-        שולף גם passenger_ids של bookings confirmed לאותן נסיעות.
+        open → completed for rides past departure.
+        RETURNING ride_id, driver_id — atomic, no race.
+        Also loads passenger_ids for confirmed bookings on those rides.
         """
         try:
             stmt = (
@@ -121,7 +121,7 @@ class MaintenanceCRUD:
             raise
 
     async def _update_expired_passenger_requests(self, db: AsyncSession, now: datetime) -> tuple[list, list[PendingUserEvent]]:
-        """active → expired לבקשות שעבר זמנן."""
+        """active → expired for requests past their departure time."""
         try:
             stmt = (
                 update(PassengerRequest)
@@ -153,7 +153,7 @@ class MaintenanceCRUD:
             raise
 
     async def _update_completed_passenger_requests(self, db: AsyncSession, now: datetime) -> tuple[list, list[PendingUserEvent]]:
-        """matched → cancelled לבקשות שעבר זמנן."""
+        """matched → cancelled for requests past their departure time."""
         try:
             stmt = (
                 update(PassengerRequest)
@@ -184,7 +184,7 @@ class MaintenanceCRUD:
             raise
 
     async def _update_completed_bookings(self, db: AsyncSession, now: datetime) -> tuple[list, list[PendingUserEvent]]:
-        """confirmed → completed להזמנות של נסיעות שעבר זמנן."""
+        """confirmed → completed for bookings on rides past departure."""
         try:
             subq = select(Ride.ride_id).where(Ride.departure_time <= now)
             stmt = (

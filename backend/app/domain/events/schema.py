@@ -8,8 +8,7 @@ from app.domain.events.enum import DispatchTarget
 
 class Event(BaseModel):
     """
-    Domain Event DTO.
-    השפה המשותפת של כל המערכת להעברת אירועים.
+    Domain event DTO — shared contract for cross-service messaging.
     """
 
     name: str = Field(..., example="user.verification_code_created")
@@ -29,7 +28,7 @@ class Event(BaseModel):
 
     @property
     def user_id(self) -> UUID | None:
-        """חילוץ בטוח של user_id מה-payload"""
+        """Safely parse user_id from payload."""
         val = self.payload.get("user_id")
         if val is None:
             return None
@@ -42,7 +41,7 @@ class Event(BaseModel):
 
     @property
     def ride_id(self) -> UUID | None:
-        """חילוץ בטוח של ride_id מה-payload"""
+        """Safely parse ride_id from payload."""
         val = self.payload.get("ride_id")
         if val is None:
             return None
@@ -55,12 +54,12 @@ class Event(BaseModel):
 
     @property
     def routing_key(self) -> str:
-        """מחשב אוטומטית את ה-Routing Key ל-RabbitMQ"""
+        """Derived RabbitMQ routing key (metadata override or event name)."""
         return self.metadata.get("routing_key", self.name)
 
     @property
     def exchange(self) -> str:
-        """מחלץ את ה-Exchange המבוקש או מחזיר ברירת מחדל"""
+        """Exchange name from metadata or default."""
         return self.metadata.get("exchange", "system_events")
 
     class Config:

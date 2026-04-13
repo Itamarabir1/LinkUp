@@ -92,7 +92,7 @@ async def get_group_rides(
     current_user: User = Depends(get_current_user),
     ride_svc: RideService = Depends(get_ride_service),
 ):
-    """פיד נסיעות של הקבוצה. רק חברי הקבוצה יכולים לראות."""
+    """Group ride feed. Only group members may view."""
     membership = await crud.get_membership(db, group_id, current_user.user_id)
     if not membership:
         raise GroupNotMemberError()
@@ -105,7 +105,7 @@ async def get_group_image_upload_url(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """מנהל בלבד. מחזיר presigned URL להעלאת תמונת קבוצה."""
+    """Admin only. Returns presigned URL for group image upload."""
     group = await crud.get_group_by_id(db, group_id)
     if not group:
         raise GroupNotFoundError(group_id)
@@ -122,7 +122,7 @@ async def confirm_group_image(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """מנהל בלבד. מאשר העלאה ומעדכן את avatar_key של הקבוצה."""
+    """Admin only. Confirms upload and updates the group avatar_key."""
     group = await crud.get_group_by_id(db, group_id)
     if not group:
         raise GroupNotFoundError(group_id)
@@ -142,7 +142,7 @@ async def delete_group_image(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """מנהל בלבד. מוחק תמונת קבוצה מ-S3 ומאפס avatar_key."""
+    """Admin only. Deletes group image from S3 and clears avatar_key."""
     group = await crud.get_group_by_id(db, group_id)
     if not group:
         raise GroupNotFoundError(group_id)

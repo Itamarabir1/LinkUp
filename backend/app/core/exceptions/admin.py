@@ -4,7 +4,7 @@ from .base import LinkupError
 
 
 class AdminAccessRequiredError(LinkupError):
-    """משתמש מחובר שאינו אדמין ניסה לגשת ל-`/api/v1/admin/*`."""
+    """Logged-in non-admin user attempted to access `/api/v1/admin/*`."""
 
     status_code = 403
     error_code = "ADMIN_ACCESS_REQUIRED"

@@ -1,6 +1,6 @@
 """
-Enum של כל אירועי הנוטיפיקציה.
-הערכים חייבים להתאים ל-routing_key שמגיע מ-RabbitMQ (או מאוטבוקס).
+Enum of all notification events.
+Values must match routing_key from RabbitMQ (or outbox).
 """
 
 from enum import Enum

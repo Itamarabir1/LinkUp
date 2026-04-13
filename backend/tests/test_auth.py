@@ -57,7 +57,7 @@ async def registered_user(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_register_success(db_session: AsyncSession):
-    """רישום תקין — מחזיר משתמש עם user_id ואימייל נכון."""
+    """Successful registration returns user_id and email."""
     user_in = UserRegister(
         full_name="New User",
         email="new_user@example.com",
@@ -83,7 +83,7 @@ async def test_register_duplicate_email_raises(
     db_session: AsyncSession,
     registered_user,
 ):
-    """אימייל כפול — EmailAlreadyRegisteredError."""
+    """Duplicate email raises EmailAlreadyRegisteredError."""
     duplicate = UserRegister(
         full_name="Another User",
         email="test_auth@example.com",
@@ -98,7 +98,7 @@ async def test_register_duplicate_email_raises(
 
 @pytest.mark.asyncio
 async def test_register_password_mismatch_raises(db_session: AsyncSession):
-    """סיסמאות לא תואמות — ValidationError מ-pydantic."""
+    """Mismatched passwords fail pydantic validation."""
     with pytest.raises(Exception):
         UserRegister(
             full_name="User",

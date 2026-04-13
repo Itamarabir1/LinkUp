@@ -21,7 +21,7 @@ env = Environment(
 
 
 def render_email_template(template_name: str, **context) -> str:
-    """טוען קובץ HTML ומזריק לתוכו נתונים"""
+    """Loads an HTML template file and renders it with the given context."""
     try:
         # Relative paths like 'driver/new_ride.html'
         template = env.get_template(template_name)

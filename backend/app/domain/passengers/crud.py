@@ -268,7 +268,8 @@ class CRUDPassenger:
     ) -> list[PassengerRequest]:
         """
         Passenger targets for ride-created notifications.
-        Filter pipeline: active + future window → exclude driver → dest proximity → pickup near route.
+        Filter pipeline: active + notifications on + same group scope + future window
+        → exclude driver → dest proximity → pickup near route.
         """
         now = datetime.now()
         ride_date = ride.departure_time.date() if getattr(ride, "departure_time", None) else None
@@ -297,15 +298,24 @@ class CRUDPassenger:
         min_date = ride_date - timedelta(days=_RIDE_DATE_WINDOW_DAYS_BEFORE)
         max_date = ride_date + timedelta(days=_RIDE_DATE_WINDOW_DAYS_AFTER)
 
+        ride_group_id = getattr(ride, "group_id", None)
+        group_match = (
+            PassengerRequest.group_id == ride_group_id
+            if ride_group_id is not None
+            else PassengerRequest.group_id.is_(None)
+        )
+
         stmt = (
             select(PassengerRequest)
             .where(
                 and_(
                     PassengerRequest.status == PassengerStatus.ACTIVE,
+                    PassengerRequest.is_notification_active.is_(True),
                     PassengerRequest.requested_departure_time > now,
                     func.date(PassengerRequest.requested_departure_time) >= min_date,
                     func.date(PassengerRequest.requested_departure_time) <= max_date,
                     PassengerRequest.passenger_id != driver_id,
+                    group_match,
                     func.ST_DWithin(
                         cast(PassengerRequest.destination_geom, Geography),
                         cast(dest_geom, Geography),

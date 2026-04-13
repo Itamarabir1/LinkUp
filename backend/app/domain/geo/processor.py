@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 
 async def resolve_origin_address(name: str | None, lat: float | None, lon: float | None) -> str:
     """
-    מבצע 'החלטה' גיאוגרפית: שם מקום או GPS.
-    מחזיר כתובת טקסטואלית או זורק שגיאה אם אין כלום.
+    Resolve origin label: prefer place name, else reverse-geocode GPS.
+    Raises if neither yields a usable address.
     """
     # 1. Prefer explicit place name from user input
     if name and name.strip():
@@ -35,7 +35,7 @@ async def get_full_routing_data(
     departure_time: datetime | None = None,
 ) -> dict | None:
     """
-    מתזמר שליפת נתונים מ-API חיצוני והמרתם לסכימות של הדומיין.
+    Orchestrate external directions API and map results to domain route DTOs.
     """
     # 1. Coordinates from GeocodingService
     lat_o, lon_o = await GeocodingService.get_coordinates_from_address(origin_name)
@@ -78,7 +78,6 @@ async def get_full_routing_data(
 
 async def get_address_from_gps(lat: float, lon: float) -> str | None:
     """
-    Reverse Geocoding: הופך קואורדינטות לכתובת קריאה.
-    משתמש ב-GeocodingService.
+    Reverse-geocode coordinates to a human-readable address via GeocodingService.
     """
     return await GeocodingService.get_address_from_gps(lat, lon)

@@ -1,9 +1,9 @@
 """
-עיבוד תמונת אווטאר — resize ל-3 גדלים והעלאה ל-S3.
-דורש: Pillow>=10.0.0
+Avatar image processing — resize to three sizes and upload to S3.
+Requires: Pillow>=10.0.0
 
-כל העלאה נכתבת ל-prefix גרסתי immutable: avatars/{user_id}/v{version}/ — ללא מחיקה לפני העלאה
-(המחיקה של גרסה קודמת מתבצעת ב-worker אחרי commit ל-DB).
+Each upload writes to an immutable versioned prefix: avatars/{user_id}/v{version}/ — no delete-before-upload
+(deleting the previous version happens in the worker after DB commit).
 """
 
 import io
@@ -28,7 +28,7 @@ WEBP_QUALITY = 85
 
 
 def _crop_center_square(img: Image.Image) -> Image.Image:
-    """חיתוך למרכז לריבוע (צד = min(width, height))."""
+    """Center-crop to a square (side = min(width, height))."""
     w, h = img.size
     side = min(w, h)
     left = (w - side) // 2
@@ -37,7 +37,7 @@ def _crop_center_square(img: Image.Image) -> Image.Image:
 
 
 def _resize_and_encode_webp(img: Image.Image, size: tuple[int, int], quality: int = WEBP_QUALITY) -> bytes:
-    """משנה גודל ל-size, ממיר ל-WebP, מחזיר bytes."""
+    """Resizes to size, encodes WebP, returns raw bytes."""
     resized = img.resize(size, Image.Resampling.LANCZOS)
     buf = io.BytesIO()
     resized.save(buf, format="WEBP", quality=quality)
@@ -45,7 +45,7 @@ def _resize_and_encode_webp(img: Image.Image, size: tuple[int, int], quality: in
 
 
 def new_avatar_version_id() -> str:
-    """מזהה גרסה כמעט בלתי מתנגש לנתיב S3 (nanoseconds + random hex)."""
+    """Near-collision-free version id for S3 paths (nanoseconds + random hex)."""
     return f"{time.time_ns()}_{secrets.token_hex(4)}"
 
 
@@ -55,14 +55,14 @@ async def process_and_save_avatar(
     s3_client: "S3Client",
 ) -> str:
     """
-    1. מוריד תמונה מ-staging_key
-    2. משנה גודל ל-3 גדלים (ריבוע מרכזי), WebP
-    3. מעלה ל-avatars/{user_id}/v{version}/ (immutable prefix חדש)
-    4. מוחק קובץ staging
+    1. Download image from staging_key
+    2. Resize to three sizes (center square crop), WebP
+    3. Upload to avatars/{user_id}/v{version}/ (new immutable prefix)
+    4. Delete staging object
 
-    לא מוחק גרסאות קודמות — זה נעשה ב-worker אחרי עדכון DB מוצלח.
+    Does not delete older versions — worker does that after a successful DB update.
 
-    מחזיר avatar_key = "avatars/{user_id}/v{version}/"
+    Returns avatar_key = "avatars/{user_id}/v{version}/"
     """
     if not staging_key.startswith("avatars/staging/"):
         raise ValueError(f"Invalid staging key: {staging_key}")

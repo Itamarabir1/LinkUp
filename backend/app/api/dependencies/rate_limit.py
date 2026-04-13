@@ -1,5 +1,5 @@
 """
-Rate limiting ל-endpoints רגישים (login, refresh, password-reset) – הגבלה לפי IP.
+Rate limiting for sensitive endpoints (login, refresh, password-reset) — per IP.
 """
 
 from fastapi import Request
@@ -10,7 +10,7 @@ from app.infrastructure.redis.client import redis_client
 
 
 def _client_ip(request: Request) -> str:
-    """מחזיר IP הלקוח – X-Forwarded-For אם מאחורי proxy, אחרת client.host."""
+    """Returns client IP — X-Forwarded-For if behind a proxy, else client.host."""
     forwarded = request.headers.get("x-forwarded-for", "").strip()
     if forwarded:
         return forwarded.split(",")[0].strip()
@@ -19,8 +19,8 @@ def _client_ip(request: Request) -> str:
 
 async def rate_limit_auth(request: Request) -> None:
     """
-    Dependency: מגביל מספר בקשות ל-auth (login, refresh, password-reset) לפי IP.
-    אם חורג – 429 Too Many Requests. משתמש ב-Redis; אם Redis לא זמין – מאפשר (fail open).
+    Dependency: limits auth requests (login, refresh, password-reset) per IP.
+    On exceed — 429 Too Many Requests. Uses Redis; if Redis is unavailable — allows (fail open).
     """
     ip = _client_ip(request)
     key = f"ratelimit:auth:{ip}"

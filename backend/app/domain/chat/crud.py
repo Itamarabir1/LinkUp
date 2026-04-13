@@ -1,6 +1,6 @@
 """
-CRUD צ'אט 1:1 – שיחות והודעות.
-תמיד שומרים user_id_1 < user_id_2 ב־Conversation.
+1:1 chat CRUD — conversations and messages.
+Always persist user_id_1 < user_id_2 on Conversation.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -17,8 +17,8 @@ from app.domain.chat.model import ChatAnalysis, Conversation, ConversationPartic
 
 async def get_or_create_conversation(db: AsyncSession, user_id_a: UUID, user_id_b: UUID) -> Conversation:
     """
-    מחזיר שיחה קיימת בין שני המשתמשים, או יוצר חדשה.
-    user_id_1 < user_id_2 תמיד.
+    Returns an existing conversation between the two users, or creates one.
+    Always stores user_id_1 < user_id_2.
     """
     u1_raw, u2_raw = (user_id_a, user_id_b) if user_id_a < user_id_b else (user_id_b, user_id_a)
     u1 = UUID(str(u1_raw)) if isinstance(u1_raw, str) else u1_raw
@@ -45,7 +45,7 @@ async def get_or_create_conversation(db: AsyncSession, user_id_a: UUID, user_id_
 
 async def get_conversation_by_id(db: AsyncSession, conversation_id: UUID, participant_user_id: UUID) -> Conversation | None:
     """
-    מחזיר שיחה לפי ID רק אם המשתמש הוא participant (user_id_1 או user_id_2).
+    Returns a conversation by id only if the user is a participant (user_id_1 or user_id_2).
     """
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
     pid = UUID(str(participant_user_id)) if isinstance(participant_user_id, str) else participant_user_id
@@ -68,7 +68,7 @@ async def get_conversation_by_id(db: AsyncSession, conversation_id: UUID, partic
 
 async def list_conversations_for_user(db: AsyncSession, user_id: UUID) -> list[Conversation]:
     """
-    רשימת כל השיחות של המשתמש (כשותף).
+    All conversations where the user is a participant.
     """
     uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
     result = await db.execute(
@@ -139,7 +139,7 @@ async def create_message(
     sender_id: UUID,
     body: str,
 ) -> Message:
-    """שומר הודעה חדשה בשיחה."""
+    """Persists a new message in a conversation."""
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
     sid = UUID(str(sender_id)) if isinstance(sender_id, str) else sender_id
     msg = Message(
@@ -160,8 +160,8 @@ async def get_messages(
     before_message_id: int | None = None,
 ) -> tuple[list[Message], bool]:
     """
-    היסטוריית הודעות בשיחה (pagination).
-    מחזיר (רשימה בסדר כרונולוגי ישן→חדש, has_more).
+    Message history for a conversation (pagination).
+    Returns (list in chronological order oldest→newest, has_more).
     """
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
     q = select(Message).where(Message.conversation_id == cid).order_by(desc(Message.created_at)).limit(limit + 1)
@@ -180,7 +180,7 @@ async def get_all_messages_for_conversation(
     conversation_id: UUID,
     limit: int | None = 5000,
 ) -> list[Message]:
-    """שליפת כל ההודעות בשיחה (לשימוש פנימי: calendar export, AI analysis). בסדר כרונולוגי."""
+    """Loads all messages in a conversation (internal: calendar export, AI analysis). Chronological order."""
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
     q = select(Message).where(Message.conversation_id == cid).order_by(Message.created_at.asc())
     if limit is not None:
@@ -190,7 +190,7 @@ async def get_all_messages_for_conversation(
 
 
 async def get_last_message(db: AsyncSession, conversation_id: UUID) -> Message | None:
-    """הודעה אחרונה בשיחה (להרשימה)."""
+    """Latest message in a conversation (for conversation list)."""
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
     result = await db.execute(select(Message).where(Message.conversation_id == cid).order_by(desc(Message.created_at)).limit(1))
     return result.scalars().first()
@@ -200,7 +200,7 @@ async def get_last_message(db: AsyncSession, conversation_id: UUID) -> Message |
 
 
 async def mark_conversation_read(db: AsyncSession, conversation_id: UUID, user_id: UUID) -> None:
-    """עדכון last_read_at למשתמש בשיחה."""
+    """Updates last_read_at for a user in a conversation."""
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
     uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
 
@@ -220,8 +220,8 @@ async def mark_conversation_read(db: AsyncSession, conversation_id: UUID, user_i
 
 async def get_unread_conversations_count(db: AsyncSession, user_id: UUID) -> int:
     """
-    מספר שיחות שבהן יש הודעות חדשות שנשלחו ע"י הצד השני אחרי last_read_at.
-    נספר unread ברמת שיחה (conversation), לא הודעות.
+    Count of conversations with new messages from the other party after last_read_at.
+    Unread is per conversation, not per message.
     """
     uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
 
@@ -253,7 +253,7 @@ async def get_unread_conversations_count(db: AsyncSession, user_id: UUID) -> int
 
 async def has_unread_messages(db: AsyncSession, conversation_id: UUID, user_id: UUID) -> bool:
     """
-    האם יש הודעות חדשות בשיחה (מאת הצד השני) אחרי last_read_at של המשתמש.
+    Whether the conversation has new messages from the other party after the user’s last_read_at.
     """
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
     uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { fetchAddressFromCoords } from '../../api/geo';
 import {
   requestRideFromSearch,
+  saveSearchAlert,
   searchRides as searchRidesApi,
 } from '../../api/passengers';
 import { fetchPassengerDriverInfo } from '../../api/rides';
@@ -35,6 +36,9 @@ export function useSearchRides() {
   const [requestSuccessRideId, setRequestSuccessRideId] = useState<string | null>(null);
   const [requestErrorRideId, setRequestErrorRideId] = useState<string | null>(null);
   const [requestErrorMessage, setRequestErrorMessage] = useState('');
+  const [savingAlert, setSavingAlert] = useState(false);
+  const [alertSaved, setAlertSaved] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const fillPickupFromMyLocation = () => {
     if (!navigator.geolocation) {
@@ -90,15 +94,18 @@ export function useSearchRides() {
     setError('');
     setSearching(true);
     setResults([]);
+    setHasSearched(false);
     setResultsNextCursor(null);
     setResultsHasMore(false);
     setRequestSuccessRideId(null);
     setDriverInfoMap({});
+    setAlertSaved(false);
     try {
       const { data } = await searchRidesApi(buildSearchParams());
       setResults(data?.items ?? []);
       setResultsNextCursor(data?.next_cursor ?? null);
       setResultsHasMore(data?.has_more ?? false);
+      setHasSearched(true);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'חיפוש נכשל'));
     } finally {
@@ -121,6 +128,33 @@ export function useSearchRides() {
       setError(getApiErrorMessage(err, 'טעינה נכשלה'));
     } finally {
       setLoadingMore(false);
+    }
+  };
+
+  const saveAlert = async () => {
+    if (!pickup.trim() || !destination.trim()) return;
+    setSavingAlert(true);
+    setError('');
+    try {
+      await saveSearchAlert({
+        pickup_name: pickup.trim(),
+        destination_name: destination.trim(),
+        requested_departure_time: selectedDate.toISOString(),
+        search_radius: searchRadius,
+        num_passengers: 1,
+        is_notification_active: true,
+        ...(groupId ? { group_id: groupId } : {}),
+      });
+      setAlertSaved(true);
+    } catch (err: unknown) {
+      const status = getApiStatus(err);
+      if (status === 401) {
+        setError('פג תוקף ההתחברות – אנא התחבר מחדש כדי לשמור התראה.');
+        return;
+      }
+      setError(getApiErrorMessage(err, 'שמירת ההתראה נכשלה'));
+    } finally {
+      setSavingAlert(false);
     }
   };
 
@@ -204,5 +238,9 @@ export function useSearchRides() {
     fetchDriverInfo,
     sendRequestToJoin,
     groupId,
+    savingAlert,
+    alertSaved,
+    saveAlert,
+    hasSearched,
   };
 }

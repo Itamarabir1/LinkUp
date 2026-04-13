@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 class RideActions:
     """
-    פעולות על נסיעות (WebSocket, וכו').
-    אירועים למיילים/פוש נשלחים דרך Outbox מהשירות.
+    Ride-side actions (WebSocket, etc.).
+    Email/push events are emitted via Outbox from the service layer.
     """
 
     @staticmethod
@@ -19,7 +19,7 @@ class RideActions:
 
     @staticmethod
     async def handle_cancellation(ride: Ride) -> None:
-        """שליחה ל-WebSocket בלבד. אירועי Outbox מטופלים בשירות הביטול."""
+        """WebSocket publish only. Outbox events are handled in the cancellation service."""
         try:
             context = RideBuilder().build(ride, event_key="ride_cancelled")
             await publish_ride_event(

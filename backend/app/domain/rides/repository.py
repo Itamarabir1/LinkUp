@@ -13,12 +13,11 @@ logger = logging.getLogger(__name__)
 
 class RideCacheRepository:
     """
-    אחריות: ניהול ה-State הזמני של נסיעות ברדיס (Caching Layer).
-    שכבה זו מפרידה בין הלוגיקה העסקית לבין מימוש ה-Storage.
+    Redis-backed cache for temporary ride preview state (storage isolation from domain logic).
     """
 
     async def save_preview(self, preview: RidePreviewResponse, preview_in: RidePreviewCreate) -> None:
-        """שומר תצוגה מקדימה של נסיעה ב-Redis: 3 המסלולים (כולל זמן נסיעה וק\"מ) לתוקף 24 שעות."""
+        """Persist ride preview (routes, duration, distance) in Redis with ~24h TTL."""
         try:
             # Serialize payload for cache
             cache_data = preview.model_dump()
@@ -56,7 +55,7 @@ class RideCacheRepository:
             raise InfrastructureError(f"Cache write error for session: {preview.session_id}", detail=str(e))
 
     async def get_preview(self, session_id: str) -> dict[str, Any] | None:
-        """שליפת נתונים מהקאש (תוקף 24 שעות)."""
+        """Load preview payload from cache if still valid."""
         key = get_ride_preview_key(session_id)
         data = await redis_client.get(key)
         if data is None:
@@ -70,7 +69,7 @@ class RideCacheRepository:
         return data
 
     async def delete_preview(self, session_id: str) -> None:
-        """ניקוי ידני של הקאש"""
+        """Manually delete cached preview for a session."""
         key = get_ride_preview_key(session_id)
         # Use client.delete if no dedicated delete helper
         try:

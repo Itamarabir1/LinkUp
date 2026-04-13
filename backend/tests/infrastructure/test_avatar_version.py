@@ -1,4 +1,4 @@
-"""חוזה מפתחות אווטאר גרסתיים (immutable prefix) — ללא S3."""
+"""Versioned avatar key contract (immutable prefix) without hitting S3."""
 
 from app.infrastructure.s3.image_processor import new_avatar_version_id
 from app.workers.tasks.avatar_tasks import _is_versioned_avatar_prefix

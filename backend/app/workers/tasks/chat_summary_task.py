@@ -1,6 +1,6 @@
 """
-טיפול באירועי סיום שיחה מ-Redis DB=1: ניתוח AI ושמירה.
-מאזין לערוץ chat:completion:* ומפעיל את handle_conversation_completion (domain/chat/ai).
+Handles chat completion events from Redis DB=1: AI analysis and persistence.
+Listens on chat:completion:* and runs handle_conversation_completion (domain/chat/ai).
 """
 
 import asyncio
@@ -21,7 +21,7 @@ CHAT_COMPLETION_PATTERN = "chat:completion:*"
 
 
 async def _process_completion_message(payload_str: str) -> None:
-    """מפרסר את ה-payload ומפעיל ניתוח AI + שמירה."""
+    """Parses the payload and runs AI analysis plus persistence."""
     try:
         data = json.loads(payload_str)
         conversation_id = data.get("conversation_id")
@@ -55,8 +55,8 @@ async def _process_completion_message(payload_str: str) -> None:
 
 async def run_chat_completion_redis_listener(stop_event: asyncio.Event) -> None:
     """
-    מאזין ל-Redis DB=1 (REDIS_CHAT_URL) לערוצים chat:completion:*.
-    כשמגיע אירוע — מפעיל handle_conversation_completion (ניתוח AI + שמירה + outbox).
+    Listens on Redis DB=1 (REDIS_CHAT_URL) for chat:completion:* channels.
+    On event — runs handle_conversation_completion (AI analysis + persistence + outbox).
     """
     client = None
     try:

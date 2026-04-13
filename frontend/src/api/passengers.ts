@@ -1,6 +1,20 @@
 import { api } from './client';
 import type { PassengerRequest, RideSearchResponse } from '../types/api';
 
+export type SaveSearchAlertBody = {
+  pickup_name: string;
+  destination_name: string;
+  requested_departure_time: string;
+  search_radius: number;
+  num_passengers: number;
+  is_notification_active: boolean;
+  group_id?: string | null;
+};
+
+export function saveSearchAlert(body: SaveSearchAlertBody) {
+  return api.post<PassengerRequest>('/passenger/passengers/', body);
+}
+
 export function fetchMyPassengerRequests() {
   return api.get<PassengerRequest[]>('/passenger/passengers/me');
 }

@@ -1,6 +1,6 @@
 import uuid
 
-from geoalchemy2 import Geography  # שימוש ב-Geography לסנכרון עם ה-SQL
+from geoalchemy2 import Geography  # Geography type aligned with PostGIS / SQL
 from sqlalchemy import (
     Boolean,
     Column,
@@ -41,8 +41,7 @@ class PassengerStatusEnumType(PG_ENUM):
 
 class PassengerRequest(Base):
     """
-    PassengerRequest Entity - Senior Edition.
-    מייצג את ה"סוכן החכם" של הנוסע שמחפש נסיעה.
+    Passenger ride-request entity: search criteria, geometry, and lifecycle status.
     """
 
     __tablename__ = "passenger_requests"

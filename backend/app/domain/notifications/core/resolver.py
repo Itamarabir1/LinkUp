@@ -1,6 +1,6 @@
 """
-זיהוי נמען להודעות – לפי event_key ו־source.
-הקריאה חייבת להעביר source עם relationships טעונים (driver, passenger, passenger_request.user).
+Recipient resolution for notifications — by event_key and source.
+Callers must pass source with required relationships loaded (driver, passenger, passenger_request.user).
 """
 
 import logging
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class ResolverError(LinkupError):
-    """שגיאה בזיהוי נמען."""
+    """Failed to resolve notification recipient."""
 
     def __init__(self, message: str):
         super().__init__(message, status_code=500)
@@ -20,19 +20,19 @@ class ResolverError(LinkupError):
 
 class RecipientResolver:
     """
-    מחזיר את ה־User שצריך לקבל את ההודעה (מייל/פוש) לפי:
-    - event_key: מפתח האירוע (NotificationEvent)
-    - source: הישות שה־Handler הביא (User / Ride / Booking)
+    Returns the User who should receive the notification (email/push) from:
+    - event_key: notification event (NotificationEvent)
+    - source: entity from the handler (User / Ride / Booking)
 
-    דרישה: כשמועבר Ride או Booking, יש לטעון relationships:
+    When passing Ride or Booking, relationships must be loaded:
     - Ride: selectinload(Ride.driver)
     - Booking: selectinload(Booking.ride).selectinload(Ride.driver), selectinload(Booking.passenger_request).selectinload(PassengerRequest.user)
     """
 
     def resolve(self, event_key: Any, source: Any) -> Any | None:
         """
-        מחזיר User (נמען) או None.
-        strategy["role"] קובע: self → source הוא User; driver → נהג מה־Ride/Booking; passenger → נוסע מה־Booking.
+        Returns recipient User or None.
+        strategy["role"]: self → source is User; driver → driver from Ride/Booking; passenger → passenger from Booking.
         """
         from app.domain.notifications.config.mappings import NOTIFICATION_STRATEGY
 
@@ -55,14 +55,14 @@ class RecipientResolver:
         raise ResolverError(f"Role {role!r} not supported")
 
     def _for_self(self, source: Any) -> Any:
-        """role=self: source הוא User – מחזירים אותו."""
+        """role=self: source is User — return it."""
         return source
 
     def _get_driver(self, source: Any) -> Any | None:
         """
-        role=driver: source הוא Ride או Booking.
-        Ride: נדרש source.driver (או נחזיר None).
-        Booking: נדרש source.ride ו־source.ride.driver.
+        role=driver: source is Ride or Booking.
+        Ride: requires source.driver (or returns None).
+        Booking: requires source.ride and source.ride.driver.
         """
         if source is None:
             return None
@@ -74,8 +74,8 @@ class RecipientResolver:
 
     def _get_passenger(self, source: Any) -> Any | None:
         """
-        role=passenger: source הוא Booking (או ישות עם passenger/passenger_request).
-        נדרש source.passenger או source.passenger_request.user.
+        role=passenger: source is Booking (or an entity with passenger/passenger_request).
+        Requires source.passenger or source.passenger_request.user.
         """
         if source is None:
             return None

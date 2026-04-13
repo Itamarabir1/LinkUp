@@ -1,4 +1,4 @@
-"""בדיקה ש-publish_to_outbox כותב שורה ל-outbox_events באותה סשן."""
+"""Ensure publish_to_outbox inserts outbox_events in the same session."""
 
 from __future__ import annotations
 

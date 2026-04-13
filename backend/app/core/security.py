@@ -46,7 +46,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 
 
 def create_refresh_token(data: dict) -> str:
-    """טוקן ארוך תוקף (Refresh) – לשימוש ב-POST /auth/refresh לקבלת Access Token חדש. תוקף נקבע ב-config: REFRESH_TOKEN_EXPIRE_DAYS."""
+    """Long-lived refresh token for POST /auth/refresh to obtain a new access token. Expiry from config: REFRESH_TOKEN_EXPIRE_DAYS."""
     to_encode = data.copy()
     expire_days = settings.REFRESH_TOKEN_EXPIRE_DAYS
     to_encode.update(
@@ -64,7 +64,7 @@ def create_refresh_token(data: dict) -> str:
 
 
 def decode_access_token(token: str) -> dict:
-    """מפענח Access Token (JWT) ומחזיר payload, או None אם לא תקין."""
+    """Decodes access JWT and returns payload, or None if invalid."""
     import logging
 
     logger = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ def decode_access_token(token: str) -> dict:
 
 
 def decode_refresh_token(token: str) -> dict | None:
-    """מפענח Refresh Token (JWT), בודק type=refresh, מחזיר payload או None."""
+    """Decodes refresh JWT, requires type=refresh, returns payload or None."""
     try:
         payload = jwt.decode(
             token,

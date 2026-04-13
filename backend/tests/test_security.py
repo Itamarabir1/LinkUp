@@ -1,6 +1,5 @@
 """
-טסטים לפונקציות אבטחה - פענוח טוקנים (JWT).
-בודק את המקרים הקריטיים: טוקן תקין, פג תוקף, חתימה שגויה.
+Security helpers tests — JWT decode paths (valid, expired, bad signature).
 """
 
 import pytest
@@ -21,25 +20,25 @@ from app.core.config import settings
 
 @pytest.fixture
 def test_user_id():
-    """user_id קבוע לטסטים."""
+    """Fixed user id for token fixtures."""
     return "123"
 
 
 @pytest.fixture
 def valid_access_token(test_user_id):
-    """טוקן access תקין מוכן לשימוש."""
+    """Valid access JWT."""
     return create_access_token(data={"sub": test_user_id})
 
 
 @pytest.fixture
 def valid_refresh_token(test_user_id):
-    """טוקן refresh תקין מוכן לשימוש."""
+    """Valid refresh JWT."""
     return create_refresh_token(data={"sub": test_user_id})
 
 
 @pytest.fixture
 def expired_access_token(test_user_id):
-    """טוקן access פג תוקף."""
+    """Expired access JWT."""
     expired_time = datetime.now(timezone.utc) - timedelta(minutes=1)
     payload = {"sub": test_user_id, "exp": expired_time}
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -47,7 +46,7 @@ def expired_access_token(test_user_id):
 
 @pytest.fixture
 def expired_refresh_token(test_user_id):
-    """טוקן refresh פג תוקף."""
+    """Expired refresh JWT."""
     expired_time = datetime.now(timezone.utc) - timedelta(days=1)
     payload = {
         "sub": test_user_id,
@@ -58,10 +57,10 @@ def expired_refresh_token(test_user_id):
 
 
 class TestDecodeAccessToken:
-    """טסטים ל-decode_access_token() - פענוח טוקן קצר (Access Token)."""
+    """Tests for decode_access_token (short-lived access JWT)."""
 
     def test_valid_token_returns_payload(self, valid_access_token, test_user_id):
-        """טוקן תקין - מחזיר payload עם sub ו-exp."""
+        """Valid token yields payload with sub and exp."""
         payload = decode_access_token(valid_access_token)
 
         assert payload is not None
@@ -69,20 +68,20 @@ class TestDecodeAccessToken:
         assert "exp" in payload
 
     def test_expired_token_returns_none(self, expired_access_token):
-        """טוקן פג תוקף - נדחה ומחזיר None."""
+        """Expired token rejected → None."""
         result = decode_access_token(expired_access_token)
         assert result is None
 
     def test_invalid_signature_returns_none(self, valid_access_token):
-        """טוקן עם חתימה שגויה - נדחה ומחזיר None."""
-        # שינוי תו אחד בטוקן כדי לפגום את החתימה
+        """Tampered signature rejected → None."""
+        # Flip one character to break the signature
         invalid_token = valid_access_token[:-1] + "X"
 
         result = decode_access_token(invalid_token)
         assert result is None
 
     def test_wrong_secret_key_returns_none(self, test_user_id):
-        """טוקן עם SECRET_KEY שגוי - נדחה ומחזיר None."""
+        """Wrong signing secret rejected → None."""
         payload = {
             "sub": test_user_id,
             "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
@@ -94,10 +93,10 @@ class TestDecodeAccessToken:
 
 
 class TestDecodeRefreshToken:
-    """טסטים ל-decode_refresh_token() - פענוח טוקן ארוך (Refresh Token)."""
+    """Tests for decode_refresh_token (long-lived refresh JWT)."""
 
     def test_valid_refresh_token_returns_payload(self, valid_refresh_token, test_user_id):
-        """טוקן refresh תקין - מחזיר payload עם type=refresh."""
+        """Valid refresh token includes type=refresh."""
         payload = decode_refresh_token(valid_refresh_token)
 
         assert payload is not None
@@ -106,21 +105,21 @@ class TestDecodeRefreshToken:
         assert "exp" in payload
 
     def test_access_token_as_refresh_returns_none(self, valid_access_token):
-        """טוקן access (לא refresh) - נדחה ומחזיר None."""
+        """Access token without refresh type rejected → None."""
         result = decode_refresh_token(valid_access_token)
-        assert result is None  # כי אין type="refresh"
+        assert result is None  # missing type="refresh"
 
     def test_refresh_token_expired_returns_none(self, expired_refresh_token):
-        """טוקן refresh פג תוקף - נדחה ומחזיר None."""
+        """Expired refresh rejected → None."""
         result = decode_refresh_token(expired_refresh_token)
         assert result is None
 
     def test_refresh_token_without_type_returns_none(self, test_user_id):
-        """טוקן refresh בלי type=refresh - נדחה ומחזיר None."""
+        """Refresh-shaped JWT without type=refresh rejected → None."""
         payload = {
             "sub": test_user_id,
             "exp": datetime.now(timezone.utc) + timedelta(days=7),
-            # אין "type": "refresh"
+            # no "type": "refresh"
         }
         token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 

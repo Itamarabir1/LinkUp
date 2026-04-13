@@ -137,7 +137,7 @@ class VerificationCodeExpiredError(LinkupError):
 
 
 class GoogleAuthFailed(LinkupError):
-    """כשל באימות מול Google — שירות חיצוני, לא אשמת המשתמש."""
+    """Failure authenticating with Google — external service, not the user's fault."""
 
     status_code = 502
     error_code = "AUTH_GOOGLE_FAILED"

@@ -18,16 +18,15 @@ logger = logging.getLogger(__name__)
 
 class CRUDRide:
     """
-    אחריות: ניהול הגישה למסד הנתונים (PostgreSQL) עבור ישות הנסיעה.
-    Senior Tip: שימוש ב-db.flush() מאפשר לסרוויס לנהל את ה-Transaction (Atomic).
+    Database access for Ride entities (PostgreSQL).
+    Uses flush() so the service layer owns transaction boundaries.
     """
 
     @staticmethod
     def _base_ride_stmt() -> Select:
         """
-        מקור אמת יחיד לטעינת Rides לתצוגה.
-        כל query שמחזיר Rides ל-RideResponse חייב לעבור דרך כאן.
-        מבטיח ש-group ו-driver תמיד נטענים — אין MissingGreenlet.
+        Canonical select for rides shown in API responses.
+        Ensures group and driver are eager-loaded (avoids MissingGreenlet).
         """
         return select(Ride).options(
             selectinload(Ride.group),
@@ -36,8 +35,7 @@ class CRUDRide:
 
     def create(self, db: Session, *, obj_in: dict[str, Any]) -> Ride:
         """
-        יצירת נסיעה - Clean Version:
-        מקבל מילון מוכן (אחרי Mapper) ושומר אותו.
+        Persist a ride from a mapper-built dict (geometries already resolved).
         """
         # 1. ORM from dict (geometries already materialized)
         db_obj = Ride(**obj_in)
@@ -52,19 +50,19 @@ class CRUDRide:
         return db_obj
 
     def get(self, db: Session, ride_id: UUID) -> Ride | None:
-        """שליפה מהירה לפי מפתח ראשי (Session סינכרוני)."""
+        """Load by primary key (sync Session)."""
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         return db.query(Ride).filter(Ride.ride_id == rid).first()
 
     async def get_async(self, db: AsyncSession, ride_id: UUID) -> Ride | None:
-        """שליפה לפי מפתח ראשי ל-AsyncSession (לשימוש ב-read_ride ו-API אסינכרוני)."""
+        """Load by primary key for AsyncSession (read_ride and async API)."""
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         stmt = self._base_ride_stmt().where(Ride.ride_id == rid)
         result = await db.execute(stmt)
         return result.scalars().first()
 
     async def get_with_driver(self, db: AsyncSession, ride_id: UUID) -> Ride | None:
-        """שליפת נסיעה עם טעינת הנהג (לפרטי נהג לתצוגה לנוסע)."""
+        """Load ride with driver joined (passenger driver-info endpoint)."""
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         stmt = select(Ride).options(joinedload(Ride.driver)).where(Ride.ride_id == rid)
         result = await db.execute(stmt)
@@ -72,11 +70,10 @@ class CRUDRide:
 
     async def get_for_update(self, db: AsyncSession, ride_id: UUID, driver_id: UUID | None = None) -> Ride | None:
         """
-        Senior Implementation: שליפת נסיעה עם נעילת שורה (FOR UPDATE).
+        Load ride with SELECT FOR UPDATE.
 
-        - אם driver_id מסופק: האימות מתבצע ב-DB (מונע גישה למי שאינו הבעלים).
-        - with_for_update(): נועל את השורה עד לסיום הטרנזקציה (Commit/Rollback),
-          מה שמונע מ-Race Conditions לקרות (למשל: נהג ונוסע שמבטלים בו-זמנית).
+        When driver_id is set, ownership is enforced in the query.
+        Row lock lasts until commit/rollback to reduce concurrent update races.
         """
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         stmt = select(Ride).where(Ride.ride_id == rid)
@@ -88,7 +85,7 @@ class CRUDRide:
         return result.scalars().first()
 
     def get_all(self, db: Session, status: RideStatus | None = None) -> list[Ride]:
-        """שליפה עם פילטור לפי סטטוס"""
+        """List rides, optionally filtered by status (sync)."""
         query = db.query(Ride)
         if status:
             query = query.filter(Ride.status == status)
@@ -100,7 +97,7 @@ class CRUDRide:
         driver_id: UUID,
         status: RideStatus | None = None,
     ) -> list[Ride]:
-        """שליפת נסיעות לפי נהג (למסך 'הנסיעות שלי')."""
+        """List rides for a driver (driver's rides screen)."""
         did = UUID(str(driver_id)) if isinstance(driver_id, str) else driver_id
         stmt = self._base_ride_stmt().where(Ride.driver_id == did)
         if status is not None:
@@ -115,7 +112,7 @@ class CRUDRide:
         group_id: UUID,
         exclude_cancelled: bool = True,
     ) -> list[Ride]:
-        """שליפת נסיעות לפי קבוצה (לטאב נסיעות במסך קבוצה)."""
+        """List rides for a group (group rides tab)."""
         gid = UUID(str(group_id)) if isinstance(group_id, str) else group_id
         stmt = self._base_ride_stmt().where(Ride.group_id == gid)
         if exclude_cancelled:
@@ -125,7 +122,7 @@ class CRUDRide:
         return list(result.scalars().all())
 
     async def update_status(self, db: AsyncSession, ride_id: UUID, status: RideStatus) -> Ride | None:
-        """עדכון סטטוס מאובטח (SELECT FOR UPDATE)"""
+        """Update ride status under row lock."""
         ride = await self.get_for_update(db, ride_id)
         if ride:
             ride.status = status
@@ -133,7 +130,7 @@ class CRUDRide:
         return ride
 
     def update_seats(self, db: Session, ride_id: UUID, num_seats_change: int) -> Ride | None:
-        """עדכון מושבים אטומי עם בדיקת תקינות"""
+        """Adjust available seats with consistency checks (sync)."""
         ride = self.get_for_update(db, ride_id)
         if ride:
             if ride.available_seats - num_seats_change < 0:
@@ -146,7 +143,7 @@ class CRUDRide:
     ALLOWED_UPDATE_FIELDS = ("available_seats", "departure_time")
 
     async def update_partial(self, db: AsyncSession, ride_id: UUID, driver_id: UUID, **updates: Any) -> Ride | None:
-        """עדכון חלקי – רק available_seats ו-departure_time. בודק בעלות וולידציית מושבים."""
+        """Partial update: available_seats and/or departure_time; ownership and seat rules enforced."""
         ride = await self.get_for_update(db, ride_id, driver_id)
         if not ride:
             return None
@@ -172,7 +169,7 @@ class CRUDRide:
         return ride
 
     async def get_for_notification(self, db: AsyncSession, ride_id: UUID) -> Ride | None:
-        """שליפת נסיעה עם נהג (לבניית קונטקסט במייל/פוש)."""
+        """Load ride with driver/group for notification context."""
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         stmt = self._base_ride_stmt().where(Ride.ride_id == rid)
         result = await db.execute(stmt)

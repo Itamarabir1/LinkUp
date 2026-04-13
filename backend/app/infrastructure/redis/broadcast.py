@@ -22,7 +22,7 @@ class RedisBroadcast:
         logger.info("⚠️ Redis Broadcast connection closed.")
 
     async def publish(self, channel: str, message: str):
-        """המתודה שבה משתמש ה-InAppProvider"""
+        """Method invoked by InAppProvider."""
         try:
             await self.engine.publish(channel=channel, message=message)
         except Exception as e:
@@ -30,8 +30,8 @@ class RedisBroadcast:
 
     def subscribe(self, channel: str):
         """
-        מחזיר Context Manager של broadcaster.
-        זה מאפשר לעשות: async with broadcast.subscribe(...)
+        Returns the broadcaster context manager.
+        Enables: async with broadcast.subscribe(...)
         """
         return self.engine.subscribe(channel=channel)
 

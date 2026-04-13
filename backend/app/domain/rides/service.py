@@ -90,7 +90,7 @@ class RideService:
     # --- Preview ---
 
     async def get_ride_preview(self, preview_in: RidePreviewCreate) -> RidePreviewResponse:
-        """שלב 1: יצירת תצוגה מקדימה של מסלולים אפשריים ושמירתם ב-Cache."""
+        """Step 1: build route preview and store it in Redis cache."""
         self._validate_preview_input(preview_in)
         origin_address = await geo_proc.resolve_origin_address(
             preview_in.origin_name,
@@ -120,7 +120,7 @@ class RideService:
     # --- Create ride ---
 
     async def create_ride(self, db: AsyncSession, ride_in: RideCreate, current_user_id: UUID) -> RideResponse:
-        """שלב 2: אישור סופי של הנסיעה והעברתה מה-Cache ל-PostgreSQL."""
+        """Step 2: finalize ride from cached preview and persist to PostgreSQL."""
         cached_data = await self._validate_and_get_cached_ride(ride_in)
         cached_data["driver_id"] = current_user_id
         if ride_in.group_id:
@@ -179,7 +179,7 @@ class RideService:
 
     @staticmethod
     async def get_ride_by_id(db: AsyncSession, ride_id: UUID):
-        """שליפת נסיעה לפי מזהה (לשימוש ב-API עם AsyncSession)."""
+        """Load ride by id (async API path)."""
         return await crud_ride.get_async(db, ride_id)
 
     async def get_my_rides(
@@ -188,13 +188,13 @@ class RideService:
         driver_id: UUID,
         status: str | None = None,
     ) -> list[RideResponse]:
-        """רשימת נסיעות של הנהג המחובר (הנסיעות שלי)."""
+        """List rides for the authenticated driver."""
         status_enum = RideStatus(status) if status else None
         rides = await crud_ride.get_by_driver_id(db, driver_id, status_enum)
         return [RideMapper.to_response(r) for r in rides]
 
     async def get_rides_by_group_id(self, db: AsyncSession, group_id: UUID) -> list[RideResponse]:
-        """רשימת נסיעות של קבוצה (לטאב נסיעות במסך קבוצה). לא בודק חברות – יש לקרוא רק אחרי אימות שהמשתמש חבר בקבוצה."""
+        """List rides for a group tab; does not verify membership — call only after authz."""
         rides = await crud_ride.get_by_group_id(db, group_id, exclude_cancelled=True)
         return [RideMapper.to_response(r) for r in rides]
 
@@ -207,7 +207,7 @@ class RideService:
         driver_id: UUID,
         payload: RideUpdate,
     ) -> RideResponse:
-        """עדכון חלקי – זמן יציאה ו/או מספר מושבים. רק הנהג בעלים."""
+        """Partial update: departure and/or seats (driver owner only)."""
         update_dict: dict[str, Any] = {}
         if payload.departure_time is not None:
             update_dict["departure_time"] = payload.departure_time
@@ -234,7 +234,7 @@ class RideService:
     # --- Start / End ride (GPS tracking) ---
 
     async def start_ride(self, db: AsyncSession, ride_id: UUID, driver_id: UUID) -> RideResponse:
-        """מעביר נסיעה לסטטוס ACTIVE. דורש לפחות הזמנה אחת מאושרת."""
+        """Transition ride to ACTIVE; requires at least one confirmed booking."""
         try:
             ride = await crud_ride.get_for_update(db, ride_id=ride_id, driver_id=driver_id)
             if not ride:
@@ -259,7 +259,7 @@ class RideService:
         return RideMapper.to_response(updated)
 
     async def end_ride(self, db: AsyncSession, ride_id: UUID, driver_id: UUID) -> RideResponse:
-        """מעביר נסיעה לסטטוס COMPLETED."""
+        """Transition ride to COMPLETED."""
         try:
             ride = await crud_ride.get_for_update(db, ride_id=ride_id, driver_id=driver_id)
             if not ride:
@@ -283,7 +283,7 @@ class RideService:
     # --- Cancel ---
 
     async def cancel_ride_by_driver(self, db: AsyncSession, ride_id: UUID, driver_id: UUID) -> None:
-        """ביטול נסיעה על ידי הנהג. לוגיקה ב-crud, Outbox נשאר כאן."""
+        """Driver-initiated cancel; core mutation in CRUD, outbox handled here."""
         ride = await crud_ride.get_for_update(db, ride_id=ride_id, driver_id=driver_id)
         if not ride:
             raise RideNotFoundError(ride_id)

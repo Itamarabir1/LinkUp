@@ -20,7 +20,7 @@ def _generate_invite_code(length: int = 8) -> str:
 
 
 def _is_invite_code_unique_violation(exc: IntegrityError) -> bool:
-    """התאמה ל-duplicate על invite_code (PostgreSQL / asyncpg)."""
+    """Detects duplicate invite_code constraint violations (PostgreSQL / asyncpg)."""
     parts: list[str] = []
     if exc.orig is not None:
         parts.append(str(exc.orig))

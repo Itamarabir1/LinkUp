@@ -1,6 +1,6 @@
 """
-שירות צ'אט 1:1 – לוגיקה מעל CRUD, בניית תשובות (partner, last message).
-אחרי שמירת הודעה – מפרסם ל-Redis Pub/Sub (שרת ה-WS ב-Go מאזין).
+1:1 chat service — logic above CRUD, response shaping (partner, last message).
+After saving a message — publishes to Redis Pub/Sub (Go WS server subscribes).
 """
 
 import json
@@ -43,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 
 async def _require_booking_and_ride_for_chat(db: AsyncSession, booking_id: UUID, current_user_id: UUID) -> tuple[Booking, Ride]:
-    """טוען הזמנה ונסיעה; זורק שגיאת דומיין אם אין הרשאה לצ'אט."""
+    """Loads booking and ride; raises domain error if chat is not allowed."""
     bid = UUID(str(booking_id)) if isinstance(booking_id, str) else booking_id
     result = await db.execute(select(Booking).where(Booking.booking_id == bid))
     booking = result.scalars().first()
@@ -68,8 +68,8 @@ async def _require_booking_and_ride_for_chat(db: AsyncSession, booking_id: UUID,
 
 async def get_or_create_conversation(db: AsyncSession, current_user_id: UUID, other_user_id: UUID) -> ConversationDetail:
     """
-    מחזיר או יוצר שיחה בין current_user ל־other_user.
-    מחזיר ConversationDetail (לשימוש בראוטר).
+    Returns or creates a conversation between current_user and other_user.
+    Returns ConversationDetail (for the router).
     """
     if other_user_id == current_user_id:
         raise LinkupError(
@@ -95,9 +95,9 @@ async def get_or_create_conversation(db: AsyncSession, current_user_id: UUID, ot
 
 async def get_or_create_conversation_by_booking(db: AsyncSession, booking_id: UUID, current_user_id: UUID) -> ConversationDetail:
     """
-    מחזיר או יוצר שיחה בין נהג לנוסע על בסיס booking_id.
-    בודק הרשאות: רק נהג או נוסע של ה-booking יכולים לפתוח שיחה,
-    ורק אם הסטטוס הוא pending_approval או confirmed.
+    Returns or creates a driver–passenger conversation for a booking_id.
+    Permission: only the booking’s driver or passenger may open chat,
+    and only when status is pending approval or confirmed.
     """
     booking, ride = await _require_booking_and_ride_for_chat(db, booking_id, current_user_id)
 
@@ -131,7 +131,7 @@ async def get_or_create_conversation_by_booking(db: AsyncSession, booking_id: UU
 
 
 def _partner_from_conversation(conv, current_user_id: UUID) -> ConversationPartner:
-    """מחזיר את הצד השני בשיחה (User → ConversationPartner)."""
+    """Returns the other party in the conversation (User → ConversationPartner)."""
     user = conv.user_2 if conv.user_id_1 == current_user_id else conv.user_1
     return ConversationPartner(
         user_id=user.user_id,
@@ -142,7 +142,7 @@ def _partner_from_conversation(conv, current_user_id: UUID) -> ConversationPartn
 
 async def list_my_conversations(db: AsyncSession, current_user_id: UUID) -> list[ConversationListItem]:
     """
-    רשימת שיחות של המשתמש עם פרטי הצד השני והודעה אחרונה.
+    Lists the user’s conversations with partner details and last message.
     """
     convs = await chat_crud.list_conversations_for_user(db, current_user_id)
     out = []
@@ -171,7 +171,7 @@ async def list_my_conversations(db: AsyncSession, current_user_id: UUID) -> list
 
 async def get_conversation_detail(db: AsyncSession, conversation_id: UUID, current_user_id: UUID) -> ConversationDetail:
     """
-    פרטי שיחה אחת – רק אם המשתמש participant.
+    One conversation’s details — only if the user is a participant.
     """
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
     if not conv:
@@ -191,8 +191,8 @@ async def send_message(
     body: str,
 ) -> MessageResponse:
     """
-    שולח הודעה בשיחה: שמירה ב-DB + פרסום ל-Redis (שרת ה-WS ב-Go מאזין).
-    אם ההודעה היא הודעת סיום — מפרסם אירוע ל-Redis DB=1; worker יטפל בניתוח AI.
+    Sends a message: persist in DB + publish to Redis (Go WS server listens).
+    If the body is a conversation-end message — publishes to Redis DB=1; worker runs AI analysis.
     """
     from app.domain.chat.completion.detector import is_conversation_completion_message
     from app.infrastructure.redis.chat_completion_publish import (
@@ -251,7 +251,7 @@ async def get_messages(
     before_message_id: int | None = None,
 ) -> PaginatedMessagesResponse:
     """
-    היסטוריית הודעות בשיחה (pagination).
+    Message history for a conversation (pagination).
     """
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
     if not conv:

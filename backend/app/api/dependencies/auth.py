@@ -62,7 +62,7 @@ async def get_current_user_optional(
     db: AsyncSession = Depends(get_db),
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme_optional),
 ):
-    """מחזיר User אם יש טוקן תקף, אחרת None. לשימוש ב-endpoints ללא auth (חיפוש)."""
+    """Returns User if a valid token is present, else None. For optional-auth endpoints (e.g. search)."""
     if not credentials:
         return None
     payload = decode_access_token(credentials.credentials)

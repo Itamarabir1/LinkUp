@@ -12,7 +12,7 @@ from app.domain.rides.schema import RideResponse
 
 
 class Passenger(BaseModel):
-    """השרת ממלא passenger_id מהמשתמש המחובר – לא מהגוף."""
+    """Server fills passenger_id from the authenticated user, not from the body."""
 
     passenger_id: UUID | None = Field(None, description="ממולא בשרת מהטוקן; התעלם בקליינט")
     num_passengers: int = Field(default=1, ge=1)
@@ -47,7 +47,7 @@ class PassengerRequestCreate(Passenger):
 
 
 class PassengerRequestResponse(BaseModel):
-    """נתוני הבקשה הבסיסיים כפי שנשמרו ב-DB"""
+    """Core passenger request fields as stored in the database."""
 
     request_id: UUID
     passenger_id: UUID
@@ -70,8 +70,8 @@ class PassengerRequestResponse(BaseModel):
 
 class PassengerRequestWithMatches(PassengerRequestResponse):
     """
-    הסכמה הזו מחזירה גם את נתוני הבקשה וגם את הנהגים שנמצאו באותו רגע.
-    יורשת אוטומטית את is_notification_active מ-PassengerRequestResponse.
+    Response including the saved request plus immediately matching rides.
+    Inherits is_notification_active from PassengerRequestResponse.
     """
 
     matching_rides: list[RideResponse] = Field(default=[], description="רשימת נהגים רלוונטיים שנמצאו מיד")
@@ -81,7 +81,7 @@ class PassengerRequestWithMatches(PassengerRequestResponse):
 
 
 class PassengerRequestUpdateNotifications(BaseModel):
-    """סכימה ייעודית לשינוי מצב הכפתור בלבד"""
+    """Schema for toggling notification preference only."""
 
     is_notification_active: bool
 
@@ -90,7 +90,7 @@ class PassengerRequestUpdateNotifications(BaseModel):
 
 
 class RideSearchRequest(BaseModel):
-    """סכמת קלט לחיפוש; passenger_id ממולא בשרת אם יש auth (אופציונלי)."""
+    """Ride search input; passenger_id set server-side when authenticated (optional)."""
 
     passenger_id: UUID | None = Field(None, description="ממולא בשרת כשמשתמש מחובר")
     pickup_name: str = Field(..., min_length=2)
@@ -106,7 +106,7 @@ class RideSearchRequest(BaseModel):
 
 
 class RideSearchResponse(BaseModel):
-    """תשובת חיפוש נסיעות עם cursor-based pagination."""
+    """Ride search results with cursor-based pagination."""
 
     items: list[RideResponse] = Field(default_factory=list)
     next_cursor: str | None = Field(None, description="ride_id להבא (after=)")
@@ -114,7 +114,7 @@ class RideSearchResponse(BaseModel):
 
 
 class RequestRideFromSearch(BaseModel):
-    """בקשת הצטרפות לנסיעה מתוך תוצאות חיפוש."""
+    """Join a ride from search results."""
 
     ride_id: UUID
     request_id: UUID | None = Field(None, description="מזהה הבקשה מהחיפוש (אם קיים)")

@@ -1,7 +1,7 @@
 """
-שירות אחסון S3 – אווטאר: presigned upload ל-staging, worker מעבד ל-prefix גרסתי:
-avatars/staging/{user_id}_{uuid}.webp → avatars/{user_id}/v{version}/ (immutable) + 3 גדלים.
-תמונת קבוצה: GROUPS/<group_id>/<uuid>.webp — העלאה ישירה, קובץ יחיד per group.
+S3 storage service — avatars: presigned upload to staging, worker processes to versioned prefix:
+avatars/staging/{user_id}_{uuid}.webp → avatars/{user_id}/v{version}/ (immutable) + three sizes.
+Group image: GROUPS/<group_id>/<uuid>.webp — direct upload, single file per group.
 """
 
 import logging
@@ -30,8 +30,8 @@ class StorageService:
         expiration: int = 300,
     ) -> tuple[str, str]:
         """
-        יוצר presigned URL להעלאה ישירה ל-S3 staging. תמיד webp.
-        מחזיר: (presigned_url, staging_key). staging_key = avatars/staging/{user_id}_{uuid}.webp
+        Creates a presigned URL for direct upload to S3 staging. Always WebP.
+        Returns: (presigned_url, staging_key). staging_key = avatars/staging/{user_id}_{uuid}.webp
         """
         uid_str = str(user_id)
         staging_key = f"{STAGING_PREFIX}{uid_str}_{uuid.uuid4().hex}.webp"
@@ -47,7 +47,7 @@ class StorageService:
         return presigned_url, staging_key
 
     async def list_and_delete_prefix(self, prefix: str) -> None:
-        """מוחק את כל האובייקטים עם prefix נתון."""
+        """Deletes all objects under the given prefix."""
         keys = await self.client.list_objects_by_prefix(prefix)
         for key in keys:
             try:
@@ -58,7 +58,7 @@ class StorageService:
                 raise S3DeleteFailed() from e
 
     async def delete_avatar_prefix(self, prefix: str) -> None:
-        """מוחק את כל האובייקטים עם prefix נתון (גרסה ישנה של אווטאר)."""
+        """Deletes all objects under the given prefix (legacy avatar version cleanup)."""
         p = prefix.strip()
         if not p:
             return
@@ -68,17 +68,17 @@ class StorageService:
         logger.info("Deleted avatar prefix: %s", p)
 
     async def delete_user_avatar_folder(self, user_id: UUID | str) -> None:
-        """מוחק את כל תוכן העץ avatars/{user_id}/ (כל הגרסאות + מבנה ישן ללא v/)."""
+        """Deletes everything under avatars/{user_id}/ (all versions + legacy layout without v/)."""
         uid_str = str(user_id)
         prefix = f"avatars/{uid_str}/"
         await self.list_and_delete_prefix(prefix)
         logger.info("Deleted avatar folder for user %s", uid_str)
 
-    async def generate_group_image_upload_url(self, group_id: UUID | str, expiration: int = 300) -> tuple[str, str]:
+    async def generate_group_image_upload_url(self, group_id: UUID | str, expiration: int = 300    ) -> tuple[str, str]:
         """
-        יוצר presigned URL להעלאה ישירה ל-S3 לתמונת קבוצה.
-        מפתח: GROUPS/<group_id>/<uuid>.webp
-        מחזיר: (presigned_url, key).
+        Creates a presigned URL for direct S3 upload of a group image.
+        Key: GROUPS/<group_id>/<uuid>.webp
+        Returns: (presigned_url, key).
         """
         gid_str = str(group_id)
         key = f"{GROUPS_PREFIX}{gid_str}/{uuid.uuid4().hex}.webp"
@@ -88,14 +88,14 @@ class StorageService:
         return presigned_url, key
 
     def generate_read_url(self, key: str, expiration: int = 900) -> str:
-        """URL לקריאה: CloudFront אם מוגדר, אחרת presigned GET ל-S3."""
+        """Read URL: CloudFront if configured, otherwise presigned GET to S3."""
         if settings.CLOUDFRONT_DOMAIN:
             encoded_key = quote(key, safe="/")
             return f"https://{settings.CLOUDFRONT_DOMAIN}/{encoded_key}"
         return self.client.generate_presigned_read_url(key=key, expiration=expiration)
 
     def build_avatar_url(self, avatar_key: str | None, filename: str) -> str | None:
-        """מקור אמת יחיד לבניית URL לאווטאר משתמש (לא קבוצות)."""
+        """Single source of truth for building a user avatar URL (not groups)."""
         if not avatar_key or not settings.S3_BUCKET_NAME:
             return None
         if avatar_key.startswith("avatars/staging/"):
@@ -109,14 +109,14 @@ class StorageService:
             return None
 
     async def delete_group_image_folder(self, group_id: UUID | str) -> None:
-        """מוחק את כל תוכן התיקייה GROUPS/<group_id>/."""
+        """Deletes all objects under GROUPS/<group_id>/."""
         gid_str = str(group_id)
         prefix = f"{GROUPS_PREFIX}{gid_str}/"
         await self.list_and_delete_prefix(prefix)
         logger.info("Deleted group image folder for group %s", gid_str)
 
     async def delete_file(self, file_url: str) -> None:
-        """מחיקת קובץ לפי URL (חילוץ key)."""
+        """Deletes a file by URL (extracts object key)."""
         try:
             key = file_url.split(".com/")[-1].split("?")[0]
             if key:

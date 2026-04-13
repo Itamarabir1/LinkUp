@@ -41,7 +41,7 @@ async def preview_ride_options(
     current_user: User = Depends(get_current_user),  # הוספנו את המשתמש המחובר
     ride_svc: RideService = Depends(get_ride_service),
 ):
-    """שלב 1: קבלת אפשרויות מסלול ומחירים"""
+    """Step 1: route options and metrics for ride preview."""
     return await ride_svc.get_ride_preview(preview_in)
 
 
@@ -67,7 +67,7 @@ async def get_my_rides(
     ),
     ride_svc: RideService = Depends(get_ride_service),
 ):
-    """רשימת הנסיעות שלי כנהג."""
+    """List current user's rides as driver."""
     return await ride_svc.get_my_rides(db, current_user.user_id, status=status)
 
 
@@ -79,7 +79,7 @@ async def update_ride(
     current_user: User = Depends(get_current_user),
     ride_svc: RideService = Depends(get_ride_service),
 ):
-    """עדכון חלקי לנסיעה – זמן יציאה ו/או מספר מושבים (רק הנהג בעלים)."""
+    """Partial ride update: departure and/or seats (driver owner only)."""
     return await ride_svc.update_ride(db, ride_id, current_user.user_id, payload)
 
 
@@ -90,7 +90,7 @@ async def start_ride(
     current_user: User = Depends(get_current_user),
     ride_svc: RideService = Depends(get_ride_service),
 ):
-    """התחל נסיעה — מעביר לסטטוס ACTIVE. דורש לפחות נוסע מאושר אחד."""
+    """Start ride → ACTIVE; requires at least one confirmed passenger."""
     return await ride_svc.start_ride(db, ride_id=ride_id, driver_id=current_user.user_id)
 
 
@@ -101,7 +101,7 @@ async def end_ride(
     current_user: User = Depends(get_current_user),
     ride_svc: RideService = Depends(get_ride_service),
 ):
-    """סיים נסיעה — מעביר לסטטוס COMPLETED."""
+    """End ride → COMPLETED."""
     return await ride_svc.end_ride(db, ride_id=ride_id, driver_id=current_user.user_id)
 
 
@@ -165,8 +165,8 @@ async def ride_passengers_locations_websocket(
     ride_svc: RideService = Depends(get_ride_service),
 ):
     """
-    ערוץ WebSocket לעדכוני מיקום נוסעים בנסיעה. רק נהג הנסיעה יכול להתחבר.
-    חיבור: GET /api/v1/rides/ws/{ride_id}/passengers?token=JWT
+    WebSocket channel for passenger location updates on a ride. Only the ride driver may connect.
+    Connect: GET /api/v1/rides/ws/{ride_id}/passengers?token=JWT
     """
     if not user:
         logger.warning("WS passengers: no user, closing")

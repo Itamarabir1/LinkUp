@@ -1,6 +1,6 @@
 """
-מודל צ'אט 1:1 – שיחה בין שני משתמשים בלבד.
-Conversation = זוג משתמשים (מזוהה יחיד). Message = הודעה בשיחה.
+1:1 chat models — conversation between exactly two users.
+Conversation = unique user pair. Message = one message in a conversation.
 """
 
 import uuid
@@ -24,8 +24,8 @@ from app.db.base import Base
 
 class Conversation(Base):
     """
-    שיחת 1:1 בין שני משתמשים.
-    user_id_1 < user_id_2 תמיד – כך הזוג ייחודי בלי כפילות (א־ב = ב־א).
+    1:1 conversation between two users.
+    user_id_1 < user_id_2 always — unique unordered pair (A–B equals B–A).
     """
 
     __tablename__ = "conversations"
@@ -54,7 +54,7 @@ class Conversation(Base):
 
 
 class Message(Base):
-    """הודעה אחת בתוך שיחת 1:1."""
+    """A single message inside a 1:1 conversation."""
 
     __tablename__ = "messages"
 
@@ -77,10 +77,10 @@ class Message(Base):
 
 class ConversationParticipant(Base):
     """
-    משתתף בשיחה (conversation).
+    Participant in a conversation.
 
-    נשמר כשורה לכל (conversation_id, user_id) ומאפשר last_read_at לכל משתמש.
-    מוכן להרחבה לקבוצות בעתיד.
+    One row per (conversation_id, user_id) with per-user last_read_at.
+    Structured to allow future group chat expansion.
     """
 
     __tablename__ = "conversation_participants"
@@ -108,7 +108,7 @@ class ConversationParticipant(Base):
 
 
 class ChatAnalysis(Base):
-    """ניתוח AI של שיחת צ'אט."""
+    """Persisted AI analysis for a chat conversation."""
 
     __tablename__ = "chat_analysis"
 

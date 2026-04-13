@@ -43,7 +43,7 @@ async def request_to_join(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """בקשת הצטרפות לנסיעה. request_id חייב להיות של המשתמש המחובר."""
+    """Request to join a ride. request_id must belong to the authenticated user."""
     try:
         return await BookingService.request_to_join(
             db,
@@ -134,8 +134,8 @@ async def report_driver_location(
     current_user: User = Depends(get_current_user),
 ):
     """
-    הנהג מדווח על המיקום בנסיעה. משודר לנוסעים המאושרים ב-WebSocket.
-    דורש: נהג הנסיעה, נסיעה בסטטוס active.
+    Driver reports location during the ride. Broadcast to confirmed passengers over WebSocket.
+    Requires: ride driver, ride in active status.
     """
     booking = await BookingService.get_booking(db, booking_id)
     if not booking or not booking.ride:
@@ -165,8 +165,8 @@ async def report_passenger_location(
     current_user: User = Depends(get_current_user),
 ):
     """
-    נוסע מדווח מיקום בנסיעה. משודר לנהג בערוץ ride_{ride_id}:passenger_locations.
-    דורש: הנוסע של הבוקינג.
+    Passenger reports location during the ride. Broadcast to driver on ride_{ride_id}:passenger_locations.
+    Requires: the booking’s passenger.
     """
     booking = await BookingService.get_booking(db, booking_id)
     if not booking or not booking.ride:
@@ -193,8 +193,8 @@ async def booking_location_websocket(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    ערוץ WebSocket לעדכוני מיקום נהג עבור בוקינג. רק הנוסע של הבוקינג יכול להתחבר.
-    חיבור: GET /api/v1/bookings/ws/{booking_id}/location?token=JWT
+    WebSocket channel for driver location updates for a booking. Only the booking passenger may connect.
+    Connect: GET /api/v1/bookings/ws/{booking_id}/location?token=JWT
     """
     if not user:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)

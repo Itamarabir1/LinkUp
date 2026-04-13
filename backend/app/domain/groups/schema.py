@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def _group_avatar_url(avatar_key: str | None) -> str | None:
-    """בונה presigned read URL לתמונת קבוצה מ-S3."""
+    """Builds a presigned read URL for a group image in S3."""
     if not avatar_key or not settings.S3_BUCKET_NAME:
         return None
     try:
@@ -56,7 +56,7 @@ class GroupOut(BaseModel):
 
 
 def group_to_out(group: Any, member_count: int | None = None) -> "GroupOut":
-    """בניית GroupOut ממודל ORM — בלי group.__dict__."""
+    """Builds GroupOut from an ORM model — avoids group.__dict__."""
     return GroupOut(
         group_id=group.group_id,
         name=group.name,
@@ -84,7 +84,7 @@ class GroupMemberOut(BaseModel):
 
 
 def group_member_to_out(member: Any) -> GroupMemberOut:
-    """שם מלא מ-user רק אם נטען — בלי lazy load."""
+    """Full name from user only if already loaded — avoids lazy load."""
     full_name: str | None = None
     try:
         st = sa_inspect(member)

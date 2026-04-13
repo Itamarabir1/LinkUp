@@ -1,6 +1,6 @@
 """
-Pub/Sub לערוצי צ'אט ב-Redis — חייב להיות אותו מספר DB כמו chat-ws (REDIS_CHAT_URL / REDIS_CHAT_DB).
-פרסום ל-DB 0 כש-chat-ws מאזין ב-DB 1 גורם להודעות שלא מגיעות בזמן אמת.
+Pub/Sub for chat channels in Redis — must use the same DB index as chat-ws (REDIS_CHAT_URL / REDIS_CHAT_DB).
+Publishing to DB 0 while chat-ws listens on DB 1 breaks real-time delivery.
 """
 
 import logging
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class RedisChatPubSub:
-    """חיבור ייעודי ל-REDIS_CHAT_URL — chat:conversation:*, chat:notification:*, user:*:events"""
+    """Dedicated connection to REDIS_CHAT_URL — chat:conversation:*, chat:notification:*, user:*:events"""
 
     def __init__(self):
         self.client: redis.Redis | None = None

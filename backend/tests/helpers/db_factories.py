@@ -125,7 +125,7 @@ async def make_booking(
     num_seats: int = 1,
     request_id=None,
 ) -> Booking:
-    """הזמנה ישירות ל-DB (אינטגרציה / זרימות נסיעה בלי מסלול API מלא)."""
+    """Insert booking row directly for integration / ride flows without full API."""
     b = Booking(
         booking_id=uuid4(),
         ride_id=ride_id,

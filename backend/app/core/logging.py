@@ -1,10 +1,10 @@
 """
-Structured Logging with structlog.
+Structured logging via structlog.
 
-- לוקאלי (LOG_FORMAT=text): צבעוני + קריא עם ConsoleRenderer
-- פרודקשן (LOG_FORMAT=json): JSON נקי עם JSONRenderer
-- request_id מוזרק אוטומטית לכל log דרך ContextVar (structlog) + RequestIDFilter על LogRecord
-- stdlib logging (uvicorn, sqlalchemy, FastAPI) מנותב דרך structlog (foreign_pre_chain)
+- Local (LOG_FORMAT=text): colored ConsoleRenderer
+- Production (LOG_FORMAT=json): JSONRenderer
+- request_id from ContextVar + RequestIDFilter on LogRecord
+- stdlib logs (uvicorn, SQLAlchemy, FastAPI) bridged through structlog
 """
 
 import logging
@@ -22,7 +22,7 @@ request_id_ctx: ContextVar[str | None] = ContextVar("request_id", default=None)
 
 
 class RequestIDFilter(logging.Filter):
-    """מוסיף request_id ל-LogRecord אם קיים ב-context."""
+    """Attach request_id to LogRecord when present in context."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = request_id_ctx.get() or ""
@@ -34,7 +34,7 @@ def add_request_id(
     method_name: str,
     event_dict: EventDict,
 ) -> EventDict:
-    """structlog processor — מוסיף request_id מה-ContextVar."""
+    """structlog processor: inject request_id from ContextVar."""
     request_id = request_id_ctx.get()
     if request_id:
         event_dict["request_id"] = request_id
@@ -43,8 +43,7 @@ def add_request_id(
 
 def setup_logging() -> None:
     """
-    מגדיר structlog + stdlib logging.
-    structlog processors רצים על כל log — גם מקוד האפליקציה וגם מ-uvicorn/sqlalchemy.
+    Configure structlog and stdlib logging; processors apply to app and library logs.
     """
     # TODO: Sentry — enable when SENTRY_DSN is set in production
     # import sentry_sdk

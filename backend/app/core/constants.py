@@ -1,6 +1,6 @@
 """
-קבועים משותפים לכל הפרויקט.
-ערכים שמופיעים ביותר מקובץ אחד — מקור אמת יחיד.
+Shared constants for the whole project.
+Values that appear in more than one file — single source of truth.
 """
 
 # Batch sizes

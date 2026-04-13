@@ -22,8 +22,8 @@ from app.infrastructure.s3.service import storage_service
 
 class UserRegister(BaseModel):
     """
-    סכמת רישום – מה שהלקוח (פרונט) שולח.
-    fcm_token אופציונלי – האפליקציה שולחת מהקוד (הרשאות פוש), לא משדה שהמשתמש ממלא.
+    Registration payload from the client.
+    Optional fcm_token is supplied by the app (push permission), not a user-typed field.
     """
 
     full_name: str = Field(..., min_length=2, max_length=100)
@@ -33,7 +33,7 @@ class UserRegister(BaseModel):
     confirm_password: str = Field(..., min_length=8)
     fcm_token: str | None = Field(
         None,
-        description="לשימוש האפליקציה בלבד (הרשאות פוש). לא להציג למשתמש בטופס רישום.",
+        description="App-only (push registration); not shown on signup form.",
     )
 
     @field_validator("email")
@@ -53,7 +53,7 @@ class UserRegister(BaseModel):
 
     @model_validator(mode="after")
     def verify_passwords_match(self) -> "UserRegister":
-        """מוודא ששני שדות הסיסמה זהים"""
+        """Ensure password and confirmation match."""
         if self.password != self.confirm_password:
             raise ValueError("Passwords do not match")
         return self
@@ -70,7 +70,7 @@ class LoginRequest(BaseModel):
 
 
 class VerifyEmailRequest(BaseModel):
-    email: EmailStr | None = None  # אופציונלי - יכול לבוא מ-cookie
+    email: EmailStr | None = None  # Optional; may come from cookie after register
     code: str
 
     @field_validator("email")
@@ -108,7 +108,7 @@ class PasswordResetConfirm(BaseModel):
 
     @model_validator(mode="after")
     def verify_reset_passwords_match(self) -> "PasswordResetConfirm":
-        """מוודא ששני שדות הסיסמה החדשים זהים"""
+        """Ensure new password fields match."""
         if self.new_password != self.confirm_new_password:
             raise ValueError("Passwords do not match")
         return self
@@ -116,13 +116,13 @@ class PasswordResetConfirm(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     """
-    שינוי סיסמה (משתמש מחובר): סיסמה ישנה + סיסמה חדשה פעמיים.
-    ולידציה כמו ברישום: חוזק סיסמה + התאמה בין שני שדות הסיסמה החדשה.
+    Authenticated password change: current password + new password twice.
+    Same strength rules as registration; new fields must match.
     """
 
-    old_password: str = Field(..., min_length=1, description="הסיסמה הנוכחית")
-    new_password: str = Field(..., min_length=8, description="סיסמה חדשה")
-    confirm_password: str = Field(..., min_length=8, description="אישור הסיסמה החדשה")
+    old_password: str = Field(..., min_length=1, description="Current password")
+    new_password: str = Field(..., min_length=8, description="New password")
+    confirm_password: str = Field(..., min_length=8, description="Confirm new password")
 
     @field_validator("new_password")
     @classmethod
@@ -131,7 +131,7 @@ class ChangePasswordRequest(BaseModel):
 
     @model_validator(mode="after")
     def verify_passwords_match_and_different(self) -> "ChangePasswordRequest":
-        """מוודא ששתי הסיסמאות החדשות זהות (כמו ברישום) והסיסמה החדשה שונה מהישנה."""
+        """New passwords must match and differ from the old password."""
         from app.core.exceptions.auth import (
             NewPasswordSameAsOldError,
             PasswordsDoNotMatchError,
@@ -164,7 +164,7 @@ class UserOut(BaseModel):
     @computed_field
     @property
     def avatar_url(self) -> str | None:
-        """תאימות לאחור — מחזיר URL ל-400x400."""
+        """Backward-compatible medium avatar URL (400x400)."""
         return _avatar_url_medium_from_key(self.avatar_key)
 
 
@@ -174,7 +174,7 @@ class Token(BaseModel):
 
 
 class LoginUserInfo(BaseModel):
-    """פרטי משתמש בתשובות login / google-signin / refresh (כולל הרשאת אדמין לפרונט)."""
+    """User summary returned on login, Google sign-in, and refresh (includes is_admin)."""
 
     user_id: UUID
     full_name: str
@@ -183,7 +183,7 @@ class LoginUserInfo(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    """תשובת לוגין: Access Token (קצר) + Refresh Token (ארוך) + פרטי משתמש."""
+    """Login response: short-lived access token, refresh token, and user info."""
 
     access_token: str
     refresh_token: str
@@ -192,13 +192,13 @@ class LoginResponse(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    """בקשת Access Token חדש באמצעות Refresh Token."""
+    """Exchange a refresh token for a new access token."""
 
-    refresh_token: str = Field(..., description="ה-Refresh Token שהתקבל ב-login")
+    refresh_token: str = Field(..., description="Refresh token issued at login")
 
 
 class RefreshResponse(BaseModel):
-    """תשובה מ-POST /auth/refresh – Access Token חדש (+ אופציונלי Refresh Token חדש) ופרטי משתמש."""
+    """POST /auth/refresh response: rotated tokens and user info."""
 
     access_token: str
     refresh_token: str
@@ -212,17 +212,16 @@ class AuthMessageResponse(BaseModel):
 
 
 class PasswordResetConfirmResponse(BaseModel):
-    """תשובה אחרי אישור שחזור סיסמה – מוצגת בפרונט/Swagger כאובייקט מובנה."""
+    """Structured success payload after password reset confirmation."""
 
-    message: str = Field(..., description="הודעת הצלחה")
-    status: str = Field(default="success", description="סטטוס התגובה")
-    detail: str | None = Field(default=None, description="פירוט אופציונלי (למשל להצגה בפרונט)")
+    message: str = Field(..., description="Success message")
+    status: str = Field(default="success", description="Response status flag")
+    detail: str | None = Field(default=None, description="Optional extra detail for clients")
 
 
 class EmailOnlyRequest(BaseModel):
     """
-    סכמה המשמשת לבקשות הדורשות רק כתובת אימייל,
-    כמו שליחה חוזרת של קוד אימות או בקשת שחזור סיסמה.
+    Body for flows that only need an email (resend verification, password reset request).
     """
 
     email: EmailStr = Field(
@@ -238,6 +237,6 @@ class EmailOnlyRequest(BaseModel):
 
 
 class GoogleSignInRequest(BaseModel):
-    """בקשת התחברות דרך Google OAuth - מקבל ID token מ-Google Sign-In."""
+    """Google Sign-In: verify using Google's ID token (JWT)."""
 
-    id_token: str = Field(..., min_length=100, description="Google ID token (JWT) מ-Google Sign-In")
+    id_token: str = Field(..., min_length=100, description="Google ID token (JWT) from Sign-In")

@@ -1,5 +1,5 @@
 """
-סכמות צ'אט 1:1 – קלט/פלט ל־API.
+Pydantic schemas for 1:1 chat API (request/response).
 """
 
 from datetime import datetime
@@ -9,13 +9,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ConversationCreate(BaseModel):
-    """פתיחת שיחה עם משתמש – מזהה או יוצר שיחה 1:1."""
+    """Start or resolve a 1:1 conversation with another user."""
 
-    other_user_id: UUID = Field(..., description="מזהה המשתמש השני")
+    other_user_id: UUID = Field(..., description="Other participant user id")
 
 
 class MessageCreate(BaseModel):
-    """שליחת הודעה בשיחה."""
+    """Send a message in a conversation."""
 
     body: str = Field(..., min_length=1, max_length=10_000)
 
@@ -24,7 +24,7 @@ class MessageCreate(BaseModel):
 
 
 class MessageResponse(BaseModel):
-    """הודעה אחת בתשובה."""
+    """Single message in API responses."""
 
     message_id: int
     conversation_id: UUID
@@ -36,15 +36,15 @@ class MessageResponse(BaseModel):
 
 
 class PaginatedMessagesResponse(BaseModel):
-    """הודעות בשיחה עם pagination (cursor-based)."""
+    """Cursor-paginated message list."""
 
     items: list[MessageResponse] = Field(default_factory=list)
-    next_cursor: str | None = Field(None, description="message_id של הישן ביותר להבא (before=)")
+    next_cursor: str | None = Field(None, description="Oldest message_id for next page (before=)")
     has_more: bool = False
 
 
 class ConversationPartner(BaseModel):
-    """מידע מינימלי על הצד השני בשיחה (להרשימה)."""
+    """Minimal partner profile for conversation lists."""
 
     user_id: UUID
     full_name: str
@@ -54,7 +54,7 @@ class ConversationPartner(BaseModel):
 
 
 class ConversationListItem(BaseModel):
-    """שיחה אחת ברשימת השיחות שלי (עם פרטי הצד השני והודעה אחרונה אופציונלית)."""
+    """One row in the inbox (partner + optional last message preview)."""
 
     conversation_id: UUID
     partner: ConversationPartner
@@ -66,11 +66,11 @@ class ConversationListItem(BaseModel):
 
 
 class ConversationDetail(BaseModel):
-    """שיחה מלאה – לפתיחה/צפייה (מזהה + פרטי הצד השני)."""
+    """Full conversation header for open/view (id + partner)."""
 
     conversation_id: UUID
     partner: ConversationPartner
     created_at: datetime
-    booking_id: UUID | None = None  # קישור ל-booking אם השיחה נוצרה דרך booking
+    booking_id: UUID | None = None  # Set when conversation was opened via a booking
 
     model_config = ConfigDict(from_attributes=True)

@@ -34,7 +34,7 @@ _DEFAULT_SEARCH_RADIUS_M = 1000
 class PassengerService:
     @staticmethod
     async def create_passenger_request(db: AsyncSession, request_in: PassengerRequestCreate, passenger_id: UUID):
-        """יוצר בקשה (מודעה) ומחפש נהגים תואמים מיד. passenger_id מהטוקן (API)."""
+        """Create a passenger request and fetch immediate driver matches; passenger_id from auth token."""
         try:
             if request_in.pickup_lat is not None and request_in.pickup_lon is not None:
                 p_lat, p_lon = request_in.pickup_lat, request_in.pickup_lon
@@ -76,7 +76,7 @@ class PassengerService:
 
     @staticmethod
     async def cancel_request(db: AsyncSession, request_id: UUID, passenger_id: UUID):
-        """ביטול הבקשה ושחרור כל ההזמנות הקשורות אליה (רק לבעל הבקשה)."""
+        """Cancel the request and release all related bookings (request owner only)."""
         p_req = await crud_passenger.get_by_id(db, request_id)
         if not p_req:
             raise PassengerRequestNotFoundError(request_id=str(request_id))
@@ -102,14 +102,14 @@ class PassengerService:
         passenger_id: UUID,
         status: str | None = None,
     ) -> list[PassengerRequestResponse]:
-        """רשימת הבקשות שלי כנוסע (הבקשות שלי)."""
+        """List passenger requests for the given user."""
         status_enum = PassengerStatus(status) if status else None
         requests = await crud_passenger.get_by_passenger_id(db, passenger_id, status_enum)
         return [PassengerRequestResponse.model_validate(r) for r in requests]
 
     @staticmethod
     async def get_matches_by_request_id(db: AsyncSession, request_id: UUID, current_user_id: UUID):
-        """שליפת התאמות חדשות לבקשה קיימת"""
+        """Fetch fresh ride matches for an existing passenger request."""
         p_req = await crud_passenger.get_by_id(db, request_id)
         if not p_req:
             raise PassengerRequestNotFoundError(request_id=str(request_id))
@@ -140,7 +140,7 @@ class PassengerService:
 
     @staticmethod
     async def search_rides_for_passenger(db: AsyncSession, search_data: RideSearchRequest):
-        """חיפוש נסיעות פעיל לפי קואורדינטות של כתובות. לא שומר בקשה ב-DB."""
+        """Search open rides by geocoded addresses; does not persist a passenger request."""
         try:
             pickup_coords = await get_coordinates(search_data.pickup_name)
             dest_coords = await get_coordinates(search_data.destination_name)
@@ -181,12 +181,12 @@ class PassengerService:
 
     @staticmethod
     async def get_all_rides_for_admin(db: AsyncSession, status: str = None):
-        """שליפת כל הנסיעות עם פילטר אופציונלי (בתוך ה-Class)"""
+        """List all rides with optional status filter (admin)."""
         return await crud_passenger.get_multi_rides(db, status=status)
 
     @staticmethod
     async def get_ride_driver_info(db: AsyncSession, ride_id: UUID) -> DriverInfoResponse:
-        """פרטי נהג של נסיעה – רק לנסיעות פתוחות (OPEN/FULL). מחזיר 404 אם לא נמצא או לא רלוונטי."""
+        """Driver details for a ride (OPEN/FULL/ACTIVE only); 404 if missing or invalid."""
         ride = await crud_ride.get_with_driver(db, ride_id)
         if not ride:
             raise RideNotFoundError(ride_id)
@@ -213,7 +213,7 @@ class PassengerService:
         destination_name: str,
         num_seats: int = 1,
     ):
-        """יוצר PassengerRequest מינימלי מבקשת הצטרפות מחיפוש; מחזיר את הבקשה (עם request_id)."""
+        """Create a minimal PassengerRequest from join-from-search; returns row with request_id."""
         pickup_coords = await get_coordinates(pickup_name)
         dest_coords = await get_coordinates(destination_name)
         if not pickup_coords or not dest_coords:

@@ -4,7 +4,7 @@ from .base import LinkupError
 
 
 class StorageServiceError(LinkupError):
-    """תקלה בחיבור ל-S3"""
+    """S3 / object storage connectivity failure."""
 
     status_code = 503
     error_code = "INFRA_STORAGE_ERROR"
@@ -15,7 +15,7 @@ class StorageServiceError(LinkupError):
 
 
 class CacheConnectionError(LinkupError):
-    """תקלה בחיבור ל-Redis"""
+    """Redis connectivity failure."""
 
     status_code = 503
     error_code = "INFRA_REDIS_ERROR"
@@ -26,7 +26,7 @@ class CacheConnectionError(LinkupError):
 
 
 class QueueServiceError(LinkupError):
-    """תקלה בחיבור ל-RabbitMQ"""
+    """RabbitMQ connectivity failure."""
 
     status_code = 503
     error_code = "INFRA_RABBIT_ERROR"
@@ -37,7 +37,7 @@ class QueueServiceError(LinkupError):
 
 
 class RouteNotFoundError(LinkupError):
-    """נזרקת כאשר לא נמצא מסלול בין שתי נקודות."""
+    """No driving route found between origin and destination."""
 
     status_code = 404
     error_code = "GEO_ROUTE_NOT_FOUND"
@@ -65,7 +65,7 @@ class GeocodingError(LinkupError):
 
 
 class InfrastructureError(LinkupError):
-    """שגיאות תשתית: Redis, DB, Network, וכו'."""
+    """Generic infrastructure failure (cache, DB, network, etc.)."""
 
     status_code = 503
     error_code = "INFRA_ERROR"
@@ -81,7 +81,7 @@ class InfrastructureError(LinkupError):
 
 
 class RateLimitExceeded(LinkupError):
-    """יותר מדי בקשות — לקוח יכול לקרוא retry_after מ-details."""
+    """Too many requests; clients may read retry_after from payload."""
 
     status_code = 429
     error_code = "RATE_LIMIT_EXCEEDED"
@@ -116,7 +116,7 @@ class WorkerTaskFailed(LinkupError):
 
 
 class ExternalServiceError(LinkupError):
-    """כשל בקריאה לשירות חיצוני (מייל, מפות, OAuth provider, וכו')."""
+    """Third-party dependency failed (email, maps, OAuth, etc.)."""
 
     status_code = 502
     error_code = "EXTERNAL_SERVICE_ERROR"

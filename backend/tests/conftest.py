@@ -112,7 +112,7 @@ async def db_session(monkeypatch: pytest.MonkeyPatch):
 async def api_client_no_auth(
     e2e_session_factory: async_sessionmaker,
 ) -> AsyncGenerator[AsyncClient, None]:
-    """Client ללא authentication — לבדיקת 401."""
+    """HTTP client without auth (for 401 tests)."""
 
     async def _get_db_override():
         async with e2e_session_factory() as s:

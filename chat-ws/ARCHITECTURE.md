@@ -28,7 +28,7 @@
 - ✅ WebSocket ב-FastAPI לנסיעות/בוקינגים/התראות (`/api/v1/rides/...`, `/api/v1/bookings/...`, `/api/v1/notifications/ws`) — אימות ב-`get_current_user_ws`: **JWT בלבד** (`WsUser`), בלי DB בזמן connect (פרטים: `ARCHITECTURE.md` בשורש, `docs/architecture/REALTIME.md`).
 - ✅ REST API endpoints
 - ✅ Calendar export (`GET /api/v1/chat/conversations/{id}/calendar.ics`)
-- ✅ AI analysis results (`GET /api/v1/chat/conversations/{id}/analysis`)
+- ✅ תוצאות ניתוח AI נשמרות ב-DB (`chat_analysis`); **אין כרגע** route ייעודי ב-`backend/app/domain/chat/router.py` ל-`GET …/analysis` (סקריפטי k6 ישנים עשויים להתייחס לנתיב מתוכנן)
 - ✅ Business logic
 - ✅ Database operations
 
@@ -56,7 +56,7 @@
 
 **מיקום קוד:**
 - ✅ `backend/app/domain/chat/calendar/` - לוגיקת calendar (נדרש)
-- ✅ `backend/app/api/v1/routers/chat.py` - endpoint
+- ✅ `backend/app/domain/chat/router.py` — endpoints REST (כולל `calendar.ics` — כרגע 501)
 - ❌ אין שירות AI נפרד; ניתוח רץ ב-backend worker
 
 **למה לא ב-chat-ws?**
@@ -76,12 +76,12 @@ Client → POST /api/v1/chat/conversations/{id}/messages (backend)
        → outbox-worker מאזין → מנתח (AI) → שומר תוצאה + outbox
 ```
 
-### 2. קבלת ניתוח AI
+### 2. ניתוח AI (רקע)
 ```
-Client → GET /api/v1/chat/conversations/{id}/analysis (backend)
-       → Backend קורא תוצאה מ-DB
-       → מחזיר תוצאה
+outbox-worker ← Redis DB1 (chat:completion:{id})
+              → ניתוח (Groq) → שמירה ל-chat_analysis ב-DB
 ```
+(אין כרגע endpoint REST ייעודי ב-spa לקריאת JSON הניתוח — התוצאה קיימת ב-DB.)
 
 ### 3. ייצוא ללוח שנה
 ```
@@ -107,6 +107,6 @@ Client → GET /api/v1/chat/conversations/{id}/calendar.ics (backend)
 | Chat-related notification fan-out | chat-ws (via `chat:notification:*`) | חיבור WS יחיד לשיחה |
 | Calendar export | backend (Python) | API endpoint |
 | AI analysis | backend worker (outbox-worker) | Async, Redis DB 1 listener |
-| AI analysis results API | backend (Python) | API endpoint |
+| AI analysis persistence | backend DB (`chat_analysis`) | worker אחרי completion |
 | Business logic | backend (Python) | Centralized |
 | Auth load testing (k6) | `backend/load_test.js` | עומס על REST register/login — לא ב-chat-ws |

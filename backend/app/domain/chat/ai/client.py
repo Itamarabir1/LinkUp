@@ -1,5 +1,5 @@
 """
-Groq API client לניתוח AI של שיחות.
+Groq API client for AI analysis of conversations.
 """
 
 import os
@@ -11,7 +11,7 @@ _groq_client: Groq | None = None
 
 
 def get_groq_client() -> Groq:
-    """מחזיר Groq client (singleton)."""
+    """Returns the Groq client (singleton)."""
     global _groq_client
     if _groq_client is None:
         api_key = os.getenv("GROK_API_KEY") or os.getenv("GROQ_API_KEY")

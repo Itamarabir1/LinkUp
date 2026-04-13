@@ -14,7 +14,7 @@ from tests.helpers.db_factories import make_passenger_request, make_ride, make_u
 
 @pytest.mark.asyncio
 async def test_request_to_join_rejects_non_owner_request(db_session: AsyncSession):
-    """משתמש לא יכול להצטרף עם request_id שלא שייך לו."""
+    """Cannot join using another user's passenger_request id."""
     driver = await make_user(db_session, "driver", email_suffix="permissions")
     passenger = await make_user(db_session, "passenger", email_suffix="permissions")
     attacker = await make_user(db_session, "attacker", email_suffix="permissions")

@@ -1,6 +1,6 @@
 """
-ראוטר צ'אט 1:1 – שיחות והודעות.
-כל ה-endpoints דורשים אימות (get_current_user).
+1:1 chat router — conversations and messages.
+All routes require authentication (get_current_user).
 """
 
 from uuid import UUID
@@ -47,8 +47,8 @@ async def create_or_get_conversation(
     current_user: User = Depends(get_current_user),
 ):
     """
-    מזהה או יוצר שיחת 1:1 עם other_user_id.
-    מחזיר conversation_id + פרטי הצד השני.
+    Get or create a 1:1 thread with other_user_id.
+    Returns conversation_id and partner details.
     """
     return await get_or_create_conversation(
         db,
@@ -69,9 +69,8 @@ async def create_or_get_conversation_by_booking(
     current_user: User = Depends(get_current_user),
 ):
     """
-    מזהה או יוצר שיחת 1:1 בין נהג לנוסע על בסיס booking_id.
-    רק נהג או נוסע של ה-booking יכולים לפתוח שיחה,
-    ורק אם הסטטוס הוא pending_approval או confirmed.
+    Get or create a driver–passenger thread for a booking.
+    Only booking parties may open; status must be pending_approval or confirmed.
     """
     return await get_or_create_conversation_by_booking(
         db,
@@ -89,7 +88,7 @@ async def list_conversations(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """כל השיחות של המשתמש המחובר, עם פרטי הצד השני והודעה אחרונה."""
+    """Inbox for the current user with partner info and last message."""
     return await list_my_conversations(db, current_user_id=current_user.user_id)
 
 
@@ -103,7 +102,7 @@ async def get_conversation(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """פרטי שיחה אחת – רק אם המשתמש participant."""
+    """Single conversation header; participant only."""
     return await get_conversation_detail(db, conversation_id=conversation_id, current_user_id=current_user.user_id)
 
 
@@ -119,7 +118,7 @@ async def post_message(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """שולח הודעה בשיחה. רק participant יכול לשלוח."""
+    """Post a message; participants only."""
     msg = await send_message(
         db,
         conversation_id=conversation_id,
@@ -142,7 +141,7 @@ async def list_conversation_messages(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """הודעות בשיחה (cursor-based pagination). רק participant יכול לצפות."""
+    """Message history with cursor pagination; participants only."""
     return await get_messages(
         db,
         conversation_id=conversation_id,
@@ -163,8 +162,7 @@ async def export_conversation_calendar(
     current_user: User = Depends(get_current_user),
 ):
     """
-    מייצא את השיחה לקובץ iCal (.ics) ללוח שנה.
-    דורש ניתוח AI קיים או מנתח על המקום.
+    Export conversation to iCal (.ics); requires AI analysis (not fully implemented).
     """
     from app.domain.chat.calendar_export import get_conversation_for_calendar_export
 

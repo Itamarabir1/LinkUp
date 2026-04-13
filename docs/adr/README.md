@@ -4,7 +4,7 @@
 
 ## סדר קריאה מומלץ לפני ראיון
 
-1. [ARCHITECTURE_DECISIONS_BACKEND.md](ARCHITECTURE_DECISIONS_BACKEND.md) — DB, Redis, RabbitMQ, Outbox, workers, סקייל, אבטחה.
+1. [ARCHITECTURE_DECISIONS_BACKEND.md](ARCHITECTURE_DECISIONS_BACKEND.md) — DB, Redis, RabbitMQ, Outbox, workers, סקייל, אבטחה, **נוסע: חיפוש מול שמירת התראה (§16)**.
 2. [WEBSOCKETS.md](WEBSOCKETS.md) — **מתי** משתמשים ב-WebSocket, **איזה שרת**, למה לא רק REST/polling.
 3. [FCM_AND_PUSH.md](FCM_AND_PUSH.md) — **למה** push ב-data-only, מחזור חיים טוקן, UX foreground/background.
 4. [ARCHITECTURE_DECISIONS_CHAT_WS.md](ARCHITECTURE_DECISIONS_CHAT_WS.md) — למה Go, גבולות שירות.

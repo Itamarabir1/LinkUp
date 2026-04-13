@@ -2,7 +2,7 @@ from enum import Enum
 
 
 class DispatchTarget(str, Enum):
-    """היעדים האפשריים להפצת אירועים - Domain Level"""
+    """Possible targets for event dispatch — domain level."""
 
     RABBITMQ = "RABBITMQ"
     KAFKA = "KAFKA"

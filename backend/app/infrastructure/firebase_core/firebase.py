@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 def initialize_firebase():
-    """מאתחל את Firebase פעם אחת עבור כל האפליקציה"""
+    """Initializes Firebase Admin SDK once for the application."""
     try:
         if not firebase_admin._apps:
             credentials_json = os.getenv("FIREBASE_CREDENTIALS_JSON")

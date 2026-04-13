@@ -43,19 +43,47 @@ export default function SearchRides() {
         onSubmit={s.search}
       />
       <div className={styles.cardList}>
-        {s.results.length === 0 && s.pickup && s.destination && !s.searching ? (
+        {s.results.length === 0 && s.hasSearched && !s.searching ? (
           <div>
             <p className={`${styles.emptyText} ${styles.emptyTextTight}`}>
-              לא נמצאו נסיעות.
+              לא נמצאו נסיעות מתאימות.
             </p>
-            {user ? (
+            {user && !s.alertSaved ? (
+              <div className={styles.saveAlertRowCenter}>
+                <button
+                  type="button"
+                  className={`${styles.btn} ${styles.btnPrimary}`}
+                  onClick={() => void s.saveAlert()}
+                  disabled={s.savingAlert}
+                >
+                  {s.savingAlert ? 'שומר...' : '🔔 התרע לי כשתצא נסיעה מתאימה'}
+                </button>
+              </div>
+            ) : null}
+            {s.alertSaved ? (
               <p className={styles.savedSearchBanner}>
-                ✅ פרטי החיפוש שלך נשמרו ותקבל התראות כאשר יימצאו נסיעות מתאימות.
+                ✅ נשמר! נודיע לך במייל כשתצא נסיעה מתאימה.
               </p>
             ) : null}
           </div>
         ) : (
           <>
+            {s.results.length > 0 && user ? (
+              <div className={styles.saveAlertRow}>
+                {!s.alertSaved ? (
+                  <button
+                    type="button"
+                    className={`${styles.btn} ${styles.btnOutline}`}
+                    onClick={() => void s.saveAlert()}
+                    disabled={s.savingAlert}
+                  >
+                    {s.savingAlert ? 'שומר...' : '🔔 שמור חיפוש זה להתראות'}
+                  </button>
+                ) : (
+                  <p className={styles.savedSearchBanner}>✅ החיפוש נשמר להתראות</p>
+                )}
+              </div>
+            ) : null}
             {s.results.map((r) => (
               <SearchRideCard
                 key={r.ride_id}
@@ -70,7 +98,7 @@ export default function SearchRides() {
                 onRequestJoin={s.sendRequestToJoin}
               />
             ))}
-            {s.resultsHasMore && (
+            {s.resultsHasMore ? (
               <div className={styles.loadMoreWrap}>
                 <button
                   type="button"
@@ -81,7 +109,7 @@ export default function SearchRides() {
                   {s.loadingMore ? 'טוען...' : 'טען עוד נסיעות'}
                 </button>
               </div>
-            )}
+            ) : null}
           </>
         )}
       </div>

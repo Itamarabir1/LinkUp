@@ -41,9 +41,9 @@ async def register(
     _: None = Depends(rate_limit_auth),
     auth_svc: AuthService = Depends(get_auth_service),
 ):
-    """רישום משתמש חדש - השלב הראשון"""
-    logger.info("[Linkup] register נקרא: email=%s", getattr(user_in, "email", ""))
-    print("[Linkup] register endpoint – מתחיל register_new_user")
+    """Register a new user (step one: create unverified account)."""
+    logger.info("[Linkup] register called: email=%s", getattr(user_in, "email", ""))
+    print("[Linkup] register endpoint – starting register_new_user")
     new_user = await auth_svc.register_new_user(db=db, user_in=user_in)
 
     # Stash email in cookie for verification (10 minutes)
@@ -82,21 +82,15 @@ async def login(
     auth_svc: AuthService = Depends(get_auth_service),
 ):
     """
-    אימות משתמש והנפקת **Access Token** (קצר) + **Refresh Token** (ארוך).
+    Authenticate and return a short-lived **access_token** plus **refresh_token**.
 
-    - **email** = אימייל המשתמש.
-    - **password** = סיסמה.
-    - בודק קיום משתמש, סיסמה נכונה ו־`is_verified`.
-    - מחזיר `access_token` (JWT קצר תוקף), `refresh_token` (JWT ארוך תוקף), `token_type: bearer` ופרטי משתמש.
+    Validates user exists, password matches, and `is_verified`.
+    Response includes JWT access token, rotated refresh token, `token_type: bearer`, and user info.
 
-    **שימוש ב-Swagger:**
-    1. בצע Login וקבל את ה-`access_token`.
-    2. לחץ על כפתור ה-Authorize (המנעול) למעלה.
-    3. הדבק את ה-`access_token` בשדה.
-    4. מהיום הזה, כל הבקשות המוגנות ב-Swagger יעבדו אוטומטית.
+    **Swagger:** run Login, copy `access_token`, click Authorize, paste token for protected routes.
 
-    הלקוח ישלח את **access_token** בכל בקשה מוגנת: `Authorization: Bearer <access_token>`.
-    את **refresh_token** שומרים (למשל ב־storage) ומשתמשים ב־POST /auth/refresh לקבלת access_token חדש.
+    Clients send `Authorization: Bearer <access_token>` on protected APIs and call POST /auth/refresh
+    with the stored refresh token when the access token expires.
     """
     return await auth_svc.authenticate_and_create_token(
         db=db,
@@ -118,9 +112,10 @@ async def refresh_token(
     auth_svc: AuthService = Depends(get_auth_service),
 ):
     """
-    מקבל **Refresh Token** (שנשמר ב-login) ומחזיר **Access Token** חדש + **Refresh Token** חדש (רוטציה).
+    Exchange the refresh token from login for a new access token and rotated refresh token.
 
-    הטוקן הישן מתבטל – רק הטוקן האחרון ששמור ב-DB תקף. שגיאה: `InvalidRefreshTokenError` (401) אם הטוקן שגוי/פג/לא תואם ל-DB.
+    Previous refresh tokens are invalidated; only the latest hash in DB is valid.
+    Returns 401 (`InvalidRefreshTokenError`) when the token is wrong, expired, or not in DB.
     """
     return await auth_svc.refresh_access_token(db, refresh_token=data.refresh_token)
 
@@ -135,7 +130,7 @@ async def logout(
     current_user: User = Depends(get_current_user),
     auth_svc: AuthService = Depends(get_auth_service),
 ):
-    """מבטל את ה-Refresh Token של המשתמש – התנתקות (לא יוכל לקבל Access Token חדש עד login מחדש)."""
+    """Revoke refresh token(s) for the user (logout until next password login)."""
     await auth_svc.logout(db, user=current_user)
 
 
@@ -150,7 +145,7 @@ async def verify_email_by_link(
     db: AsyncSession = Depends(get_db),
     auth_svc: AuthService = Depends(get_auth_service),
 ):
-    """אימות בלחיצה אחת – הלינק מהכפתור במייל. מפנה לפרונט (הצלחה או שגיאה)."""
+    """Email verification via one-click link; redirects to frontend on success or error."""
     base = _frontend_base_url()
     try:
         await auth_svc.verify_user_email(db, email, code)
@@ -168,8 +163,8 @@ async def verify_email(
     auth_svc: AuthService = Depends(get_auth_service),
 ):
     """
-    אימות המייל מהפרונט (המשתמש מזין קוד בדף).
-    האימייל יכול לבוא מה-cookie (אחרי רישום) או מה-body (אם לא נשמר ב-cookie).
+    Verify email from the SPA using a typed code.
+    Email may come from the registration cookie or from the request body.
     """
     # Fallback email from cookie
     email = data.email
@@ -200,7 +195,7 @@ async def resend_verification_code(
     _: None = Depends(rate_limit_auth),
     auth_svc: AuthService = Depends(get_auth_service),
 ):
-    """שליחה חוזרת של קוד האימות"""
+    """Resend email verification code."""
     return await auth_svc.initiate_email_verification(db, data.email)
 
 
@@ -211,7 +206,7 @@ async def request_password_reset(
     _: None = Depends(rate_limit_auth),
     auth_svc: AuthService = Depends(get_auth_service),
 ):
-    """שחזור סיסמה – שלב 1: המשתמש מזין מייל, נשלח אליו קוד במייל."""
+    """Password reset step 1: request OTP emailed to the user."""
     return await auth_svc.request_password_reset(db, data.email)
 
 
@@ -221,7 +216,7 @@ async def confirm_password_reset(
     db: AsyncSession = Depends(get_db),
     auth_svc: AuthService = Depends(get_auth_service),
 ):
-    """שחזור סיסמה – שלב 2: המשתמש מזין מייל + קוד מהמייל + סיסמה חדשה פעמיים."""
+    """Password reset step 2: email + OTP + new password (twice)."""
     return await auth_svc.reset_password_with_code(
         db=db,
         email=data.email,
@@ -238,8 +233,8 @@ async def change_password(
     auth_svc: AuthService = Depends(get_auth_service),
 ):
     """
-    שינוי סיסמה למשתמש מחובר: סיסמה ישנה + סיסמה חדשה פעמיים (אישור).
-    ולידציה כמו ברישום: חוזק סיסמה + התאמה בין שני שדות הסיסמה החדשה.
+    Authenticated password change with old password + new password confirmation.
+    Same strength rules as registration.
     """
     return await auth_svc.change_password(db, user_id=current_user.user_id, data=data)
 
@@ -257,12 +252,9 @@ async def google_signin(
     auth_svc: AuthService = Depends(get_auth_service),
 ):
     """
-    התחברות/רישום דרך Google OAuth.
+    Google Sign-In: verify ID token from the client, auto-provision user if new.
 
-    מקבל ID token מ-Google Sign-In (הפרונט שולח את ה-token שהתקבל מ-Google).
-    השרת מאמת את ה-token עם Google, ואם המשתמש לא קיים - יוצר משתמש חדש אוטומטית (auto-signup).
-
-    מחזיר access_token + refresh_token + user (כמו /login רגיל).
+    Returns the same token bundle as password /login.
     """
     try:
         # Ensure GOOGLE_CLIENT_ID is configured

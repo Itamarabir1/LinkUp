@@ -8,8 +8,7 @@ from app.domain.events.enum import DispatchTarget
 
 class Event(BaseModel):
     """
-    Domain Event Schema.
-    זהו 'החוזה' של האירוע במערכת.
+    Domain event schema — contract for persisted/outbound events.
     """
 
     name: str = Field(..., min_length=1)
