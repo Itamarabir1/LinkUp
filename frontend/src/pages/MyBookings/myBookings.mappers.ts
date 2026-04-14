@@ -29,8 +29,8 @@ function mapRideWithPassengersToDriverItem(raw: RideWithPassengers): DriverBooki
     created_at: raw.departure_time,
     // Fields not returned by summary — safe defaults
     driver_id: '',
-    distance_km: null,
-    duration_min: null,
+    distance_km: undefined,
+    duration_min: undefined,
     route_coords: [],
     user_booking_status: null,
   };
@@ -83,8 +83,8 @@ function mapPassengerSummaryRowToItem(raw: PassengerBookingSummary): PassengerBo
     created_at: raw.departure_time,
     // Fields not returned by summary — safe defaults
     driver_id: '',
-    distance_km: null,
-    duration_min: null,
+    distance_km: undefined,
+    duration_min: undefined,
     route_coords: [],
     user_booking_status: null,
   };

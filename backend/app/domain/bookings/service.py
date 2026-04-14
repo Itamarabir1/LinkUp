@@ -206,7 +206,7 @@ class BookingService:
     @staticmethod
     async def get_driver_summary(db: AsyncSession, driver_id: UUID) -> DriverSummaryResponse:
         """All driver rides with pending/confirmed passengers — single DB round-trip."""
-        from app.domain.bookings.schema import DriverSummaryResponse, RideWithPassengersItem, BookingManifestItem
+        from app.domain.bookings.schema import DriverSummaryResponse, BookingManifestItem
         from urllib.parse import quote
 
         rides = await crud_booking.get_driver_rides_with_passengers(db, driver_id)
@@ -250,7 +250,7 @@ class BookingService:
     @staticmethod
     async def get_passenger_summary(db: AsyncSession, passenger_id: UUID) -> PassengerSummaryResponse:
         """All passenger bookings with ride + driver info — single DB round-trip."""
-        from app.domain.bookings.schema import PassengerSummaryResponse, PassengerBookingSummaryItem, DriverSummaryInfo
+        from app.domain.bookings.schema import PassengerSummaryResponse, DriverSummaryInfo
 
         bookings = await crud_booking.get_passenger_bookings_with_rides(db, passenger_id)
         items = []

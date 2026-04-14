@@ -43,7 +43,7 @@ export function useGoogleMapInstance(
     const el = containerRef.current;
     if (!document.contains(el)) return;
 
-    const m = new google.maps.Map(el, {
+    const mapOptions = {
       center: DEFAULT_CENTER,
       zoom: 10,
       mapId: import.meta.env.VITE_GOOGLE_MAPS_MAP_ID ?? 'linkup_map',
@@ -51,7 +51,9 @@ export function useGoogleMapInstance(
       streetViewControl: false,
       fullscreenControl: true,
       zoomControl: true,
-    });
+    } as google.maps.MapOptions;
+
+    const m = new google.maps.Map(el, mapOptions);
     mapRef.current = m;
     setMap(m);
 
