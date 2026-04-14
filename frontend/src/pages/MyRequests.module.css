@@ -11,7 +11,7 @@
   text-align: center;
   color: var(--text-secondary);
   padding: 3rem;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 /* ── Section header ── */
@@ -30,7 +30,7 @@
   color: var(--text-tertiary);
   letter-spacing: 0.7px;
   text-transform: uppercase;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .sectionCount {
@@ -95,7 +95,7 @@
 .emptyIcon { color: var(--border); margin-bottom: 1rem; }
 
 .emptyTitle {
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
@@ -103,7 +103,7 @@
 }
 
 .emptySubtitle {
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
   font-size: 14px;
   color: var(--text-secondary);
   margin: 0 0 1.5rem;
@@ -116,7 +116,7 @@
   background: var(--primary-light);
   color: var(--primary);
   border-radius: var(--radius-md);
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
   font-size: 13px;
   font-weight: 600;
   display: inline-flex;

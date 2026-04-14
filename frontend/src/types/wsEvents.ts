@@ -77,7 +77,7 @@ export const ChatPresenceEventSchema = z.discriminatedUnion('type', [
 ]);
 export type ChatPresenceEvent = z.infer<typeof ChatPresenceEventSchema>;
 
-/** הודעת צ'אט שמגיעה ב-WS (מקביל ל-MessageResponse ב-api). */
+/** Chat message frame arriving over WS (parallel to API MessageResponse). */
 export const ChatMessageSchema = z
   .object({
     message_id: z.number(),

@@ -1,4 +1,5 @@
 import { MessageCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { AVATAR_COLORS } from './myBookings.constants';
 import { avatarInitial } from './myBookings.utils';
 import type { PassengerInRide } from './myBookings.types';
@@ -21,6 +22,7 @@ export default function DriverBookingPassengerRow({
   onApprove,
   onReject,
 }: DriverBookingPassengerRowProps) {
+  const { t } = useTranslation(['bookings', 'common']);
   return (
     <li className={styles.passengerRow}>
       <div
@@ -35,9 +37,9 @@ export default function DriverBookingPassengerRow({
       <div className={styles.passengerInfo}>
         <div className={styles.passengerName}>{passenger.passengerName}</div>
         <div className={styles.passengerMeta}>
-          {passenger.numSeats} מושבים
-          {passenger.pickupName ? ` · עולה: ${passenger.pickupName}` : ''}
-          {passenger.dropoffName ? ` · יורד: ${passenger.dropoffName}` : ''}
+          {t('common:seats', { count: passenger.numSeats })}
+          {passenger.pickupName ? ` · ${t('bookings:pickup')}: ${passenger.pickupName}` : ''}
+          {passenger.dropoffName ? ` · ${t('bookings:dropoff')}: ${passenger.dropoffName}` : ''}
         </div>
       </div>
       <div className={styles.passengerActions}>
@@ -49,7 +51,7 @@ export default function DriverBookingPassengerRow({
               onClick={() => onApprove(passenger.bookingId)}
               disabled={actionBookingId === passenger.bookingId}
             >
-              ✅ אשר
+              ✅ {t('bookings:approve')}
             </button>
             <button
               type="button"
@@ -57,7 +59,7 @@ export default function DriverBookingPassengerRow({
               onClick={() => onReject(passenger.bookingId)}
               disabled={actionBookingId === passenger.bookingId}
             >
-              ❌ דחה
+              ❌ {t('bookings:reject')}
             </button>
             <button
               type="button"
@@ -66,13 +68,13 @@ export default function DriverBookingPassengerRow({
               disabled={chatLoading === passenger.bookingId}
             >
               <MessageCircle size={15} />
-              צ&apos;אט
+              {t('bookings:chat')}
             </button>
           </div>
         )}
         {passenger.status === 'confirmed' && (
           <>
-            <span className={styles.statusConfirmed}>מאושר</span>
+            <span className={styles.statusConfirmed}>{t('bookings:bookingStatus_approved')}</span>
             <button
               type="button"
               className={styles.btnOutline}
@@ -80,11 +82,11 @@ export default function DriverBookingPassengerRow({
               disabled={chatLoading === passenger.bookingId}
             >
               <MessageCircle size={15} />
-              צ&apos;אט
+              {t('bookings:chat')}
             </button>
           </>
         )}
-        {passenger.status === 'rejected' && <span className={styles.statusRejected}>נדחה</span>}
+        {passenger.status === 'rejected' && <span className={styles.statusRejected}>{t('bookings:bookingStatus_rejected')}</span>}
       </div>
     </li>
   );

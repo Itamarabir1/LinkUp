@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ERROR_MESSAGES } from '../../config/constants';
 import { useAuth } from '../../context/AuthContext';
 import { getApiErrorMessage } from '../../utils/apiError';
+import i18n from '../../i18n';
 import { useGoogleSignInScript } from './useGoogleSignInScript';
 
 export interface UseGoogleSignInOptions {
@@ -38,7 +39,7 @@ export function useGoogleSignIn({ onError, disabled }: UseGoogleSignInOptions) {
           onError(ERROR_MESSAGES.BACKEND_TIMEOUT);
           return;
         }
-        onError?.(getApiErrorMessage(err, e.message || 'התחברות נכשלה'));
+        onError?.(getApiErrorMessage(err, e.message || i18n.t('auth:error_login_failed')));
       } finally {
         setLoading(false);
       }

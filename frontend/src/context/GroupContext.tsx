@@ -2,17 +2,18 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import type { Group } from '../types/api';
 import { getMyGroups } from '../api/groups';
 import { getApiErrorMessage } from '../utils/apiError';
+import { apiErr } from '../utils/i18nError';
 import { useAuth } from './AuthContext';
 
 type GroupContextValue = {
-  activeGroup: Group | null;        // null = ציבורי — משמש ב־mutations (ניהול קבוצה)
+  activeGroup: Group | null;        // null = public context; used in group-management mutations
   setActiveGroup: (g: Group | null) => void;
-  /** פילטר משותף ל־MyRides / MyRequests: 'all' | 'public' | group_id */
+  /** Shared filter for MyRides / MyRequests: 'all' | 'public' | group_id. */
   activeChipId: string;
   setActiveChipId: (id: string) => void;
   myGroups: Group[];
   isLoadingGroups: boolean;
-  /** הודעת שגיאה אחרונה מטעינת קבוצות (ריק אם אין) */
+  /** Last groups-loading error message (empty when none). */
   groupsError: string;
   refreshGroups: () => Promise<void>;
 };
@@ -36,7 +37,7 @@ export function GroupProvider({ children }: { children: React.ReactNode }) {
       setMyGroups(groups);
     } catch (err) {
       setMyGroups([]);
-      setGroupsError(getApiErrorMessage(err, 'טעינת הקבוצות נכשלה'));
+      setGroupsError(getApiErrorMessage(err, apiErr('err_load_groups')));
     } finally {
       setIsLoadingGroups(false);
     }

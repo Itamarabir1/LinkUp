@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Car, Plus, X } from 'lucide-react';
 import { cancelRide, fetchMyRides } from '../api/rides';
 import type { Ride } from '../types/api';
@@ -10,6 +11,7 @@ import RideCard from '../components/RideCard/RideCard';
 import ConfirmModal from '../components/ConfirmModal/ConfirmModal';
 import ErrorBanner from '../components/ErrorBanner';
 import { getApiErrorMessage } from '../utils/apiError';
+import { apiErr } from '../utils/i18nError';
 import { getRideSourceLabel, getRideStatusLabel } from '../utils/rideDisplay';
 import HistorySection from '../components/HistorySection/HistorySection';
 import { useUserEvent } from '../hooks/useUserEvent';
@@ -18,6 +20,7 @@ import { LIVE_STATUSES } from '../constants/rideStatuses';
 import styles from './MyRides.module.css';
 
 export default function MyRides() {
+  const { t } = useTranslation(['rides', 'common']);
   const navigate = useNavigate();
   const { myGroups, activeChipId, setActiveChipId } = useGroup();
   const [rides, setRides] = useState<Ride[]>([]);
@@ -27,8 +30,8 @@ export default function MyRides() {
   const [cancelling, setCancelling] = useState(false);
 
   const chipItems: ChipItem[] = [
-    { id: 'all', label: 'הכל' },
-    { id: 'public', label: 'ציבורי' },
+    { id: 'all', label: t('common:all') },
+    { id: 'public', label: t('common:public') },
     ...myGroups.map((g) => ({ id: g.group_id, label: g.name })),
   ];
 
@@ -59,7 +62,7 @@ export default function MyRides() {
       setRides(Array.isArray(data) ? data : []);
       setError('');
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'טעינת נסיעות נכשלה'));
+      setError(getApiErrorMessage(err, apiErr('err_load_rides')));
     } finally {
       setLoading(false);
     }
@@ -116,7 +119,7 @@ export default function MyRides() {
       );
       setRideToCancel(null);
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'ביטול הנסיעה נכשל'));
+      setError(getApiErrorMessage(err, apiErr('err_cancel_ride')));
       setRideToCancel(null);
     } finally {
       setCancelling(false);
@@ -126,7 +129,7 @@ export default function MyRides() {
   if (loading) {
     return (
       <div className={styles.page}>
-        <div className={styles.pageLoading}>טוען...</div>
+        <div className={styles.pageLoading}>{t('common:loading')}</div>
       </div>
     );
   }
@@ -140,15 +143,15 @@ export default function MyRides() {
       {displayedRides.length === 0 ? (
         <div className={styles.emptyState}>
           <Car size={48} strokeWidth={1.5} className={styles.emptyIcon} />
-          <h2 className={styles.emptyTitle}>אין נסיעות עדיין</h2>
-          <p className={styles.emptySubtitle}>צור את הנסיעה הראשונה שלך</p>
+          <h2 className={styles.emptyTitle}>{t('rides:noRides')}</h2>
+          <p className={styles.emptySubtitle}>{t('rides:createFirstRide')}</p>
           <button
             type="button"
             className={styles.btnPrimary}
             onClick={() => navigate('/create-ride')}
           >
             <Plus size={14} />
-            הצע נסיעה
+            {t('rides:createRide')}
           </button>
         </div>
       ) : (
@@ -156,8 +159,8 @@ export default function MyRides() {
           {activeRides.length > 0 && (
             <>
               <div className={styles.sectionHeader}>
-                <span className={styles.sectionLabel}>נסיעות פעילות</span>
-                <span className={styles.sectionCount}>{activeRides.length} נסיעות</span>
+                <span className={styles.sectionLabel}>{t('rides:activeRides')}</span>
+                <span className={styles.sectionCount}>{t('rides:activeRidesCount', { count: activeRides.length })}</span>
               </div>
               <div className={styles.gridWrap}>
                 <div className={styles.grid}>
@@ -170,14 +173,14 @@ export default function MyRides() {
                           e.stopPropagation();
                           setRideToCancel(r.ride_id);
                         }}
-                        title="בטל נסיעה"
-                        aria-label="בטל נסיעה"
+                        title={t('rides:cancelRide')}
+                        aria-label={t('rides:cancelRide')}
                       >
                         <X size={12} strokeWidth={2.5} />
                       </button>
                       <RideCard
                         route={`${r.origin_name ?? '?'} → ${r.destination_name ?? '?'}`}
-                        scheduleCaption="זמן היציאה"
+                        scheduleCaption={t('rides:rideTimeLabel')}
                         time={formatDateTimeNoSeconds(r.departure_time)}
                         status={getRideStatusLabel(r)}
                         source={getRideSourceLabel(r.group_id, myGroups)}
@@ -191,13 +194,13 @@ export default function MyRides() {
 
           {pastRides.length > 0 && (
             <div className={styles.gridWrap}>
-              <HistorySection title={`נסיעות עבר · ${pastRides.length}`}>
+              <HistorySection title={t('rides:pastRidesCount', { count: pastRides.length })}>
                 <div className={styles.grid}>
                   {pastRides.map((r) => (
                     <div key={r.ride_id} className={styles.cardWrap}>
                       <RideCard
                         route={`${r.origin_name ?? '?'} → ${r.destination_name ?? '?'}`}
-                        scheduleCaption="זמן היציאה"
+                        scheduleCaption={t('rides:rideTimeLabel')}
                         time={formatDateTimeNoSeconds(r.departure_time)}
                         status={getRideStatusLabel(r)}
                         source={getRideSourceLabel(r.group_id, myGroups)}
@@ -214,8 +217,8 @@ export default function MyRides() {
       <ConfirmModal
         open={rideToCancel != null}
         onClose={() => setRideToCancel(null)}
-        title="האם אתה בטוח שברצונך לבטל את הנסיעה?"
-        confirmLabel="אישור"
+        title={t('rides:confirmCancelRide')}
+        confirmLabel={t('common:confirm')}
         variant="danger"
         loading={cancelling}
         onConfirm={handleConfirmCancel}

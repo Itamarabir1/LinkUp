@@ -1,5 +1,6 @@
 import ConfirmModal from '../../components/ConfirmModal/ConfirmModal';
 import ErrorBanner from '../../components/ErrorBanner';
+import { useTranslation } from 'react-i18next';
 import type { GroupManageViewModel } from './useGroupManage';
 import GroupMembersTab from './GroupMembersTab';
 import GroupRidesTab from './GroupRidesTab';
@@ -11,6 +12,7 @@ export interface GroupManageContentProps {
 }
 
 export default function GroupManageContent({ vm }: GroupManageContentProps) {
+  const { t } = useTranslation(['groups', 'common']);
   const { isAdmin } = vm;
 
   return (
@@ -23,7 +25,7 @@ export default function GroupManageContent({ vm }: GroupManageContentProps) {
           className={vm.activeTab === 'rides' ? `${styles.tab} ${styles.tabActive}` : styles.tab}
           onClick={() => vm.setActiveTab('rides')}
         >
-          נסיעות
+          {t('groups:ridesTab')}
         </button>
         <button
           type="button"
@@ -32,7 +34,7 @@ export default function GroupManageContent({ vm }: GroupManageContentProps) {
           className={vm.activeTab === 'members' ? `${styles.tab} ${styles.tabActive}` : styles.tab}
           onClick={() => vm.setActiveTab('members')}
         >
-          חברים
+          {t('groups:membersTab')}
         </button>
         {isAdmin && (
           <button
@@ -42,7 +44,7 @@ export default function GroupManageContent({ vm }: GroupManageContentProps) {
             className={vm.activeTab === 'settings' ? `${styles.tab} ${styles.tabActive}` : styles.tab}
             onClick={() => vm.setActiveTab('settings')}
           >
-            הגדרות
+            {t('groups:settingsTab')}
           </button>
         )}
       </div>
@@ -58,8 +60,8 @@ export default function GroupManageContent({ vm }: GroupManageContentProps) {
       <ConfirmModal
         open={vm.confirmLeave}
         onClose={() => vm.setConfirmLeave(false)}
-        title="לעזוב את הקבוצה?"
-        confirmLabel="עזוב"
+        title={t('groups:leaveGroup')}
+        confirmLabel={t('groups:leaveGroup')}
         variant="danger"
         loading={vm.actionLoading}
         onConfirm={vm.handleLeave}
@@ -68,9 +70,9 @@ export default function GroupManageContent({ vm }: GroupManageContentProps) {
       <ConfirmModal
         open={vm.confirmClose}
         onClose={() => vm.setConfirmClose(false)}
-        title="למחוק את הקבוצה?"
-        description="כל החברים יוצאו והקבוצה לא תהיה זמינה. פעולה זו לא ניתנת לביטול."
-        confirmLabel="מחק קבוצה"
+        title={t('groups:deleteGroup')}
+        description={t('groups:deleteGroupWarning')}
+        confirmLabel={t('groups:deleteGroup')}
         variant="danger"
         loading={vm.actionLoading}
         onConfirm={vm.handleClose}

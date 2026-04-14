@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { getGroupByInviteCode, joinGroup } from '../api/groups';
 import type { Group } from '../types/api';
 import ErrorBanner from '../components/ErrorBanner';
@@ -8,6 +9,7 @@ import { getApiErrorMessage, getApiStatus } from '../utils/apiError';
 import styles from './JoinGroup.module.css';
 
 export default function JoinGroup() {
+  const { t } = useTranslation(['groups', 'common']);
   const { inviteCode } = useParams<{ inviteCode: string }>();
   const navigate = useNavigate();
   const [group, setGroup] = useState<Group | null>(null);
@@ -18,7 +20,7 @@ export default function JoinGroup() {
   useEffect(() => {
     if (!inviteCode) {
       setLoading(false);
-      setError('חסר קוד הזמנה.');
+      setError(t('groups:missingInviteCode'));
       return;
     }
     let cancelled = false;
@@ -30,7 +32,7 @@ export default function JoinGroup() {
       })
       .catch(() => {
         if (!cancelled) {
-          setError('הקבוצה לא נמצאה או שהקישור לא תקף.');
+          setError(t('groups:groupNotFoundOrInvalid'));
           setGroup(null);
         }
       })
@@ -38,7 +40,7 @@ export default function JoinGroup() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [inviteCode]);
+  }, [inviteCode, t]);
 
   const handleJoin = async () => {
     if (!inviteCode) return;
@@ -54,11 +56,11 @@ export default function JoinGroup() {
     } catch (err: unknown) {
       const status = getApiStatus(err);
       if (status === 409) {
-        setError('אתה כבר חבר בקבוצה זו');
+        setError(t('groups:alreadyMember'));
       } else if (status === 404) {
-        setError('קוד ההצטרפות אינו תקף');
+        setError(t('groups:invalidJoinCode'));
       } else {
-        setError(getApiErrorMessage(err, 'הצטרפות לקבוצה נכשלה'));
+        setError(getApiErrorMessage(err, t('groups:joinFailed')));
       }
     } finally {
       setJoining(false);
@@ -68,7 +70,9 @@ export default function JoinGroup() {
   if (!inviteCode) {
     return (
       <div className={styles.page}>
-        <p className={styles.pageError}>{error}</p>
+        <div className={styles.inner}>
+          <ErrorBanner message={error || t('groups:missingInviteCode')} className={styles.pageError} />
+        </div>
       </div>
     );
   }
@@ -76,7 +80,9 @@ export default function JoinGroup() {
   if (loading) {
     return (
       <div className={styles.page}>
-        <div className={styles.pageLoading}>טוען...</div>
+        <div className={styles.inner}>
+          <div className={styles.pageLoading}>{t('common:loading')}</div>
+        </div>
       </div>
     );
   }
@@ -84,29 +90,60 @@ export default function JoinGroup() {
   if (error || !group) {
     return (
       <div className={styles.page}>
-        <h1 className={styles.pageTitle}>הצטרפות לקבוצה</h1>
-        <ErrorBanner message={error || 'הקבוצה לא נמצאה.'} className={styles.pageError} />
+        <div className={styles.inner}>
+          <h1 className={styles.pageTitle}>{t('groups:joinGroupTitle')}</h1>
+          <ErrorBanner
+            message={error || t('common:not_found')}
+            className={styles.pageError}
+          />
+        </div>
       </div>
     );
   }
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.pageTitle}>הצטרפות לקבוצה</h1>
-      <div className={styles.card}>
-        <div className={styles.groupName}>{group.name}</div>
-        <div className={styles.memberCount}>
-          {group.member_count != null ? `${group.member_count} חברים` : 'קבוצה פעילה'}
+      <div className={styles.inner}>
+        <h1 className={styles.pageTitle}>{t('groups:joinGroupTitle')}</h1>
+        <div className={styles.card}>
+          {group.avatar_url ? (
+            <img
+              src={group.avatar_url}
+              alt={group.name}
+              className={styles.groupAvatarImg}
+            />
+          ) : (
+            <div className={styles.groupAvatar}>
+              {group.name.charAt(0).toUpperCase()}
+            </div>
+          )}
+
+          <div className={styles.groupName}>{group.name}</div>
+
+          <div className={styles.groupMeta}>
+            {group.member_count != null && (
+              <span>{t('groups:membersLabel', { count: group.member_count })}</span>
+            )}
+            {group.member_count != null && (
+              <span className={styles.metaDot} />
+            )}
+            <span>{t('groups:privateGroupLabel')}</span>
+          </div>
+
+          {error && (
+            <ErrorBanner message={error} className={styles.pageError} />
+          )}
+
+          <LoadingButton
+            type="button"
+            className={styles.btnPrimary}
+            loading={joining}
+            loadingLabel={t('groups:joiningButton')}
+            onClick={handleJoin}
+          >
+            {t('groups:joinButton')}
+          </LoadingButton>
         </div>
-        <LoadingButton
-          type="button"
-          className={`${styles.btn} ${styles.btnPrimary}`}
-          loading={joining}
-          loadingLabel="מצטרף..."
-          onClick={handleJoin}
-        >
-          הצטרף לקבוצה
-        </LoadingButton>
       </div>
     </div>
   );

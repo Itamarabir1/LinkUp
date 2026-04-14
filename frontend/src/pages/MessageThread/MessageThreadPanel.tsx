@@ -1,7 +1,9 @@
 import type { FormEvent, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowRight, Send } from 'lucide-react';
 import ErrorBanner from '../../components/ErrorBanner';
+import { formatDateFull, formatTimeHm } from '../../utils/date';
 import { formatChatLastSeen } from './messageThread.utils';
 import type { MessageThreadViewModel } from './useMessageThread';
 import styles from './MessageThread.module.css';
@@ -12,6 +14,7 @@ export interface MessageThreadPanelProps {
 }
 
 export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelProps) {
+  const { t } = useTranslation('common');
   const {
     cid,
     user,
@@ -32,23 +35,10 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
     onInputChange,
   } = vm;
 
-  function formatBubbleTime(dateStr: string): string {
-    const d = new Date(dateStr);
-    return d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-  }
-
-  function getDayLabel(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('he-IL', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
-  }
-
   if (loading) {
     return (
       <div className={embedded ? styles.embeddedWrap : styles.page}>
-        <p className={styles.pageLoading}>טוען שיחה...</p>
+        <p className={styles.pageLoading}>{t('msg_thread_loading')}</p>
       </div>
     );
   }
@@ -59,22 +49,22 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
         <ErrorBanner message={error} className={styles.pageError} />
         {!embedded && (
           <Link to="/messages" className={styles.backBtn} style={{ margin: '16px' }}>
-            חזרה להודעות
+            {t('msg_back_to_messages')}
           </Link>
         )}
       </div>
     );
   }
 
-  const partnerName = conversation?.partner?.full_name || (cid ? 'שיחה' : '');
+  const partnerName = conversation?.partner?.full_name || (cid ? t('msg_conversation_fallback') : '');
   const partnerAvatarUrl = conversation?.partner?.avatar_url;
 
   const partnerStatusText = partnerTyping
-    ? `${partnerTypingName || partnerName} מקליד...`
+    ? t('msg_typing', { name: partnerTypingName || partnerName })
     : partnerPresence?.online
-      ? 'מחובר'
+      ? t('msg_online')
       : partnerPresence?.last_seen
-        ? `נראה לאחרונה ${formatChatLastSeen(partnerPresence.last_seen)}`
+        ? t('msg_last_seen', { when: formatChatLastSeen(partnerPresence.last_seen) })
         : '';
 
   const isOnline = !partnerTyping && partnerPresence?.online;
@@ -86,7 +76,7 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
     <div className={embedded ? styles.embeddedWrap : styles.page}>
       <div className={headerClass}>
         {!embedded && (
-          <Link to="/messages" className={styles.backBtn} aria-label="חזרה">
+          <Link to="/messages" className={styles.backBtn} aria-label={t('msg_back_aria')}>
             <ArrowRight size={16} />
           </Link>
         )}
@@ -120,12 +110,12 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
             onClick={() => void loadMoreMessages()}
             disabled={loadingMore}
           >
-            {loadingMore ? 'טוען...' : 'טען הודעות ישנות יותר'}
+            {loadingMore ? t('loading') : t('msg_load_older')}
           </button>
         ) : null}
 
         {messages.length === 0 ? (
-          <p className={styles.emptyMessages}>אין הודעות. שלח הודעה ראשונה.</p>
+          <p className={styles.emptyMessages}>{t('msg_empty_thread')}</p>
         ) : (
           messages.reduce<ReactNode[]>((acc, m, i) => {
             const isMe = m.sender_id === user?.user_id;
@@ -136,7 +126,7 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
               acc.push(
                 <div key={`day-${msgDay}-${i}`} className={styles.dayDivider}>
                   <div className={styles.dayLine} aria-hidden />
-                  <span className={styles.dayLabel}>{getDayLabel(m.created_at)}</span>
+                  <span className={styles.dayLabel}>{formatDateFull(m.created_at)}</span>
                   <div className={styles.dayLine} aria-hidden />
                 </div>
               );
@@ -146,7 +136,7 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
               <div key={m.message_id} className={isMe ? styles.msgBubbleMe : styles.msgBubbleThem}>
                 <div className={styles.msgBody}>
                   <div className={styles.msgText}>{m.body}</div>
-                  <div className={styles.msgTime}>{formatBubbleTime(m.created_at)}</div>
+                  <div className={styles.msgTime}>{formatTimeHm(m.created_at)}</div>
                 </div>
               </div>
             );
@@ -171,7 +161,7 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
           type="submit"
           className={styles.sendBtn}
           disabled={sending || !input.trim()}
-          aria-label="שלח"
+          aria-label={t('msg_send')}
         >
           <Send size={16} strokeWidth={2} />
         </button>
@@ -188,7 +178,7 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
               void handleSend(e as unknown as FormEvent<HTMLFormElement>);
             }
           }}
-          placeholder="כתוב הודעה..."
+          placeholder={t('msg_compose_placeholder')}
           className={styles.composeTextarea}
           rows={1}
           maxLength={10000}

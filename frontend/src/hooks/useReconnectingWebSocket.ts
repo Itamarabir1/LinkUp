@@ -6,9 +6,9 @@ interface Options {
   enabled?: boolean;
   reconnectDelayMs?: number;
   onMessage: (ev: MessageEvent) => void;
-  /** נקרא אחרי חיבור מוצלח (כולל reconnect) */
+  /** Called after a successful connection (including reconnect). */
   onOpen?: () => void;
-  /** כשמשתנה (למשל rideId) — ה-effect מתחבר מחדש ל-URL הנכון */
+  /** Reconnect key (e.g. rideId); changing it reconnects to a new URL. */
   reconnectKey?: string | null;
 }
 

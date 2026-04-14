@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import type { Dispatch } from 'react';
 import type { ChatAction } from './chatState';
 
-/** פתיחת צ'אט בפופאפ או בפנל לפי הנתיב הנוכחי */
+/** Opens chat as popup or panel based on current route context. */
 export function useChatOpenClose(pathname: string, dispatch: Dispatch<ChatAction>) {
   const openChat = useCallback(
     (conversationId: string) => {

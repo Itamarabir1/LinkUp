@@ -67,5 +67,20 @@ declare namespace google {
       bottom?: number;
       left?: number;
     }
+
+    /** Advanced markers (`marker` library); loaded with Maps JS API. */
+    namespace marker {
+      interface AdvancedMarkerElementOptions {
+        map?: Map | null;
+        position?: LatLngLiteral;
+        title?: string;
+        content?: HTMLElement;
+      }
+      class AdvancedMarkerElement {
+        map: Map | null;
+        position?: LatLngLiteral;
+        constructor(opts?: AdvancedMarkerElementOptions);
+      }
+    }
   }
 }

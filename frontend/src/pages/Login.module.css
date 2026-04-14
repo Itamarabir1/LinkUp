@@ -63,7 +63,7 @@
   font-size: 13px;
   text-align: center;
   margin-bottom: 16px;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 /* Error */
@@ -91,7 +91,7 @@
   font-weight: 600;
   color: var(--text-secondary);
   letter-spacing: 0.2px;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 /* Input */
@@ -103,7 +103,7 @@
   font-size: 14px;
   background: var(--bg-secondary);
   color: var(--text-primary);
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
   transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
   text-align: right;
   box-sizing: border-box;
@@ -125,7 +125,7 @@
 .fieldHint {
   font-size: 11px;
   color: var(--text-tertiary);
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 /* Submit button */
@@ -139,7 +139,7 @@
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
   box-shadow: 0 2px 10px rgba(79, 70, 229, 0.3);
   transition: all 180ms ease;
   margin-top: 4px;
@@ -187,7 +187,7 @@
   text-align: center;
   font-size: 14px;
   color: var(--text-secondary);
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .link a {

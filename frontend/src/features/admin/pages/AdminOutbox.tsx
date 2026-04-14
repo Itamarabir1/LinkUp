@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ConfirmModal from '../../../components/ConfirmModal/ConfirmModal';
 import { triggerNotificationToast } from '../../../components/NotificationToast/notificationToast.utils';
 import {
@@ -8,12 +8,8 @@ import {
   type AdminOutboxDetail,
   type AdminOutboxRow,
 } from '../api/outbox';
+import { useAdminFetch } from '../hooks/useAdminFetch';
 import page from '../styles/AdminPage.module.css';
-
-type ListState =
-  | { status: 'loading' }
-  | { status: 'ready'; items: AdminOutboxRow[] }
-  | { status: 'error' };
 
 type DetailState =
   | { status: 'idle' }
@@ -23,27 +19,17 @@ type DetailState =
 
 export default function AdminOutbox() {
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const [list, setList] = useState<ListState>({ status: 'loading' });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailState>({ status: 'idle' });
   const [requeueId, setRequeueId] = useState<string | null>(null);
   const [requeueLoading, setRequeueLoading] = useState(false);
 
   const params = useMemo(() => ({ limit: 100, status: statusFilter || undefined }), [statusFilter]);
-
-  const loadList = useCallback(async () => {
-    setList({ status: 'loading' });
-    try {
-      const { data } = await fetchAdminOutbox(params);
-      setList({ status: 'ready', items: Array.isArray(data) ? data : [] });
-    } catch {
-      setList({ status: 'error' });
-    }
-  }, [params]);
-
-  useEffect(() => {
-    void loadList();
-  }, [loadList]);
+  const {
+    status: listStatus,
+    data: listData,
+    reload: loadList,
+  } = useAdminFetch<AdminOutboxRow[]>(() => fetchAdminOutbox(params));
 
   useEffect(() => {
     let mounted = true;
@@ -77,7 +63,7 @@ export default function AdminOutbox() {
       triggerNotificationToast({ title: 'בוצע', body: 'האירוע הוחזר לתור.' });
       setRequeueId(null);
       if (selectedId === requeueId) setSelectedId(null);
-      await loadList();
+      loadList();
     } catch {
       triggerNotificationToast({ title: 'שגיאה', body: 'לא ניתן להחזיר לתור.' });
     } finally {
@@ -111,9 +97,9 @@ export default function AdminOutbox() {
         )}
       </div>
 
-      {list.status === 'loading' && <p className={page.muted}>טוען…</p>}
-      {list.status === 'error' && <p className={page.error}>שגיאה בטעינה.</p>}
-      {list.status === 'ready' && (
+      {listStatus === 'loading' && <p className={page.muted}>טוען…</p>}
+      {listStatus === 'error' && <p className={page.error}>שגיאה בטעינה.</p>}
+      {listStatus === 'ready' && (
         <div className={page.grid2}>
           <div className={page.tableWrap}>
             <table className={page.table}>
@@ -126,7 +112,7 @@ export default function AdminOutbox() {
                 </tr>
               </thead>
               <tbody>
-                {list.items.map((e) => (
+                {(listData ?? []).map((e) => (
                   <tr
                     key={e.id}
                     className={`${page.rowClick} ${selectedId === e.id ? page.rowSelected : ''}`}
@@ -134,7 +120,16 @@ export default function AdminOutbox() {
                   >
                     <td>{e.created_at}</td>
                     <td>{e.event_name}</td>
-                    <td>{e.status}</td>
+                    <td>
+                      {(() => {
+                        const badgeClass = {
+                          PENDING: page.badgeWarn,
+                          PROCESSED: page.badgeOk,
+                          FAILED: page.badgeErr,
+                        }[e.status] ?? page.badgeGray;
+                        return <span className={`${page.badge} ${badgeClass}`}>{e.status}</span>;
+                      })()}
+                    </td>
                     <td>{e.retry_count}</td>
                   </tr>
                 ))}

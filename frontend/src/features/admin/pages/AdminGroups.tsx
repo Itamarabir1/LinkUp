@@ -1,40 +1,20 @@
-import { useEffect, useState } from 'react';
 import { fetchAdminGroups, type AdminGroupRow } from '../api/groups';
+import { useAdminFetch } from '../hooks/useAdminFetch';
 import page from '../styles/AdminPage.module.css';
 
-type State =
-  | { status: 'loading' }
-  | { status: 'ready'; items: AdminGroupRow[] }
-  | { status: 'error' };
-
 export default function AdminGroups() {
-  const [state, setState] = useState<State>({ status: 'loading' });
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const { data } = await fetchAdminGroups({ limit: 200 });
-        if (!mounted) return;
-        setState({ status: 'ready', items: Array.isArray(data) ? data : [] });
-      } catch {
-        if (!mounted) return;
-        setState({ status: 'error' });
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const { status, data: items } = useAdminFetch<AdminGroupRow[]>(
+    () => fetchAdminGroups({ limit: 200 })
+  );
 
   return (
     <div>
       <h2 className={page.pageTitle}>קבוצות</h2>
       <p className={page.muted}>קריאה בלבד — רשימת קבוצות במערכת.</p>
 
-      {state.status === 'loading' && <p className={page.muted}>טוען…</p>}
-      {state.status === 'error' && <p className={page.error}>שגיאה בטעינה.</p>}
-      {state.status === 'ready' && (
+      {status === 'loading' && <p className={page.muted}>טוען…</p>}
+      {status === 'error' && <p className={page.error}>שגיאה בטעינה.</p>}
+      {status === 'ready' && (
         <div className={page.tableWrap}>
           <table className={page.table}>
             <thead>
@@ -48,7 +28,7 @@ export default function AdminGroups() {
               </tr>
             </thead>
             <tbody>
-              {state.items.map((g) => (
+              {(items ?? []).map((g) => (
                 <tr key={g.group_id}>
                   <td>{g.name}</td>
                   <td>{g.member_count}</td>

@@ -1,4 +1,5 @@
 import { formatRideDate } from '../../utils/date';
+import { useTranslation } from 'react-i18next';
 import { canDriverOpenMap, canDriverShare, getSource } from './myBookings.utils';
 import type { DriverBookingItem } from './myBookings.types';
 import DriverBookingPassengerRow from './DriverBookingPassengerRow';
@@ -33,10 +34,10 @@ function rideStatusClass(status: string): string {
 }
 
 function rideStatusLabel(status: string): string {
-  if (status === 'active') return 'פעילה';
-  if (status === 'completed') return 'הושלמה';
-  if (status === 'cancelled') return 'בוטלה';
-  return 'פתוחה';
+  if (status === 'active') return 'rides:status_active';
+  if (status === 'completed') return 'rides:status_completed';
+  if (status === 'cancelled') return 'rides:status_cancelled';
+  return 'bookings:openRide';
 }
 
 export default function DriverRideBlock({
@@ -47,6 +48,7 @@ export default function DriverRideBlock({
   chatLoading,
   handlers,
 }: DriverRideBlockProps) {
+  const { t } = useTranslation(['bookings', 'common', 'rides']);
   const pendingCount = passengers.filter((p) => p.status === 'pending_approval').length;
   const confirmedCount = passengers.filter((p) => p.status === 'confirmed').length;
 
@@ -62,17 +64,17 @@ export default function DriverRideBlock({
           <div className={styles.cardMeta}>
             <span>{formatRideDate(ride.departure_time)}</span>
             <span className={styles.cardMetaSep} />
-            <span>{ride.available_seats} מושבים פנויים</span>
+            <span>{t('common:seats', { count: ride.available_seats ?? 0 })}</span>
           </div>
           <div className={styles.driverBlockCounts}>
             {pendingCount > 0 && (
               <span className={`${styles.countBadge} ${styles.countBadgePending}`}>
-                {pendingCount} בקשות
+                {t('bookings:requestsCount', { count: pendingCount })}
               </span>
             )}
             {confirmedCount > 0 && (
               <span className={`${styles.countBadge} ${styles.countBadgeConfirmed}`}>
-                {confirmedCount} מאושרים
+                {t('bookings:approvedCount', { count: confirmedCount })}
               </span>
             )}
           </div>
@@ -80,14 +82,14 @@ export default function DriverRideBlock({
             {ride.group_id ? (
               <span className={styles.groupTag}>{ride.group_name ?? getSource(ride, myGroups)}</span>
             ) : (
-              <span className={styles.groupTagPublic}>ציבורי</span>
+              <span className={styles.groupTagPublic}>{t('common:public')}</span>
             )}
           </div>
         </div>
 
         <div className={styles.driverBlockRight}>
           <span className={`${styles.rideStatusBadge} ${rideStatusClass(ride.status)}`}>
-            {rideStatusLabel(ride.status)}
+            {t(rideStatusLabel(ride.status))}
           </span>
           <div className={styles.driverBlockActionRow}>
             {canDriverShare(confirmedCount) && (
@@ -99,7 +101,7 @@ export default function DriverRideBlock({
                   }`}
                   onClick={() => handlers.onSharingToggle(ride.ride_id)}
                 >
-                  {sharingRideId === ride.ride_id ? 'הפסק שיתוף' : 'שתף מיקום'}
+                  {sharingRideId === ride.ride_id ? t('bookings:stopSharing') : t('bookings:shareLocation')}
                 </button>
                 {ride.status === 'active' ? (
                   <button
@@ -107,7 +109,7 @@ export default function DriverRideBlock({
                     className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
                     onClick={() => void handlers.onShareStop(ride.ride_id)}
                   >
-                    סיים נסיעה
+                    {t('bookings:endRide')}
                   </button>
                 ) : (
                   <button
@@ -115,7 +117,7 @@ export default function DriverRideBlock({
                     className={styles.btnOutline}
                     onClick={() => void handlers.onShareStart(ride.ride_id)}
                   >
-                    התחל נסיעה
+                    {t('bookings:startRide')}
                   </button>
                 )}
                 {canDriverOpenMap(confirmedCount) && (
@@ -124,7 +126,7 @@ export default function DriverRideBlock({
                     className={`${styles.btnOutline} ${styles.btnAccentBlue}`}
                     onClick={() => handlers.onOpenMap(ride.ride_id)}
                   >
-                    מפה
+                    {t('bookings:openMap')}
                   </button>
                 )}
               </>
@@ -134,7 +136,7 @@ export default function DriverRideBlock({
               className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
               onClick={() => handlers.onCancelRide(ride.ride_id)}
             >
-              בטל נסיעה
+              {t('rides:cancelRide')}
             </button>
           </div>
         </div>

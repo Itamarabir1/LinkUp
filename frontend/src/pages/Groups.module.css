@@ -18,14 +18,14 @@
   color: var(--text-primary);
   margin: 0;
   letter-spacing: -0.02em;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .pageLoading {
   text-align: center;
   padding: 3rem;
   color: var(--text-secondary);
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .btnPrimary {
@@ -35,7 +35,7 @@
   background: var(--primary);
   color: #fff;
   border-radius: var(--radius-md);
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
   font-size: 13px;
   font-weight: 600;
   display: inline-flex;
@@ -69,14 +69,14 @@
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 0.5rem;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .emptySubtitle {
   font-size: 14px;
   color: var(--text-secondary);
   margin: 0 0 1.5rem;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 /* ── Grid ── */
@@ -124,7 +124,7 @@
   font-size: 1.25rem;
   font-weight: 700;
   flex-shrink: 0;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .avatarImg {
@@ -150,7 +150,7 @@
   padding: 0;
   cursor: pointer;
   text-align: right;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
   margin-bottom: 2px;
   display: block;
   transition: color var(--transition-fast, 150ms ease);
@@ -161,7 +161,7 @@
 .memberCount {
   font-size: 13px;
   color: var(--text-tertiary);
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .cardDescription {
@@ -173,7 +173,7 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   line-height: 1.5;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .cardFooter {
@@ -193,7 +193,7 @@
   padding: 3px 10px;
   border-radius: 999px;
   border: 1px solid var(--primary-soft-border);
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .badgeType {
@@ -203,5 +203,5 @@
   padding: 3px 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }

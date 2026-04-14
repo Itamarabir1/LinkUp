@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getGroupMembers, getGroupRides } from '../../api/groups';
 import type { GroupMember, Ride } from '../../types/api';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { apiErr } from '../../utils/i18nError';
 import type { GroupTab } from './groupManage.types';
 
 /**
@@ -26,7 +27,7 @@ export function useGroupManageLists(
       const list = await getGroupMembers(groupId);
       setMembers(list);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'טעינת חברי הקבוצה נכשלה'));
+      setError(getApiErrorMessage(err, apiErr('err_load_group_members')));
       setMembers([]);
     } finally {
       setLoadingMembers(false);
@@ -41,7 +42,7 @@ export function useGroupManageLists(
       const list = await getGroupRides(groupId);
       setRides(Array.isArray(list) ? list : []);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'טעינת נסיעות הקבוצה נכשלה'));
+      setError(getApiErrorMessage(err, apiErr('err_load_group_rides')));
       setRides([]);
     } finally {
       setLoadingRides(false);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -13,103 +13,32 @@ import ConfirmModal from '../../../components/ConfirmModal/ConfirmModal';
 import { triggerNotificationToast } from '../../../components/NotificationToast/notificationToast.utils';
 import { fetchAdminStats } from '../api/stats';
 import { fetchAdminRides, postAdminCancelRide, type AdminRideRow } from '../api/rides';
+import { useAdminFetch } from '../hooks/useAdminFetch';
+import { useAdminTheme } from '../hooks/useAdminTheme';
+import { RIDE_STATUS_COLORS, RIDE_STATUS_LABELS } from '../adminConstants';
 import page from '../styles/AdminPage.module.css';
-
-const RIDE_COLORS: Record<string, string> = {
-  open: '#3b82f6',
-  full: '#f59e0b',
-  active: '#10b981',
-  completed: '#6366f1',
-  cancelled: '#ef4444',
-};
-
-const RIDE_LABELS: Record<string, string> = {
-  open: 'פתוח',
-  full: 'מלא',
-  active: 'פעיל',
-  completed: 'הושלם',
-  cancelled: 'בוטל',
-};
-
-function subscribeTheme(onChange: () => void) {
-  const el = document.documentElement;
-  const mo = new MutationObserver(onChange);
-  mo.observe(el, { attributes: true, attributeFilter: ['data-theme'] });
-  return () => mo.disconnect();
-}
-
-function themeSnapshot() {
-  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-}
-
-function useDataTheme() {
-  return useSyncExternalStore(subscribeTheme, themeSnapshot, () => 'light');
-}
 
 type State =
   | { status: 'loading' }
   | { status: 'ready'; items: AdminRideRow[] }
   | { status: 'error' };
 
-type ChartState =
-  | { status: 'loading' }
-  | { status: 'ready'; rides_by_status: Record<string, number> }
-  | { status: 'error' };
-
 export default function AdminRides() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [state, setState] = useState<State>({ status: 'loading' });
-  const [chartState, setChartState] = useState<ChartState>({ status: 'loading' });
   const [cancelTarget, setCancelTarget] = useState<AdminRideRow | null>(null);
   const [cancelling, setCancelling] = useState(false);
-  const dataTheme = useDataTheme();
-  const isDark = dataTheme === 'dark';
-
-  const chartTheme = useMemo(
-    () =>
-      isDark
-        ? {
-            axis: '#94a3b8',
-            grid: '#334155',
-            tooltipBg: '#1e293b',
-            tooltipBorder: '#334155',
-            tooltipColor: '#e2e8f0',
-          }
-        : {
-            axis: '#64748b',
-            grid: '#e2e8f0',
-            tooltipBg: '#ffffff',
-            tooltipBorder: '#e2e8f0',
-            tooltipColor: '#0f172a',
-          },
-    [isDark],
-  );
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const { data } = await fetchAdminStats();
-        if (!mounted) return;
-        setChartState({ status: 'ready', rides_by_status: data.rides_by_status ?? {} });
-      } catch {
-        if (!mounted) return;
-        setChartState({ status: 'error' });
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const { chart: chartTheme } = useAdminTheme();
+  const { data: statsData } = useAdminFetch(fetchAdminStats);
 
   const barData = useMemo(() => {
-    if (chartState.status !== 'ready') return [];
-    return Object.entries(chartState.rides_by_status).map(([key, count]) => ({
+    const ridesByStatus = statsData?.rides_by_status ?? {};
+    return Object.entries(ridesByStatus).map(([key, count]) => ({
       statusKey: key,
-      name: RIDE_LABELS[key] ?? key,
+      name: RIDE_STATUS_LABELS[key] ?? key,
       count,
     }));
-  }, [chartState]);
+  }, [statsData]);
 
   const barTotal = useMemo(() => barData.reduce((s, d) => s + d.count, 0), [barData]);
 
@@ -156,11 +85,10 @@ export default function AdminRides() {
     <div>
       <h2 className={page.pageTitle}>נסיעות</h2>
 
-      {chartState.status === 'loading' && (
+      {!statsData && (
         <p className={page.muted}>טוען חלוקה לפי סטטוס…</p>
       )}
-      {chartState.status === 'error' && null}
-      {chartState.status === 'ready' && (
+      {statsData && (
         <div className={page.chartMiniWrap}>
           <div dir="ltr">
             {barTotal === 0 ? (
@@ -189,7 +117,7 @@ export default function AdminRides() {
                     {barData.map((entry, i) => (
                       <Cell
                         key={`${entry.statusKey}-${i}`}
-                        fill={RIDE_COLORS[entry.statusKey] ?? '#94a3b8'}
+                        fill={RIDE_STATUS_COLORS[entry.statusKey] ?? '#94a3b8'}
                       />
                     ))}
                   </Bar>
@@ -237,7 +165,12 @@ export default function AdminRides() {
               {state.items.map((r) => (
                 <tr key={r.ride_id}>
                   <td title={r.ride_id}>{r.ride_id.slice(0, 8)}…</td>
-                  <td>{r.driver_name || r.driver_id.slice(0, 8)}</td>
+                  <td>
+                    <div className={page.userCell}>
+                      <div className={page.avatar}>{(r.driver_name || '?').charAt(0)}</div>
+                      <span className={page.userName}>{r.driver_name || r.driver_id.slice(0, 8)}</span>
+                    </div>
+                  </td>
                   <td>{r.origin_name ?? '—'}</td>
                   <td>{r.destination_name ?? '—'}</td>
                   <td>{r.departure_time ?? '—'}</td>

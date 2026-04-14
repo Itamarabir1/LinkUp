@@ -5,23 +5,6 @@
   text-align: right;
 }
 
-/* ── Header ── */
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.pageTitle {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-  letter-spacing: -0.02em;
-  font-family: var(--font-primary, "Heebo", sans-serif);
-}
-
 .markAllRead {
   font-size: 13px;
   font-weight: 600;
@@ -31,7 +14,7 @@
   border-radius: 8px;
   padding: 6px 14px;
   cursor: pointer;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
   transition: all var(--transition-fast, 150ms ease);
 }
 
@@ -41,18 +24,24 @@
   border-color: var(--primary);
 }
 
+.markAllWrap {
+  display: flex;
+  justify-content: flex-start;
+  padding: 0 0 12px;
+}
+
 /* ── States ── */
 .pageError {
   color: var(--danger-text);
   margin-bottom: 1rem;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .pageLoading {
   text-align: center;
   color: var(--text-secondary);
   padding: 3rem;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .empty {
@@ -71,14 +60,14 @@
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .emptySub {
   font-size: 14px;
   color: var(--text-secondary);
   margin: 0;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 /* ── Groups ── */
@@ -97,7 +86,7 @@
   color: var(--text-primary);
   margin: 20px 0 4px;
   padding: 0 4px;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .groupTitle:first-child { margin-top: 4px; }
@@ -141,7 +130,7 @@
   justify-content: center;
   font-size: 18px;
   font-weight: 700;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 /* Avatar color variants by notification type */
@@ -182,7 +171,7 @@
   color: var(--text-primary);
   margin: 0 0 2px;
   line-height: 1.4;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .notifTitleUnread {
@@ -196,14 +185,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .notifTime {
   font-size: 12px;
   font-weight: 400;
   color: var(--text-tertiary);
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .notifTimeUnread {

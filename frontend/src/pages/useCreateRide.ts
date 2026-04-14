@@ -5,6 +5,7 @@ import { previewRideRoutes, createRideFromSession } from '../api/rides';
 import { useAuth } from '../context/AuthContext';
 import type { RidePreviewResponse } from '../types/api';
 import { getApiErrorMessage } from '../utils/apiError';
+import { apiErr } from '../utils/i18nError';
 import type { RouteMapData } from '../components/RouteMapModal';
 
 type CreateRideStatus = 'idle' | 'locating' | 'previewing' | 'creating';
@@ -60,7 +61,7 @@ export function useCreateRide() {
           );
           if (isCurrent(token)) setOriginName(data.address ?? '');
         } catch (err) {
-          if (isCurrent(token)) setError(getApiErrorMessage(err, 'לא נמצאה כתובת למיקום זה'));
+          if (isCurrent(token)) setError(getApiErrorMessage(err, apiErr('err_geocode_not_found')));
         } finally {
           if (isCurrent(token)) setStatus('idle');
         }
@@ -108,7 +109,7 @@ export function useCreateRide() {
         setPreview({ ...data, routes: routesList });
         setSelectedRouteIndex(routesList.length === 1 ? 0 : -1);
       } catch (err) {
-        if (isCurrent(token)) setError(getApiErrorMessage(err, 'תצוגה מקדימה נכשלה'));
+        if (isCurrent(token)) setError(getApiErrorMessage(err, apiErr('err_preview_ride')));
       } finally {
         if (isCurrent(token)) setStatus('idle');
       }
@@ -136,7 +137,7 @@ export function useCreateRide() {
       setPreview(null);
       navigate(groupId ? `/groups/${groupId}` : '/my-rides', { replace: true });
     } catch (err) {
-      if (isCurrent(token)) setError(getApiErrorMessage(err, 'יצירת נסיעה נכשלה'));
+      if (isCurrent(token)) setError(getApiErrorMessage(err, apiErr('err_create_ride')));
     } finally {
       if (isCurrent(token)) setStatus('idle');
     }

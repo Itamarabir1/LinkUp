@@ -12,11 +12,11 @@ Linkup connects drivers and passengers for shared rides. Drivers publish trips w
 
 ## Engineering highlights (portfolio)
 
-Single doc for **stack, scale patterns, real-time chat (disconnect / last-seen debounce), Outbox, ops, CI/CD, tests, k6 load testing, auth under concurrent load (sync vs async), phone validation, frontend refactor**: **[docs/ENGINEERING_HIGHLIGHTS.md](docs/ENGINEERING_HIGHLIGHTS.md)**.  
+Single doc for **stack, scale patterns, real-time chat (disconnect / last-seen debounce), Outbox, ops, CI/CD, tests, k6 load testing, auth under concurrent load (sync vs async), phone validation, frontend refactor, i18n/locale/error fallbacks/CSS fonts**: **[docs/ENGINEERING_HIGHLIGHTS.md](docs/ENGINEERING_HIGHLIGHTS.md)**.  
 פרונט — רשימת ריפקטור מפורטת: **[frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md](frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md)**.  
 **FCM (Web push — `data` map מהשרת; SW + Toast ב־`App.tsx` + צליל; רישום אחרי login ב־`AuthContext`, ניקוי טוקן ב-logout):** **[docs/FCM_SYSTEM_SUMMARY.md](docs/FCM_SYSTEM_SUMMARY.md)**.  
 **מסך אדמין פנימי (React, `/admin`, lazy routes, סטטיסטיקות + משתמשים + נסיעות/קבוצות + Outbox + חיפוש):** **[ADMIN_DASHBOARD.md](ADMIN_DASHBOARD.md)**.  
-**שגיאות API אחידות (`error_code`, `trace_id`, `LinkupError`):** **[docs/ERRORS.md](docs/ERRORS.md)** — בקאנד handlers מרוכזים; בפרונט `useErrorHandler` + `ChatErrorBoundary`; ב-chat-ws לוגים עם `slog` ותגובות JSON ל-HTTP.
+**שגיאות API אחידות (`error_code`, `trace_id`, `LinkupError`):** **[docs/ERRORS.md](docs/ERRORS.md)** — בקאנד handlers מרוכזים; בפרונט `utils/apiError.ts` + `ChatErrorBoundary`; ב-chat-ws לוגים עם `slog` ותגובות JSON ל-HTTP.
 
 ---
 
@@ -32,6 +32,7 @@ flowchart LR
     subgraph services
         API[Backend\nFastAPI]
         WS[chat-ws\nGo]
+        ER[Email Renderer\nNode/Express + React Email]
     end
 
     subgraph data
@@ -49,11 +50,13 @@ flowchart LR
     API --> R0
     API --> MQ
     API --> R1
+    API --> ER
+    ER --> API
     WS --> R1
 ```
 
 - **Frontend / Mobile** → REST to backend, WebSocket to chat-ws.  
-- **Backend** → PostgreSQL (data), Redis DB=0 (cache, rate limit, ride `broadcast`, outbox worker), Redis DB=1 (**chat** + **`publish_user_event`** / `user:{id}:events`, chat completion), RabbitMQ (async tasks, notifications).  
+- **Backend / outbox-worker** → PostgreSQL (data), Redis DB=0 (cache, rate limit, ride `broadcast`, outbox worker), Redis DB=1 (**chat** + **`publish_user_event`** / `user:{id}:events`, chat completion), RabbitMQ (async tasks, notifications), **email-renderer** (`POST /render` for HTML generation).  
 - **chat-ws** → Redis DB=1 only (subscribe to chat channels, presence, **`user:online` / `user:offline`**, and per-user domain events pattern **`user:*:events`**, fan out to connected clients).
 
 ---
@@ -64,6 +67,7 @@ flowchart LR
 |----------|------------------|------|
 | backend  | Python (FastAPI) | REST API, auth, rides, bookings, chat CRUD, **groups**, passengers (requests/matches), **admin JSON API** (`/api/v1/admin/*`), AI summary pipeline (Redis completion + outbox-worker listener), notifications, outbox worker |
 | chat-ws  | Go               | WebSocket server; chat + typing + presence; Redis Pub/Sub including **`user:online` / `user:offline`** and **`user:*:events`** (ride/maintenance-style JSON to the logged-in client) |
+| email-renderer | Node.js / Express / React Email | Dedicated email HTML rendering microservice (`/health`, `/render`), shared by backend notification flow |
 | frontend | React / TypeScript | Web app (Vite); Hebrew RTL |
 | mobile   | React Native / Expo | Mobile app (TypeScript) |
 
@@ -73,7 +77,8 @@ flowchart LR
 
 | Category      | Technologies |
 |---------------|--------------|
-| **Backend**   | Python, FastAPI, PostgreSQL, PostGIS, SQLAlchemy (async), Alembic, Redis, RabbitMQ, Firebase (FCM), S3 (**optional CloudFront** for public media URLs via `CLOUDFRONT_DOMAIN`), Groq (AI) |
+| **Backend**   | Python, FastAPI, PostgreSQL, PostGIS, SQLAlchemy (async), Alembic, Redis, RabbitMQ, Firebase (FCM), S3 (**optional CloudFront** for public media URLs via `CLOUDFRONT_DOMAIN`), Groq (AI), Brevo |
+| **Email rendering** | Node.js, Express, React, React Email, `react-dom/server` |
 | **Real-time** | Go (chat-ws), Redis Pub/Sub |
 | **Frontend**  | React, TypeScript, Vite, Google Maps |
 | **Mobile**    | React Native, Expo, TypeScript |
@@ -85,7 +90,7 @@ flowchart LR
 
 ## Key Features
 
-- ✅ **Rides & bookings:** ride search, booking requests, driver approve/reject; **start/end ride** from "My Bookings" (driver tab; requires at least one confirmed passenger). **My Bookings** uses **aggregated REST reads** — [`GET /bookings/driver-summary`](docs/architecture/API.md) and [`GET /bookings/passenger-summary`](docs/architecture/API.md) — so the web app avoids N+1 (one round-trip each for driver/passenger tabs). Frontend: [`useMyBookingsDriver.ts`](frontend/src/pages/MyBookings/useMyBookingsDriver.ts) / [`useMyBookingsPassenger.ts`](frontend/src/pages/MyBookings/useMyBookingsPassenger.ts) + [`useMyBookings.ts`](frontend/src/pages/MyBookings/useMyBookings.ts) returns a **nested view-model** (`passenger`, `driver`, `chat`) with exported **`MyBookingsViewModel`**; UI split into [`PassengerBookingCard.tsx`](frontend/src/pages/MyBookings/PassengerBookingCard.tsx) + tabs. Backend: [`BookingService.get_driver_summary` / `get_passenger_summary`](backend/app/domain/bookings/service.py), CRUD with `joinedload` + `with_loader_criteria` for filtered bookings on rides.
+- ✅ **Rides & bookings:** ride search, booking requests, driver approve/reject; **start/end ride** from "My Bookings" (driver tab; requires at least one confirmed passenger). **My Bookings** uses **aggregated REST reads** — [`GET /bookings/driver-summary`](docs/architecture/API.md) and [`GET /bookings/passenger-summary`](docs/architecture/API.md) — so the web app avoids N+1 (one round-trip each for driver/passenger tabs). Frontend: [`useMyBookingsDriver.ts`](frontend/src/pages/MyBookings/useMyBookingsDriver.ts) / [`useMyBookingsPassenger.ts`](frontend/src/pages/MyBookings/useMyBookingsPassenger.ts) + [`useMyBookings.ts`](frontend/src/pages/MyBookings/useMyBookings.ts) returns a **nested view-model** (`passenger`, `driver`, `chat`) with exported **`MyBookingsViewModel`**; DTO-to-UI mapping is centralized in [`myBookings.mappers.ts`](frontend/src/pages/MyBookings/myBookings.mappers.ts). UI split into [`PassengerBookingCard.tsx`](frontend/src/pages/MyBookings/PassengerBookingCard.tsx) + tabs. Backend: [`BookingService.get_driver_summary` / `get_passenger_summary`](backend/app/domain/bookings/service.py), CRUD with `joinedload` + `with_loader_criteria` for filtered bookings on rides.
 - ✅ **Async core flow refactor (Passenger/Booking/Ride):** core passenger-request, booking, and ride flows were migrated to SQLAlchemy 2.0 async patterns (`AsyncSession`, `select/execute`). **Bookings** are now async-only (no `db.run_sync`) and use `select(...).with_for_update()` where needed for race safety.
 - ✅ **Scheduled notifications & Redis publisher:** pickup/driver reminders use the `scheduled_notifications` table (Alembic **008**); `ReminderScheduler` loads due rows and hands off to the notification handler. [`publisher.py`](backend/app/infrastructure/redis/publisher.py): **`publish_ride_event`** → `broadcast` / **DB 0**; **`publish_user_event`** → [`redis_chat_pubsub`](backend/app/infrastructure/redis/chat_pubsub.py) / **`REDIS_CHAT_URL`** (אותו DB כמו chat-ws) לערוץ `user:{user_id}:events` מ-[`keys.py`](backend/app/infrastructure/redis/keys.py). Legacy `reminder_sent` columns were removed from ORM/API after migration **008**; dead reminder/expiry CRUD and `ride_expiry.py` were deleted.
 - ✅ **Frontend user event stream:** [`useUserEventStream`](frontend/src/hooks/useUserEventStream.ts) on the chat WebSocket parses **Zod**-validated `UserEvent` messages ([`wsEvents.ts`](frontend/src/types/wsEvents.ts)); **HistorySection** and My Rides / Bookings hooks consume these for active vs past UI.
@@ -107,6 +112,7 @@ flowchart LR
 - ✅ **Internal admin dashboard (web):** lazy-loaded routes under **`/admin`** — stats, health, users (toggle active/admin), rides (list + cancel), groups, outbox (inspect + requeue FAILED), ride/booking lookup; gated by **`user.is_admin`** (מ-JWT / תשובת login); מעטפת **דסקטופ** (סיידבר קבוע, בלי drawer מובייל); mutations behind confirm + toasts; backend **`/api/v1/admin/*`** + `[admin_audit]` logging — see **[ADMIN_DASHBOARD.md](ADMIN_DASHBOARD.md)**
 - ✅ Kubernetes-ready (manifests in `k8s/`)
 - ✅ **API errors:** מערכת שגיאות אחידה (`error_code`, `trace_id`, payload אופציונלי), handlers ל-validation/DB/`LinkupError` — **[docs/ERRORS.md](docs/ERRORS.md)**
+- ✅ **i18n, לוקאליזציה וטיפוגרפיה (ווב):** **i18next** עם משאבים ב־`frontend/src/i18n/locales/{he,en}/` (למשל `common.json`, `nav.json`). **`LangContext`** מגדיר `dir` על `<html>` ומעדכן **`--font-primary`** (עברית: Heebo, אנגלית: DM Sans). פורמט תאריכים/שעות לפי שפת הממשק דרך **`frontend/src/utils/date.ts`** ו־**`getLocale()`** — בלי `he-IL` קשיח ברוב הזרימות. ב־hooks ובלוגיקה מחוץ ל־React, fallback לטקסטי שגיאת API אחרי **`getApiErrorMessage`** עובר דרך **`apiErr('err_*')`** ב־[`frontend/src/utils/i18nError.ts`](frontend/src/utils/i18nError.ts) (מפתחות **`common:err_*`**). **CSS Modules:** `font-family: var(--font-primary)` / `var(--font-numeric)`; חריג מכוון לכפתור שפה — **`LangToggle`** (מונוספייס). פירוט החלטות: **[docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md](docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md)** (סעיפים 10–12).
 
 ---
 
@@ -185,9 +191,11 @@ docker compose ps            # סטטוס (backend: healthy / ממתין)
 | `frontend/`| React (Vite) web app; Dockerfile + `nginx.conf` לתוך image סטטי; מודול אדמין ב־`src/features/admin/` (מסלולים `/admin/*`); WebSocket — [`frontend/README.md`](frontend/README.md), חוזי JSON ב־[`docs/architecture/REALTIME.md`](docs/architecture/REALTIME.md) |
 | `nginx/`   | קונפיג Nginx ל־Compose — reverse proxy (פורט 80): API, chat-ws, פרונט |
 | `mobile/`  | React Native (Expo) app |
-| `k8s/`     | Kubernetes base, backend, chat-ws, frontend, infra (Postgres, Redis, RabbitMQ) |
+| `k8s/`     | Kubernetes base, backend, chat-ws, frontend, email-renderer (Node), worker, infra (Postgres, Redis, RabbitMQ) |
 | `db/`      | Reference schema (`schema.sql`) and utility scripts; migrations live in `backend/alembic/` |
-| `docs/`    | Architecture: `docs/architecture/` — API.md, DATABASE.md, EVENTS.md (outbox, DLQ, retry), REALTIME.md (GPS, chat), DEVELOPMENT.md |
+| `docs/`    | Architecture: `docs/architecture/` — API.md, DATABASE.md, EVENTS.md (outbox, DLQ, retry), REALTIME.md (GPS, chat), DEVELOPMENT.md; ADR תחת `docs/adr/`; סיכום portfolio — `docs/ENGINEERING_HIGHLIGHTS.md`; תסריטי וידאו — `docs/VIDEO_SCRIPT_*.md` |
+| `email-renderer/` | Node microservice (Express + React Email): `GET /health`, `POST /render`; תבניות ב־`src/emails/`; נקרא מ־backend/outbox-worker דרך `EMAIL_RENDERER_URL` |
+| `files/`   | מדריכי מיזוג / עזר (למשל `MERGE_GUIDE.md`) — לא מקור אמת לקוד חי |
 
 ---
 

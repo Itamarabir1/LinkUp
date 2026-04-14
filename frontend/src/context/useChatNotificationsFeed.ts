@@ -3,6 +3,7 @@ import type { Dispatch } from 'react';
 import { fetchMyNotifications } from '../api/users';
 import type { NotificationItem } from '../types/api';
 import { getApiErrorMessage } from '../utils/apiError';
+import { apiErr } from '../utils/i18nError';
 import {
   getNotificationItemKey,
   getReadNotificationSet,
@@ -30,7 +31,7 @@ export function useChatNotificationsFeed(
       const list = Array.isArray(data) ? data : [];
       dispatch({ type: 'SET_NOTIFICATION_STATE', list });
     } catch (err) {
-      const msg = getApiErrorMessage(err, 'לא ניתן לטעון את ההתראות');
+      const msg = getApiErrorMessage(err, apiErr('err_load_notifications'));
       setNotificationsError(msg);
       if (import.meta.env.DEV) {
         console.warn('[ChatContext] refreshUnreadNotifications:', msg);

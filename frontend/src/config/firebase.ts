@@ -8,7 +8,7 @@ import { getMessaging } from 'firebase/messaging';
 
 const env = import.meta.env;
 
-/** VAPID key for FCM Web Push (getToken). מ-Firebase Console → Cloud Messaging → Web. */
+/** VAPID key for FCM Web Push (getToken), from Firebase Console > Cloud Messaging > Web. */
 export const FIREBASE_VAPID_KEY = env.VITE_FIREBASE_VAPID_KEY as string;
 
 const firebaseConfig = {
@@ -23,13 +23,13 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-/** Analytics — רק בדפדפן (לא ב-SSR). */
+/** Analytics instance: browser-only (not SSR). */
 export function getAnalyticsSafe() {
   if (typeof window === 'undefined') return null;
   return getAnalytics(app);
 }
 
-/** Messaging (FCM) — רק בדפדפן; לשימוש ב-getToken וכו'. */
+/** Messaging (FCM) instance: browser-only, used by getToken and listeners. */
 export function getMessagingSafe() {
   if (typeof window === 'undefined') return null;
   return getMessaging(app);

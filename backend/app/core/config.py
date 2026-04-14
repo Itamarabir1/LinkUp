@@ -140,6 +140,10 @@ class Settings(BaseSettings):
     BREVO_API_KEY: str = Field("")
     BREVO_SENDER_EMAIL: EmailStr = Field("support@itamarabir.com")
     BREVO_SENDER_NAME: str = Field("LinkUp", description="Sender display name in emails")
+    EMAIL_RENDERER_URL: str = Field(
+        "http://email-renderer:3001",
+        description="React Email HTTP service (Compose service name; K8s: http://linkup-email-renderer:3001).",
+    )
 
     # --- EIA (U.S. fuel prices API) ---
     # Get free API key: https://www.eia.gov/opendata/register.php

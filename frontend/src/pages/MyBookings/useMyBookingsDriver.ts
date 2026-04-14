@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { apiErr } from '../../utils/i18nError';
 import { useUserEvent } from '../../hooks/useUserEvent';
-import { approveBooking, fetchDriverBookingSummary, rejectBooking } from '../../api/bookings';
-import type { Ride } from '../../types/api';
+import { approveBooking, fetchDriverSummary, rejectBooking } from '../../api/bookings';
 import { cancelRide, endRide, startRide } from '../../api/rides';
 import { useLocationBroadcast } from '../../hooks/useLocationBroadcast';
 import { getApiErrorCode, getApiErrorMessage, getApiStatus } from '../../utils/apiError';
 import type { DriverBookingItem, TabKind } from './myBookings.types';
+import { mapDriverSummaryToItems } from './myBookings.mappers';
 
 type DriverStatus =
   | { kind: 'idle' }
   | { kind: 'loading'; busyBookingId?: string }
   | { kind: 'action'; bookingId: string };
 
-/** טעינה, אישורים ושיתוף מיקום במצב נהג */
+/** Driver mode: loading, approvals, and location sharing. */
 export function useMyBookingsDriver(
   user: { user_id: string } | null | undefined,
   activeTab: TabKind,
@@ -33,39 +34,10 @@ export function useMyBookingsDriver(
     );
     setError('');
     try {
-      const { data } = await fetchDriverBookingSummary();
-      const rows = data?.rides ?? [];
-      const items: DriverBookingItem[] = [];
-      for (const row of rows) {
-        const mappedPassengers = (row.passengers ?? []).map((p) => ({
-          bookingId: p.booking_id,
-          passengerName: p.passenger_name ?? 'נוסע',
-          numSeats: p.num_seats,
-          status: p.status,
-          pickupName: p.pickup_name ?? null,
-          pickupTime: p.pickup_time ?? null,
-          dropoffName: p.destination_name ?? null,
-        }));
-        if (mappedPassengers.length === 0) continue;
-        const ride: Ride = {
-          ride_id: row.ride_id,
-          driver_id: userId,
-          group_id: row.group_id ?? null,
-          group_name: row.group_name ?? null,
-          origin_name: row.origin_name,
-          destination_name: row.destination_name,
-          departure_time: row.departure_time,
-          estimated_arrival_time: row.estimated_arrival_time,
-          available_seats: row.available_seats,
-          price: row.price,
-          status: row.status,
-          created_at: row.departure_time,
-        };
-        items.push({ ride, passengers: mappedPassengers });
-      }
-      setDriverList(items);
+      const { data } = await fetchDriverSummary();
+      setDriverList(mapDriverSummaryToItems(data));
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'טעינת ההזמנות נכשלה'));
+      setError(getApiErrorMessage(err, apiErr('err_load_driver_bookings')));
     } finally {
       setDriverStatus({ kind: 'idle' });
     }
@@ -116,7 +88,7 @@ export function useMyBookingsDriver(
           await fetchDriverBookings();
           return;
         }
-        setError(detail || 'התחלת הנסיעה נכשלה');
+        setError(detail || apiErr('err_start_ride'));
         throw err;
       }
     },
@@ -163,7 +135,7 @@ export function useMyBookingsDriver(
         await approveBooking(bookingId);
         await fetchDriverBookings(bookingId);
       } catch (err: unknown) {
-        setError(getApiErrorMessage(err, 'אישור הבקשה נכשל'));
+        setError(getApiErrorMessage(err, apiErr('err_approve_booking')));
       } finally {
         setDriverStatus({ kind: 'idle' });
       }
@@ -180,7 +152,7 @@ export function useMyBookingsDriver(
         await rejectBooking(bookingId);
         await fetchDriverBookings(bookingId);
       } catch (err: unknown) {
-        setError(getApiErrorMessage(err, 'דחיית הבקשה נכשלה'));
+        setError(getApiErrorMessage(err, apiErr('err_reject_booking')));
       } finally {
         setDriverStatus({ kind: 'idle' });
       }
@@ -205,7 +177,7 @@ export function useMyBookingsDriver(
       setLiveRideId((prev) => (prev === rideToCancel ? null : prev));
       setRideToCancel(null);
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'ביטול הנסיעה נכשל'));
+      setError(getApiErrorMessage(err, apiErr('err_cancel_ride')));
       await fetchDriverBookings();
     } finally {
       setCancellingRide(false);

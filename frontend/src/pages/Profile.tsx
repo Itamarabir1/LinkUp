@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import ErrorBanner from '../components/ErrorBanner';
 import LoadingButton from '../components/LoadingButton';
 import { ACCEPT_AVATAR, useProfile } from './useProfile';
 import styles from './Profile.module.css';
 
 export default function Profile() {
+  const { t } = useTranslation(['profile', 'auth', 'common']);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const {
     user,
@@ -30,7 +32,7 @@ export default function Profile() {
   return (
     <div className={styles.page}>
       <div className={styles.inner}>
-        <h1 className={styles.pageTitle}>פרופיל</h1>
+        <h1 className={styles.pageTitle}>{t('profile:profileTitle')}</h1>
         {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
 
         {user && (
@@ -45,7 +47,7 @@ export default function Profile() {
                   }
                   onClick={() => hasValidAvatar && setAvatarExpanded(true)}
                   role={hasValidAvatar ? 'button' : undefined}
-                  aria-label={hasValidAvatar ? 'הצג תמונה בהגדלה' : undefined}
+                  aria-label={hasValidAvatar ? t('profile:viewImageExpanded') : undefined}
                 >
                   {hasValidAvatar ? (
                     <img
@@ -60,7 +62,7 @@ export default function Profile() {
                     </div>
                   )}
                   {uploading ? (
-                    <div className={styles.profileAvatarOverlay}>מעדכן...</div>
+                    <div className={styles.profileAvatarOverlay}>{t('profile:avatarOverlayUpdating')}</div>
                   ) : null}
                 </div>
 
@@ -85,21 +87,21 @@ export default function Profile() {
                         type="button"
                         className={styles.profileAvatarLink}
                         loading={uploading}
-                        loadingLabel="מעלה..."
+                        loadingLabel={t('profile:uploadingImage')}
                         disabled={removing}
                         onClick={() => fileInputRef.current?.click()}
                       >
-                        החלף תמונה
+                        {t('profile:replaceImage')}
                       </LoadingButton>
                       <LoadingButton
                         type="button"
                         className={`${styles.profileAvatarLink} ${styles.profileAvatarLinkMuted}`}
                         loading={removing}
-                        loadingLabel="מסיר..."
+                        loadingLabel={t('profile:removingImage')}
                         disabled={uploading}
                         onClick={handleRemoveAvatar}
                       >
-                        הסר תמונה
+                        {t('profile:removeImage')}
                       </LoadingButton>
                     </>
                   ) : (
@@ -107,10 +109,10 @@ export default function Profile() {
                       type="button"
                       className={styles.profileAvatarLink}
                       loading={uploading}
-                      loadingLabel="מעלה..."
+                      loadingLabel={t('profile:uploadingImage')}
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      העלאת תמונה
+                      {t('profile:uploadImage')}
                     </LoadingButton>
                   )}
                 </div>
@@ -119,18 +121,18 @@ export default function Profile() {
 
             <div className={styles.infoCard}>
               <div className={styles.profileRow}>
-                <span className={styles.profileLabel}>שם</span>
+                <span className={styles.profileLabel}>{t('profile:name')}</span>
                 <span className={styles.profileValue}>
                   {user.full_name || user.first_name || user.email}
                 </span>
               </div>
               <div className={styles.profileRow}>
-                <span className={styles.profileLabel}>אימייל</span>
+                <span className={styles.profileLabel}>{t('profile:email')}</span>
                 <span className={styles.profileValue}>{user.email}</span>
               </div>
               {user.phone_number ? (
                 <div className={styles.profileRow}>
-                  <span className={styles.profileLabel}>טלפון</span>
+                  <span className={styles.profileLabel}>{t('profile:phone')}</span>
                   <span className={`${styles.profileValue} ${styles.profileValueLtr}`}>
                     {user.phone_number}
                   </span>
@@ -141,7 +143,7 @@ export default function Profile() {
         )}
 
         <button type="button" className={styles.btnDanger} onClick={() => logout()}>
-          התנתק
+          {t('auth:logout')}
         </button>
       </div>
 
@@ -152,20 +154,20 @@ export default function Profile() {
           onKeyDown={(e) => e.key === 'Escape' && setAvatarExpanded(false)}
           role="dialog"
           aria-modal="true"
-          aria-label="תמונת פרופיל מוגדלת"
+          aria-label={t('profile:profileImageExpanded')}
         >
           <button
             ref={closeButtonRef}
             type="button"
             className={styles.avatarModalClose}
             onClick={() => setAvatarExpanded(false)}
-            aria-label="סגור"
+            aria-label={t('common:close')}
           >
             <X size={18} strokeWidth={2} />
           </button>
           <img
             src={avatarSrc}
-            alt="תמונת פרופיל"
+            alt={t('profile:profileImage')}
             className={styles.avatarModalImg}
             onClick={(e) => e.stopPropagation()}
             onError={() => {

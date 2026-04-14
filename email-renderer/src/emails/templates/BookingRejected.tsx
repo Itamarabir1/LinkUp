@@ -1,0 +1,61 @@
+import { Section, Text } from '@react-email/components';
+import * as React from 'react';
+import EmailButton from '../components/EmailButton';
+import EmailLayout from '../components/EmailLayout';
+
+const COLORS = {
+  primary: '#4F46E5',
+  success: '#16a34a',
+  danger: '#e11d48',
+  warning: '#d97706',
+  info: '#0284c7',
+} as const;
+
+interface Props {
+  passenger_name?: string;
+  origin?: string;
+  destination?: string;
+  action_url?: string;
+}
+
+export default function BookingRejected({
+  passenger_name,
+  origin,
+  destination,
+  action_url = 'https://linkup.co.il/search',
+}: Props) {
+  return (
+    <EmailLayout preview="עדכון לגבי בקשת ההצטרפות שלך" headerColor={COLORS.danger} headerTitle="עדכון לגבי בקשתך">
+      <Text style={bodyText}>
+        שלום <strong>{passenger_name}</strong>,
+      </Text>
+      <Text style={mutedText}>
+        לצערנו, הנהג לא אישר את בקשת ההצטרפות שלך לנסיעה מ<strong>{origin}</strong> ל<strong>{destination}</strong>.
+      </Text>
+      <Section
+        style={{
+          backgroundColor: '#fff1f2',
+          borderRadius: '10px',
+          padding: '16px 20px',
+          borderRight: `4px solid ${COLORS.danger}`,
+          margin: '20px 0',
+        }}
+      >
+        <Text style={{ margin: 0, color: COLORS.danger, fontSize: '14px' }}>
+          אל דאגה — ישנן עוד נסיעות זמינות במסלול שלך.
+        </Text>
+      </Section>
+      <EmailButton href={action_url} color={COLORS.primary}>
+        חפש נסיעה חלופית
+      </EmailButton>
+    </EmailLayout>
+  );
+}
+
+const bodyText: React.CSSProperties = { color: '#0d0f1a', fontSize: '16px', margin: '0 0 16px' };
+const mutedText: React.CSSProperties = {
+  color: '#5a607a',
+  fontSize: '15px',
+  lineHeight: '1.6',
+  margin: '0 0 16px',
+};

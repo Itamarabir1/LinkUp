@@ -1,11 +1,13 @@
 import { useAuth } from '../../context/AuthContext';
 import { useGroup } from '../../context/GroupContext';
+import { useTranslation } from 'react-i18next';
 import { useSearchRides } from './useSearchRides';
 import { SearchRidesForm } from './SearchRidesForm';
 import { SearchRideCard } from './SearchRideCard';
 import styles from './SearchRides.module.css';
 
 export default function SearchRides() {
+  const { t } = useTranslation('rides');
   const { user } = useAuth();
   const { myGroups } = useGroup();
   const s = useSearchRides();
@@ -18,12 +20,11 @@ export default function SearchRides() {
     <div className={styles.page}>
       {activeGroupName && (
         <div className={styles.groupBanner}>
-          נוסע בשם קבוצה: {activeGroupName}
+          {t('groupContext', { name: activeGroupName })}
         </div>
       )}
-      <h1 className={styles.pageTitle}>חפש טרמפ</h1>
       <p className={styles.pageMeta}>
-        מוצא, יעד, רדיוס חיפוש וזמן יציאה — כמו בבקאנד.
+        {t('searchMeta')}
       </p>
 
       <SearchRidesForm
@@ -46,7 +47,7 @@ export default function SearchRides() {
       <div className={styles.cardList}>
         {s.results.length === 0 && s.hasSearched && !s.searching ? (
           <div>
-            <p className={styles.emptyText}>לא נמצאו נסיעות מתאימות.</p>
+            <p className={styles.emptyText}>{t('noSearchResults')}</p>
             {user && !s.alertSaved ? (
               <div style={{ textAlign: 'center' }}>
                 <button
@@ -55,19 +56,19 @@ export default function SearchRides() {
                   onClick={() => void s.saveAlert()}
                   disabled={s.savingAlert}
                 >
-                  {s.savingAlert ? 'שומר...' : 'התרע לי כשתופיע נסיעה מתאימה'}
+                  {s.savingAlert ? t('savingAlert') : t('saveAlert')}
                 </button>
               </div>
             ) : null}
             {s.alertSaved ? (
-              <p className={styles.savedSearchBanner}>נשמר! נודיע לך כשתופיע נסיעה מתאימה.</p>
+              <p className={styles.savedSearchBanner}>{t('alertSaved')}</p>
             ) : null}
           </div>
         ) : (
           <>
             {s.results.length > 0 && (
               <div className={styles.resultsHeader}>
-                <span className={styles.resultsLabel}>{s.results.length} נסיעות נמצאו</span>
+                <span className={styles.resultsLabel}>{t('ridesFound', { count: s.results.length })}</span>
                 {user && !s.alertSaved ? (
                   <button
                     type="button"
@@ -75,10 +76,10 @@ export default function SearchRides() {
                     onClick={() => void s.saveAlert()}
                     disabled={s.savingAlert}
                   >
-                    {s.savingAlert ? 'שומר...' : 'שמור חיפוש להתראות'}
+                    {s.savingAlert ? t('savingAlert') : t('searchSaved')}
                   </button>
                 ) : s.alertSaved ? (
-                  <span className={styles.savedSearchBanner}>החיפוש נשמר</span>
+                  <span className={styles.savedSearchBanner}>{t('searchSaved')}</span>
                 ) : null}
               </div>
             )}
@@ -106,7 +107,7 @@ export default function SearchRides() {
                   onClick={s.loadMoreResults}
                   disabled={s.loadingMore}
                 >
-                  {s.loadingMore ? 'טוען...' : 'טען עוד נסיעות'}
+                  {s.loadingMore ? t('loadingMore') : t('loadMore')}
                 </button>
               </div>
             )}

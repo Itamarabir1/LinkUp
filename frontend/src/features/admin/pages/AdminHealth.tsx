@@ -1,11 +1,6 @@
-import { useEffect, useState } from 'react';
 import { fetchAdminHealth, type AdminHealthResponse } from '../api/health';
+import { useAdminFetch } from '../hooks/useAdminFetch';
 import page from '../styles/AdminPage.module.css';
-
-type State =
-  | { status: 'loading' }
-  | { status: 'ready'; data: AdminHealthResponse }
-  | { status: 'error' };
 
 function ServiceStatus({ ok }: { ok: boolean }) {
   return (
@@ -17,29 +12,9 @@ function ServiceStatus({ ok }: { ok: boolean }) {
 }
 
 export default function AdminHealth() {
-  const [state, setState] = useState<State>({ status: 'loading' });
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const { data } = await fetchAdminHealth();
-        if (!mounted) return;
-        setState({ status: 'ready', data });
-      } catch {
-        if (!mounted) return;
-        setState({ status: 'error' });
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  if (state.status === 'loading') return <p className={page.muted}>טוען…</p>;
-  if (state.status === 'error') return <p className={page.error}>שגיאה בטעינת בריאות.</p>;
-
-  const { data } = state;
+  const { status, data } = useAdminFetch<AdminHealthResponse>(fetchAdminHealth);
+  if (status === 'loading') return <p className={page.muted}>טוען…</p>;
+  if (status === 'error' || !data) return <p className={page.error}>שגיאה בטעינת בריאות.</p>;
   const healthy = data.status === 'healthy';
 
   return (

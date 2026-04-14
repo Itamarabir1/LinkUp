@@ -10,7 +10,7 @@
 ```
 c:\Users\user\Desktop\Linkup
 ```
-בתוכו צריכות להיות לפחות תיקיות: `backend`, `frontend`. ל**צ'אט בזמן אמת**, **התראות in-app** (פיד), **push דרך worker** וכו' — צריך גם תשתית (Postgres, Redis, RabbitMQ), ולרוב **chat-ws** על פורט **8081**; השורה המלאה: **`readme.md`** / **`docs/architecture/DEVELOPMENT.md`** עם `docker compose up -d`.
+בתוכו צריכות להיות לפחות תיקיות: `backend`, `frontend`. ל**צ'אט בזמן אמת**, **התראות in-app** (פיד), **push דרך worker** וכו' — צריך גם תשתית (Postgres, Redis, RabbitMQ), ולרוב **chat-ws** על פורט **8081**; השורה המלאה: **`README.md`** / **`docs/architecture/DEVELOPMENT.md`** עם `docker compose up -d`.
 
 ---
 

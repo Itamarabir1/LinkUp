@@ -8,7 +8,7 @@ interface Options {
   connectionErrorLabel?: string;
   onMessage: (ev: MessageEvent) => void;
   onReset?: () => void;
-  /** כשמשתנה (למשל rideId / bookingId) — ה-effect מתחבר מחדש */
+  /** Reconnect key (e.g. rideId/bookingId); changing it reconnects. */
   reconnectKey?: string | null;
 }
 

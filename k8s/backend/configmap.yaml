@@ -44,3 +44,5 @@ data:
   JWT_ISSUER: "linkup-api"
   ALGORITHM: "HS256"
   BREVO_SENDER_NAME: "LinkUp"
+  # React Email microservice (see k8s/email-renderer)
+  EMAIL_RENDERER_URL: "http://linkup-email-renderer:3001"

@@ -1,6 +1,7 @@
 import type { Ride, DriverInfo } from '../../types/api';
 import { formatDateTimeNoSeconds } from '../../utils/date';
 import { Clock, CheckCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import styles from './SearchRides.module.css';
 
 type Props = {
@@ -26,6 +27,7 @@ export function SearchRideCard({
   onFetchDriver,
   onRequestJoin,
 }: Props) {
+  const { t } = useTranslation('rides');
   return (
     <div className={styles.card}>
       <div className={styles.cardRoute}>
@@ -37,7 +39,7 @@ export function SearchRideCard({
       <div className={styles.cardMeta}>
         <span>{formatDateTimeNoSeconds(r.departure_time)}</span>
         <span className={styles.cardMetaSep} />
-        <span className={styles.seatsBadge}>{r.available_seats} מושבים</span>
+        <span className={styles.seatsBadge}>{t('common:seats', { count: r.available_seats ?? 0 })}</span>
         {r.route_summary && (
           <>
             <span className={styles.cardMetaSep} />
@@ -53,18 +55,18 @@ export function SearchRideCard({
           onClick={() => onFetchDriver(r.ride_id)}
           disabled={loadingDriverRideId === r.ride_id}
         >
-          {loadingDriverRideId === r.ride_id ? '...' : 'פרטי נהג'}
+          {loadingDriverRideId === r.ride_id ? '...' : t('driverDetails')}
         </button>
 
         {r.user_booking_status === 'pending_approval' ? (
           <span className={styles.statusPending}>
             <Clock size={12} style={{ display: 'inline', marginLeft: 4 }} />
-            ממתין לאישור
+            {t('pendingApproval')}
           </span>
         ) : r.user_booking_status === 'confirmed' ? (
           <span className={styles.statusConfirmed}>
             <CheckCircle size={12} style={{ display: 'inline', marginLeft: 4 }} />
-            מאושר
+            {t('approved')}
           </span>
         ) : (
           <button
@@ -74,10 +76,10 @@ export function SearchRideCard({
             disabled={sendingRequestRideId !== null || requestSuccessRideId === r.ride_id}
           >
             {requestSuccessRideId === r.ride_id
-              ? '✓ הבקשה נשלחה'
+              ? `✓ ${t('requestSent')}`
               : sendingRequestRideId === r.ride_id
-              ? 'שולח...'
-              : 'בקש להצטרף לנסיעה'}
+              ? t('common:sending')
+              : t('requestToJoin')}
           </button>
         )}
       </div>
@@ -90,7 +92,7 @@ export function SearchRideCard({
 
       {driverInfo && (
         <div className={styles.driverInfoBox}>
-          <strong>נהג:</strong> {driverInfo.full_name}
+          <strong>{t('driverLabel')}</strong> {driverInfo.full_name}
           {driverInfo.phone_number && (
             <> · <a href={`tel:${driverInfo.phone_number}`}>{driverInfo.phone_number}</a></>
           )}

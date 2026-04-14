@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Mail } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { resendVerificationEmail, verifyEmailCode } from '../api/auth';
 import ErrorBanner from '../components/ErrorBanner';
 import LoadingButton from '../components/LoadingButton';
@@ -8,6 +9,7 @@ import { getApiErrorMessage } from '../utils/apiError';
 import styles from './VerifyEmail.module.css';
 
 export default function VerifyEmail() {
+  const { t } = useTranslation('auth');
   const location = useLocation();
   const navigate = useNavigate();
   const emailFromState = (location.state as { email?: string } | null)?.email;
@@ -32,12 +34,12 @@ export default function VerifyEmail() {
               </svg>
             </div>
           </div>
-          <h1 className={styles.title}>אימות חשבון מייל</h1>
-          <p className={styles.intro}>לא נמצא אימייל לאימות. נסה להירשם או להיכנס מחדש.</p>
+          <h1 className={styles.title}>{t('verifyAccountTitle')}</h1>
+          <p className={styles.intro}>{t('error_missing_email_for_verify')}</p>
           <p className={styles.link}>
-            <Link to="/register">הרשמה</Link>
+            <Link to="/register">{t('registration')}</Link>
             {' · '}
-            <Link to="/login">התחברות</Link>
+            <Link to="/login">{t('loginLink')}</Link>
           </p>
         </div>
       </div>
@@ -47,7 +49,7 @@ export default function VerifyEmail() {
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim()) {
-      setError('נא להזין את הקוד שנשלח למייל');
+      setError(t('error_missing_verification_code'));
       return;
     }
     setError('');
@@ -55,12 +57,12 @@ export default function VerifyEmail() {
     setLoading(true);
     try {
       await verifyEmailCode(email, code.trim());
-      setSuccess('החשבון אומת בהצלחה.');
+      setSuccess(t('verify_success'));
       setTimeout(() => {
         navigate('/login', { replace: true, state: { email, verified: true } });
       }, 1200);
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'אימות נכשל'));
+      setError(getApiErrorMessage(err, t('error_verify_failed')));
     } finally {
       setLoading(false);
     }
@@ -72,9 +74,9 @@ export default function VerifyEmail() {
     setResendLoading(true);
     try {
       await resendVerificationEmail(email);
-      setSuccess('קוד חדש נשלח למייל.');
+      setSuccess(t('resend_success'));
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'שליחת קוד מחדש נכשלה'));
+      setError(getApiErrorMessage(err, t('error_resend_failed')));
     } finally {
       setResendLoading(false);
     }
@@ -98,10 +100,10 @@ export default function VerifyEmail() {
           </div>
         </div>
 
-        <h1 className={styles.title}>בדוק את האימייל שלך</h1>
+        <h1 className={styles.title}>{t('checkInboxTitle')}</h1>
         <p className={styles.intro}>
-          שלחנו קוד אימות ל-<strong>{email}</strong>.<br />
-          הזן את הקוד כדי לאמת את החשבון.
+          {t('verificationIntroPrefix')}<strong>{email}</strong>.<br />
+          {t('verificationIntro2')}
         </p>
 
         <form onSubmit={handleVerify}>
@@ -117,8 +119,8 @@ export default function VerifyEmail() {
               maxLength={6}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder="······"
-              aria-label="קוד אימות"
+              placeholder={t('verificationCodePlaceholder')}
+              aria-label={t('verificationCode')}
             />
           </div>
 
@@ -126,9 +128,9 @@ export default function VerifyEmail() {
             type="submit"
             className={styles.button}
             loading={loading}
-            loadingLabel="מאמת..."
+            loadingLabel={t('verifying')}
           >
-            אמת חשבון
+            {t('verifyAccountButton')}
           </LoadingButton>
         </form>
 
@@ -137,14 +139,14 @@ export default function VerifyEmail() {
             type="button"
             className={styles.resendBtn}
             loading={resendLoading}
-            loadingLabel="שולח..."
+            loadingLabel={t('sending')}
             onClick={handleResend}
           >
-            שלח קוד חדש
+            {t('resendNewCode')}
           </LoadingButton>
         </p>
         <p className={styles.link}>
-          <Link to="/login">חזרה להתחברות</Link>
+          <Link to="/login">{t('backToLogin')}</Link>
         </p>
       </div>
     </div>

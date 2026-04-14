@@ -1,82 +1,60 @@
+/* ── Page ── */
 .page {
-  padding: 1rem 1.5rem;
-  max-width: 480px;
-  margin: 0 auto;
-  text-align: right;
+  min-height: calc(100vh - 56px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: var(--bg-secondary);
+}
+
+.inner {
+  width: 100%;
+  max-width: 460px;
 }
 
 .pageTitle {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-}
-
-.pageError {
-  color: var(--danger-text);
-  margin-bottom: 1rem;
-}
-
-.hiddenFileInput {
-  display: none;
-}
-
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.label {
-  font-weight: 500;
-  font-size: 0.95rem;
-}
-
-.input {
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-md);
-  font-size: 1rem;
-  text-align: right;
-  background: var(--input-bg);
+  font-size: 1.75rem;
+  font-weight: 700;
   color: var(--text-primary);
-}
-
-.textarea {
-  padding: 0.6rem 0.75rem;
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-md);
-  font-size: 1rem;
+  margin: 0 0 1.5rem;
+  letter-spacing: -0.02em;
+  font-family: var(--font-primary);
   text-align: right;
-  resize: vertical;
-  font-family: inherit;
-  background: var(--input-bg);
-  color: var(--text-primary);
 }
 
-.charCount {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+/* ── Card ── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 4px 24px rgba(13, 15, 26, 0.06);
 }
 
+/* ── Avatar upload ── */
 .avatarUpload {
-  width: 90px;
-  height: 90px;
-  border-radius: 50%;
-  border: 2px dashed var(--input-border);
+  width: 88px;
+  height: 88px;
+  border-radius: 16px;
+  border: 2px dashed var(--primary-soft-border);
+  background: var(--primary-light);
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  margin: 0 auto 20px;
+  margin: 0 auto 1.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  background: var(--bg-secondary);
-  transition: border-color 200ms ease;
+  transition: all var(--transition-fast, 200ms ease);
 }
 
 .avatarUpload:hover {
   border-color: var(--primary);
+  background: var(--primary-light);
+  transform: scale(1.02);
 }
 
 .avatarPlaceholder {
@@ -84,9 +62,9 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  color: var(--text-tertiary);
+  color: var(--primary);
   font-size: 11px;
-  font-family: 'Heebo', sans-serif;
+  font-family: var(--font-primary);
 }
 
 .avatarPreview {
@@ -98,124 +76,242 @@
 .avatarOverlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #fff;
   opacity: 0;
-  transition: opacity 200ms ease;
+  transition: opacity var(--transition-fast, 200ms ease);
 }
 
 .avatarUpload:hover .avatarOverlay {
   opacity: 1;
 }
 
-.fileInput {
-  font-size: 0.9rem;
+.hiddenFileInput { display: none; }
+
+/* ── Form fields ── */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
-.fileName {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  margin: 0;
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+  text-align: right;
 }
 
-.btn {
-  display: inline-block;
-  padding: 0.6rem 1.2rem;
-  border-radius: var(--radius-md);
-  font-size: 1rem;
+.fieldLabel {
+  font-size: 13px;
   font-weight: 600;
-  text-decoration: none;
-  border: none;
-  cursor: pointer;
-  text-align: center;
+  color: var(--text-primary);
+  font-family: var(--font-primary);
 }
 
+.fieldInput {
+  padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-family: var(--font-primary);
+  background: var(--bg-secondary);
+  text-align: right;
+  outline: none;
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.fieldInput:focus {
+  border-color: var(--primary);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3px var(--focus-ring-primary);
+}
+
+.fieldInput::placeholder { color: var(--text-tertiary); }
+
+.fieldTextarea {
+  padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-family: var(--font-primary);
+  background: var(--bg-secondary);
+  text-align: right;
+  outline: none;
+  resize: none;
+  transition: all var(--transition-fast, 150ms ease);
+  line-height: 1.5;
+}
+
+.fieldTextarea:focus {
+  border-color: var(--primary);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3px var(--focus-ring-primary);
+}
+
+.fieldTextarea::placeholder { color: var(--text-tertiary); }
+
+.charCount {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-align: left;
+  font-family: var(--font-primary);
+}
+
+.pageError { margin-bottom: 1rem; }
+
+.imageWarn {
+  margin: 0 0 1rem;
+  padding: 10px 14px;
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--warning-text);
+  font-family: var(--font-primary);
+  text-align: right;
+}
+
+/* ── Submit button ── */
 .btnPrimary {
+  width: 100%;
+  height: 46px;
   background: var(--primary);
-  color: var(--text-inverse);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-primary);
+  box-shadow: 0 2px 10px rgba(79, 70, 229, 0.3);
+  transition: all var(--transition-fast, 180ms ease);
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.btnPrimary:hover {
+.btnPrimary:hover:not(:disabled) {
   background: var(--primary-hover);
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.4);
+  transform: translateY(-1px);
 }
 
 .btnPrimary:disabled {
-  opacity: 0.7;
+  opacity: 0.65;
   cursor: not-allowed;
+  transform: none;
 }
 
-.btnCopy {
-  transition: transform 100ms ease, background-color 100ms ease, color 100ms ease;
+/* ── Success state ── */
+.successCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 4px 24px rgba(13, 15, 26, 0.06);
+  text-align: center;
 }
 
-.btnCopy:active {
-  transform: scale(0.95);
-  background-color: var(--primary-hover);
-}
-
-.btnCopySuccess {
-  background: var(--success-text);
-  border-color: var(--success-text);
-  color: var(--text-inverse);
-}
-
-.btnCopySuccess:hover {
-  background: var(--success-hover);
-}
-
-.imageWarn {
-  margin: 0 0 1rem 0;
-  padding: 0.75rem 1rem;
-  background: var(--warning-bg);
-  border: 1px solid var(--warning-border);
-  border-radius: var(--radius-md);
-  font-size: 0.9rem;
-  color: var(--warning-strong-text);
-}
-
-.successSection {
-  margin-top: 1.5rem;
-  padding: 1rem 1.25rem;
-  background: var(--success-bg);
-  border: 1px solid var(--success-border);
-  border-radius: var(--radius-lg);
+.successAvatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.3);
+  font-family: var(--font-primary);
 }
 
 .successTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+  font-family: var(--font-primary);
+}
+
+.successSub {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 1.5rem;
+  font-family: var(--font-primary);
+}
+
+.inviteBox {
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  text-align: right;
+}
+
+.inviteLabel {
+  font-size: 11px;
   font-weight: 600;
-  margin-bottom: 0.5rem;
+  color: var(--text-tertiary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  font-family: var(--font-primary);
 }
 
-.inviteRow {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.5rem;
-}
-
-.inviteInput {
-  flex: 1;
-  min-width: 180px;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-md);
-  font-size: 0.95rem;
+.inviteUrl {
+  font-size: 13px;
+  color: var(--primary);
   direction: ltr;
   text-align: left;
-  background: var(--input-bg);
-  color: var(--text-primary);
+  word-break: break-all;
+  font-family: var(--font-primary);
+}
+
+.btnCopy {
+  width: 100%;
+  height: 40px;
+  background: var(--primary-light);
+  border: 1.5px solid var(--primary-soft-border);
+  border-radius: 10px;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-primary);
+  transition: all var(--transition-fast, 150ms ease);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btnCopy:hover {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.btnCopySuccess {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-text);
 }
 
 .inviteError {
-  margin-top: 0.5rem;
-  font-size: 0.9rem;
-  color: var(--danger-text);
-}
-
-.copiedToast {
-  font-size: 0.9rem;
-  color: var(--success-text);
+  margin-top: 8px;
+  font-size: 13px;
+  font-family: var(--font-primary);
 }

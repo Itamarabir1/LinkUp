@@ -15,7 +15,10 @@ Manifests under `k8s/` match [docker-compose.yml](../docker-compose.yml) and [ba
    kubectl wait --for=condition=complete job/linkup-migrate -n linkup --timeout=300s
    ```
 
-5. `kubectl apply -k k8s/backend`, `k8s/chat-ws`, `k8s/worker`, `k8s/frontend` (or `kubectl apply -k k8s/base`).
+5. `kubectl apply -k k8s/email-renderer` — Node/React Email render API (backend + worker call it).
+6. `kubectl apply -k k8s/backend`, `k8s/chat-ws`, `k8s/worker`, `k8s/frontend` (or `kubectl apply -k k8s/base` — includes `email-renderer` before `backend`).
+
+If you apply overlays individually, start **email-renderer** before **backend** / **worker** so outbound email rendering can reach `EMAIL_RENDERER_URL` ([backend/configmap.yaml](backend/configmap.yaml)).
 
 ## Environment variable names (backend)
 
@@ -28,6 +31,7 @@ Pydantic loads DB/Redis from **`DATABASE_URL_RAW`** and **`REDIS_URL_RAW`** (not
 - **`S3_BUCKET_NAME`**: empty in repo — set a real bucket name before relying on uploads.
 - **`SENTRY_DSN`**: empty disables Sentry (optional).
 - **Redis**: one Deployment, logical **DB 0** (API) and **DB 1** (chat / completion) — same model as Docker Compose.
+- **`EMAIL_RENDERER_URL`**: Cluster DNS to the email-renderer Service (`http://linkup-email-renderer:3001`). Image: `ghcr.io/.../linkup-email-renderer:latest` (build/push via [email-renderer CI](../.github/workflows/email-renderer-ci.yml)).
 
 ## Secrets to create manually
 

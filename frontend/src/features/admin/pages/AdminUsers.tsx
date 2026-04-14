@@ -19,6 +19,13 @@ type PendingModal =
   | { kind: 'admin'; user: AdminUserRow }
   | null;
 
+function stringToColor(str: string): string {
+  const colors = ['#4f6ef7', '#06b6d4', '#22c55e', '#f59e0b', '#a855f7', '#ef4444'];
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+}
+
 export default function AdminUsers() {
   const [q, setQ] = useState('');
   const [state, setState] = useState<State>({ status: 'loading' });
@@ -122,12 +129,34 @@ export default function AdminUsers() {
             <tbody>
               {state.items.map((u) => (
                 <tr key={u.user_id}>
-                  <td>{u.full_name}</td>
+                  <td>
+                    <div className={page.userCell}>
+                      <div
+                        className={page.avatar}
+                        style={{ background: stringToColor(u.user_id) }}
+                      >
+                        {(u.full_name || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className={page.userName}>{u.full_name}</div>
+                        <div className={page.userEmail}>{u.email ?? '—'}</div>
+                      </div>
+                    </div>
+                  </td>
                   <td>{u.email ?? '—'}</td>
                   <td>{u.phone_number}</td>
-                  <td>{u.is_active ? 'כן' : 'לא'}</td>
-                  <td>{u.is_admin ? 'כן' : 'לא'}</td>
-                  <td>{u.is_verified ? 'כן' : 'לא'}</td>
+                  <td>
+                    {u.is_active ? <span className={`${page.badge} ${page.badgeOk}`}>כן</span>
+                      : <span className={`${page.badge} ${page.badgeErr}`}>לא</span>}
+                  </td>
+                  <td>
+                    {u.is_admin ? <span className={`${page.badge} ${page.badgeInfo}`}>כן</span>
+                      : <span className={`${page.badge} ${page.badgeGray}`}>לא</span>}
+                  </td>
+                  <td>
+                    {u.is_verified ? <span className={`${page.badge} ${page.badgeOk}`}>כן</span>
+                      : <span className={`${page.badge} ${page.badgeGray}`}>לא</span>}
+                  </td>
                   <td>{u.last_login ?? '—'}</td>
                   <td className={page.actionsCell}>
                     <button

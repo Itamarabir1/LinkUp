@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { cancelPassengerRequest, fetchMyPassengerRequests } from '../api/passengers';
 import type { PassengerRequest } from '../types/api';
 import { getApiErrorMessage } from '../utils/apiError';
+import { apiErr } from '../utils/i18nError';
 import { useUserEvent } from '../hooks/useUserEvent';
 
 type RequestsStatus = 'loading' | 'idle' | 'error';
@@ -20,7 +21,7 @@ export function useMyRequests() {
       setError('');
       setFetchStatus('idle');
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'טעינת בקשות נכשלה'));
+      setError(getApiErrorMessage(err, apiErr('err_load_requests')));
       setFetchStatus('error');
     }
   }, []);
@@ -54,7 +55,7 @@ export function useMyRequests() {
       );
       setRequestToCancel(null);
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'ביטול הבקשה נכשל'));
+      setError(getApiErrorMessage(err, apiErr('err_cancel_request')));
     } finally {
       setCancelling(false);
     }

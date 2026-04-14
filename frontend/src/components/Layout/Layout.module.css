@@ -34,7 +34,7 @@
   align-items: center;
   text-decoration: none;
   color: var(--text-secondary);
-  font-family: "Heebo", sans-serif;
+  font-family: var(--font-primary);
   font-size: 14px;
   font-weight: 500;
   border-bottom: 2px solid transparent;
@@ -97,7 +97,7 @@
   border-radius: 50%;
   background: var(--unread-dot);
   color: white;
-  font-family: "Heebo", sans-serif;
+  font-family: var(--font-primary);
   font-size: 10px;
   font-weight: 700;
   display: inline-flex;
@@ -121,7 +121,7 @@
   background: var(--primary-light);
   color: var(--primary);
   border-radius: var(--radius-md);
-  font-family: "Heebo", sans-serif;
+  font-family: var(--font-primary);
   font-size: 13px;
   font-weight: 600;
   display: inline-flex;
@@ -145,7 +145,7 @@
   background: var(--primary);
   color: white;
   border-radius: var(--radius-md);
-  font-family: "Heebo", sans-serif;
+  font-family: var(--font-primary);
   font-size: 13px;
   font-weight: 600;
   display: inline-flex;
@@ -190,7 +190,7 @@
   text-align: right;
   border: none;
   background: none;
-  font-family: "Heebo", sans-serif;
+  font-family: var(--font-primary);
   font-size: 14px;
   color: var(--text-primary);
   cursor: pointer;

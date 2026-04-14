@@ -3,6 +3,8 @@
 מסמך זה הוא snapshot תיעודי (לא מקור אמת מחייב לקובץ-לקובץ), ועלול לפגר אחרי שינויים בריפו.  
 למצב עדכני בזמן אמת עדיף להסתמך על העץ בפועל (`git ls-files` / IDE) ועל מסמכי ארכיטקטורה בשורש (`README.md`, `ARCHITECTURE.md`).
 
+**עדכונים אחרונים בתיעוד:** נוספו שירות **`email-renderer/`** (React Email), מסלולי **`frontend/src/i18n/`** (he/en), **`frontend/src/utils/date.ts`**, **`frontend/src/utils/i18nError.ts`**, ואיחוד `font-family` ב־`*.module.css` סביב **`var(--font-primary)`**. עץ התיקיות המפורט למטה עלול עדיין להציג קבצים שהוסרו או הוזזו — השוו לריפו.
+
 ---
 
 ## שורש הפרויקט (Linkup/)
@@ -31,7 +33,9 @@ Linkup/
 ├── backend/
 ├── chat-ws/
 ├── db/
-├── docs/
+├── docs/                          # ארכיטקטורה, ADR, ENGINEERING_HIGHLIGHTS, תסריטי וידאו
+├── email-renderer/                # מיקרו-שירות Node — React Email, /render
+├── files/                         # מדריכי מיזוג ועזר (לא מקור אמת לקוד)
 ├── frontend/
 └── mobile/
 ```
@@ -439,6 +443,7 @@ frontend/
     │   │   ├── PassengerBookingCard.tsx
     │   │   ├── PassengerBookingsTab.tsx
     │   │   ├── DriverBookingsTab.tsx
+    │   │   ├── myBookings.mappers.ts
     │   │   ├── useMyBookings.ts
     │   │   ├── useMyBookingsDriver.ts
     │   │   ├── useMyBookingsPassenger.ts
@@ -558,6 +563,7 @@ k8s/
 ## הערות
 
 - **backend**: שרת API ב‑Python (FastAPI), עם Alembic למיגרציות, workers, ותשתיות (Redis, RabbitMQ, S3, Firebase).
+- **email-renderer**: מיקרו-שירות Node.js/Express לרינדור תבניות מייל ב-React Email (`src/emails/components`, `src/emails/templates`, registry + `/render`).
 - **chat-ws**: שרת WebSocket ב‑Go בלבד. אחראי על העברת הודעות בזמן אמת בין משתמשים.
 - **db**: סכמה (schema.sql) וסקריפטים שימושיים; מיגרציות ב-backend/alembic/.
 - **frontend**: אפליקציית ווב ב‑React + TypeScript + Vite.

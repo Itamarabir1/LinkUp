@@ -11,18 +11,18 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
 
 function getStatusVariant(status: string): keyof typeof STATUS_STYLES {
   const s = status.toLowerCase().trim();
-  if (s.includes('מלא') || s.includes('ממתין')) return 'warning';
-  if (s.includes('בוטל') || s.includes('נדחה')) return 'danger';
-  if (s.includes('מחפש')) return 'info';
-  if (s.includes('פג תוקף')) return 'neutral';
+  if (s.includes('מלא') || s.includes('ממתין') || s.includes('full') || s.includes('pending')) return 'warning';
+  if (s.includes('בוטל') || s.includes('נדחה') || s.includes('cancel') || s.includes('reject')) return 'danger';
+  if (s.includes('מחפש') || s.includes('search')) return 'info';
+  if (s.includes('פג תוקף') || s.includes('expired')) return 'neutral';
   return 'success';
 }
 
 interface RideCardProps {
   route: string;
-  /** תאריך ושעה של הנסיעה/הבקשה (לא זמן יצירה באתר) */
+  /** Ride/request date and time (not entity creation time). */
   time: string;
-  /** כותרת מעל השעה, למשל "זמן הנסיעה" */
+  /** Optional caption shown above the time, e.g. "Ride time". */
   scheduleCaption?: string;
   status: string;
   source?: string;

@@ -8,7 +8,7 @@
 2. [WEBSOCKETS.md](WEBSOCKETS.md) — **מתי** משתמשים ב-WebSocket, **איזה שרת**, למה לא רק REST/polling.
 3. [FCM_AND_PUSH.md](FCM_AND_PUSH.md) — **למה** push ב-data-only, מחזור חיים טוקן, UX foreground/background.
 4. [ARCHITECTURE_DECISIONS_CHAT_WS.md](ARCHITECTURE_DECISIONS_CHAT_WS.md) — למה Go, גבולות שירות.
-5. [ARCHITECTURE_DECISIONS_FRONTEND.md](ARCHITECTURE_DECISIONS_FRONTEND.md) — React/Vite, Zod, התראות, אדמין.
+5. [ARCHITECTURE_DECISIONS_FRONTEND.md](ARCHITECTURE_DECISIONS_FRONTEND.md) — React/Vite, Zod, התראות, אדמין, **i18n / לוקאל / פונטים (§10–12)**.
 
 ## מפת מערכת (תזכורת)
 
@@ -43,13 +43,14 @@ flowchart TB
 
 | נושא | מסמך |
 |------|------|
-| סקירה כללית | [../ARCHITECTURE.md](../ARCHITECTURE.md) (שורש), [../readme.md](../readme.md) (Architecture Decisions) |
+| סקירה כללית | [../ARCHITECTURE.md](../ARCHITECTURE.md) (שורש), [../../README.md](../../README.md) (סקירה + Architecture Decisions) |
 | פיצ'רים וסקייל | [../ENGINEERING_HIGHLIGHTS.md](../ENGINEERING_HIGHLIGHTS.md) |
 | אירועים ותורים | [../architecture/EVENTS.md](../architecture/EVENTS.md) |
 | Real-time / WS | [../architecture/REALTIME.md](../architecture/REALTIME.md) |
 | FCM | [../FCM_SYSTEM_SUMMARY.md](../FCM_SYSTEM_SUMMARY.md) |
 | שגיאות API | [../ERRORS.md](../ERRORS.md) |
 | פרונט | [../../frontend/docs/ARCHITECTURE.md](../../frontend/docs/ARCHITECTURE.md) |
+| תסריטי וידאו (דמו / ארכיטקטורה) | [../VIDEO_SCRIPT_PROJECT_DEMO.md](../VIDEO_SCRIPT_PROJECT_DEMO.md), [../VIDEO_SCRIPT_ARCHITECTURE.md](../VIDEO_SCRIPT_ARCHITECTURE.md) |
 | chat-ws | [../../chat-ws/ARCHITECTURE.md](../../chat-ws/ARCHITECTURE.md) |
 
 ## איך להשתמש בראיון

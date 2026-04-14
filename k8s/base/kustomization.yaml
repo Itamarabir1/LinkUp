@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - ../infra
+  - ../email-renderer
   - ../backend
   - ../frontend
   - ../chat-ws

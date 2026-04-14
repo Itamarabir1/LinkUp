@@ -1,73 +1,18 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
+  CartesianGrid, Cell, Line, LineChart,
+  Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { fetchAdminStats, type AdminStatsResponse } from '../api/stats';
+import { fetchAdminHealth } from '../api/health';
+import { useAdminFetch } from '../hooks/useAdminFetch';
+import { useAdminTheme } from '../hooks/useAdminTheme';
+import {
+  RIDE_STATUS_COLORS, RIDE_STATUS_LABELS,
+  BOOKING_STATUS_COLORS, BOOKING_STATUS_LABELS,
+} from '../adminConstants';
 import page from '../styles/AdminPage.module.css';
-import styles from './AdminHome.module.css';
-
-const RIDE_COLORS: Record<string, string> = {
-  open: '#3b82f6',
-  full: '#f59e0b',
-  active: '#10b981',
-  completed: '#6366f1',
-  cancelled: '#ef4444',
-};
-
-const BOOKING_COLORS: Record<string, string> = {
-  pending_approval: '#f59e0b',
-  confirmed: '#10b981',
-  rejected: '#ef4444',
-  cancelled: '#94a3b8',
-  completed: '#6366f1',
-  en_route: '#3b82f6',
-  arrived: '#06b6d4',
-  trip_in_progress: '#8b5cf6',
-};
-
-const RIDE_LABELS: Record<string, string> = {
-  open: 'פתוח',
-  full: 'מלא',
-  active: 'פעיל',
-  completed: 'הושלם',
-  cancelled: 'בוטל',
-};
-
-const BOOKING_LABELS: Record<string, string> = {
-  pending_approval: 'ממתין לאישור',
-  confirmed: 'מאושר',
-  rejected: 'נדחה',
-  cancelled: 'בוטל',
-  completed: 'הושלם',
-  en_route: 'בדרך',
-  arrived: 'הגיע',
-  trip_in_progress: 'בנסיעה',
-};
-
-function subscribeTheme(onChange: () => void) {
-  const el = document.documentElement;
-  const mo = new MutationObserver(onChange);
-  mo.observe(el, { attributes: true, attributeFilter: ['data-theme'] });
-  return () => mo.disconnect();
-}
-
-function themeSnapshot() {
-  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
-}
-
-function useDataTheme() {
-  return useSyncExternalStore(subscribeTheme, themeSnapshot, () => 'light');
-}
 
 function recordToPie(
   record: Record<string, number>,
@@ -76,286 +21,194 @@ function recordToPie(
 ) {
   return Object.entries(record)
     .filter(([, v]) => v > 0)
-    .map(([k, v]) => ({
-      name: labels[k] ?? k,
-      value: v,
-      fill: colors[k] ?? '#94a3b8',
-    }));
+    .map(([k, v]) => ({ name: labels[k] ?? k, value: v, fill: colors[k] ?? '#334155' }));
 }
 
 function pieLabel(props: { name?: string; percent?: number }) {
   const pct = Math.round((props.percent ?? 0) * 100);
-  if (pct === 0) return null;
-  return `${props.name ?? ''} ${pct}%`;
+  return pct === 0 ? null : `${props.name} ${pct}%`;
 }
 
-type State =
-  | { status: 'loading' }
-  | { status: 'ready'; data: AdminStatsResponse }
-  | { status: 'error' };
+function HealthStrip() {
+  const { status, data } = useAdminFetch(fetchAdminHealth);
+  if (status !== 'ready' || !data) return null;
+  const pills = [
+    { label: 'DB', ok: data.database === 'ok' },
+    { label: 'Redis', ok: data.redis === 'ok' },
+    { label: 'RabbitMQ', ok: data.rabbitmq === 'ok' },
+  ];
+  return (
+    <div className={page.healthStrip}>
+      {pills.map((p) => (
+        <div
+          key={p.label}
+          className={`${page.healthPill} ${p.ok ? page.healthPillOk : page.healthPillErr}`}
+        >
+          <div className={page.healthDot} />
+          {p.label} {p.ok ? 'תקין' : 'שגיאה'}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function AdminHome() {
-  const [state, setState] = useState<State>({ status: 'loading' });
-  const dataTheme = useDataTheme();
-  const isDark = dataTheme === 'dark';
-
-  const chartTheme = useMemo(
-    () =>
-      isDark
-        ? {
-            axis: '#94a3b8',
-            grid: '#334155',
-            tooltipBg: '#1e293b',
-            tooltipBorder: '#334155',
-            tooltipColor: '#e2e8f0',
-          }
-        : {
-            axis: '#64748b',
-            grid: '#e2e8f0',
-            tooltipBg: '#ffffff',
-            tooltipBorder: '#e2e8f0',
-            tooltipColor: '#0f172a',
-          },
-    [isDark],
-  );
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const { data } = await fetchAdminStats();
-        if (!mounted) return;
-        setState({ status: 'ready', data });
-      } catch {
-        if (!mounted) return;
-        setState({ status: 'error' });
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const { status, data } = useAdminFetch<AdminStatsResponse>(fetchAdminStats);
+  const { chart } = useAdminTheme();
 
   const tooltipStyle = {
-    backgroundColor: chartTheme.tooltipBg,
-    border: `1px solid ${chartTheme.tooltipBorder}`,
+    backgroundColor: chart.tooltipBg,
+    border: `1px solid ${chart.tooltipBorder}`,
     borderRadius: 8,
-    color: chartTheme.tooltipColor,
+    color: chart.tooltipColor,
+    fontSize: 12,
   };
+
+  const ridePie = useMemo(() =>
+    data ? recordToPie(data.rides_by_status, RIDE_STATUS_COLORS, RIDE_STATUS_LABELS) : [],
+  [data]);
+
+  const bookingPie = useMemo(() =>
+    data ? recordToPie(data.bookings_by_status, BOOKING_STATUS_COLORS, BOOKING_STATUS_LABELS) : [],
+  [data]);
 
   return (
     <div>
-      <h2 className={page.pageTitle}>לוח בקרה</h2>
-      <p className={styles.intro}>
-        סקירה מהירה של מצב המערכת. לחיצה על כרטיס מובילה למסך הרלוונטי.
-      </p>
+      <HealthStrip />
 
-      {state.status === 'loading' && <p className={page.muted}>טוען נתונים…</p>}
-      {state.status === 'error' && (
-        <p className={page.error}>לא ניתן לטעון סטטיסטיקות.</p>
-      )}
-      {state.status === 'ready' && (
-        <>
-          <div className={styles.statsGrid}>
-            <Link to="/admin/users" className={styles.statCard}>
-              <p className={styles.statLabel}>סה״כ משתמשים</p>
-              <p className={styles.statValue}>{state.data.users_total}</p>
-              <p className={styles.statHint}>ניהול משתמשים ←</p>
-            </Link>
-
-            <Link to="/admin/users" className={`${styles.statCard} ${styles.statCardToday}`}>
-              <p className={styles.statLabel}>
-                נרשמו היום <span className={styles.badgeToday}>היום</span>
-              </p>
-              <p className={styles.statValue}>{state.data.users_new_today}</p>
-              <p className={styles.statHint}>משתמשים חדשים</p>
-            </Link>
-
-            <Link to="/admin/users" className={styles.statCard}>
-              <p className={styles.statLabel}>פעילים 7 ימים</p>
-              <p className={styles.statValue}>{state.data.active_users_last_7_days}</p>
-              <p className={styles.statHint}>לפי פעילות אחרונה</p>
-            </Link>
-
-            <Link to="/admin/rides" className={styles.statCard}>
-              <p className={styles.statLabel}>נסיעות פעילות</p>
-              <p className={styles.statValue}>{state.data.rides_active}</p>
-              <p className={styles.statHint}>open / full / active</p>
-            </Link>
-
-            <Link to="/admin/rides" className={styles.statCard}>
-              <p className={styles.statLabel}>סה״כ נסיעות</p>
-              <p className={styles.statValue}>{state.data.rides_total}</p>
-              <p className={styles.statHint}>כל הסטטוסים</p>
-            </Link>
-
-            <Link
-              to="/admin/lookup"
-              className={`${styles.statCard} ${state.data.bookings_pending > 0 ? styles.statCardWarn : ''}`}
-            >
-              <p className={styles.statLabel}>הזמנות ממתינות</p>
-              <p
-                className={`${styles.statValue} ${state.data.bookings_pending > 0 ? styles.statValueWarn : ''}`}
-              >
-                {state.data.bookings_pending}
-              </p>
-              <p className={styles.statHint}>ממתין לאישור</p>
-            </Link>
-
-            <Link to="/admin/outbox" className={styles.statCard}>
-              <p className={styles.statLabel}>Outbox ממתין</p>
-              <p className={styles.statValue}>{state.data.outbox_pending}</p>
-              <p className={styles.statHint}>תור אירועים</p>
-            </Link>
-
-            <Link
-              to="/admin/outbox"
-              className={`${styles.statCard} ${state.data.outbox_failed > 0 ? styles.statCardDanger : ''}`}
-            >
-              <p className={styles.statLabel}>Outbox נכשל</p>
-              <p
-                className={`${styles.statValue} ${state.data.outbox_failed > 0 ? styles.statValueDanger : ''}`}
-              >
-                {state.data.outbox_failed}
-              </p>
-              <p className={styles.statHint}>דורש טיפול</p>
-            </Link>
+      <div className={page.sectionTitle}>סטטיסטיקות</div>
+      <div className={page.statsGrid}>
+        <Link to="/admin/users" className={page.statCard}>
+          <div className={page.statLabel}>סה"כ משתמשים</div>
+          <div className={page.statValue}>{data?.users_total ?? '—'}</div>
+          <div className={page.statHint}>כל הזמן</div>
+        </Link>
+        <Link to="/admin/users" className={`${page.statCard} ${page.statCardToday}`}>
+          <div className={page.statLabel}>
+            חדשים היום <span className={page.badgeToday}>היום</span>
           </div>
+          <div className={page.statValue}>{data?.users_new_today ?? '—'}</div>
+          <div className={page.statChangeUp}>↑ משתמשים חדשים</div>
+        </Link>
+        <Link to="/admin/rides" className={page.statCard}>
+          <div className={page.statLabel}>נסיעות פעילות</div>
+          <div className={page.statValue}>{data?.rides_active ?? '—'}</div>
+          <div className={page.statHint}>open / full / active</div>
+        </Link>
+        <Link
+          to="/admin/lookup"
+          className={`${page.statCard} ${(data?.bookings_pending ?? 0) > 0 ? page.statCardWarn : ''}`}
+        >
+          <div className={page.statLabel}>הזמנות ממתינות</div>
+          <div className={`${page.statValue} ${(data?.bookings_pending ?? 0) > 0 ? page.statValueWarn : ''}`}>
+            {data?.bookings_pending ?? '—'}
+          </div>
+          <div className={page.statChangeWarn}>⚠ דורש טיפול</div>
+        </Link>
+        <Link to="/admin/outbox" className={page.statCard}>
+          <div className={page.statLabel}>Outbox ממתינים</div>
+          <div className={page.statValue}>{data?.outbox_pending ?? '—'}</div>
+          <div className={page.statHint}>תור אירועים</div>
+        </Link>
+        <Link
+          to="/admin/outbox"
+          className={`${page.statCard} ${(data?.outbox_failed ?? 0) > 0 ? page.statCardDanger : ''}`}
+        >
+          <div className={page.statLabel}>Outbox נכשל</div>
+          <div className={`${page.statValue} ${(data?.outbox_failed ?? 0) > 0 ? page.statValueDanger : ''}`}>
+            {data?.outbox_failed ?? '—'}
+          </div>
+          <div className={page.statHint}>דורש בדיקה</div>
+        </Link>
+        <Link to="/admin/users" className={page.statCard}>
+          <div className={page.statLabel}>פעילים 7 ימים</div>
+          <div className={page.statValue}>{data?.active_users_last_7_days ?? '—'}</div>
+          <div className={page.statHint}>לפי פעילות אחרונה</div>
+        </Link>
+        <Link to="/admin/rides" className={page.statCard}>
+          <div className={page.statLabel}>סה"כ נסיעות</div>
+          <div className={page.statValue}>{data?.rides_total ?? '—'}</div>
+          <div className={page.statHint}>כל הסטטוסים</div>
+        </Link>
+      </div>
 
-          <h3 className={styles.sectionTitle}>משתמשים חדשים (7 ימים)</h3>
-          <div className={styles.chartCard}>
-            <div dir="ltr" className={styles.chartLtr}>
-              {state.data.users_per_day.every((d) => d.count === 0) ? (
-                <p className={styles.chartEmpty}>אין נתונים</p>
+      {status === 'loading' && <p className={page.muted}>טוען נתונים...</p>}
+      {status === 'error' && <p className={page.error}>לא ניתן לטעון סטטיסטיקות.</p>}
+
+      {status === 'ready' && data && (
+        <>
+          <div className={page.sectionTitle} style={{ marginTop: 24 }}>משתמשים חדשים — 7 ימים</div>
+          <div className={page.chartCard} style={{ marginBottom: 16 }}>
+            <div className={`${page.chartLtr}`} style={{ height: 200 }}>
+              {data.users_per_day.every((d) => d.count === 0) ? (
+                <p className={page.chartEmpty}>אין נתונים</p>
               ) : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <LineChart data={state.data.users_per_day}>
-                    <CartesianGrid stroke={chartTheme.grid} strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tick={{ fill: chartTheme.axis, fontSize: 12 }} />
-                    <YAxis tick={{ fill: chartTheme.axis, fontSize: 12 }} allowDecimals={false} />
-                    <Tooltip
-                      contentStyle={tooltipStyle}
-                      labelStyle={{ color: chartTheme.tooltipColor }}
-                      formatter={(value) => {
-                        const n = typeof value === 'number' ? value : Number(value);
-                        return [`${Number.isFinite(n) ? n : 0} משתמשים`, ''];
-                      }}
-                      labelFormatter={(label) => `תאריך: ${label}`}
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={data.users_per_day} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                    <CartesianGrid stroke={chart.grid} strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fill: chart.axis, fontSize: 10 }} />
+                    <YAxis tick={{ fill: chart.axis, fontSize: 10 }} allowDecimals={false} />
+                    <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: chart.tooltipColor }}
+                      formatter={(v) => [`${Number(v)} משתמשים`, '']}
+                      labelFormatter={(l) => `תאריך: ${l}`}
                     />
-                    <Line
-                      type="monotone"
-                      dataKey="count"
-                      stroke="#3b82f6"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                    />
+                    <Line type="monotone" dataKey="count" stroke="#4f6ef7" strokeWidth={2} dot={{ r: 3, fill: '#4f6ef7' }} />
                   </LineChart>
                 </ResponsiveContainer>
               )}
             </div>
           </div>
 
-          <div className={`${page.grid2} ${styles.pieRow}`}>
-            <div className={styles.chartCard}>
-              <h4 className={styles.chartTitle}>נסיעות לפי סטטוס</h4>
-              <div dir="ltr" className={styles.chartLtr}>
-                {(() => {
-                  const pieData = recordToPie(
-                    state.data.rides_by_status,
-                    RIDE_COLORS,
-                    RIDE_LABELS,
-                  );
-                  const total = pieData.reduce((s, d) => s + d.value, 0);
-                  if (total === 0) {
-                    return <p className={styles.chartEmpty}>אין נתונים</p>;
-                  }
-                  return (
-                    <ResponsiveContainer width="100%" height={260}>
-                      <PieChart>
-                        <Pie
-                          data={pieData}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={88}
-                          label={pieLabel}
-                        >
-                          {pieData.map((entry, i) => (
-                            <Cell key={`${entry.name}-${i}`} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={tooltipStyle}
-                          formatter={(value) => {
-                            const n = typeof value === 'number' ? value : Number(value);
-                            return [Number.isFinite(n) ? n : 0, 'נסיעות'];
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  );
-                })()}
+          <div className={page.grid2} style={{ marginBottom: 16 }}>
+            <div className={page.chartCard}>
+              <div className={page.chartTitle}>נסיעות לפי סטטוס</div>
+              <div className={page.chartLtr} style={{ height: 220 }}>
+                {ridePie.length === 0 ? (
+                  <p className={page.chartEmpty}>אין נתונים</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={ridePie} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                        outerRadius={80} innerRadius={40} label={pieLabel} labelLine={false}>
+                        {ridePie.map((e, i) => <Cell key={i} fill={e.fill} />)}
+                      </Pie>
+                      <Tooltip contentStyle={tooltipStyle}
+                        formatter={(v) => [Number(v), 'נסיעות']} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
-            <div className={styles.chartCard}>
-              <h4 className={styles.chartTitle}>הזמנות לפי סטטוס</h4>
-              <div dir="ltr" className={styles.chartLtr}>
-                {(() => {
-                  const pieData = recordToPie(
-                    state.data.bookings_by_status,
-                    BOOKING_COLORS,
-                    BOOKING_LABELS,
-                  );
-                  const total = pieData.reduce((s, d) => s + d.value, 0);
-                  if (total === 0) {
-                    return <p className={styles.chartEmpty}>אין נתונים</p>;
-                  }
-                  return (
-                    <ResponsiveContainer width="100%" height={260}>
-                      <PieChart>
-                        <Pie
-                          data={pieData}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={88}
-                          label={pieLabel}
-                        >
-                          {pieData.map((entry, i) => (
-                            <Cell key={`${entry.name}-${i}`} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={tooltipStyle}
-                          formatter={(value) => {
-                            const n = typeof value === 'number' ? value : Number(value);
-                            return [Number.isFinite(n) ? n : 0, 'הזמנות'];
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  );
-                })()}
+            <div className={page.chartCard}>
+              <div className={page.chartTitle}>הזמנות לפי סטטוס</div>
+              <div className={page.chartLtr} style={{ height: 220 }}>
+                {bookingPie.length === 0 ? (
+                  <p className={page.chartEmpty}>אין נתונים</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={bookingPie} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                        outerRadius={80} innerRadius={40} label={pieLabel} labelLine={false}>
+                        {bookingPie.map((e, i) => <Cell key={i} fill={e.fill} />)}
+                      </Pie>
+                      <Tooltip contentStyle={tooltipStyle}
+                        formatter={(v) => [Number(v), 'הזמנות']} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
           </div>
+
+          <div className={page.sectionTitle}>קישורים מהירים</div>
+          <div className={page.quickLinks}>
+            <Link to="/admin/health" className={page.quickLink}>בריאות מערכת</Link>
+            <Link to="/admin/groups" className={page.quickLink}>קבוצות</Link>
+            <Link to="/admin/lookup" className={page.quickLink}>חיפוש נסיעה / הזמנה</Link>
+            <Link to="/admin/outbox" className={page.quickLink}>Outbox</Link>
+          </div>
         </>
       )}
-
-      <h3 className={styles.sectionTitle}>קישורים מהירים</h3>
-      <div className={styles.quickLinks}>
-        <Link to="/admin/health" className={styles.quickLink}>
-          בריאות מערכת
-        </Link>
-        <Link to="/admin/groups" className={styles.quickLink}>
-          קבוצות
-        </Link>
-        <Link to="/admin/lookup" className={styles.quickLink}>
-          חיפוש נסיעה / הזמנה
-        </Link>
-      </div>
     </div>
   );
 }

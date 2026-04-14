@@ -9,11 +9,11 @@ export function useMapMarker(
     isDriver?: boolean;
   }
 ) {
-  const markerRef = useRef<any>(null);
+  const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
 
   useEffect(() => {
     if (!map) return;
-    const markerApi = (window.google?.maps as any)?.marker;
+    const markerApi = window.google?.maps?.marker;
     if (!markerApi?.AdvancedMarkerElement) return;
 
     const el = document.createElement('div');
@@ -60,6 +60,8 @@ export function useMapMarker(
         markerRef.current = null;
       }
     };
+    // `position` is applied in the next effect so the marker is not recreated on every GPS tick.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, options.isDriver, options.color, options.title]);
 
   useEffect(() => {

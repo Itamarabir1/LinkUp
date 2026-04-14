@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchRideManifest, postDriverBookingLocation, type RideManifestPassenger } from '../api/bookings';
 import { getApiErrorMessage, getApiStatus } from '../utils/apiError';
+import { apiErr } from '../utils/i18nError';
 import { useLocationWatcher } from './useLocationWatcher';
 
 export interface DriverPosition {
@@ -15,7 +16,7 @@ export interface UseLocationBroadcastOptions {
   rideId: string | null;
   driverId: string | null;
   enabled: boolean;
-  /** אם מועבר — משמש ל־POST /location בלי לטעון מ-manifest */
+  /** Optional booking id used for POST /location without manifest lookup. */
   bookingId?: string | null;
   onPosition?: (pos: DriverPosition) => void;
   onStart?: (rideId: string) => void | Promise<void>;
@@ -140,7 +141,7 @@ export function useLocationBroadcast(options: UseLocationBroadcastOptions) {
           onPositionRef.current?.({ lat, lng, heading, speed, timestamp: ts });
         })
         .catch((err: unknown) => {
-          setError(getApiErrorMessage(err, 'שליחת מיקום נכשלה'));
+          setError(getApiErrorMessage(err, apiErr('err_send_location')));
         });
     },
     onError: (msg) => setError(msg),

@@ -1,4 +1,5 @@
 import type { PassengerBookingItem } from './myBookings.types';
+import { useTranslation } from 'react-i18next';
 import HistorySection from '../../components/HistorySection/HistorySection';
 import PassengerBookingCard, {
   type PassengerBookingCardHandlers,
@@ -32,6 +33,7 @@ export default function PassengerBookingsTab({
   chatLoading,
   onOpenChat,
 }: PassengerBookingsTabProps) {
+  const { t } = useTranslation(['bookings', 'common']);
   const activeItems = items.filter(
     (item) => item.bookingStatus !== 'cancelled' && item.bookingStatus !== 'completed'
   );
@@ -49,9 +51,9 @@ export default function PassengerBookingsTab({
   return (
     <div className={styles.cardList}>
       {loading ? (
-        <p className={styles.pageLoading}>טוען...</p>
+        <p className={styles.pageLoading}>{t('common:loading')}</p>
       ) : items.length === 0 ? (
-        <p className={styles.emptyText}>אין הזמנות כנוסע. חפש טרמפ ובקש להצטרף.</p>
+        <p className={styles.emptyText}>{t('bookings:noPassengerBookings')}</p>
       ) : (
         <>
           {activeItems.map((item) => (
@@ -66,7 +68,7 @@ export default function PassengerBookingsTab({
             />
           ))}
           {pastItems.length > 0 ? (
-            <HistorySection title="היסטוריית הזמנות נוסע">
+            <HistorySection title={t('bookings:passengerHistoryTitle')}>
               {pastItems.map((item) => (
                 <PassengerBookingCard
                   key={item.bookingId}

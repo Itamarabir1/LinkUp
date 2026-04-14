@@ -1,203 +1,163 @@
-import { useEffect, useState, useRef } from 'react';
-import { Camera } from 'lucide-react';
-import {
-  createGroup,
-  getGroupImageUploadUrl,
-  confirmGroupImage,
-} from '../api/groups';
-import { useGroup } from '../context/GroupContext';
+import { Camera, Copy, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import ErrorBanner from '../components/ErrorBanner';
 import LoadingButton from '../components/LoadingButton';
-import { getApiErrorMessage } from '../utils/apiError';
+import { ACCEPT_GROUP_IMAGE, DESCRIPTION_MAX, useCreateGroup } from './useCreateGroup';
 import styles from './CreateGroup.module.css';
 
-const DESCRIPTION_MAX = 500;
-
 export default function CreateGroup() {
-  const { refreshGroups } = useGroup();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const [createdGroup, setCreatedGroup] = useState<{ inviteCode: string; name: string } | null>(null);
-  const [imageError, setImageError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [copyError, setCopyError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation(['groups', 'common']);
+  const {
+    name,
+    setName,
+    description,
+    setDescription,
+    previewUrl,
+    submitting,
+    error,
+    imageError,
+    createdGroup,
+    inviteUrl,
+    copied,
+    copyError,
+    fileInputRef,
+    handleImageChange,
+    handleSubmit,
+    handleCopy,
+  } = useCreateGroup();
 
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    setImageFile(file);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(file ? URL.createObjectURL(file) : null);
-    e.target.value = '';
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setSubmitting(true);
-    setError('');
-    setImageError(null);
-    try {
-      const group = await createGroup({
-        name: trimmed,
-        description: description.trim().slice(0, DESCRIPTION_MAX) || undefined,
-      });
-      if (imageFile && group.group_id) {
-        try {
-          const { upload_url, key } = await getGroupImageUploadUrl(group.group_id);
-          const putRes = await fetch(upload_url, {
-            method: 'PUT',
-            body: imageFile,
-            headers: { 'Content-Type': 'image/webp' },
-          });
-          if (!putRes.ok) throw new Error('Upload failed');
-          await confirmGroupImage(group.group_id, key);
-        } catch (err) {
-          setImageError(
-            getApiErrorMessage(
-              err,
-              'הקבוצה נוצרה, אך העלאת התמונה נכשלה. ניתן לעדכן תמונה בהגדרות הקבוצה.'
-            )
-          );
-        }
-      }
-      setCreatedGroup({ inviteCode: group.invite_code, name: group.name });
-      await refreshGroups();
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'יצירת הקבוצה נכשלה.'));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const inviteUrl =
-    createdGroup && typeof window !== 'undefined'
-      ? `${window.location.origin}/join/${createdGroup.inviteCode}`
-      : '';
-
-  const handleCopy = async () => {
-    if (!inviteUrl) return;
-    setCopyError(null);
-    try {
-      await navigator.clipboard.writeText(inviteUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      const message = (err as Error)?.message || 'העתקה נכשלה. נסה שוב.';
-      setCopyError(message);
-    }
-  };
-
+  /* ── Success state ── */
   if (createdGroup) {
     return (
       <div className={styles.page}>
-        <h1 className={styles.pageTitle}>הקבוצה נוצרה</h1>
-        {imageError && (
-          <p className={styles.imageWarn} role="alert">
-            {imageError}
-          </p>
-        )}
-        <div className={styles.successSection}>
-          <div className={styles.successTitle}>הזמן חברים עם הקישור:</div>
-          <div className={styles.inviteRow}>
-            <input type="text" className={styles.inviteInput} value={inviteUrl} readOnly />
+        <div className={styles.inner}>
+          {imageError && (
+            <p className={styles.imageWarn} role="alert">{imageError}</p>
+          )}
+          <div className={styles.successCard}>
+            <div className={styles.successAvatar}>{createdGroup.avatarLetter}</div>
+            <p className={styles.successTitle}>{t('groups:createSuccess')}</p>
+            <p className={styles.successSub}>
+              {t('groups:shareInvite', { name: '' })}<strong>{createdGroup.name}</strong>
+            </p>
+            <div className={styles.inviteBox}>
+              <div className={styles.inviteLabel}>{t('groups:joinLink')}</div>
+              <div className={styles.inviteUrl}>{inviteUrl}</div>
+            </div>
+            {copyError && (
+              <ErrorBanner
+                message={copyError}
+                variant="compact"
+                className={styles.inviteError}
+              />
+            )}
             <button
               type="button"
-              className={`${styles.btn} ${styles.btnPrimary} ${styles.btnCopy} ${copied ? styles.btnCopySuccess : ''}`}
+              className={`${styles.btnCopy} ${copied ? styles.btnCopySuccess : ''}`}
               onClick={handleCopy}
             >
-              {copied ? '✓ הועתק!' : 'העתק'}
+              {copied ? (
+                <><Check size={14} strokeWidth={2.5} /> {t('common:copied')}</>
+              ) : (
+                <><Copy size={14} strokeWidth={2} /> {t('groups:copyLink')}</>
+              )}
             </button>
           </div>
-          {copyError ? (
-            <ErrorBanner message={copyError} variant="compact" className={styles.inviteError} />
-          ) : null}
         </div>
       </div>
     );
   }
 
+  /* ── Create form ── */
   return (
     <div className={styles.page}>
-      <h1 className={styles.pageTitle}>צור קבוצה</h1>
-      {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
-      <form className={styles.form} onSubmit={handleSubmit}>
-        <label className={styles.label} htmlFor="group-name">
-          שם הקבוצה
-        </label>
-        <input
-          id="group-name"
-          type="text"
-          className={styles.input}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="למשל: נסיעות לתל אביב"
-          required
-        />
-        <label className={styles.label} htmlFor="group-desc">
-          תיאור (אופציונלי, עד {DESCRIPTION_MAX} תווים)
-        </label>
-        <textarea
-          id="group-desc"
-          className={styles.textarea}
-          value={description}
-          onChange={(e) => setDescription(e.target.value.slice(0, DESCRIPTION_MAX))}
-          placeholder="תיאור קצר של הקבוצה"
-          rows={3}
-        />
-        <span className={styles.charCount}>{description.length}/{DESCRIPTION_MAX}</span>
-        <div
-          className={styles.avatarUpload}
-          onClick={() => fileInputRef.current?.click()}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              fileInputRef.current?.click();
-            }
-          }}
-          aria-label="הוסף תמונה לקבוצה"
-        >
-          {previewUrl ? (
-            <img src={previewUrl} className={styles.avatarPreview} alt="תצוגה מקדימה" />
-          ) : (
-            <div className={styles.avatarPlaceholder}>
-              <Camera size={28} color="#9CA3AF" />
-              <span>הוסף תמונה</span>
+      <div className={styles.inner}>
+        <h1 className={styles.pageTitle}>{t('groups:createGroup')}</h1>
+        <div className={styles.card}>
+          {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
+
+          {/* Avatar upload */}
+          <div
+            className={styles.avatarUpload}
+            onClick={() => fileInputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
+            aria-label={t('groups:createGroup')}
+          >
+            {previewUrl ? (
+              <img src={previewUrl} className={styles.avatarPreview} alt={t('rides:previewButton')} />
+            ) : (
+              <div className={styles.avatarPlaceholder}>
+                <Camera size={24} strokeWidth={1.5} />
+                <span>{t('profile:profileTitle')}</span>
+              </div>
+            )}
+            <div className={styles.avatarOverlay}>
+              <Camera size={18} color="white" />
             </div>
-          )}
-          <div className={styles.avatarOverlay}>
-            <Camera size={20} color="white" />
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept={ACCEPT_GROUP_IMAGE}
+              className={styles.hiddenFileInput}
+              onChange={handleImageChange}
+            />
           </div>
-          <input
-            type="file"
-            ref={fileInputRef}
-            accept="image/*"
-            className={styles.hiddenFileInput}
-            onChange={handleImageChange}
-          />
+
+          <form className={styles.form} onSubmit={handleSubmit}>
+            <div className={styles.field}>
+              <label className={styles.fieldLabel} htmlFor="group-name">
+                {t('groups:groupName')}
+              </label>
+              <input
+                id="group-name"
+                type="text"
+                className={styles.fieldInput}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t('groups:groupName')}
+                required
+                autoComplete="off"
+              />
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.fieldLabel} htmlFor="group-desc">
+                {t('groups:description')}{' '}
+                <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>
+                  ({t('common:or')})
+                </span>
+              </label>
+              <textarea
+                id="group-desc"
+                className={styles.fieldTextarea}
+                value={description}
+                onChange={(e) => setDescription(e.target.value.slice(0, DESCRIPTION_MAX))}
+                placeholder={t('groups:description')}
+                rows={3}
+              />
+              <span className={styles.charCount}>
+                {description.length} / {DESCRIPTION_MAX}
+              </span>
+            </div>
+
+            <LoadingButton
+              type="submit"
+              className={styles.btnPrimary}
+              loading={submitting}
+              loadingLabel={t('common:creating')}
+            >
+              {t('groups:createGroup')}
+            </LoadingButton>
+          </form>
         </div>
-        <LoadingButton
-          type="submit"
-          className={`${styles.btn} ${styles.btnPrimary}`}
-          loading={submitting}
-          loadingLabel="יוצר..."
-        >
-          צור קבוצה
-        </LoadingButton>
-      </form>
+      </div>
     </div>
   );
 }

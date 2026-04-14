@@ -2,9 +2,11 @@ import { forwardRef } from 'react';
 import { Link } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { he } from 'date-fns/locale';
+import { enUS, he } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
 import { MapPin, ArrowUpDown, Calendar } from 'lucide-react';
 import LoadingButton from '../../components/LoadingButton';
+import { useLang } from '../../context/LangContext';
 import styles from './SearchRides.module.css';
 
 interface DateTriggerProps {
@@ -28,14 +30,15 @@ const DateTrigger = forwardRef<HTMLButtonElement, DateTriggerProps>(
   )
 );
 
-function formatDateDisplay(date: Date): string {
+function formatDateDisplay(date: Date, lang: 'he' | 'en', todayLabel: string, tomorrowLabel: string): string {
+  const locale = lang === 'en' ? 'en-US' : 'he-IL';
   const now = new Date();
   const tomorrow = new Date();
   tomorrow.setDate(now.getDate() + 1);
-  const timeStr = date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-  if (date.toDateString() === now.toDateString()) return `היום, ${timeStr}`;
-  if (date.toDateString() === tomorrow.toDateString()) return `מחר, ${timeStr}`;
-  return date.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' }) + `, ${timeStr}`;
+  const timeStr = date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  if (date.toDateString() === now.toDateString()) return `${todayLabel}, ${timeStr}`;
+  if (date.toDateString() === tomorrow.toDateString()) return `${tomorrowLabel}, ${timeStr}`;
+  return date.toLocaleDateString(locale, { day: 'numeric', month: 'short' }) + `, ${timeStr}`;
 }
 
 type Props = {
@@ -71,13 +74,15 @@ export function SearchRidesForm({
   onSwap,
   onSubmit,
 }: Props) {
+  const { t } = useTranslation(['rides', 'common', 'auth']);
+  const { lang } = useLang();
   return (
     <form onSubmit={onSubmit} className={styles.formBlock}>
       {error ? (
         <div className={styles.pageError}>
           {error}
           {error.includes('פג תוקף') && (
-            <> · <Link to="/login" className={styles.errorInlineLink}>התחבר מחדש</Link></>
+            <> · <Link to="/login" className={styles.errorInlineLink}>{t('auth:signIn')}</Link></>
           )}
         </div>
       ) : null}
@@ -89,11 +94,11 @@ export function SearchRidesForm({
             <MapPin size={15} strokeWidth={2.5} />
           </div>
           <div className={styles.fieldContent}>
-            <div className={styles.fieldLabel}>מוצא</div>
+            <div className={styles.fieldLabel}>{t('rides:origin')}</div>
             <input
               type="text"
               className={styles.formInput}
-              placeholder="כתובת איסוף..."
+              placeholder={t('rides:originPlaceholder')}
               value={pickup}
               onChange={(e) => setPickup(e.target.value)}
               autoComplete="off"
@@ -104,7 +109,7 @@ export function SearchRidesForm({
             className={styles.gpsBtn}
             onClick={onFillLocation}
             disabled={locationLoading}
-            title="מיקום נוכחי"
+            title={t('rides:myLocation')}
           >
             {locationLoading ? '...' : 'GPS'}
           </button>
@@ -116,7 +121,7 @@ export function SearchRidesForm({
               type="button"
               className={styles.swapBtn}
               onClick={onSwap}
-              aria-label="החלף כיוון"
+              aria-label={t('rides:swapDirection')}
             >
               <ArrowUpDown size={12} strokeWidth={2} />
             </button>
@@ -128,11 +133,11 @@ export function SearchRidesForm({
             <MapPin size={15} strokeWidth={2} />
           </div>
           <div className={styles.fieldContent}>
-            <div className={styles.fieldLabel}>יעד</div>
+            <div className={styles.fieldLabel}>{t('rides:destination')}</div>
             <input
               type="text"
               className={styles.formInput}
-              placeholder="לאן אתה הולך?"
+              placeholder={t('rides:destinationPlaceholder')}
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
               autoComplete="off"
@@ -144,7 +149,7 @@ export function SearchRidesForm({
       {/* Datetime (first in DOM = right in RTL) + radius */}
       <div className={styles.metaRow}>
         <div className={`${styles.metaField} ${styles.metaFieldWide}`}>
-          <div className={styles.metaLabel}>תאריך ושעה</div>
+          <div className={styles.metaLabel}>{t('rides:departureTime')}</div>
           <DatePicker
             selected={selectedDate}
             onChange={(date: Date | null) => date && setSelectedDate(date)}
@@ -152,15 +157,15 @@ export function SearchRidesForm({
             timeFormat="HH:mm"
             timeIntervals={15}
             dateFormat="dd/MM/yyyy HH:mm"
-            locale={he}
+            locale={lang === 'en' ? enUS : he}
             minDate={new Date()}
             wrapperClassName={styles.datetimeWrapper}
-            customInput={<DateTrigger displayText={formatDateDisplay(selectedDate)} />}
+            customInput={<DateTrigger displayText={formatDateDisplay(selectedDate, lang, t('common:today'), t('common:tomorrow'))} />}
           />
         </div>
 
         <div className={styles.metaField}>
-          <div className={styles.metaLabel}>רדיוס חיפוש</div>
+          <div className={styles.metaLabel}>{t('rides:searchRadius')}</div>
           <div className={styles.metaValue}>
             <div className={styles.radiusControl}>
               <button
@@ -175,7 +180,7 @@ export function SearchRidesForm({
                 onClick={() => setSearchRadius(Math.min(50, searchRadius + 1))}
               >+</button>
             </div>
-            <span className={styles.radiusUnit}>ק"מ</span>
+            <span className={styles.radiusUnit}>{t('rides:km')}</span>
           </div>
         </div>
       </div>
@@ -184,9 +189,9 @@ export function SearchRidesForm({
         type="submit"
         className={styles.searchBtn}
         loading={searching}
-        loadingLabel="מחפש..."
+        loadingLabel={t('rides:searching')}
       >
-        חפש
+        {t('common:search')}
       </LoadingButton>
     </form>
   );

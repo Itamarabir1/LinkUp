@@ -1,16 +1,18 @@
 import ErrorBanner from '../../components/ErrorBanner';
+import { useTranslation } from 'react-i18next';
 import GroupManageContent from './GroupManageContent';
 import GroupManageHeader from './GroupManageHeader';
 import { useGroupManage } from './useGroupManage';
 import styles from './GroupManage.module.css';
 
 export default function GroupManage() {
+  const { t } = useTranslation(['groups', 'common']);
   const vm = useGroupManage();
 
   if (!vm.groupId) {
     return (
       <div className={styles.page}>
-        <ErrorBanner message="חסר מזהה קבוצה." className={styles.pageError} />
+        <ErrorBanner message={t('groups:groupNotFoundOrInvalid')} className={styles.pageError} />
       </div>
     );
   }
@@ -18,7 +20,7 @@ export default function GroupManage() {
   if (!vm.isLoadingGroups && !vm.group) {
     return (
       <div className={styles.page}>
-        <ErrorBanner message="הקבוצה לא נמצאה או שאין לך גישה אליה." className={styles.pageError} />
+        <ErrorBanner message={t('groups:groupNotFoundOrInvalid')} className={styles.pageError} />
       </div>
     );
   }
@@ -26,7 +28,7 @@ export default function GroupManage() {
   if (!vm.group) {
     return (
       <div className={styles.page}>
-        <div className={styles.pageLoading}>טוען...</div>
+        <div className={styles.pageLoading}>{t('common:loading')}</div>
       </div>
     );
   }

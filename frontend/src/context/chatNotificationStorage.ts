@@ -1,6 +1,6 @@
 const NOTIF_READ_KEY = 'linkup_notif_read';
 
-/** מפתח ייחודי לפריט התראה (ל־localStorage + markNotificationRead). */
+/** Stable notification item key (localStorage + markNotificationRead). */
 export function getNotificationItemKey(n: { booking_id: string; created_at: string }): string {
   return `${n.booking_id}_${n.created_at}`;
 }

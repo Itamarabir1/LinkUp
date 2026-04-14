@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { sendMessage } from '../../api/chat';
 import { useAuth } from '../../context/AuthContext';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { apiErr } from '../../utils/i18nError';
 import { useConversationMessages } from './useConversationMessages';
 import { useChatWebSocket } from './useChatWebSocket';
 import { fetchPartnerPresence, type PartnerPresence } from '../../api/presence';
@@ -103,7 +104,7 @@ export function useMessageThread(conversationIdOverride?: string) {
         }
         sendTypingStop(recipientId);
       } catch (err: unknown) {
-        setError(getApiErrorMessage(err, 'שליחת ההודעה נכשלה'));
+        setError(getApiErrorMessage(err, apiErr('err_send_message')));
       } finally {
         setSending(false);
       }

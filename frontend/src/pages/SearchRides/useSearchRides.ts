@@ -9,6 +9,7 @@ import {
 import { fetchPassengerDriverInfo } from '../../api/rides';
 import type { Ride, DriverInfo } from '../../types/api';
 import { getApiErrorMessage, getApiStatus } from '../../utils/apiError';
+import { apiErr } from '../../utils/i18nError';
 
 function defaultDepartureDate(): Date {
   const d = new Date();
@@ -73,7 +74,7 @@ export function useSearchRides() {
           if (isLocationOpCurrent(token)) setPickup(data.address ?? '');
         } catch (err) {
           if (isLocationOpCurrent(token))
-            setError(getApiErrorMessage(err, 'לא נמצאה כתובת למיקום זה'));
+            setError(getApiErrorMessage(err, apiErr('err_geocode_not_found')));
         } finally {
           if (isLocationOpCurrent(token)) setLocationLoading(false);
         }
@@ -133,7 +134,7 @@ export function useSearchRides() {
         setResultsHasMore(data?.has_more ?? false);
         setHasSearched(true);
       } catch (err: unknown) {
-        if (isSearchOpCurrent(token)) setError(getApiErrorMessage(err, 'חיפוש נכשל'));
+        if (isSearchOpCurrent(token)) setError(getApiErrorMessage(err, apiErr('err_search_rides')));
       } finally {
         if (isSearchOpCurrent(token)) setSearching(false);
       }
@@ -162,7 +163,7 @@ export function useSearchRides() {
       setResultsNextCursor(data?.next_cursor ?? null);
       setResultsHasMore(data?.has_more ?? false);
     } catch (err: unknown) {
-      if (isLoadMoreOpCurrent(token)) setError(getApiErrorMessage(err, 'טעינה נכשלה'));
+      if (isLoadMoreOpCurrent(token)) setError(getApiErrorMessage(err, apiErr('err_load_more')));
     } finally {
       if (isLoadMoreOpCurrent(token)) setLoadingMore(false);
     }
@@ -194,10 +195,10 @@ export function useSearchRides() {
     } catch (err: unknown) {
       const status = getApiStatus(err);
       if (status === 401) {
-        setError('פג תוקף ההתחברות – אנא התחבר מחדש כדי לשמור התראה.');
+        setError(apiErr('err_save_alert_session'));
         return;
       }
-      setError(getApiErrorMessage(err, 'שמירת ההתראה נכשלה'));
+      setError(getApiErrorMessage(err, apiErr('err_save_alert')));
     } finally {
       setSavingAlert(false);
     }
@@ -210,7 +211,7 @@ export function useSearchRides() {
       const { data } = await fetchPassengerDriverInfo(rideId);
       setDriverInfoMap((prev) => ({ ...prev, [rideId]: data }));
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'לא ניתן לטעון פרטי נהג'));
+      setError(getApiErrorMessage(err, apiErr('err_load_driver')));
     } finally {
       setLoadingDriverRideId(null);
     }
@@ -240,13 +241,13 @@ export function useSearchRides() {
         return;
       }
       if (status === 409) {
-        const msg = getApiErrorMessage(err, 'המקום התמלא. נסה נסיעה אחרת.');
+        const msg = getApiErrorMessage(err, apiErr('err_ride_full'));
         setRequestErrorRideId(r.ride_id);
         setRequestErrorMessage(msg);
         setError(msg);
         return;
       }
-      const msg = getApiErrorMessage(err, 'שליחת הבקשה נכשלה');
+      const msg = getApiErrorMessage(err, apiErr('err_join_request'));
       setRequestErrorRideId(r.ride_id);
       setRequestErrorMessage(msg);
       setError(msg);

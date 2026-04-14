@@ -30,7 +30,7 @@ export function getApiErrorCode(err: unknown): string | undefined {
   return typeof data?.error_code === 'string' ? data.error_code : undefined;
 }
 
-/** Axios timeout / abort — לטיפול נפרד מ־getApiErrorMessage (למשל הודעת timeout ייעודית). */
+/** Axios timeout/abort detector for dedicated timeout handling paths. */
 export function isTimeoutOrAbortError(err: unknown): boolean {
   const ax = err as { code?: string; message?: string };
   if (ax.code === 'ECONNABORTED') return true;

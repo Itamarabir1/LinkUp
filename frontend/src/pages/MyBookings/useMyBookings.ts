@@ -5,6 +5,7 @@ import { useGroup } from '../../context/GroupContext';
 import { useChat } from '../../context/ChatContext';
 import { openChatByBooking } from '../../api/chat';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { apiErr } from '../../utils/i18nError';
 import { usePassengerLocationBroadcast } from '../../hooks/usePassengerLocationBroadcast';
 import type { TabKind } from './myBookings.types';
 import { useMyBookingsDriver } from './useMyBookingsDriver';
@@ -43,7 +44,7 @@ export function useMyBookings() {
         const conversation = await openChatByBooking(bookingId);
         openChat(conversation.conversation_id);
       } catch (err: unknown) {
-        setError(getApiErrorMessage(err, 'פתיחת שיחה נכשלה'));
+        setError(getApiErrorMessage(err, apiErr('err_open_chat')));
       } finally {
         setChatLoading(null);
       }

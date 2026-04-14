@@ -2,7 +2,7 @@ import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import styles from './ThemeToggle.module.css';
 
-/** מתג ערכת נושא — קבוע בפינה (נראה גם בדפי התחברות מחוץ ל־Layout). */
+/** Theme toggle pinned in a corner (also visible on auth pages outside Layout). */
 export default function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === 'dark';

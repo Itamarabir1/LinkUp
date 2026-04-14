@@ -2,12 +2,14 @@ import ConfirmModal from '../../components/ConfirmModal/ConfirmModal';
 import ErrorBanner from '../../components/ErrorBanner';
 import LiveMapModal from '../../components/LiveMapModal';
 import LiveRideMapModal from '../../components/LiveRideMapModal';
+import { useTranslation } from 'react-i18next';
 import DriverBookingsTab from './DriverBookingsTab';
 import PassengerBookingsTab from './PassengerBookingsTab';
 import { useMyBookings } from './useMyBookings';
 import styles from './MyBookings.module.css';
 
 export default function MyBookings() {
+  const { t } = useTranslation(['bookings', 'common']);
   const vm = useMyBookings();
 
   return (
@@ -25,7 +27,7 @@ export default function MyBookings() {
             }
             onClick={() => vm.setActiveTab('passenger')}
           >
-            אני נוסע
+            {t('bookings:iAmPassenger')}
           </button>
           <button
             type="button"
@@ -36,7 +38,7 @@ export default function MyBookings() {
             }
             onClick={() => vm.setActiveTab('driver')}
           >
-            אני נהג
+            {t('bookings:iAmDriver')}
           </button>
         </div>
       </div>
@@ -82,8 +84,8 @@ export default function MyBookings() {
       <ConfirmModal
         open={vm.passenger.bookingToCancel != null}
         onClose={() => vm.passenger.setBookingToCancel(null)}
-        title="האם אתה בטוח שאתה רוצה לבטל את ההזמנה הזו?"
-        confirmLabel="אישור"
+        title={t('bookings:confirmCancelBooking')}
+        confirmLabel={t('common:confirm')}
         variant="danger"
         loading={vm.passenger.cancelling}
         onConfirm={vm.passenger.confirmCancelBooking}
@@ -93,8 +95,8 @@ export default function MyBookings() {
       <ConfirmModal
         open={vm.driver.rideToCancel != null}
         onClose={() => vm.driver.setRideToCancel(null)}
-        title="האם אתה בטוח שאתה רוצה לבטל את הנסיעה?"
-        confirmLabel="אישור"
+        title={t('bookings:confirmCancelRide')}
+        confirmLabel={t('common:confirm')}
         variant="danger"
         loading={vm.driver.cancellingRide}
         onConfirm={vm.driver.confirmCancelRide}

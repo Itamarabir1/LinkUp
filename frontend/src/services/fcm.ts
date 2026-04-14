@@ -30,7 +30,7 @@ function showForegroundNotification(payload: MessagePayload): void {
   const title =
     fromDataTitle ||
     payload.notification?.title?.trim() ||
-    'LinkUp';
+    'Linkup';
   const body =
     fromDataBody || payload.notification?.body?.trim() || '';
   triggerNotificationToast({ title, body });
@@ -38,9 +38,9 @@ function showForegroundNotification(payload: MessagePayload): void {
 }
 
 /**
- * מבקש הרשאת Notifications, רושם את ה-SW, מעביר לו config, מקבל FCM token
- * ושולח ל-backend (PATCH /users/fcm-token).
- * נקרא אוטומטית אחרי התחברות משתמש (AuthContext).
+ * Requests notification permission, registers the SW, obtains an FCM token,
+ * and sends it to the backend (PATCH /users/fcm-token).
+ * Called automatically after user login (AuthContext).
  */
 export async function initFCM(): Promise<void> {
   try {

@@ -1,37 +1,49 @@
+"""
+Email renderer — delegates to the React Email microservice.
+Drop-in replacement for the old Jinja2 renderer.
+Interface is identical: render_email_template(template_name, **context) -> str
+"""
 import logging
-import os
+from typing import Any
 
-from jinja2 import Environment, FileSystemLoader, TemplateNotFound, select_autoescape
+import httpx
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# 1. Absolute paths so templates resolve on any cwd
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-# templates/ next to this module
-TEMPLATE_DIR = os.path.join(CURRENT_DIR, "templates")
 
-# 2. Single shared Jinja environment
-# trim_blocks / lstrip_blocks keep HTML compact
-env = Environment(
-    loader=FileSystemLoader(TEMPLATE_DIR),
-    autoescape=select_autoescape(["html", "xml"]),
-    trim_blocks=True,
-    lstrip_blocks=True,
-)
-
-
-def render_email_template(template_name: str, **context) -> str:
-    """Loads an HTML template file and renders it with the given context."""
+def render_email_template(template_name: str, **context: Any) -> str:
+    """
+    Calls the React Email renderer service and returns an HTML string.
+    Returns "" on any error (same behaviour as old Jinja2 renderer).
+    """
     try:
-        # Relative paths like 'driver/new_ride.html'
-        template = env.get_template(template_name)
-        return template.render(**context)
+        response = httpx.post(
+            f"{settings.EMAIL_RENDERER_URL.rstrip('/')}/render",
+            json={"template": template_name, "props": context},
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        html = response.json().get("html", "")
+        if not html:
+            logger.error("[email-renderer] Empty HTML returned for template=%s", template_name)
+        return html
 
-    except TemplateNotFound:
-        # Loud log — missing template is a deploy/config issue
-        logger.error(f"❌ Template not found: {template_name} | Searched in: {TEMPLATE_DIR}")
-        return ""  # Safer to skip send than ship broken HTML
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            "[email-renderer] HTTP %s for template=%s: %s",
+            e.response.status_code,
+            template_name,
+            e.response.text,
+        )
+        return ""
 
     except Exception as e:
-        logger.error(f"❌ Rendering error for {template_name}: {e!s}")
+        logger.error(
+            "[email-renderer] Failed to render template=%s: %s",
+            template_name,
+            e,
+            exc_info=True,
+        )
         return ""

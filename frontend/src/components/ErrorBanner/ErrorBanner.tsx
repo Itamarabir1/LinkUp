@@ -3,16 +3,16 @@ import styles from './ErrorBanner.module.css';
 
 export interface ErrorBannerProps {
   message: string;
-  /** תוכן נוסף אחרי ההודעה (למשל קישור) */
+  /** Optional trailing content after message (e.g. a link). */
   children?: ReactNode;
-  /** default = קופסה מלאה; compact = שורה צרה (העתקה, מפה, כרטיס) */
+  /** default = full banner; compact = narrow row (copy/map/card). */
   variant?: 'default' | 'compact';
-  /** תפקיד ל-a11y */
+  /** ARIA role for accessibility semantics. */
   role?: 'alert' | 'status';
   className?: string;
 }
 
-/** הודעת שגיאה אחידה לדפים */
+/** Shared, reusable error banner for pages/components. */
 export default function ErrorBanner({
   message,
   children,

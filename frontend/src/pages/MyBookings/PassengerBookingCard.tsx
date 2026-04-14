@@ -1,4 +1,5 @@
 import { formatRideDate } from '../../utils/date';
+import { useTranslation } from 'react-i18next';
 import { STATUS_LABEL } from './myBookings.constants';
 import { canPassengerShare, getSource } from './myBookings.utils';
 import type { PassengerBookingItem } from './myBookings.types';
@@ -37,6 +38,7 @@ export default function PassengerBookingCard({
   chatLoading,
   handlers,
 }: PassengerBookingCardProps) {
+  const { t } = useTranslation(['bookings', 'common']);
   const { ride, bookingId, bookingStatus, driverName } = item;
   const cardClass = [
     styles.bookingCard,
@@ -70,7 +72,7 @@ export default function PassengerBookingCard({
         </div>
         {driverName ? (
           <div className={styles.cardDriverRow}>
-            נהג: {driverName}
+            {t('bookings:driver')} {driverName}
           </div>
         ) : null}
       </div>
@@ -90,14 +92,14 @@ export default function PassengerBookingCard({
                   )
                 }
               >
-                {sharingLocationBookingId === bookingId ? 'הפסק שיתוף' : 'שתף מיקום'}
+                {sharingLocationBookingId === bookingId ? t('bookings:stopSharing') : t('bookings:shareLocation')}
               </button>
               <button
                 type="button"
                 className={`${styles.btnOutline} ${styles.btnAccentBlue}`}
                 onClick={() => handlers.onTrackDriver(bookingId)}
               >
-                מפה
+                {t('bookings:openMap')}
               </button>
               <button
                 type="button"
@@ -105,7 +107,7 @@ export default function PassengerBookingCard({
                 onClick={() => handlers.onOpenChat(bookingId)}
                 disabled={chatLoading === bookingId}
               >
-                צ&apos;אט
+                {t('bookings:chat')}
               </button>
               <button
                 type="button"
@@ -113,7 +115,7 @@ export default function PassengerBookingCard({
                 onClick={() => handlers.onCancelBooking(bookingId)}
                 disabled={cancelling}
               >
-                בטל
+                {t('bookings:cancel')}
               </button>
             </>
           ) : (
@@ -124,7 +126,7 @@ export default function PassengerBookingCard({
                 onClick={() => handlers.onOpenChat(bookingId)}
                 disabled={chatLoading === bookingId}
               >
-                צ&apos;אט
+                {t('bookings:chat')}
               </button>
               <button
                 type="button"
@@ -132,7 +134,7 @@ export default function PassengerBookingCard({
                 onClick={() => handlers.onCancelBooking(bookingId)}
                 disabled={cancelling}
               >
-                בטל הזמנה
+                {t('bookings:cancelBooking')}
               </button>
             </>
           )}

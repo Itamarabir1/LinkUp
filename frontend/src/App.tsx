@@ -7,10 +7,12 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { GroupProvider } from './context/GroupContext';
 import { ChatProvider } from './context/ChatContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { LangProvider } from './context/LangContext';
 import Layout from './components/Layout';
 import PageLoading from './components/PageLoading';
 import styles from './App.module.css';
 import { AdminRoute } from './features/admin';
+import LangToggle from './components/LangToggle/LangToggle';
 
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
@@ -122,15 +124,18 @@ export default function App() {
   return (
     <BrowserRouter>
       <ThemeProvider>
-        <AuthProvider>
-          <GroupProvider>
-            <ChatProvider>
-              <ThemeToggle />
-              <AppRoutes />
-              <NotificationToast />
-            </ChatProvider>
-          </GroupProvider>
-        </AuthProvider>
+        <LangProvider>
+          <AuthProvider>
+            <GroupProvider>
+              <ChatProvider>
+                <ThemeToggle />
+                <LangToggle />
+                <AppRoutes />
+                <NotificationToast />
+              </ChatProvider>
+            </GroupProvider>
+          </AuthProvider>
+        </LangProvider>
       </ThemeProvider>
     </BrowserRouter>
   );

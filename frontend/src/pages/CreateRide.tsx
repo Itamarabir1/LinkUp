@@ -1,12 +1,14 @@
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { he } from 'date-fns/locale';
+import { enUS, he } from 'date-fns/locale';
 import { forwardRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { formatDurationMinutes } from '../utils/duration';
 import { MapPin, ArrowUpDown, ChevronRight, Map, Calendar } from 'lucide-react';
 import LoadingButton from '../components/LoadingButton';
 import RouteMapModal from '../components/RouteMapModal';
 import { useGroup } from '../context/GroupContext';
+import { useLang } from '../context/LangContext';
 import { useCreateRide } from './useCreateRide';
 import styles from './CreateRide.module.css';
 
@@ -23,7 +25,7 @@ const DateTrigger = forwardRef<HTMLButtonElement, DateTriggerProps>(
       ref={ref}
       onClick={onClick}
       className={styles.datetimeTrigger}
-      aria-label={`שנה תאריך ושעה: ${displayText}`}
+      aria-label={displayText}
     >
       <Calendar size={14} strokeWidth={2} className={styles.datetimeIcon} />
       <span>{displayText}</span>
@@ -31,7 +33,7 @@ const DateTrigger = forwardRef<HTMLButtonElement, DateTriggerProps>(
   )
 );
 
-function StepIndicator({ step }: { step: 1 | 2 }) {
+function StepIndicator({ step, step1Label, step2Label }: { step: 1 | 2; step1Label: string; step2Label: string }) {
   return (
     <div className={styles.stepsRow}>
       <div className={styles.stepItem}>
@@ -39,7 +41,7 @@ function StepIndicator({ step }: { step: 1 | 2 }) {
           {step === 1 ? '1' : '✓'}
         </div>
         <span className={`${styles.stepLabel} ${step === 1 ? styles.active : styles.idle}`}>
-          פרטי הנסיעה
+          {step1Label}
         </span>
       </div>
       <div className={`${styles.stepLine} ${step === 2 ? styles.done : ''}`} />
@@ -48,7 +50,7 @@ function StepIndicator({ step }: { step: 1 | 2 }) {
           2
         </div>
         <span className={`${styles.stepLabel} ${step === 2 ? styles.active : styles.idle}`}>
-          בחר מסלול
+          {step2Label}
         </span>
       </div>
     </div>
@@ -56,6 +58,8 @@ function StepIndicator({ step }: { step: 1 | 2 }) {
 }
 
 export default function CreateRide() {
+  const { lang } = useLang();
+  const { t } = useTranslation(['rides', 'common']);
   const { myGroups } = useGroup();
   const {
     groupId, originName, setOriginName, destinationName, setDestinationName,
@@ -73,23 +77,24 @@ export default function CreateRide() {
   const currentStep: 1 | 2 = hasPreview ? 2 : 1;
 
   const formatDateDisplay = (date: Date) => {
+    const locale = lang === 'en' ? 'en-US' : 'he-IL';
     const now = new Date();
     const tomorrow = new Date();
     tomorrow.setDate(now.getDate() + 1);
-    const timeStr = date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-    if (date.toDateString() === now.toDateString()) return `היום, ${timeStr}`;
-    if (date.toDateString() === tomorrow.toDateString()) return `מחר, ${timeStr}`;
-    return date.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' }) + `, ${timeStr}`;
+    const timeStr = date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    if (date.toDateString() === now.toDateString()) return `${t('common:today')}, ${timeStr}`;
+    if (date.toDateString() === tomorrow.toDateString()) return `${t('common:tomorrow')}, ${timeStr}`;
+    return date.toLocaleDateString(locale, { day: 'numeric', month: 'short' }) + `, ${timeStr}`;
   };
 
   return (
     <div className={styles.page}>
       <a href={groupId ? `/groups/${groupId}` : '/my-rides'} className={styles.backLink}>
         <ChevronRight size={14} />
-        {groupId ? 'חזור לקבוצה' : 'הנסיעות שלי'}
+        {groupId ? t('rides:backToGroup') : t('rides:backToRides')}
       </a>
 
-      <StepIndicator step={currentStep} />
+      <StepIndicator step={currentStep} step1Label={t('rides:step1Label')} step2Label={t('rides:step2Label')} />
 
       {!hasPreview && (
         <>
@@ -97,12 +102,12 @@ export default function CreateRide() {
             {activeGroupName && (
               <div className={styles.groupPill}>
                 <span className={styles.groupPillDot} />
-                נוסע בשם קבוצה: {activeGroupName}
+                {t('rides:groupContext', { name: activeGroupName })}
               </div>
             )}
-            <h1 className={styles.pageTitle}>לאן אתה נוסע?</h1>
+            <h1 className={styles.pageTitle}>{t('rides:whereAreYouGoing')}</h1>
             <p className={styles.pageMeta}>
-              הזן מסלול, מספר מושבים ושעת יציאה — ונמצא את הנתיב הטוב ביותר
+              {t('rides:fillRouteAndTime')}
             </p>
           </div>
 
@@ -116,19 +121,19 @@ export default function CreateRide() {
                     <MapPin size={15} strokeWidth={2.5} />
                   </div>
                   <div className={styles.fieldContent}>
-                    <div className={styles.fieldLabel}>מוצא</div>
-                    <input type="text" className={styles.formInput} placeholder="כתובת איסוף..."
+                    <div className={styles.fieldLabel}>{t('rides:origin')}</div>
+                    <input type="text" className={styles.formInput} placeholder={t('rides:originPlaceholder')}
                       value={originName} onChange={(e) => setOriginName(e.target.value)} autoComplete="off" />
                   </div>
                   <button type="button" className={styles.gpsBtn}
-                    onClick={fillOriginFromMyLocation} disabled={locationLoading} title="מיקום נוכחי">
+                    onClick={fillOriginFromMyLocation} disabled={locationLoading} title={t('rides:myLocation')}>
                     {locationLoading ? '...' : 'GPS'}
                   </button>
                 </div>
 
                 <div className={styles.fieldDivider}>
                   <div className={styles.swapWrap}>
-                    <button type="button" className={styles.swapBtn} onClick={handleSwap} aria-label="החלף כיוון">
+                    <button type="button" className={styles.swapBtn} onClick={handleSwap} aria-label={t('rides:swapDirection')}>
                       <ArrowUpDown size={13} strokeWidth={2} />
                     </button>
                   </div>
@@ -139,8 +144,8 @@ export default function CreateRide() {
                     <MapPin size={15} strokeWidth={2} />
                   </div>
                   <div className={styles.fieldContent}>
-                    <div className={styles.fieldLabel}>יעד</div>
-                    <input type="text" className={styles.formInput} placeholder="לאן אתה הולך?"
+                    <div className={styles.fieldLabel}>{t('rides:destination')}</div>
+                    <input type="text" className={styles.formInput} placeholder={t('rides:destinationPlaceholder')}
                       value={destinationName} onChange={(e) => setDestinationName(e.target.value)} autoComplete="off" />
                   </div>
                 </div>
@@ -148,7 +153,7 @@ export default function CreateRide() {
 
               <div className={styles.metaRow}>
                 <div className={styles.metaField}>
-                  <div className={styles.metaLabel}>מושבים פנויים</div>
+                  <div className={styles.metaLabel}>{t('rides:availableSeats')}</div>
                   <div className={styles.metaValue}>
                     <div className={styles.seatsControl}>
                       <button type="button" className={styles.seatBtn}
@@ -157,17 +162,17 @@ export default function CreateRide() {
                       <button type="button" className={styles.seatBtn}
                         onClick={() => setSeats((s) => Math.min(8, s + 1))} disabled={seats >= 8}>+</button>
                     </div>
-                    <span className={styles.seatsUnit}>נוסעים</span>
+                    <span className={styles.seatsUnit}>{t('rides:passengers')}</span>
                   </div>
                 </div>
 
                 <div className={styles.metaField}>
-                  <div className={styles.metaLabel}>תאריך ושעה</div>
+                  <div className={styles.metaLabel}>{t('rides:departureTime')}</div>
                   <DatePicker
                     selected={selectedDate}
                     onChange={(date: Date | null) => date && setSelectedDate(date)}
                     showTimeSelect timeFormat="HH:mm" timeIntervals={15}
-                    dateFormat="dd/MM/yyyy HH:mm" locale={he} minDate={new Date()}
+                    dateFormat="dd/MM/yyyy HH:mm" locale={lang === 'en' ? enUS : he} minDate={new Date()}
                     wrapperClassName={styles.datetimeWrapper}
                     customInput={<DateTrigger displayText={formatDateDisplay(selectedDate)} />}
                   />
@@ -175,8 +180,8 @@ export default function CreateRide() {
               </div>
 
               <LoadingButton type="submit" className={`${styles.btn} ${styles.btnPrimary}`}
-                loading={loading} loadingLabel="מחשב מסלולים...">
-                תצוגה מקדימה
+                loading={loading} loadingLabel={t('rides:calculatingRoutes')}>
+                {t('rides:previewButton')}
               </LoadingButton>
             </div>
           </form>
@@ -184,19 +189,19 @@ export default function CreateRide() {
       )}
 
       {preview && (preview.routes?.length ?? 0) === 0 && (
-        <p className={styles.routesEmptyHint}>לא נמצאו מסלולים. נסה מוצא/יעד אחרים.</p>
+        <p className={styles.routesEmptyHint}>{t('rides:noRoutes')}</p>
       )}
 
       {hasPreview && (
         <>
           <div className={styles.pageHeader}>
-            <h1 className={styles.pageTitle}>בחר מסלול</h1>
-            <p className={styles.pageMeta}>נמצאו {preview.routes!.length} מסלולים — בחר את הנתיב המועדף עליך</p>
+            <h1 className={styles.pageTitle}>{t('rides:selectRoute')}</h1>
+            <p className={styles.pageMeta}>{t('rides:ridesFound', { count: preview.routes!.length })}</p>
           </div>
 
           {error ? <div className={styles.pageError}>{error}</div> : null}
 
-          <div className={styles.sectionLabel}>מסלולים זמינים</div>
+          <div className={styles.sectionLabel}>{t('rides:availableRoutes')}</div>
 
           <div className={styles.routeOptions}>
             {preview.routes!.map((route, idx) => (
@@ -206,18 +211,18 @@ export default function CreateRide() {
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedRouteIndex(route.route_index); } }}>
                 <div className={styles.routeOptionContent}>
                   <div className={styles.cardRoute}>
-                    מסלול {route.route_index + 1}{route.summary ? ` — ${route.summary}` : ''}
+                    {t('rides:routeNumber', { number: route.route_index + 1 })}{route.summary ? ` — ${route.summary}` : ''}
                   </div>
                   <div className={styles.cardMeta}>
-                    <span>{route.distance_km ?? 0} ק"מ</span>
+                    <span>{route.distance_km ?? 0} {t('rides:km')}</span>
                     <span className={styles.routeMetaDot} />
                     <span>{formatDurationMinutes(route.duration_min ?? 0)}</span>
-                    {idx === 0 && (<><span className={styles.routeMetaDot} /><span className={styles.routeFastest}>מהיר ביותר</span></>)}
+                    {idx === 0 && (<><span className={styles.routeMetaDot} /><span className={styles.routeFastest}>{t('rides:fastestRoute')}</span></>)}
                   </div>
                 </div>
                 <button type="button" className={styles.btnRouteMap}
                   onClick={(e) => { e.stopPropagation(); setMapPreviewData({ originCoords: preview.origin_coords, destinationCoords: preview.destination_coords, routeCoords: route.coords ?? [], summary: route.summary || '' }); }}>
-                  <Map size={12} style={{ display: 'inline', marginLeft: 4 }} />מפה
+                  <Map size={12} style={{ display: 'inline', marginLeft: 4 }} />{t('rides:map')}
                 </button>
                 <div className={styles.routeSelIndicator}>
                   {selectedRouteIndex === route.route_index && (
@@ -228,13 +233,13 @@ export default function CreateRide() {
             ))}
           </div>
 
-          <p className={styles.routeHint}>לחץ על מסלול לבחירה · לחץ "מפה" לצפייה בנתיב</p>
+          <p className={styles.routeHint}>{t('rides:routeHint')}</p>
 
           <RouteMapModal data={mapPreviewData} onClose={() => setMapPreviewData(null)} />
 
           <LoadingButton type="button" className={`${styles.btn} ${styles.btnSuccess}`}
-            loading={creating} loadingLabel="יוצר נסיעה..." onClick={createRide}>
-            צור נסיעה עם המסלול הנבחר
+            loading={creating} loadingLabel={t('rides:creatingRide')} onClick={createRide}>
+            {t('rides:createButton')}
           </LoadingButton>
         </>
       )}

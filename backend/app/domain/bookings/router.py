@@ -95,7 +95,7 @@ async def get_driver_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Aggregated driver rides + passengers (single query); must stay before /{booking_id}."""
+    """Driver rides with embedded passengers — replaces N+1 fetchRideManifest loop."""
     return await BookingService.get_driver_summary(db, current_user.user_id)
 
 
@@ -104,7 +104,7 @@ async def get_passenger_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Passenger bookings with ride + driver (single query); must stay before /{booking_id}."""
+    """Passenger bookings with embedded ride + driver — replaces N+1 fetchRideById loop."""
     return await BookingService.get_passenger_summary(db, current_user.user_id)
 
 

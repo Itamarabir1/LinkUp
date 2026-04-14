@@ -14,6 +14,16 @@ For production, use Docker (see root `docker-compose.yml`).
 
 **Push (FCM):** ב־Compose קובץ השירות של Firebase נטען מ־volume לנתיב בקונטיינר; הגדר `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env` (גם ל־`outbox-worker`) — פירוט ב־`docs/FCM_SYSTEM_SUMMARY.md` וב־README בשורש.
 
+## Email rendering architecture
+
+- Email HTML rendering now runs through a dedicated **Node.js + Express + React Email** service in `../email-renderer/`.
+- Backend/outbox-worker call [`app/domain/notifications/channels/email/renderer.py`](app/domain/notifications/channels/email/renderer.py), which delegates to:
+  - `POST {EMAIL_RENDERER_URL}/render` with `{ template, props }`
+- Configure endpoint in `backend/.env`:
+  - `EMAIL_RENDERER_URL=http://email-renderer:3001`
+- Template names are mapped in [`app/domain/notifications/config/templates_map/email_conf.py`](app/domain/notifications/config/templates_map/email_conf.py) as **PascalCase** registry keys (not Jinja paths).
+- Compose runtime expects `email-renderer` healthy before `backend`/`outbox-worker` start.
+
 ## Environment
 
 Copy `.env.example` to `.env` and set your values. See root README for full setup.
@@ -50,6 +60,7 @@ Endpoints for operators only: FastAPI dependency **`get_current_admin_user`** (`
 - **`GET /api/v1/bookings/passenger-summary`** (auth): all bookings for the current passenger with ride, **driver**, and **group** in **one** query — `get_passenger_bookings_with_rides`.
 - **Shared manifest mapping:** `BookingService._booking_to_manifest_item` feeds both the per-ride manifest endpoint and driver-summary passengers.
 - **GPS REST:** `BookingService.broadcast_driver_location` / `broadcast_passenger_location` centralize permission checks; routers delegate only.
+- **Frontend contract:** web client consumes these endpoints via `fetchDriverSummary` / `fetchPassengerSummary` and maps payloads in `frontend/src/pages/MyBookings/myBookings.mappers.ts` to keep transport DTOs decoupled from UI view models.
 
 See `docs/architecture/API.md` and `docs/architecture/DATABASE.md`.
 

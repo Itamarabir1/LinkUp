@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { confirmGroupImage, getGroupImageUploadUrl, updateGroup } from '../../api/groups';
 import type { Group } from '../../types/api';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { apiErr } from '../../utils/i18nError';
 import { GROUP_AVATAR_COLORS } from './groupManage.constants';
 
 /**
@@ -70,7 +71,7 @@ export function useGroupManageHeader(
       await confirmGroupImage(groupId, key);
       await refreshGroups();
     } catch (err) {
-      setError(getApiErrorMessage(err, 'שמירת השינויים נכשלה'));
+      setError(getApiErrorMessage(err, apiErr('err_save_group_header')));
     } finally {
       setHeaderSaving(false);
     }
@@ -91,7 +92,7 @@ export function useGroupManageHeader(
       await refreshGroups();
       setIsEditingName(false);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'שמירת השינויים נכשלה'));
+      setError(getApiErrorMessage(err, apiErr('err_save_group_header')));
     } finally {
       setHeaderSaving(false);
     }
@@ -108,7 +109,7 @@ export function useGroupManageHeader(
       await refreshGroups();
       setIsEditingDesc(false);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'שמירת השינויים נכשלה'));
+      setError(getApiErrorMessage(err, apiErr('err_save_group_header')));
     } finally {
       setHeaderSaving(false);
     }

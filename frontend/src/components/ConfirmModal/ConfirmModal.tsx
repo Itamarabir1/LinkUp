@@ -37,7 +37,7 @@ export default function ConfirmModal({
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  /** החזרת פוקוס כשסוגרים (לא תלוי ב-loading) */
+  /** Restores focus on close (independent of loading state). */
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -46,7 +46,7 @@ export default function ConfirmModal({
     };
   }, [open]);
 
-  /** מיקוד ראשוני / אחרי שינוי מצב loading */
+  /** Initial focus and refocus after loading-state changes. */
   useEffect(() => {
     if (!open) return;
     const id = requestAnimationFrame(() => {
@@ -69,7 +69,7 @@ export default function ConfirmModal({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [open, loading, onClose]);
 
-  /** לכידת Tab בתוך המודאל */
+  /** Traps Tab navigation inside the modal. */
   useEffect(() => {
     if (!open) return;
     const panel = panelRef.current;

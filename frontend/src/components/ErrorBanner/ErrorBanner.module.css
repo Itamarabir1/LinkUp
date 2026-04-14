@@ -9,7 +9,7 @@
   text-align: right;
 }
 
-/** שורת שגיאה צרה (הזמנה, סרגל מפה, כרטיס חיפוש) */
+/** Compact single-line error row (booking, map bar, search card). */
 .compact {
   margin: 0;
   padding: 0.35rem 0.55rem;

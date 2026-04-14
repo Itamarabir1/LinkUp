@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { Group } from '../../types/api';
 
-/** קישור הזמנה והעתקה ללוח */
+/** Invite-link creation and clipboard copy flow. */
 export function useGroupManageInvite(group: Group | null) {
   const [, setCopyInviteDone] = useState(false);
   const [copyInviteError, setCopyInviteError] = useState<string | null>(null);

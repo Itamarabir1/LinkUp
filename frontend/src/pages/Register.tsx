@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import type { RegisterData } from '../context/AuthContext';
 import ErrorBanner from '../components/ErrorBanner';
@@ -8,6 +9,7 @@ import { getApiErrorMessage } from '../utils/apiError';
 import styles from './Register.module.css';
 
 export default function Register() {
+  const { t } = useTranslation('auth');
   const [form, setForm] = useState<RegisterData>({
     full_name: '',
     email: '',
@@ -29,15 +31,15 @@ export default function Register() {
       !form.password ||
       !form.confirm_password
     ) {
-      setError('נא למלא את כל השדות');
+      setError(t('error_fill_all'));
       return;
     }
     if (form.password !== form.confirm_password) {
-      setError('הסיסמאות אינן תואמות');
+      setError(t('error_passwords_mismatch'));
       return;
     }
     if (form.password.length < 8) {
-      setError('הסיסמה: לפחות 8 תווים, אות גדולה, אות קטנה, מספר ותו מיוחד (@$!%*?&)');
+      setError(t('error_password_too_short'));
       return;
     }
     setError('');
@@ -51,7 +53,7 @@ export default function Register() {
       });
       navigate('/verify-email', { replace: true, state: { email: form.email.trim() } });
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'הרשמה נכשלה'));
+      setError(getApiErrorMessage(err, t('error_register_failed')));
     } finally {
       setLoading(false);
     }
@@ -79,20 +81,20 @@ export default function Register() {
           </div>
         </div>
 
-        <h1 className={styles.title}>יצירת חשבון</h1>
-        <p className={styles.subtitle}>הצטרף ל-Linkup והתחל לנסוע</p>
+        <h1 className={styles.title}>{t('registerTitle')}</h1>
+        <p className={styles.subtitle}>{t('registerSubtitle')}</p>
 
         <form onSubmit={handleSubmit} className={styles.form}>
           {error ? <ErrorBanner message={error} className={styles.error} /> : null}
 
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="reg-name">
-              שם מלא
+              {t('fullName')}
             </label>
             <input
               id="reg-name"
               type="text"
-              placeholder="שם מלא"
+              placeholder={t('fullNamePlaceholder')}
               value={form.full_name}
               onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
               className={styles.input}
@@ -102,7 +104,7 @@ export default function Register() {
 
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="reg-email">
-              אימייל
+              {t('email')}
             </label>
             <input
               id="reg-email"
@@ -117,12 +119,12 @@ export default function Register() {
 
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="reg-phone">
-              טלפון
+              {t('phone')}
             </label>
             <input
               id="reg-phone"
               type="tel"
-              placeholder="למשל 0501234567 או +972501234567"
+              placeholder={t('phonePlaceholder')}
               value={form.phone_number}
               onChange={(e) => setForm((f) => ({ ...f, phone_number: e.target.value }))}
               className={styles.input}
@@ -132,30 +134,30 @@ export default function Register() {
 
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="reg-password">
-              סיסמה
+              {t('password')}
             </label>
             <input
               id="reg-password"
               type="password"
-              placeholder="לפחות 8 תווים"
+              placeholder={t('passwordPlaceholder')}
               value={form.password}
               onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
               className={styles.input}
               autoComplete="new-password"
             />
             <span className={styles.fieldHint}>
-              חייב לכלול אות גדולה, קטנה, מספר ותו מיוחד (@$!%*?&)
+              {t('passwordHint')}
             </span>
           </div>
 
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="reg-confirm">
-              אימות סיסמה
+              {t('confirmPassword')}
             </label>
             <input
               id="reg-confirm"
               type="password"
-              placeholder="הזן שוב את הסיסמה"
+              placeholder={t('confirmPasswordPlaceholder')}
               value={form.confirm_password}
               onChange={(e) => setForm((f) => ({ ...f, confirm_password: e.target.value }))}
               className={styles.input}
@@ -167,15 +169,15 @@ export default function Register() {
             type="submit"
             className={styles.button}
             loading={loading}
-            loadingLabel="נרשם..."
+            loadingLabel={t('registering')}
           >
-            צור חשבון
+            {t('register')}
           </LoadingButton>
         </form>
 
         <p className={styles.link}>
           <Link to="/login">
-            כבר יש חשבון? <strong>התחבר</strong>
+            {t('alreadyHaveAccount')} <strong>{t('signIn')}</strong>
           </Link>
         </p>
       </div>

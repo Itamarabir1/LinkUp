@@ -1,0 +1,20 @@
+.button {
+  position: fixed;
+  inset-block-end: 18px;
+  inset-inline-start: 18px;
+  z-index: 1200;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-family: "DM Mono", "DM Sans", monospace;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.button:hover {
+  background: var(--bg-secondary);
+}

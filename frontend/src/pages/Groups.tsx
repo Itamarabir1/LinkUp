@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Users, Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useGroup } from '../context/GroupContext';
 import ErrorBanner from '../components/ErrorBanner';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +20,7 @@ function getAvatarStyle(index: number) {
 }
 
 export default function Groups() {
+  const { t } = useTranslation(['groups', 'common']);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { myGroups, isLoadingGroups, groupsError } = useGroup();
@@ -28,7 +30,7 @@ export default function Groups() {
   if (isLoadingGroups) {
     return (
       <div className={styles.page}>
-        <div className={styles.pageLoading}>טוען...</div>
+        <div className={styles.pageLoading}>{t('common:loading')}</div>
       </div>
     );
   }
@@ -37,22 +39,21 @@ export default function Groups() {
     <div className={styles.page}>
       {groupsError ? <ErrorBanner message={groupsError} /> : null}
       <header className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>הקבוצות שלי</h1>
         <button
           type="button"
           className={styles.btnPrimary}
           onClick={handleCreateGroup}
         >
           <Plus size={14} />
-          צור קבוצה
+          {t('groups:createGroup')}
         </button>
       </header>
 
       {myGroups.length === 0 ? (
         <div className={styles.emptyState}>
           <Users size={48} strokeWidth={1.5} className={styles.emptyIcon} />
-          <h2 className={styles.emptyTitle}>אין קבוצות עדיין</h2>
-          <p className={styles.emptySubtitle}>צור קבוצה או הצטרף לאחת</p>
+          <h2 className={styles.emptyTitle}>{t('groups:noGroupsYet')}</h2>
+          <p className={styles.emptySubtitle}>{t('groups:createOrJoin')}</p>
         </div>
       ) : (
         <div className={styles.grid}>
@@ -100,7 +101,7 @@ export default function Groups() {
                       {g.name}
                     </button>
                     <span className={styles.memberCount}>
-                      {g.member_count ?? 0} חברים
+                      {t('groups:membersLabel', { count: g.member_count ?? 0 })}
                     </span>
                   </div>
                 </div>
@@ -109,9 +110,9 @@ export default function Groups() {
                 )}
                 <div className={styles.cardFooter}>
                   {isAdmin && (
-                    <span className={styles.badgeAdmin}>מנהל</span>
+                    <span className={styles.badgeAdmin}>{t('groups:admin')}</span>
                   )}
-                  <span className={styles.badgeType}>פרטית</span>
+                  <span className={styles.badgeType}>{t('groups:privateGroup')}</span>
                 </div>
               </article>
             );

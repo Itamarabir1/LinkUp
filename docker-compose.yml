@@ -59,6 +59,25 @@ services:
     networks:
       - linkup_network
 
+  # --- Email Renderer: React Email (Node) ---
+  email-renderer:
+    build:
+      context: ./email-renderer
+      target: production
+    container_name: linkup_email_renderer
+    restart: unless-stopped
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - linkup_network
+
   # --- DB Migration — רץ פעם אחת לפני backend ו-outbox-worker ---
   migrate:
     build:
@@ -99,6 +118,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      email-renderer:
+        condition: service_healthy
     networks:
       - linkup_network
     restart: unless-stopped
@@ -131,6 +152,8 @@ services:
       redis:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      email-renderer:
         condition: service_healthy
     healthcheck:
       test:

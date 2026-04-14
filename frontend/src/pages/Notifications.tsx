@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   CheckCircle,
   XCircle,
@@ -14,12 +15,14 @@ import { useAuth } from '../context/AuthContext';
 import { useChat, getNotificationItemKey } from '../context/ChatContext';
 import { api } from '../api/client';
 import type { NotificationItem } from '../types/api';
-import { formatRelativeNotificationTime } from '../utils/date';
+import { formatMonthYearLong, formatRelativeNotificationTime, formatWeekdayLong } from '../utils/date';
+import { getApiErrorMessage } from '../utils/apiError';
+import { apiErr } from '../utils/i18nError';
 import styles from './Notifications.module.css';
 
 type DisplayType = 'booking_approved' | 'booking_rejected' | 'ride_cancelled' | 'booking_request' | 'booking_cancelled_by_passenger' | 'group_joined' | 'group_member_joined' | 'pending_approval' | 'default';
 
-/** מיפוי type מהבקאנד לסוג תצוגה (אייקון + סגנון). */
+/** Maps backend type to display type (icon + style). */
 function getDisplayType(type: string): DisplayType {
   if (type === 'booking_confirmed') return 'booking_approved';
   if (type === 'ride_request') return 'booking_request';
@@ -28,23 +31,9 @@ function getDisplayType(type: string): DisplayType {
   return known.includes(type as DisplayType) ? (type as DisplayType) : 'default';
 }
 
-/** קבוצת זמן: היום, אתמול, השבוע, קודם לכן */
-function getTimeGroup(date: string): string {
-  const d = new Date(date);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diffDays = Math.round((today.getTime() - dayStart.getTime()) / (24 * 60 * 60 * 1000));
-  if (diffDays === 0) return 'היום';
-  if (diffDays === 1) return 'אתמול';
-  if (diffDays >= 2 && diffDays < 7) return 'השבוע';
-  return 'קודם לכן';
-}
-
-const GROUP_ORDER = ['היום', 'אתמול', 'השבוע', 'קודם לכן'];
-
 export default function Notifications() {
   const navigate = useNavigate();
+  const { t } = useTranslation('common');
   const { user } = useAuth();
   const {
     markNotificationRead,
@@ -65,12 +54,29 @@ export default function Notifications() {
       const { data } = await api.get<NotificationItem[]>('/users/me/notifications');
       setList(Array.isArray(data) ? data : []);
       refreshUnreadNotifications();
-    } catch {
-      setError('לא ניתן לטעון את ההתראות');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, apiErr('err_load_notifications')));
     } finally {
       setLoading(false);
     }
   }, [user?.user_id, refreshUnreadNotifications]);
+
+  const getTimeGroup = useCallback(
+    (dateStr: string): string => {
+      const d = new Date(dateStr);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const diffDays = Math.round(
+        (today.getTime() - dayStart.getTime()) / (24 * 60 * 60 * 1000)
+      );
+      if (diffDays === 0) return t('today');
+      if (diffDays === 1) return t('yesterday');
+      if (diffDays >= 2 && diffDays < 7) return formatWeekdayLong(d);
+      return formatMonthYearLong(d);
+    },
+    [t]
+  );
 
   useEffect(() => {
     fetchNotifications();
@@ -85,15 +91,25 @@ export default function Notifications() {
   }, [fetchNotifications]);
 
   const grouped = useCallback(() => {
-    const groups: Record<string, NotificationItem[]> = {};
-    GROUP_ORDER.forEach((g) => { groups[g] = []; });
+    const groups: Record<string, { label: string; date: Date; items: NotificationItem[] }> = {};
+
     list.forEach((n) => {
-      const g = getTimeGroup(n.created_at);
-      if (!groups[g]) groups[g] = [];
-      groups[g].push(n);
+      const label = getTimeGroup(n.created_at);
+      if (!groups[label]) {
+        groups[label] = {
+          label,
+          date: new Date(n.created_at),
+          items: [],
+        };
+      }
+      groups[label].items.push(n);
     });
-    return GROUP_ORDER.filter((g) => groups[g].length > 0).map((g) => ({ label: g, items: groups[g] }));
-  }, [list]);
+
+    // Sort groups: most recent first
+    return Object.values(groups).sort(
+      (a, b) => b.date.getTime() - a.date.getTime()
+    );
+  }, [list, getTimeGroup]);
 
   const getNotificationTarget = (type: string): string | null => {
     switch (type) {
@@ -150,37 +166,34 @@ export default function Notifications() {
   if (loading) {
     return (
       <div className={styles.page}>
-        <h1 className={styles.pageTitle}>התראות</h1>
-        <p className={styles.pageLoading}>טוען...</p>
+        <p className={styles.pageLoading}>{t('loading')}</p>
       </div>
     );
   }
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <h1 className={styles.pageTitle}>התראות</h1>
-        {unreadNotifications > 0 && (
-          <button
-            type="button"
-            className={styles.markAllRead}
-            onClick={() => markAllNotificationsRead()}
-          >
-            סמן הכל כנקרא
-          </button>
-        )}
-      </header>
-
       {error && <p className={styles.pageError}>{error}</p>}
 
       {list.length === 0 ? (
         <div className={styles.empty}>
           <Bell size={48} strokeWidth={1.5} className={styles.emptyIcon} />
-          <p className={styles.emptyTitle}>אין התראות חדשות</p>
-          <p className={styles.emptySub}>כשיהיו פעילויות חדשות, הן יופיעו כאן</p>
+          <p className={styles.emptyTitle}>{t('notif_empty_title')}</p>
+          <p className={styles.emptySub}>{t('notif_empty_sub')}</p>
         </div>
       ) : (
         <div className={styles.groups}>
+          {list.length > 0 && unreadNotifications > 0 && (
+            <div className={styles.markAllWrap}>
+              <button
+                type="button"
+                className={styles.markAllRead}
+                onClick={() => markAllNotificationsRead()}
+              >
+                {t('notif_mark_all_read')}
+              </button>
+            </div>
+          )}
           {grouped().map(({ label, items }) => (
             <div key={label} className={styles.group}>
               <h2 className={styles.groupTitle}>{label}</h2>

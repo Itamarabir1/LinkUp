@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import GoogleSignIn from '../components/GoogleSignIn/GoogleSignIn.tsx';
 import ErrorBanner from '../components/ErrorBanner';
@@ -9,6 +10,7 @@ import { getApiErrorMessage, isTimeoutOrAbortError } from '../utils/apiError';
 import styles from './Login.module.css';
 
 export default function Login() {
+  const { t } = useTranslation('auth');
   const location = useLocation();
   const state = location.state as {
     email?: string;
@@ -26,7 +28,7 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) {
-      setError('נא למלא אימייל וסיסמה');
+      setError(t('error_email_password'));
       return;
     }
     setError('');
@@ -50,7 +52,7 @@ export default function Login() {
         setError(ERROR_MESSAGES.BACKEND_TIMEOUT);
         return;
       }
-      setError(getApiErrorMessage(err, 'התחברות נכשלה'));
+      setError(getApiErrorMessage(err, t('error_login_failed')));
     } finally {
       setLoading(false);
     }
@@ -78,11 +80,11 @@ export default function Login() {
           </div>
         </div>
 
-        <h1 className={styles.title}>ברוך הבא</h1>
-        <p className={styles.subtitle}>התחבר לחשבון שלך כדי להמשיך</p>
+        <h1 className={styles.title}>{t('welcomeBack')}</h1>
+        <p className={styles.subtitle}>{t('loginSubtitle')}</p>
 
         {verifiedMessage ? (
-          <p className={styles.verifiedBanner}>✓ האימייל אומת בהצלחה. התחבר כעת.</p>
+          <p className={styles.verifiedBanner}>✓ {t('emailVerified')}</p>
         ) : null}
 
         <form onSubmit={handleLogin} className={styles.form}>
@@ -90,7 +92,7 @@ export default function Login() {
 
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="login-email">
-              אימייל
+              {t('email')}
             </label>
             <input
               id="login-email"
@@ -105,12 +107,12 @@ export default function Login() {
 
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="login-password">
-              סיסמה
+              {t('password')}
             </label>
             <input
               id="login-password"
               type="password"
-              placeholder="הסיסמה שלך"
+              placeholder={t('passwordPlaceholder')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={styles.input}
@@ -122,22 +124,22 @@ export default function Login() {
             type="submit"
             className={styles.button}
             loading={loading}
-            loadingLabel="מתחבר..."
+            loadingLabel={t('loggingIn')}
           >
-            התחבר
+            {t('login')}
           </LoadingButton>
         </form>
 
         <div className={styles.divider}>
           <div className={styles.dividerLine} aria-hidden />
-          <span className={styles.dividerLabel}>או</span>
+          <span className={styles.dividerLabel}>{t('orContinueWith')}</span>
         </div>
 
         <GoogleSignIn onError={setError} disabled={loading} />
 
         <p className={styles.link}>
           <Link to="/register">
-            אין חשבון? <strong>הירשם</strong>
+            {t('noAccount')} <strong>{t('signUp')}</strong>
           </Link>
         </p>
       </div>

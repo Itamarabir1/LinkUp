@@ -98,6 +98,36 @@
 
 ---
 
+## 10. i18n (עברית + אנגלית)
+
+| | |
+|--|--|
+| **החלטה** | **i18next** + `react-i18next`; משאבים תחת [`frontend/src/i18n/locales/`](../../frontend/src/i18n/locales/) (`he` / `en`), כולל מפתחות **`common:err_*`** לטקסטי שגיאה כלליים. |
+| **למה** | מוצר מקומי עם אפשרות הדגמה/שימוש ב-LTR; מחרוזות UI ושגיאות נשארות מתורגמות גם מחוץ לרכיבי React (hooks) דרך `i18n.t`. |
+| **בקצרה לראיון** | "לא שומרים עברית קשיחה ב-hooks — מפתחות `common` ו-`apiErr`." |
+
+---
+
+## 11. פורמט תאריכים ושעות לפי לוקאל
+
+| | |
+|--|--|
+| **החלטה** | [`getLocale()`](../../frontend/src/utils/date.ts) נגזר מ־`i18n.language` (`he-IL` / `en-US`); פונקציות עזר (`formatTimeHm`, `formatWeekdayLong`, `formatMonthYearLong`, וכו') ל־`toLocaleString` / ICU במקום מחרוזות קשיחות. |
+| **למה** | אותו קוד תומך בשתי השפות בלי לשכפל לוגיקת תצוגה. |
+| **בקצרה לראיון** | "תאריכים עוקבים אחרי שפת הממשק, לא אחרי שפה קבועה בקוד." |
+
+---
+
+## 12. טיפוגרפיה ב-CSS Modules
+
+| | |
+|--|--|
+| **החלטה** | ב־**`*.module.css`** — `font-family: var(--font-primary)` (ולמספרים: `var(--font-numeric)`); **`LangContext`** מגדיר `--font-primary` על הדף לפי שפה. **חריג:** [`LangToggle.module.css`](../../frontend/src/components/LangToggle/LangToggle.module.css) נשאר עם פונט מונוספי לווידג'ט. |
+| **למה** | מקור אמת אחד לפונט גוף; מעבר שפה מעדכן טיפוגרפיה בלי לשכפל fallback של Heebo בכל קובץ. |
+| **בקצרה לראיון** | "טוקן CSS אחד לפונט גוף — בדומה לצבעים ב־`tokens.css`." |
+
+---
+
 ## קישורים
 
 - [README.md](README.md) (מפת ADR)  

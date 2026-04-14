@@ -12,7 +12,7 @@ export interface BookingRow {
   phone?: string;
 }
 
-/** הזמנות שבהן אני נוסע – מבוקינג + פרטי נסיעה + שם נהג */
+/** Passenger-side bookings: booking + ride details + driver name. */
 export interface PassengerBookingItem {
   ride: Ride;
   bookingId: string;
@@ -20,7 +20,7 @@ export interface PassengerBookingItem {
   driverName: string | null;
 }
 
-/** נוסע בנסיעה שלי (כנהג) */
+/** Passenger item within one of my rides (driver view). */
 export interface PassengerInRide {
   bookingId: string;
   passengerName: string;
@@ -28,11 +28,11 @@ export interface PassengerInRide {
   status: string;
   pickupName?: string | null;
   pickupTime?: string | null;
-  /** יעד הבקשה של הנוסע (מ-passenger_request) */
+  /** Passenger-request destination (from passenger_request). */
   dropoffName?: string | null;
 }
 
-/** הזמנות שבהן אני נהג – נסיעה עם כל הנוסעים שלה */
+/** Driver-side bookings: ride with all attached passengers. */
 export interface DriverBookingItem {
   ride: Ride;
   passengers: PassengerInRide[];

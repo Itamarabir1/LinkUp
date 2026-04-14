@@ -37,7 +37,7 @@ export interface Ride {
   distance_km?: number;
   duration_min?: number;
   route_coords?: number[][];
-  /** סיכום המסלול (כביש) – כמו ביצירת הנסיעה */
+  /** Route summary label (road), as in ride creation. */
   route_summary?: string | null;
 }
 
@@ -70,7 +70,7 @@ export interface ConversationDetail {
   };
   created_at: string;
   booking_id?: string;
-  /** אם הבקאנד מחזיר – מוצג בכותרת הצ'אט (למשל מוצא ← יעד) */
+  /** Optional backend summary shown in chat header (e.g. origin ← destination). */
   route_label?: string | null;
 }
 
@@ -141,7 +141,56 @@ export interface Booking {
   phone?: string | null;
 }
 
-/** סוגי התראות לתצוגה ולמיפוי מהבקאנד. */
+export interface BookingManifestPassenger {
+  booking_id: string;
+  passenger_id: string;
+  passenger_name: string;
+  phone: string;
+  whatsapp_link: string | null;
+  num_seats: number;
+  status: string;
+  pickup_name: string | null;
+  pickup_time: string | null;
+  destination_name: string | null;
+}
+
+export interface RideWithPassengers {
+  ride_id: string;
+  origin_name: string | null;
+  destination_name: string | null;
+  departure_time: string;
+  estimated_arrival_time: string | null;
+  available_seats: number;
+  price: number;
+  status: string;
+  group_id: string | null;
+  group_name: string | null;
+  passengers: BookingManifestPassenger[];
+}
+
+export interface DriverSummaryResponse {
+  rides: RideWithPassengers[];
+}
+
+export interface PassengerBookingSummary {
+  booking_id: string;
+  booking_status: string;
+  ride_id: string;
+  origin_name: string | null;
+  destination_name: string | null;
+  departure_time: string;
+  estimated_arrival_time: string | null;
+  ride_status: string;
+  group_id: string | null;
+  group_name: string | null;
+  driver: { full_name: string; phone_number: string | null } | null;
+}
+
+export interface PassengerSummaryResponse {
+  bookings: PassengerBookingSummary[];
+}
+
+/** Notification types used for UI display/mapping. */
 export type NotificationType =
   | 'booking_approved'
   | 'booking_rejected'
@@ -163,7 +212,7 @@ export interface NotificationItem {
   ride_origin: string | null;
   ride_destination: string | null;
   status: string | null;
-  /** אופציונלי — כשהבקאנד יחזיר; לסמן כנקרא. */
+  /** Optional unread flag when provided by backend. */
   id?: string;
   is_read?: boolean;
   action_url?: string;

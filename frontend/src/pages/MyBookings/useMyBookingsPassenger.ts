@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useUserEvent } from '../../hooks/useUserEvent';
-import { cancelPassengerBooking, fetchPassengerBookingSummary } from '../../api/bookings';
+import { apiErr } from '../../utils/i18nError';
+import { cancelPassengerBooking, fetchPassengerSummary } from '../../api/bookings';
 import { getApiErrorMessage } from '../../utils/apiError';
-import type { Ride } from '../../types/api';
 import { useRideWebSocket } from '../../hooks/useRideWebSocket';
 import type { RideEvent } from '../../types/wsEvents';
 import type { PassengerBookingItem } from './myBookings.types';
 import { LIVE_STATUSES } from '../../constants/rideStatuses';
+import { mapPassengerSummaryToItems } from './myBookings.mappers';
 
-/** טעינה וביטול הזמנות במצב נוסע */
+/** Passenger mode: loading and booking cancellation. */
 export function useMyBookingsPassenger(
   userId: string | undefined,
   setError: (message: string) => void
@@ -23,33 +24,10 @@ export function useMyBookingsPassenger(
     setPassengerLoading(true);
     setError('');
     try {
-      const { data } = await fetchPassengerBookingSummary();
-      const rows = data?.bookings ?? [];
-      const items: PassengerBookingItem[] = rows.map((row) => {
-        const ride: Ride = {
-          ride_id: row.ride_id,
-          driver_id: '',
-          group_id: row.group_id ?? null,
-          group_name: row.group_name ?? null,
-          origin_name: row.origin_name,
-          destination_name: row.destination_name,
-          departure_time: row.departure_time,
-          estimated_arrival_time: row.estimated_arrival_time,
-          available_seats: 0,
-          price: 0,
-          status: row.ride_status,
-          created_at: row.departure_time,
-        };
-        return {
-          ride,
-          bookingId: row.booking_id,
-          bookingStatus: row.booking_status,
-          driverName: row.driver?.full_name ?? null,
-        };
-      });
-      setPassengerList(items);
+      const { data } = await fetchPassengerSummary();
+      setPassengerList(mapPassengerSummaryToItems(data));
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'טעינת ההזמנות נכשלה'));
+      setError(getApiErrorMessage(err, apiErr('err_load_passenger_bookings')));
     } finally {
       setPassengerLoading(false);
     }
@@ -125,7 +103,7 @@ export function useMyBookingsPassenger(
       );
       setBookingToCancel(null);
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'ביטול ההזמנה נכשל'));
+      setError(getApiErrorMessage(err, apiErr('err_cancel_booking')));
       await fetchPassengerBookings();
     } finally {
       setCancelling(false);

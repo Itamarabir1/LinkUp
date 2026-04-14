@@ -1,0 +1,25 @@
+{
+  "profileTitle": "My Profile",
+  "personalDetails": "Personal details",
+  "fullName": "Full name",
+  "email": "Email",
+  "phone": "Phone",
+  "rating": "Rating",
+  "ridesOffered": "Rides offered",
+  "ridesTaken": "Rides taken",
+  "saveChanges": "Save changes"
+  ,"avatarOverlayUpdating": "Updating..."
+  ,"uploadingImage": "Uploading..."
+  ,"removingImage": "Removing..."
+  ,"replaceImage": "Replace image"
+  ,"removeImage": "Remove image"
+  ,"uploadImage": "Upload image"
+  ,"name": "Name"
+  ,"viewImageExpanded": "View enlarged image"
+  ,"profileImageExpanded": "Enlarged profile image"
+  ,"profileImage": "Profile image"
+  ,"maxImageSize": "Maximum size {{size}}MB"
+  ,"allowedImageTypes": "File type: JPEG, PNG or WebP only"
+  ,"uploadFailed": "Image upload failed"
+  ,"removeFailed": "Image removal failed"
+}

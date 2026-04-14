@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { postPassengerBookingLocation } from '../api/bookings';
 import { getApiErrorMessage } from '../utils/apiError';
+import { apiErr } from '../utils/i18nError';
 import { useLocationWatcher } from './useLocationWatcher';
 
 /**
@@ -24,7 +25,7 @@ export function usePassengerLocationBroadcast(bookingId: string | null, enabled:
       postPassengerBookingLocation(bookingId, { lat, lng, heading, speed })
         .then(() => setError(null))
         .catch((err: unknown) => {
-          setError(getApiErrorMessage(err, 'שליחת מיקום נכשלה'));
+          setError(getApiErrorMessage(err, apiErr('err_send_location')));
         });
     },
     onError: (msg) => setError(msg),

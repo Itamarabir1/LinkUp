@@ -1,4 +1,5 @@
 import type { DriverBookingItem } from './myBookings.types';
+import { useTranslation } from 'react-i18next';
 import DriverRideBlock, { type DriverRideBlockHandlers } from './DriverRideBlock';
 import HistorySection from '../../components/HistorySection/HistorySection';
 import styles from './MyBookings.module.css';
@@ -38,6 +39,7 @@ export default function DriverBookingsTab({
   onApprove,
   onReject,
 }: DriverBookingsTabProps) {
+  const { t } = useTranslation(['bookings', 'common']);
   const activeItems = items.filter(
     (item) => item.ride.status !== 'cancelled' && item.ride.status !== 'completed'
   );
@@ -59,9 +61,9 @@ export default function DriverBookingsTab({
   return (
     <div className={styles.cardList}>
       {loading ? (
-        <p className={styles.pageLoading}>טוען...</p>
+        <p className={styles.pageLoading}>{t('common:loading')}</p>
       ) : items.length === 0 ? (
-        <p className={styles.emptyText}>אין הזמנות שאישרת. נוסעים שאישרת יופיעו כאן.</p>
+        <p className={styles.emptyText}>{t('bookings:noDriverBookings')}</p>
       ) : (
         <>
           {activeItems.map((item) => (
@@ -76,7 +78,7 @@ export default function DriverBookingsTab({
             />
           ))}
           {pastItems.length > 0 ? (
-            <HistorySection title="היסטוריית נסיעות נהג">
+            <HistorySection title={t('bookings:driverHistoryTitle')}>
               {pastItems.map((item) => (
                 <DriverRideBlock
                   key={item.ride.ride_id}

@@ -1,3 +1,5 @@
+import i18n from '../../i18n';
+
 export const AVATAR_COLORS = [
   '#6366f1',
   '#059669',
@@ -8,9 +10,9 @@ export const AVATAR_COLORS = [
 ] as const;
 
 export const STATUS_LABEL: Record<string, string> = {
-  pending_approval: 'ממתין לאישור',
-  confirmed: 'אושר',
-  rejected: 'נדחה',
-  cancelled: 'בוטל',
-  completed: 'הושלם',
+  pending_approval: i18n.t('bookings:bookingStatus_pending'),
+  confirmed: i18n.t('bookings:bookingStatus_approved'),
+  rejected: i18n.t('bookings:bookingStatus_rejected'),
+  cancelled: i18n.t('bookings:bookingStatus_cancelled'),
+  completed: i18n.t('rides:status_completed'),
 };

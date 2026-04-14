@@ -121,7 +121,7 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
   transition: all var(--transition-fast, 180ms ease);
   border: 1px solid var(--primary-soft-border);
   background: var(--primary-light);
@@ -188,7 +188,7 @@
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
 }
 
 .profileValue {
@@ -213,7 +213,7 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
   transition: all var(--transition-fast, 180ms ease);
   display: flex;
   align-items: center;

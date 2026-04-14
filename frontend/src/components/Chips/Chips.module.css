@@ -19,7 +19,7 @@
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-tertiary);
-  font-family: var(--font-primary, "Heebo", sans-serif);
+  font-family: var(--font-primary);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;

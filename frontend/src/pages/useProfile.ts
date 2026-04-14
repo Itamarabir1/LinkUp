@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
+import i18n from '../i18n';
 import { useAuth } from '../context/AuthContext';
 import { confirmAvatar, deleteMyAvatar, fetchCurrentUser, getAvatarUploadUrl } from '../api/users';
 import { compressImage } from '../utils/imageUtils';
@@ -39,12 +40,12 @@ export function useProfile() {
     e.target.value = '';
     if (!file) return;
     if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-      setError(`גודל מקסימלי ${MAX_SIZE_MB}MB`);
+      setError(i18n.t('profile:maxImageSize', { size: MAX_SIZE_MB }));
       return;
     }
     const ok = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type);
     if (!ok) {
-      setError('סוג קובץ: JPEG, PNG או WebP בלבד');
+      setError(i18n.t('profile:allowedImageTypes'));
       return;
     }
     setError('');
@@ -69,7 +70,7 @@ export function useProfile() {
         setAvatarPreview(null);
       }
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'העלאת תמונה נכשלה'));
+      setError(getApiErrorMessage(err, i18n.t('profile:uploadFailed')));
     } finally {
       setUploading(false);
     }
@@ -85,7 +86,7 @@ export function useProfile() {
       await refreshUser();
       setTimeout(() => refreshUser(), 2000);
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'הסרת תמונה נכשלה'));
+      setError(getApiErrorMessage(err, i18n.t('profile:removeFailed')));
     } finally {
       setRemoving(false);
     }

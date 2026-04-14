@@ -29,8 +29,10 @@ describe('formatChatLastSeen', () => {
     expect(formatChatLastSeen('2026-06-01T12:10:00Z')).toBe('לפני 50 דקות');
   });
 
-  it('shows hours when under one day', () => {
-    vi.setSystemTime(new Date('2026-06-03T10:00:00Z'));
-    expect(formatChatLastSeen('2026-06-02T12:00:00Z')).toBe('לפני 22 שעות');
+  it('shows yesterday at time when previous local calendar day', () => {
+    vi.setSystemTime(new Date(2026, 5, 3, 14, 0, 0));
+    const past = new Date(2026, 5, 2, 10, 30, 0);
+    const timeLabel = past.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+    expect(formatChatLastSeen(past.toISOString())).toBe(`אתמול בשעה ${timeLabel}`);
   });
 });

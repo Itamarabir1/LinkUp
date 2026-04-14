@@ -53,6 +53,21 @@
 
 ## 5. תזמון (scheduled work)
 
+## 4א. Email rendering service (React Email, Node.js)
+
+| | |
+|--|--|
+| **הקשר** | רינדור מיילים בוצע מקומית ב-Jinja2 בתוך הבקאנד; נדרש מעבר לתבניות מודרניות, רכיבים משותפים ו-preview נוח. |
+| **החלטה** | מיקרו-שירות `email-renderer` (Node.js + Express + React Email) אחראי על רינדור HTML. הבקאנד/worker שולחים `template + props` ל-`POST /render`. |
+| **למה (סקייל)** | הפרדת אחריות: orchestration ושליחה נשארים ב-Python (Outbox/worker), rendering מרוכז בשירות ייעודי שניתן להרחיב ולעדכן בנפרד. |
+| **חוזה** | `EMAIL_MAP` בבקאנד משתמש ב-template names ב-**PascalCase**; ב-renderer יש `TEMPLATE_REGISTRY` + fail-fast validation מול `EMAIL_MAP_KEYS` בזמן startup. |
+| **Trade-off** | תלות רשת נוספת (timeout/health/startup ordering). ב-Compose הוגדר healthcheck ו-`depends_on` ל-`email-renderer` עבור `backend` ו-`outbox-worker`. |
+| **בקצרה לראיון** | "הפרדנו רינדור מייל לשירות Node עם React Email; הבקאנד נשאר אחראי לאירועים ושליחה אמינה דרך Outbox." |
+
+---
+
+## 5. תזמון (scheduled work)
+
 | | |
 |--|--|
 | **הקשר** | תזכורות נסיעה, תחזוקה, timeout לצ'אט, סריקת דלק. |

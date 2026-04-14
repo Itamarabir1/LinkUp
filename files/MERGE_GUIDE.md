@@ -1,5 +1,7 @@
 # מדריך מיזוג — סדר מדויק
 
+> **הערה:** מסמך ארכייבי לשלב מיזוג היסטורי (scheduled notifications / הסרת `reminder_sent`). למצב מערכת עדכני ראו **`README.md`**, **`ARCHITECTURE.md`**, ו־**`docs/`**.
+
 ## שלב 1: DB (migration)
 backend/alembic/versions/008_scheduled_notifications.py  ← קובץ חדש
 

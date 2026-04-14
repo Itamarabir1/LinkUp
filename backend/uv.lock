@@ -1399,7 +1399,7 @@ requires-dist = [
     { name = "google-auth-oauthlib", specifier = ">=1.1.0" },
     { name = "groq", specifier = ">=0.4.0" },
     { name = "gunicorn" },
-    { name = "httpx" },
+    { name = "httpx", specifier = ">=0.27.0" },
     { name = "icalendar", specifier = ">=5.0.0" },
     { name = "itsdangerous", specifier = "==2.1.2" },
     { name = "jinja2", specifier = ">=3.1.0" },

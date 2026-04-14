@@ -15,7 +15,7 @@ type LiveRideMapModalProps = {
   rideId: string;
   driverId: string;
   onClose: () => void;
-  /** false = השידור לשרת דרך "שתף מיקום" בהזמנות בלבד; כאן רק תצוגה מקומית */
+  /** false = no server broadcast here; this view is local-only display. */
   broadcastToServer?: boolean;
 };
 
@@ -26,7 +26,7 @@ export default function LiveRideMapModal({
   broadcastToServer = true,
 }: LiveRideMapModalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const passengerMarkersRef = useRef<any[]>([]);
+  const passengerMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
   const { resolvedKey, loadError: keyError } = useGoogleMapsKey();
   const { map, loadError: mapError } = useGoogleMapInstance(containerRef, resolvedKey);
   const loadError = keyError || mapError;
@@ -63,7 +63,7 @@ export default function LiveRideMapModal({
   useMapMarker(map, myPosition, { title: 'המיקום שלי (נהג)', color: DRIVER_COLOR, isDriver: true });
 
   useEffect(() => {
-    const markerApi = (window.google?.maps as any)?.marker;
+    const markerApi = window.google?.maps?.marker;
     if (!map || !markerApi?.AdvancedMarkerElement) return;
 
     passengerMarkersRef.current.forEach((m) => m.map = null);

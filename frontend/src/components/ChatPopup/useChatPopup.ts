@@ -5,6 +5,7 @@ import { useChat } from '../../context/ChatContext';
 import { getConversation, getMessages, sendMessage } from '../../api/chat';
 import type { ConversationDetail, MessageResponse } from '../../types/api';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { apiErr } from '../../utils/i18nError';
 
 export function useChatPopup(conversationId: string) {
   const { user } = useAuth();
@@ -32,7 +33,7 @@ export function useChatPopup(conversationId: string) {
       setConversation(convRes.data);
       setMessages(msgRes.data?.items ?? []);
     } catch (err) {
-      setFetchError(getApiErrorMessage(err, 'טעינת השיחה נכשלה'));
+      setFetchError(getApiErrorMessage(err, apiErr('err_load_chat_popup_fetch')));
       setConversation(null);
       setMessages([]);
     } finally {
@@ -65,7 +66,7 @@ export function useChatPopup(conversationId: string) {
         const { data } = await sendMessage(conversationId, body);
         setMessages((prev) => [...prev, data]);
       } catch (err) {
-        setSendError(getApiErrorMessage(err, 'שליחת ההודעה נכשלה'));
+        setSendError(getApiErrorMessage(err, apiErr('err_load_chat_popup_send')));
         setInput(body);
       } finally {
         setSending(false);

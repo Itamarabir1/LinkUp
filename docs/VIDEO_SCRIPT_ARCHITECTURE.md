@@ -9,7 +9,7 @@
 **תגיד:**  
 “Linkup בנויה משלושה חלקים עיקריים: **בקאנד** ב-Python ו-FastAPI — כל ה-REST, העסקים, ה-DB והאאוטבוקס; **chat-ws** ב-Go — שרת WebSocket לצ’אט והעברת הודעות מ-Redis ללקוחות; ו**פרונט** React עם Vite. הלקוח מדבר ב-HTTP לבקאנד וב-WebSocket ל-chat-ws לפי סוג הפיצ’ר.”
 
-**מומלץ להציג:** דיאגרמה מ-`readme.md` (mermaid services) או שקופית פשוטה: FE → API, FE → chat-ws, API → Postgres / Redis / RabbitMQ.
+**מומלץ להציג:** דיאגרמה מ־[`README.md`](../../README.md) (mermaid services) או שקופית פשוטה: FE → API, FE → chat-ws, API/worker → Postgres / Redis / RabbitMQ / **email-renderer**.
 
 **תגיד:**  
 “יש הפרדה של Redis לוגית: **DB 0** לקאש, rate limit, broadcast של נסיעות; **DB 1** לצ’אט, presence, והשלמת שיחות ל-AI.”
@@ -22,7 +22,7 @@
 “שינויים עסקיים נכתבים ל-PostgreSQL. כשצריך לשלוח מייל, פוש או משימה כבדה — לא סומכים על קריאה סינכרונית לברוקר. משתמשים ב-**Outbox**: באותה טרנזקציה נכתבת שורה ל-`outbox_events`, ו-**outbox-worker** מושך ומפרסם ל-**RabbitMQ**. כך מקבלים משלוח לפחות פעם אחת בלי לחסום את תשובת ה-API.”
 
 **תגיד:**  
-“ה-worker מריץ כמה צרכנים: תור התראות — Brevo ו-FCM; תור אווטאר ל-S3; תור מתוזמנות — תזכורות, תחזוקה, ועוד. בנוסף הוא מאזין ל-Redis על סיום שיחות להרצת ניתוח AI.”
+“ה-worker מריץ כמה צרכנים: תור התראות — מייל דרך **Brevo + email-renderer (React Email)** ופוש דרך FCM; תור אווטאר ל-S3; תור מתוזמנות — תזכורות, תחזוקה, ועוד. בנוסף הוא מאזין ל-Redis על סיום שיחות להרצת ניתוח AI.”
 
 **מפת מפתחות:** `docs/architecture/EVENTS.md`, `ARCHITECTURE.md` (תרשים Communication Flow).
 
@@ -103,7 +103,7 @@
 | נושא | קובץ |
 |------|------|
 | API מלא | `docs/architecture/API.md` |
-| סקירת מערכת | `ARCHITECTURE.md`, `readme.md` |
+| סקירת מערכת | `ARCHITECTURE.md`, `README.md` (שורש) |
 | אירועים ותורים | `docs/architecture/EVENTS.md` |
 | WS ו-GPS | `docs/architecture/REALTIME.md` |
 | ADR בקאנד כולל נוסע §16 | `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` |

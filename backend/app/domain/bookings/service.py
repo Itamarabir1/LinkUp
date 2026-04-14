@@ -206,20 +206,33 @@ class BookingService:
     @staticmethod
     async def get_driver_summary(db: AsyncSession, driver_id: UUID) -> DriverSummaryResponse:
         """All driver rides with pending/confirmed passengers — single DB round-trip."""
+        from app.domain.bookings.schema import DriverSummaryResponse, RideWithPassengersItem, BookingManifestItem
+        from urllib.parse import quote
+
         rides = await crud_booking.get_driver_rides_with_passengers(db, driver_id)
-        items: list[RideWithPassengersItem] = []
+        items = []
         for ride in rides:
-            raw_bookings = list(ride.bookings)
-            raw_bookings.sort(key=lambda b: b.created_at, reverse=True)
-            passengers: list[BookingManifestItem] = []
-            for b in raw_bookings:
-                m = BookingService._booking_to_manifest_item(b)
-                if m:
-                    passengers.append(m)
-            group_name = ride.group.name if ride.group is not None else None
-            status_val = ride.status.value if hasattr(ride.status, "value") else str(ride.status)
-            items.append(
-                RideWithPassengersItem(
+            passengers = []
+            for b in ride.bookings:
+                user = b.passenger_request.user if b.passenger_request else None
+                if not user:
+                    continue
+                clean_phone = "".join(filter(str.isdigit, user.phone_number or ""))
+                if clean_phone.startswith("0"):
+                    clean_phone = "972" + clean_phone[1:]
+                passengers.append(BookingManifestItem(
+                    booking_id=b.booking_id,
+                    passenger_id=user.user_id,
+                    passenger_name=user.full_name or "נוסע",
+                    phone=user.phone_number or "",
+                    whatsapp_link=f"https://wa.me/{clean_phone}?text={quote('היי, אני הנהג שלך מהאפליקציה')}",
+                    num_seats=b.num_seats,
+                    status=b.status,
+                    pickup_name=b.pickup_name,
+                    pickup_time=b.pickup_time,
+                    destination_name=(b.passenger_request.destination_name if b.passenger_request else None),
+                ))
+            items.append(RideWithPassengersItem(
                     ride_id=ride.ride_id,
                     origin_name=ride.origin_name,
                     destination_name=ride.destination_name,
@@ -227,30 +240,26 @@ class BookingService:
                     estimated_arrival_time=ride.estimated_arrival_time,
                     available_seats=ride.available_seats,
                     price=float(ride.price or 0),
-                    status=status_val,
-                    group_id=ride.group_id,
-                    group_name=group_name,
+                    status=ride.status.value if hasattr(ride.status, "value") else str(ride.status),
+                    group_id=ride.group.group_id if ride.group else None,
+                    group_name=ride.group.name if ride.group else None,
                     passengers=passengers,
-                ),
-            )
+                ))
         return DriverSummaryResponse(rides=items)
 
     @staticmethod
     async def get_passenger_summary(db: AsyncSession, passenger_id: UUID) -> PassengerSummaryResponse:
-        """Passenger bookings with ride + driver — single DB round-trip."""
+        """All passenger bookings with ride + driver info — single DB round-trip."""
+        from app.domain.bookings.schema import PassengerSummaryResponse, PassengerBookingSummaryItem, DriverSummaryInfo
+
         bookings = await crud_booking.get_passenger_bookings_with_rides(db, passenger_id)
-        out: list[PassengerBookingSummaryItem] = []
+        items = []
         for b in bookings:
             ride = b.ride
             if not ride:
                 continue
-            driver_blob: DriverSummaryInfo | None = None
-            if ride.status not in (RideStatus.CANCELLED, RideStatus.COMPLETED):
-                driver_blob = BookingService._driver_to_summary(ride.driver)
-            group_name = ride.group.name if ride.group is not None else None
-            ride_status_val = ride.status.value if hasattr(ride.status, "value") else str(ride.status)
-            out.append(
-                PassengerBookingSummaryItem(
+            driver = ride.driver
+            items.append(PassengerBookingSummaryItem(
                     booking_id=b.booking_id,
                     booking_status=b.status,
                     ride_id=ride.ride_id,
@@ -258,13 +267,15 @@ class BookingService:
                     destination_name=ride.destination_name,
                     departure_time=ride.departure_time,
                     estimated_arrival_time=ride.estimated_arrival_time,
-                    ride_status=ride_status_val,
-                    group_id=ride.group_id,
-                    group_name=group_name,
-                    driver=driver_blob,
-                ),
-            )
-        return PassengerSummaryResponse(bookings=out)
+                    ride_status=ride.status.value if hasattr(ride.status, "value") else str(ride.status),
+                    group_id=ride.group.group_id if ride.group else None,
+                    group_name=ride.group.name if ride.group else None,
+                    driver=DriverSummaryInfo(
+                        full_name=driver.full_name or "נהג",
+                        phone_number=getattr(driver, "phone_number", None),
+                    ) if driver else None,
+                ))
+        return PassengerSummaryResponse(bookings=items)
 
     @staticmethod
     async def broadcast_driver_location(

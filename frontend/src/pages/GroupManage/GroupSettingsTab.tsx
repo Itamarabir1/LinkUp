@@ -1,16 +1,18 @@
 import ErrorBanner from '../../components/ErrorBanner';
+import { useTranslation } from 'react-i18next';
 import type { GroupManageViewModel } from './useGroupManage';
 import styles from './GroupManage.module.css';
 
 export default function GroupSettingsTab({ vm }: { vm: GroupManageViewModel }) {
+  const { t } = useTranslation('groups');
   return (
     <div className={styles.settingsSection}>
       <div>
-        <h3 className={styles.settingsSectionTitle}>קוד הצטרפות</h3>
+        <h3 className={styles.settingsSectionTitle}>{t('inviteCodeTitle')}</h3>
         <div className={styles.inviteRow}>
           <span className={styles.inviteUrl}>{vm.inviteUrl}</span>
           <button type="button" className={styles.btnSecondary} onClick={() => void vm.handleCopyInvite()}>
-            העתק
+            {t('copyLink')}
           </button>
         </div>
         {vm.copyInviteError ? (
@@ -31,7 +33,7 @@ export default function GroupSettingsTab({ vm }: { vm: GroupManageViewModel }) {
           onClick={() => vm.setConfirmClose(true)}
           disabled={vm.actionLoading}
         >
-          מחק קבוצה
+          {t('deleteGroup')}
         </button>
       </div>
     </div>

@@ -7,6 +7,7 @@ import type { ConversationListItem } from '../types/api';
 import { formatConversationTime } from '../utils/date';
 import ErrorBanner from '../components/ErrorBanner';
 import { getApiErrorMessage } from '../utils/apiError';
+import { apiErr } from '../utils/i18nError';
 import MessageThread from './MessageThread';
 import styles from './Messages.module.css';
 
@@ -30,7 +31,7 @@ export default function Messages() {
       });
       setList(sorted);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'לא ניתן לטעון את השיחות'));
+      setError(getApiErrorMessage(err, apiErr('err_load_conversations')));
     } finally {
       setLoading(false);
     }
@@ -44,7 +45,6 @@ export default function Messages() {
     <div className={styles.container}>
       <aside className={styles.sidebar}>
         <header className={styles.sidebarHeader}>
-          <h1 className={styles.title}>הודעות</h1>
           {unreadMessages > 0 && (
             <span className={styles.newCount}>{unreadMessages} חדשות</span>
           )}

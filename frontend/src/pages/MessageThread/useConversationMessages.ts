@@ -3,6 +3,7 @@ import { getConversation, getMessages, markConversationRead } from '../../api/ch
 import type { ConversationDetail, MessageResponse } from '../../types/api';
 import { useChat } from '../../context/ChatContext';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { apiErr } from '../../utils/i18nError';
 
 export function useConversationMessages(cid: string, userId: string | undefined) {
   const { refreshUnread } = useChat();
@@ -30,7 +31,7 @@ export function useConversationMessages(cid: string, userId: string | undefined)
       setMessagesNextCursor(paginated?.next_cursor ?? null);
       setMessagesHasMore(paginated?.has_more ?? false);
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'לא ניתן לטעון את השיחה'));
+      setError(getApiErrorMessage(err, apiErr('err_load_conversation')));
     } finally {
       setLoading(false);
     }
@@ -47,7 +48,7 @@ export function useConversationMessages(cid: string, userId: string | undefined)
       setMessagesNextCursor(paginated?.next_cursor ?? null);
       setMessagesHasMore(paginated?.has_more ?? false);
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'לא ניתן לטעון הודעות ישנות'));
+      setError(getApiErrorMessage(err, apiErr('err_load_older_messages')));
     } finally {
       setLoadingMore(false);
     }

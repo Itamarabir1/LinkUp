@@ -3,7 +3,7 @@ import styles from './RouteErrorBoundary.module.css';
 
 interface Props {
   children: ReactNode;
-  /** כשהנתיב משתנה – מאפס את מצב השגיאה */
+  /** Resets error state whenever route path changes. */
   resetKey?: string;
 }
 

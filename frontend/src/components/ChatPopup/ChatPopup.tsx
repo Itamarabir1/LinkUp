@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MapPin, Maximize2, X, Send } from 'lucide-react';
+import { formatDayMonthLong, formatTimeHm } from '../../utils/date';
 import ChatErrorBoundary from '../ChatErrorBoundary/ChatErrorBoundary';
 import { useChatPopup } from './useChatPopup';
 import styles from './ChatPopup.module.css';
@@ -9,6 +11,7 @@ interface ChatPopupProps {
 }
 
 function ChatPopupContent({ conversationId }: ChatPopupProps) {
+  const { t } = useTranslation('common');
   const {
     user,
     closeChat,
@@ -31,7 +34,7 @@ function ChatPopupContent({ conversationId }: ChatPopupProps) {
     return (
       <div className={styles.popup}>
         <div className={styles.header}>
-          <div className={styles.headerPlaceholder}>טוען...</div>
+          <div className={styles.headerPlaceholder}>{t('chat_popup_loading')}</div>
         </div>
         <div className={styles.messagesArea} />
         <div className={styles.sendArea} />
@@ -44,7 +47,7 @@ function ChatPopupContent({ conversationId }: ChatPopupProps) {
       <div className={styles.popup}>
         <div className={styles.header}>
           <div className={styles.headerPlaceholder} role="alert">
-            {fetchError || 'לא ניתן לטעון את השיחה'}
+            {fetchError || t('err_load_conversation')}
           </div>
         </div>
         <div className={styles.messagesArea} />
@@ -53,14 +56,9 @@ function ChatPopupContent({ conversationId }: ChatPopupProps) {
     );
   }
 
-  const partnerName = conversation.partner?.full_name || 'שיחה';
+  const partnerName = conversation.partner?.full_name || t('chat_popup_conversation_fallback');
   const partnerAvatar = conversation.partner?.avatar_url;
   const routeLabel = conversation.route_label?.trim() || null;
-
-  function formatBubbleTime(dateStr: string): string {
-    const d = new Date(dateStr);
-    return d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-  }
 
   return (
     <div className={styles.popup}>
@@ -86,7 +84,7 @@ function ChatPopupContent({ conversationId }: ChatPopupProps) {
             type="button"
             className={styles.iconBtn}
             onClick={handleMaximize}
-            aria-label="הגדל"
+            aria-label={t('chat_popup_maximize')}
           >
             <Maximize2 size={16} />
           </button>
@@ -94,7 +92,7 @@ function ChatPopupContent({ conversationId }: ChatPopupProps) {
             type="button"
             className={styles.iconBtn}
             onClick={closeChat}
-            aria-label="סגור"
+            aria-label={t('chat_popup_close')}
           >
             <X size={16} />
           </button>
@@ -103,17 +101,14 @@ function ChatPopupContent({ conversationId }: ChatPopupProps) {
 
       <div ref={listRef} className={styles.messagesArea}>
         {messages.length === 0 ? (
-          <p className={styles.emptyMsg}>אין הודעות. שלח הודעה ראשונה.</p>
+          <p className={styles.emptyMsg}>{t('chat_popup_empty')}</p>
         ) : (
           messages.reduce<ReactNode[]>((acc, m, i) => {
             const isMe = m.sender_id === user?.user_id;
             const msgDate = new Date(m.created_at).toDateString();
             const prevDate = i > 0 ? new Date(messages[i - 1].created_at).toDateString() : null;
             if (msgDate !== prevDate) {
-              const label = new Date(m.created_at).toLocaleDateString('he-IL', {
-                day: 'numeric',
-                month: 'long',
-              });
+              const label = formatDayMonthLong(m.created_at);
               acc.push(
                 <div key={`day-${msgDate}-${i}`} className={styles.dayDivider}>
                   <div className={styles.dayLine} aria-hidden />
@@ -125,7 +120,7 @@ function ChatPopupContent({ conversationId }: ChatPopupProps) {
             acc.push(
               <div key={m.message_id} className={isMe ? styles.bubbleOut : styles.bubbleIn}>
                 <div className={styles.bubbleText}>{m.body}</div>
-                <div className={styles.bubbleTime}>{formatBubbleTime(m.created_at)}</div>
+                <div className={styles.bubbleTime}>{formatTimeHm(m.created_at)}</div>
               </div>
             );
             return acc;
@@ -143,7 +138,7 @@ function ChatPopupContent({ conversationId }: ChatPopupProps) {
         <div className={styles.sendRow}>
           <textarea
             className={styles.textarea}
-            placeholder="כתוב הודעה..."
+            placeholder={t('msg_compose_placeholder')}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
@@ -154,7 +149,7 @@ function ChatPopupContent({ conversationId }: ChatPopupProps) {
             type="submit"
             className={styles.sendBtn}
             disabled={sending || !input.trim()}
-            aria-label="שלח"
+            aria-label={t('msg_send')}
           >
             <Send size={16} />
           </button>

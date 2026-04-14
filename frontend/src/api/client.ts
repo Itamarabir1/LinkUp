@@ -133,7 +133,7 @@ api.interceptors.response.use(
   }
 );
 
-/** בקשות HTTP ל-chat-ws (presence) — לא ל-backend */
+/** HTTP client for chat-ws presence endpoints (not backend API). */
 export const chatWsApi = axios.create({
   baseURL: '',
   timeout: API_TIMEOUT_MS,

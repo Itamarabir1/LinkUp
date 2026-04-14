@@ -1,285 +1,461 @@
+/* ── Typography ── */
 .pageTitle {
-  margin: 0 0 1.25rem;
-  font-size: 1.25rem;
+  margin: 0 0 20px;
+  font-size: 18px;
   font-weight: 600;
+  color: #f1f5f9;
+  letter-spacing: -0.02em;
+  font-family: var(--font-primary);
 }
 
 .subheading {
-  margin: 0 0 0.75rem;
-  font-size: 1rem;
+  margin: 0 0 12px;
+  font-size: 13px;
   font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 11px;
 }
 
-.muted {
+.muted { color: #475569; font-size: 13px; }
+.error { color: #ef4444; font-size: 13px; }
+
+/* ── Health strip ── */
+.healthStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.healthPill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.healthPillOk {
+  background: rgba(34,197,94,0.08);
+  border-color: rgba(34,197,94,0.2);
+  color: #22c55e;
+}
+
+.healthPillWarn {
+  background: rgba(245,158,11,0.08);
+  border-color: rgba(245,158,11,0.2);
+  color: #f59e0b;
+}
+
+.healthPillErr {
+  background: rgba(239,68,68,0.08);
+  border-color: rgba(239,68,68,0.2);
+  color: #ef4444;
+}
+
+.healthDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ── Stat cards ── */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1100px) { .statsGrid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px)  { .statsGrid { grid-template-columns: 1fr; } }
+
+.statCard {
+  background: #141924;
+  border: 1px solid #1e2535;
+  border-radius: 12px;
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+  text-decoration: none;
+  display: block;
+}
+
+.statCard:hover {
+  border-color: #2a3444;
+  transform: translateY(-1px);
+}
+
+.statCardWarn { border-color: rgba(245,158,11,0.3) !important; }
+.statCardDanger { border-color: rgba(239,68,68,0.3) !important; }
+.statCardToday { border-color: rgba(79,110,247,0.25) !important; }
+
+.statLabel {
+  font-size: 11px;
+  color: #475569;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.statValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: #f1f5f9;
+  line-height: 1;
+  margin-bottom: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  letter-spacing: -0.03em;
+}
+
+.statValueWarn  { color: #f59e0b !important; }
+.statValueDanger { color: #ef4444 !important; }
+
+.statHint {
+  font-size: 11px;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.statChangeUp   { color: #22c55e; font-size: 11px; }
+.statChangeDown { color: #ef4444; font-size: 11px; }
+.statChangeWarn { color: #f59e0b; font-size: 11px; }
+
+.badgeToday {
+  background: rgba(79,110,247,0.15);
+  color: #818cf8;
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 20px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* ── Chart cards ── */
+.chartCard {
+  background: #141924;
+  border: 1px solid #1e2535;
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.chartTitle {
+  font-size: 11px;
+  font-weight: 600;
   color: #64748b;
-  font-size: 0.875rem;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
 }
 
-.error {
-  color: #b91c1c;
-  font-size: 0.875rem;
+.chartLtr { direction: ltr; }
+.chartEmpty {
+  text-align: center;
+  font-size: 12px;
+  color: #334155;
+  padding: 2rem 0;
 }
 
+.sectionTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: #334155;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.pieRow { margin-top: 0; }
+
+.quickLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.quickLink {
+  padding: 7px 14px;
+  background: #141924;
+  border: 1px solid #1e2535;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #64748b;
+  text-decoration: none;
+  transition: border-color 0.12s, color 0.12s;
+  font-family: var(--font-primary);
+}
+
+.quickLink:hover { border-color: #4f6ef7; color: #818cf8; }
+
+.intro { font-size: 13px; color: #475569; margin-bottom: 24px; line-height: 1.6; }
+
+/* ── Toolbar ── */
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 10px;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 16px;
 }
 
 .searchInput {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #e2e8f0;
+  padding: 7px 12px;
+  border: 1px solid #1e2535;
   border-radius: 8px;
-  font-size: 0.875rem;
-  min-width: 200px;
-  max-width: 100%;
-  background: #fff;
-  color: inherit;
+  font-size: 13px;
+  min-width: 220px;
+  background: #0d1117;
+  color: #e2e8f0;
+  font-family: var(--font-primary);
+  transition: border-color 0.12s;
+  outline: none;
 }
 
-:global([data-theme='dark']) .searchInput {
-  background: #1e293b;
-  border-color: #334155;
-}
+.searchInput:focus { border-color: #4f6ef7; }
+.searchInput::placeholder { color: #334155; }
 
 .select {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #e2e8f0;
+  padding: 7px 12px;
+  border: 1px solid #1e2535;
   border-radius: 8px;
-  font-size: 0.875rem;
-  background: #fff;
-  color: inherit;
+  font-size: 13px;
+  background: #0d1117;
+  color: #e2e8f0;
+  font-family: var(--font-primary);
+  outline: none;
+  cursor: pointer;
 }
 
-:global([data-theme='dark']) .select {
-  background: #1e293b;
-  border-color: #334155;
-}
-
+/* ── Table ── */
 .tableWrap {
-  overflow-x: auto;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: #fff;
-}
-
-:global([data-theme='dark']) .tableWrap {
-  background: #1e293b;
-  border-color: #334155;
+  border: 1px solid #1e2535;
+  border-radius: 12px;
+  background: #141924;
+  overflow: hidden;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.8125rem;
+  font-size: 12.5px;
+  font-family: var(--font-primary);
 }
 
 .table th {
   text-align: start;
-  padding: 0.65rem 0.75rem;
-  border-bottom: 1px solid #e2e8f0;
+  padding: 10px 14px;
+  border-bottom: 1px solid #1e2535;
   font-weight: 600;
-  color: #475569;
+  color: #334155;
   white-space: nowrap;
-  background: #f8fafc;
-}
-
-:global([data-theme='dark']) .table th {
-  background: #0f172a;
-  border-bottom-color: #334155;
-  color: #94a3b8;
+  background: #0d1117;
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .table td {
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid #f1f5f9;
+  padding: 10px 14px;
+  border-bottom: 1px solid #0d1117;
   vertical-align: middle;
+  color: #64748b;
 }
 
-:global([data-theme='dark']) .table td {
-  border-bottom-color: #334155;
-}
+.table td:first-child { color: #94a3b8; }
+.table tr:last-child td { border-bottom: none; }
+.table tr:hover td { background: rgba(255,255,255,0.015); }
 
-.table tr:last-child td {
-  border-bottom: none;
-}
+.rowClick { cursor: pointer; }
+.rowSelected { background: rgba(79,110,247,0.07) !important; }
 
-.rowClick {
-  cursor: pointer;
-}
+.actionsCell { white-space: nowrap; }
 
-.rowSelected {
-  background: rgba(59, 130, 246, 0.08);
-}
-
+/* ── Buttons ── */
 .btnSm {
-  padding: 0.35rem 0.6rem;
-  font-size: 0.75rem;
+  padding: 4px 10px;
+  font-size: 11px;
   border-radius: 6px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
+  border: 1px solid #1e2535;
+  background: #0d1117;
   cursor: pointer;
-  margin-inline-end: 0.35rem;
-  color: inherit;
+  margin-inline-end: 4px;
+  color: #64748b;
+  font-family: var(--font-primary);
+  transition: border-color 0.12s, color 0.12s;
 }
 
-:global([data-theme='dark']) .btnSm {
-  background: #334155;
-  border-color: #475569;
-}
+.btnSm:hover { border-color: #2a3444; color: #94a3b8; }
 
 .btnSmPrimary {
-  padding: 0.35rem 0.6rem;
-  font-size: 0.75rem;
+  padding: 4px 10px;
+  font-size: 11px;
   border-radius: 6px;
-  border: 1px solid #3b82f6;
-  background: #3b82f6;
-  color: #fff;
+  border: 1px solid rgba(79,110,247,0.4);
+  background: rgba(79,110,247,0.12);
+  color: #818cf8;
   cursor: pointer;
-  margin-inline-end: 0.35rem;
+  margin-inline-end: 4px;
+  font-family: var(--font-primary);
+  transition: background 0.12s;
 }
+
+.btnSmPrimary:hover { background: rgba(79,110,247,0.2); }
 
 .btnSmDanger {
-  padding: 0.35rem 0.6rem;
-  font-size: 0.75rem;
+  padding: 4px 10px;
+  font-size: 11px;
   border-radius: 6px;
-  border: 1px solid #fecaca;
-  background: #fff;
-  color: #b91c1c;
+  border: 1px solid rgba(239,68,68,0.25);
+  background: rgba(239,68,68,0.08);
+  color: #ef4444;
   cursor: pointer;
-  margin-inline-end: 0.35rem;
+  margin-inline-end: 4px;
+  font-family: var(--font-primary);
+  transition: background 0.12s;
 }
 
-:global([data-theme='dark']) .btnSmDanger {
-  background: #1e293b;
-  border-color: #7f1d1d;
-  color: #fca5a5;
+.btnSmDanger:hover { background: rgba(239,68,68,0.15); }
+.btnSm:disabled, .btnSmPrimary:disabled, .btnSmDanger:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Badges ── */
+.badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  letter-spacing: 0.2px;
 }
 
-.btnSm:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
+.badgeOk    { background: rgba(34,197,94,0.1);   color: #22c55e; }
+.badgeWarn  { background: rgba(245,158,11,0.1);  color: #f59e0b; }
+.badgeErr   { background: rgba(239,68,68,0.1);   color: #ef4444; }
+.badgeInfo  { background: rgba(79,110,247,0.12); color: #818cf8; }
+.badgeGray  { background: rgba(100,116,139,0.1); color: #64748b; }
 
-.actionsCell {
-  white-space: nowrap;
-}
-
+/* ── Grid ── */
 .grid2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 12px;
 }
 
-@media (max-width: 900px) {
-  .grid2 {
-    grid-template-columns: 1fr;
-  }
-}
+@media (max-width: 900px) { .grid2 { grid-template-columns: 1fr; } }
 
+/* ── Pre JSON ── */
 .preJson {
-  background: #0f172a;
-  color: #e2e8f0;
-  padding: 0.75rem;
+  background: #080b11;
+  color: #94a3b8;
+  padding: 14px;
   border-radius: 8px;
   overflow-x: auto;
-  max-height: 420px;
-  font-size: 0.75rem;
+  max-height: 440px;
+  font-size: 11.5px;
   margin: 0;
+  border: 1px solid #1e2535;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  line-height: 1.6;
 }
 
+/* ── Health page ── */
 .healthTitleRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem 0.75rem;
-  margin: 0 0 1rem;
+  gap: 10px;
+  margin: 0 0 20px;
 }
 
 .healthPageTitle {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 18px;
   font-weight: 600;
+  color: #f1f5f9;
 }
 
 .healthBadge {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.8125rem;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
-.healthBadgeOk {
-  background: #dcfce7;
-  color: #166534;
-}
+.healthBadgeOk  { background: rgba(34,197,94,0.1);  color: #22c55e; border: 1px solid rgba(34,197,94,0.2); }
+.healthBadgeBad { background: rgba(239,68,68,0.1);  color: #ef4444; border: 1px solid rgba(239,68,68,0.2); }
 
-.healthBadgeBad {
-  background: #fee2e2;
-  color: #b91c1c;
-}
+.healthRow { display: flex; align-items: center; gap: 8px; }
+.healthDot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.healthDotOk  { background: #22c55e; }
+.healthDotErr { background: #ef4444; }
 
-:global([data-theme='dark']) .healthBadgeOk {
-  background: #14532d;
-  color: #bbf7d0;
-}
-
-:global([data-theme='dark']) .healthBadgeBad {
-  background: #450a0a;
-  color: #fecaca;
-}
-
-.healthRow {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.healthDot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.healthDotOk {
-  background: #22c55e;
-}
-
-.healthDotErr {
-  background: #ef4444;
-}
-
+/* ── Mini chart ── */
 .chartMiniWrap {
-  margin-bottom: 1rem;
-  padding: 0.75rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: #fff;
-}
-
-:global([data-theme='dark']) .chartMiniWrap {
-  background: #1e293b;
-  border-color: #334155;
-}
-
-.usersSummary {
-  margin: 0 0 0.75rem;
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid #1e2535;
+  border-radius: 12px;
+  background: #141924;
 }
 
 .chartMiniEmpty {
   margin: 0;
-  padding: 1rem;
+  padding: 1.5rem;
   text-align: center;
-  font-size: 0.8125rem;
-  color: #64748b;
+  font-size: 12px;
+  color: #334155;
 }
 
-:global([data-theme='dark']) .chartMiniEmpty {
-  color: #94a3b8;
+/* ── User avatar ── */
+.userCell { display: flex; align-items: center; gap: 10px; }
+.avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #4f6ef7;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.userName  { color: #94a3b8; font-weight: 500; font-size: 12.5px; }
+.userEmail { font-size: 10.5px; color: #334155; }
+
+.usersSummary { margin: 0 0 12px; }
+
+/* ── Chart mini empty ── */
+.statsIntro {
+  font-size: 12px;
+  color: #334155;
+  margin-bottom: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }

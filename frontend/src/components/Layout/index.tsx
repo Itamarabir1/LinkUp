@@ -1,10 +1,12 @@
 import { Outlet, NavLink, Link } from 'react-router-dom';
 import { MessageCircle, Bell, User, Search, Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import ChatPopup from '../ChatPopup/ChatPopup';
 import { useLayoutShell } from './useLayoutShell';
 import styles from './Layout.module.css';
 
 export default function Layout() {
+  const { t } = useTranslation('nav');
   const {
     openConversationId,
     showChatPopup,
@@ -22,7 +24,7 @@ export default function Layout() {
               isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
             }
           >
-            הנסיעות שלי
+            {t('myRides')}
           </NavLink>
           <NavLink
             to="/my-requests"
@@ -30,7 +32,7 @@ export default function Layout() {
               isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
             }
           >
-            בקשות טרמפ
+            {t('myRequests')}
           </NavLink>
           <NavLink
             to="/my-bookings"
@@ -38,7 +40,7 @@ export default function Layout() {
               isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
             }
           >
-            הזמנות שלי
+            {t('myBookings')}
           </NavLink>
           <NavLink
             to="/groups"
@@ -47,13 +49,13 @@ export default function Layout() {
               isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink
             }
           >
-            קבוצות
+            {t('groups')}
           </NavLink>
         </div>
 
         <div className={styles.navActions}>
           <div className={styles.iconBtnWrapper}>
-            <Link to="/messages" className={styles.iconBtn} aria-label="הודעות">
+            <Link to="/messages" className={styles.iconBtn} aria-label={t('messages')}>
               <MessageCircle size={16} />
               {messagesBadge && (
                 <span className={styles.badge} aria-hidden>
@@ -63,7 +65,7 @@ export default function Layout() {
             </Link>
           </div>
           <div className={styles.iconBtnWrapper}>
-            <Link to="/notifications" className={styles.iconBtn} aria-label="התראות" title="התראות">
+            <Link to="/notifications" className={styles.iconBtn} aria-label={t('notifications')} title={t('notifications')}>
               <Bell size={16} />
               {notificationsBadge && (
                 <span className={styles.badge} aria-hidden>
@@ -76,8 +78,8 @@ export default function Layout() {
             <Link
               to="/profile"
               className={styles.iconBtn}
-              aria-label="פרופיל"
-              title="הפרופיל שלי"
+              aria-label={t('profile')}
+              title={t('profile')}
             >
               <User size={16} />
             </Link>
@@ -85,11 +87,11 @@ export default function Layout() {
           <div className={styles.navDivider} />
           <Link to="/search" className={styles.btnSearch}>
             <Search size={14} />
-            חפש טרמפ
+            {t('searchRide')}
           </Link>
           <Link to="/create-ride" className={styles.btnCreateRide}>
             <Plus size={14} />
-            הצע נסיעה
+            {t('createRide')}
           </Link>
         </div>
       </nav>

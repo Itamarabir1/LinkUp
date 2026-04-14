@@ -8,7 +8,7 @@ export interface LoadingButtonProps
   loadingLabel?: string;
 }
 
-/** כפתור עם מצב טעינה אחיד */
+/** Reusable button with standardized loading state. */
 export default function LoadingButton({
   children,
   loading,

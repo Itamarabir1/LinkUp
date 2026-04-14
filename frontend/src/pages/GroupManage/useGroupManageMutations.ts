@@ -3,6 +3,7 @@ import type { NavigateFunction } from 'react-router-dom';
 import { closeGroup, leaveGroup, promoteMember, removeMember } from '../../api/groups';
 import type { Group } from '../../types/api';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { apiErr } from '../../utils/i18nError';
 
 export interface UseGroupManageMutationsParams {
   groupId: string | undefined;
@@ -42,7 +43,7 @@ export function useGroupManageMutations({
       await loadMembers();
       await refreshGroups();
     } catch (err) {
-      setError(getApiErrorMessage(err, 'הסרת החבר נכשלה'));
+      setError(getApiErrorMessage(err, apiErr('err_remove_member')));
     } finally {
       setActionLoading(false);
     }
@@ -58,7 +59,7 @@ export function useGroupManageMutations({
       await loadMembers();
       await refreshGroups();
     } catch (err) {
-      setError(getApiErrorMessage(err, 'העלאת החבר למנהל נכשלה'));
+      setError(getApiErrorMessage(err, apiErr('err_promote_member')));
     } finally {
       setActionLoading(false);
     }
@@ -76,7 +77,7 @@ export function useGroupManageMutations({
       await refreshGroups();
       navigate('/groups', { replace: true });
     } catch (err) {
-      setError(getApiErrorMessage(err, 'עזיבת הקבוצה נכשלה'));
+      setError(getApiErrorMessage(err, apiErr('err_leave_group')));
     } finally {
       setActionLoading(false);
     }
@@ -94,7 +95,7 @@ export function useGroupManageMutations({
       await refreshGroups();
       navigate('/groups', { replace: true });
     } catch (err) {
-      setError(getApiErrorMessage(err, 'סגירת הקבוצה נכשלה'));
+      setError(getApiErrorMessage(err, apiErr('err_close_group')));
     } finally {
       setActionLoading(false);
     }

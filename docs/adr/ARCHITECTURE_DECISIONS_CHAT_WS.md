@@ -10,7 +10,7 @@
 |--|--|
 | **הקשר** | אלפי חיבורי WS ארוכים, הודעות קצרות ותכופות (צ'אט, typing, presence). |
 | **החלטה** | שירות נפרד ב-**Go** — goroutines ועלות נמוכה לחיבור בהשוואה לסטאק Python כבד יותר לכל חיבור. |
-| **למה** | מפורש ב-[readme.md](../../readme.md) (סעיף **Architecture Decisions**): שרתי WebSocket נהנים מ-overhead נמוך לחיבור וקונקרנציה גבוהה; השירות **לא עושה DB ולא לוגיקה עסקית** — רק subscribe ל-Redis ודחיפה ללקוחות. |
+| **למה** | מפורש ב-[README.md](../../README.md) (סעיף **Architecture Decisions**): שרתי WebSocket נהנים מ-overhead נמוך לחיבור וקונקרנציה גבוהה; השירות **לא עושה DB ולא לוגיקה עסקית** — רק subscribe ל-Redis ודחיפה ללקוחות. |
 | **אלטרנטיבה** | WS בתוך FastAPI — אפשרי לזרימות מצומצמות, אבל עומס חיבורים וזיכרון היו מסבכים את נתיב ה-API. |
 | **בקצרה לראיון** | "הפרדנו את צ'אט ה-WS ל-Go כדי לטפל בהרבה חיבורים idle בלי למשוך את כל סטאק הפייתון לנתיב ה-real-time." |
 
@@ -71,6 +71,6 @@
 
 ## קישורים
 
-- [../../readme.md](../../readme.md) — Architecture Decisions  
+- [../../README.md](../../README.md) — Architecture Decisions  
 - [../../ARCHITECTURE.md](../../ARCHITECTURE.md) — סקירה כללית  
 - [../architecture/REALTIME.md](../architecture/REALTIME.md)

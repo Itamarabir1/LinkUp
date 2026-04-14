@@ -1,6 +1,7 @@
 import type { Ride } from '../types/api';
+import i18n from '../i18n';
 
-/** קבוצות למיפוי שם תצוגה (מקור נסיעה / בקשה) */
+/** Groups for display-name mapping (ride/request source). */
 export type GroupNameRef = { group_id: string; name: string };
 
 /**
@@ -10,33 +11,33 @@ export function getRideSourceLabel(
   groupId: string | null | undefined,
   myGroups: GroupNameRef[]
 ): string {
-  if (!groupId) return 'ציבורי';
+  if (!groupId) return i18n.t('common:public');
   const g = myGroups.find((x) => x.group_id === groupId);
-  return g?.name ?? 'ציבורי';
+  return g?.name ?? i18n.t('common:public');
 }
 
 export function getRideStatusLabel(r: Ride): string {
-  if (r.status === 'cancelled') return 'בוטלה';
-  if (r.status === 'completed') return 'הושלמה';
-  if (r.status === 'active') return 'פעילה';
+  if (r.status === 'cancelled') return i18n.t('rides:status_cancelled');
+  if (r.status === 'completed') return i18n.t('rides:status_completed');
+  if (r.status === 'active') return i18n.t('rides:status_active');
   const seats = r.available_seats ?? 0;
-  if (seats <= 0) return 'מלא';
-  if (seats === 1) return '1 מקום';
-  return `${seats} מקומות`;
+  if (seats <= 0) return i18n.t('rides:status_full');
+  return i18n.t('common:seats', { count: seats });
 }
 
 const REQUEST_STATUS_LABELS: Record<string, string> = {
-  active: 'מחפש',
-  pending: 'ממתין לאישור',
-  approved: 'אושר',
-  rejected: 'נדחה',
-  completed: 'הושלם',
-  expired: 'פג תוקף',
-  matched: 'נמצאה נסיעה',
-  cancelled: 'בוטל',
+  active: 'rides:searchTitle',
+  pending: 'rides:pendingApproval',
+  approved: 'bookings:bookingStatus_approved',
+  rejected: 'bookings:bookingStatus_rejected',
+  completed: 'rides:status_completed',
+  expired: 'rides:expired',
+  matched: 'rides:matchFound',
+  cancelled: 'bookings:bookingStatus_cancelled',
 };
 
 export function getRequestStatusLabel(status: string): string {
-  return REQUEST_STATUS_LABELS[status] ?? status;
+  const key = REQUEST_STATUS_LABELS[status];
+  return key ? i18n.t(key) : status;
 }
 
