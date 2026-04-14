@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { fetchAddressFromCoords } from '../api/geo';
 import { previewRideRoutes, createRideFromSession } from '../api/rides';
@@ -7,10 +7,25 @@ import type { RidePreviewResponse } from '../types/api';
 import { getApiErrorMessage } from '../utils/apiError';
 import type { RouteMapData } from '../components/RouteMapModal';
 
+type CreateRideStatus = 'idle' | 'locating' | 'previewing' | 'creating';
+
+function useOperationToken() {
+  const tokenRef = useRef(0);
+  const claim = useCallback((): number => {
+    tokenRef.current += 1;
+    return tokenRef.current;
+  }, []);
+  const isCurrent = useCallback((token: number): boolean => {
+    return tokenRef.current === token;
+  }, []);
+  return { claim, isCurrent };
+}
+
 export function useCreateRide() {
   const { groupId } = useParams<{ groupId?: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+
   const [originName, setOriginName] = useState('');
   const [destinationName, setDestinationName] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -20,111 +35,115 @@ export function useCreateRide() {
     return d;
   });
   const [seats, setSeats] = useState(4);
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<CreateRideStatus>('idle');
   const [preview, setPreview] = useState<RidePreviewResponse | null>(null);
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(-1);
-  const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
-  const [locationLoading, setLocationLoading] = useState(false);
   const [mapPreviewData, setMapPreviewData] = useState<RouteMapData | null>(null);
 
-  const fillOriginFromMyLocation = () => {
+  const { claim, isCurrent } = useOperationToken();
+
+  const fillOriginFromMyLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setError('הדפדפן לא תומך במיקום');
       return;
     }
-    setLocationLoading(true);
+    const token = claim();
+    setStatus('locating');
     setError('');
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
         try {
-          const { data } = await fetchAddressFromCoords(lat, lon);
-          setOriginName(data.address ?? '');
+          const { data } = await fetchAddressFromCoords(
+            pos.coords.latitude,
+            pos.coords.longitude
+          );
+          if (isCurrent(token)) setOriginName(data.address ?? '');
         } catch (err) {
-          setError(getApiErrorMessage(err, 'לא נמצאה כתובת למיקום זה'));
+          if (isCurrent(token)) setError(getApiErrorMessage(err, 'לא נמצאה כתובת למיקום זה'));
         } finally {
-          setLocationLoading(false);
+          if (isCurrent(token)) setStatus('idle');
         }
       },
       () => {
-        setError('לא ניתן לקבל מיקום – בדוק הרשאות');
-        setLocationLoading(false);
+        if (isCurrent(token)) {
+          setError('לא ניתן לקבל מיקום — בדוק הרשאות');
+          setStatus('idle');
+        }
       },
       { timeout: 10000 }
     );
-  };
+  }, [claim, isCurrent]);
 
-  const handleSwap = () => {
-    const o = originName;
-    const d = destinationName;
-    setOriginName(d);
-    setDestinationName(o);
-  };
+  const handleSwap = useCallback(() => {
+    setOriginName((prev) => {
+      setDestinationName(prev);
+      return destinationName;
+    });
+  }, [destinationName]);
 
-  const requestPreview = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user?.user_id) {
-      setError('לא זוהה משתמש מחובר. התחבר/י מחדש ונסה/י שוב.');
-      return;
-    }
-    if (!originName.trim() || !destinationName.trim()) {
-      setError('נא למלא מוצא ויעד');
-      return;
-    }
-    if (isNaN(selectedDate.getTime()) || selectedDate <= new Date()) {
-      setError('נא לבחור זמן יציאה בעתיד');
-      return;
-    }
-    setError('');
-    setLoading(true);
-    setPreview(null);
-    try {
-      const { data } = await previewRideRoutes({
-        driver_id: user.user_id,
-        origin_name: originName.trim(),
-        destination_name: destinationName.trim(),
-        departure_time: selectedDate.toISOString(),
-        available_seats: seats,
-        ...(groupId ? { group_id: groupId } : {}),
-      });
-      const routesList = Array.isArray(data.routes) ? data.routes : (data.routes ? [data.routes] : []);
-      setPreview({ ...data, routes: routesList });
-      setSelectedRouteIndex(routesList.length === 1 ? 0 : -1);
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'תצוגה מקדימה נכשלה'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const requestPreview = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!user?.user_id) { setError('לא זוהה משתמש מחובר. התחבר/י מחדש ונסה/י שוב.'); return; }
+      if (!originName.trim() || !destinationName.trim()) { setError('יש למלא מוצא ויעד'); return; }
+      if (isNaN(selectedDate.getTime()) || selectedDate <= new Date()) { setError('יש לבחור זמן יציאה בעתיד'); return; }
 
-  const createRide = async () => {
+      const token = claim();
+      setStatus('previewing');
+      setError('');
+      setPreview(null);
+
+      try {
+        const { data } = await previewRideRoutes({
+          driver_id: user.user_id,
+          origin_name: originName.trim(),
+          destination_name: destinationName.trim(),
+          departure_time: selectedDate.toISOString(),
+          available_seats: seats,
+          ...(groupId ? { group_id: groupId } : {}),
+        });
+        if (!isCurrent(token)) return;
+        const routesList = Array.isArray(data.routes) ? data.routes : data.routes ? [data.routes] : [];
+        setPreview({ ...data, routes: routesList });
+        setSelectedRouteIndex(routesList.length === 1 ? 0 : -1);
+      } catch (err) {
+        if (isCurrent(token)) setError(getApiErrorMessage(err, 'תצוגה מקדימה נכשלה'));
+      } finally {
+        if (isCurrent(token)) setStatus('idle');
+      }
+    },
+    [user, originName, destinationName, selectedDate, seats, groupId, claim, isCurrent]
+  );
+
+  const createRide = useCallback(async () => {
     if (!preview?.session_id) return;
     const routesCount = preview.routes?.length ?? 0;
     if (routesCount > 1 && (selectedRouteIndex < 0 || selectedRouteIndex >= routesCount)) {
-      setError('נא לבחור מסלול');
+      setError('יש לבחור מסלול');
       return;
     }
-    const indexToSend = routesCount === 1 ? 0 : selectedRouteIndex;
-    setCreating(true);
+    const token = claim();
+    setStatus('creating');
     setError('');
     try {
       await createRideFromSession({
         session_id: preview.session_id,
-        selected_route_index: indexToSend,
+        selected_route_index: routesCount === 1 ? 0 : selectedRouteIndex,
         ...(groupId ? { group_id: groupId } : {}),
       });
+      if (!isCurrent(token)) return;
       setPreview(null);
       navigate(groupId ? `/groups/${groupId}` : '/my-rides', { replace: true });
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'יצירת נסיעה נכשלה'));
+    } catch (err) {
+      if (isCurrent(token)) setError(getApiErrorMessage(err, 'יצירת נסיעה נכשלה'));
     } finally {
-      setCreating(false);
+      if (isCurrent(token)) setStatus('idle');
     }
-  };
+  }, [preview, selectedRouteIndex, groupId, claim, isCurrent, navigate]);
 
   return {
+    groupId,
     originName,
     setOriginName,
     destinationName,
@@ -133,19 +152,18 @@ export function useCreateRide() {
     setSelectedDate,
     seats,
     setSeats,
-    loading,
     preview,
     selectedRouteIndex,
     setSelectedRouteIndex,
-    creating,
     error,
-    locationLoading,
     mapPreviewData,
     setMapPreviewData,
     fillOriginFromMyLocation,
     handleSwap,
     requestPreview,
     createRide,
-    groupId,
+    loading: status === 'previewing',
+    creating: status === 'creating',
+    locationLoading: status === 'locating',
   };
 }

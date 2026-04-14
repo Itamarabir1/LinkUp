@@ -1,5 +1,5 @@
 import type { DriverBookingItem } from './myBookings.types';
-import DriverRideBlock from './DriverRideBlock';
+import DriverRideBlock, { type DriverRideBlockHandlers } from './DriverRideBlock';
 import HistorySection from '../../components/HistorySection/HistorySection';
 import styles from './MyBookings.module.css';
 
@@ -22,14 +22,39 @@ export interface DriverBookingsTabProps {
   onReject: (bookingId: string) => void;
 }
 
-export default function DriverBookingsTab(props: DriverBookingsTabProps) {
-  const { loading, items, myGroups, ...blockProps } = props;
+export default function DriverBookingsTab({
+  loading,
+  items,
+  myGroups,
+  sharingRideId,
+  setSharingRideId,
+  setLiveRideId,
+  setRideToCancel,
+  chatLoading,
+  actionBookingId,
+  onShareStart,
+  onShareStop,
+  onOpenChat,
+  onApprove,
+  onReject,
+}: DriverBookingsTabProps) {
   const activeItems = items.filter(
     (item) => item.ride.status !== 'cancelled' && item.ride.status !== 'completed'
   );
   const pastItems = items.filter(
     (item) => item.ride.status === 'cancelled' || item.ride.status === 'completed'
   );
+
+  const handlers: DriverRideBlockHandlers = {
+    onSharingToggle: (rideId) => setSharingRideId((prev) => (prev === rideId ? null : rideId)),
+    onShareStart,
+    onShareStop,
+    onOpenMap: setLiveRideId,
+    onCancelRide: setRideToCancel,
+    onOpenChat,
+    onApprove,
+    onReject,
+  };
 
   return (
     <div className={styles.cardList}>
@@ -40,12 +65,28 @@ export default function DriverBookingsTab(props: DriverBookingsTabProps) {
       ) : (
         <>
           {activeItems.map((item) => (
-            <DriverRideBlock key={item.ride.ride_id} item={item} myGroups={myGroups} {...blockProps} />
+            <DriverRideBlock
+              key={item.ride.ride_id}
+              item={item}
+              myGroups={myGroups}
+              sharingRideId={sharingRideId}
+              actionBookingId={actionBookingId}
+              chatLoading={chatLoading}
+              handlers={handlers}
+            />
           ))}
           {pastItems.length > 0 ? (
             <HistorySection title="היסטוריית נסיעות נהג">
               {pastItems.map((item) => (
-                <DriverRideBlock key={item.ride.ride_id} item={item} myGroups={myGroups} {...blockProps} />
+                <DriverRideBlock
+                  key={item.ride.ride_id}
+                  item={item}
+                  myGroups={myGroups}
+                  sharingRideId={sharingRideId}
+                  actionBookingId={actionBookingId}
+                  chatLoading={chatLoading}
+                  handlers={handlers}
+                />
               ))}
             </HistorySection>
           ) : null}

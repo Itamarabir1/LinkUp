@@ -12,98 +12,108 @@ export default function MyBookings() {
 
   return (
     <div className={styles.page}>
-      <div role="tablist" className={styles.pageTabs}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={vm.activeTab === 'passenger'}
-          className={vm.activeTab === 'passenger' ? styles.tabActive : styles.tab}
-          onClick={() => vm.setActiveTab('passenger')}
-        >
-          אני נוסע
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={vm.activeTab === 'driver'}
-          className={vm.activeTab === 'driver' ? styles.tabActive : styles.tab}
-          onClick={() => vm.setActiveTab('driver')}
-        >
-          אני נהג
-        </button>
+      <div className={styles.tabWrap}>
+        <div role="tablist" className={styles.tabPills}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={vm.activeTab === 'passenger'}
+            className={
+              vm.activeTab === 'passenger'
+                ? `${styles.tabPill} ${styles.tabPillActive}`
+                : styles.tabPill
+            }
+            onClick={() => vm.setActiveTab('passenger')}
+          >
+            אני נוסע
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={vm.activeTab === 'driver'}
+            className={
+              vm.activeTab === 'driver' ? `${styles.tabPill} ${styles.tabPillActive}` : styles.tabPill
+            }
+            onClick={() => vm.setActiveTab('driver')}
+          >
+            אני נהג
+          </button>
+        </div>
       </div>
 
       {vm.error ? <ErrorBanner message={vm.error} className={styles.pageError} /> : null}
 
-      {vm.activeTab === 'passenger' && (
-        <PassengerBookingsTab
-          loading={vm.passengerLoading}
-          items={vm.passengerList}
-          myGroups={vm.myGroups}
-          sharingLocationBookingId={vm.sharingLocationBookingId}
-          setSharingLocationBookingId={vm.setSharingLocationBookingId}
-          setTrackDriverBookingId={vm.setTrackDriverBookingId}
-          setBookingToCancel={vm.setBookingToCancel}
-          cancelling={vm.cancelling}
-          chatLoading={vm.chatLoading}
-          onOpenChat={vm.handleOpenChat}
-        />
-      )}
+      <div className={styles.content}>
+        {vm.activeTab === 'passenger' && (
+          <PassengerBookingsTab
+            loading={vm.passenger.loading}
+            items={vm.passenger.list}
+            myGroups={vm.myGroups}
+            sharingLocationBookingId={vm.passenger.sharingLocationBookingId}
+            onSharingChange={(id) => vm.passenger.setSharingLocationBookingId(id)}
+            setTrackDriverBookingId={vm.passenger.setTrackDriverBookingId}
+            setBookingToCancel={vm.passenger.setBookingToCancel}
+            cancelling={vm.passenger.cancelling}
+            chatLoading={vm.chat.loading}
+            onOpenChat={vm.chat.onOpen}
+          />
+        )}
 
-      {vm.activeTab === 'driver' && (
-        <DriverBookingsTab
-          loading={vm.driverLoading}
-          items={vm.driverList}
-          myGroups={vm.myGroups}
-          sharingRideId={vm.sharingRideId}
-          setSharingRideId={vm.setSharingRideId}
-          setLiveRideId={vm.setLiveRideId}
-          setRideToCancel={vm.setRideToCancel}
-          chatLoading={vm.chatLoading}
-          actionBookingId={vm.actionBookingId}
-          onShareStart={vm.handleShareStart}
-          onShareStop={vm.handleShareStop}
-          onOpenChat={vm.handleOpenChat}
-          onApprove={vm.handleApprove}
-          onReject={vm.handleReject}
-        />
-      )}
+        {vm.activeTab === 'driver' && (
+          <DriverBookingsTab
+            loading={vm.driver.loading}
+            items={vm.driver.list}
+            myGroups={vm.myGroups}
+            sharingRideId={vm.driver.sharingRideId}
+            setSharingRideId={vm.driver.setSharingRideId}
+            setLiveRideId={vm.driver.setLiveRideId}
+            setRideToCancel={vm.driver.setRideToCancel}
+            chatLoading={vm.chat.loading}
+            actionBookingId={vm.driver.actionBookingId}
+            onShareStart={vm.driver.handleShareStart}
+            onShareStop={vm.driver.handleShareStop}
+            onOpenChat={vm.chat.onOpen}
+            onApprove={vm.driver.handleApprove}
+            onReject={vm.driver.handleReject}
+          />
+        )}
+      </div>
 
       <ConfirmModal
-        open={vm.bookingToCancel != null}
-        onClose={() => vm.setBookingToCancel(null)}
+        open={vm.passenger.bookingToCancel != null}
+        onClose={() => vm.passenger.setBookingToCancel(null)}
         title="האם אתה בטוח שאתה רוצה לבטל את ההזמנה הזו?"
         confirmLabel="אישור"
         variant="danger"
-        loading={vm.cancelling}
-        onConfirm={vm.confirmCancelBooking}
+        loading={vm.passenger.cancelling}
+        onConfirm={vm.passenger.confirmCancelBooking}
         titleId="confirm-cancel-booking-title"
       />
 
       <ConfirmModal
-        open={vm.rideToCancel != null}
-        onClose={() => vm.setRideToCancel(null)}
+        open={vm.driver.rideToCancel != null}
+        onClose={() => vm.driver.setRideToCancel(null)}
         title="האם אתה בטוח שאתה רוצה לבטל את הנסיעה?"
         confirmLabel="אישור"
         variant="danger"
-        loading={vm.cancellingRide}
-        onConfirm={vm.confirmCancelRide}
+        loading={vm.driver.cancellingRide}
+        onConfirm={vm.driver.confirmCancelRide}
         titleId="confirm-cancel-ride-mybookings"
       />
 
-      {vm.trackDriverBookingId && (
+      {vm.passenger.trackDriverBookingId && (
         <LiveMapModal
-          bookingId={vm.trackDriverBookingId}
-          onClose={() => vm.setTrackDriverBookingId(null)}
+          bookingId={vm.passenger.trackDriverBookingId}
+          onClose={() => vm.passenger.setTrackDriverBookingId(null)}
         />
       )}
 
-      {vm.liveRideId && vm.user && (
+      {vm.driver.liveRideId && vm.user && (
         <LiveRideMapModal
-          rideId={vm.liveRideId}
+          rideId={vm.driver.liveRideId}
           driverId={vm.user.user_id}
           broadcastToServer={false}
-          onClose={() => vm.setLiveRideId(null)}
+          onClose={() => vm.driver.setLiveRideId(null)}
         />
       )}
     </div>

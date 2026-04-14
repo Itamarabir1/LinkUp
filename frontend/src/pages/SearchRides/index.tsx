@@ -16,16 +16,16 @@ export default function SearchRides() {
 
   return (
     <div className={styles.page}>
+      {activeGroupName && (
+        <div className={styles.groupBanner}>
+          נוסע בשם קבוצה: {activeGroupName}
+        </div>
+      )}
       <h1 className={styles.pageTitle}>חפש טרמפ</h1>
       <p className={styles.pageMeta}>
-        מוצא, יעד, רדיוס חיפוש (בק"מ) וזמן יציאה אופציונלי – כמו בבקאנד.
+        מוצא, יעד, רדיוס חיפוש וזמן יציאה — כמו בבקאנד.
       </p>
-      {activeGroupName ? (
-        <div className={styles.groupBanner}>
-          <span>🔍 מחפש נסיעות בקבוצה:</span>
-          <strong>{activeGroupName}</strong>
-        </div>
-      ) : null}
+
       <SearchRidesForm
         error={s.error}
         pickup={s.pickup}
@@ -42,48 +42,47 @@ export default function SearchRides() {
         onSwap={s.handleSwap}
         onSubmit={s.search}
       />
+
       <div className={styles.cardList}>
         {s.results.length === 0 && s.hasSearched && !s.searching ? (
           <div>
-            <p className={`${styles.emptyText} ${styles.emptyTextTight}`}>
-              לא נמצאו נסיעות מתאימות.
-            </p>
+            <p className={styles.emptyText}>לא נמצאו נסיעות מתאימות.</p>
             {user && !s.alertSaved ? (
-              <div className={styles.saveAlertRowCenter}>
+              <div style={{ textAlign: 'center' }}>
                 <button
                   type="button"
-                  className={`${styles.btn} ${styles.btnPrimary}`}
+                  className={`${styles.btn} ${styles.btnSuccess}`}
                   onClick={() => void s.saveAlert()}
                   disabled={s.savingAlert}
                 >
-                  {s.savingAlert ? 'שומר...' : '🔔 התרע לי כשתצא נסיעה מתאימה'}
+                  {s.savingAlert ? 'שומר...' : 'התרע לי כשתופיע נסיעה מתאימה'}
                 </button>
               </div>
             ) : null}
             {s.alertSaved ? (
-              <p className={styles.savedSearchBanner}>
-                ✅ נשמר! נודיע לך במייל כשתצא נסיעה מתאימה.
-              </p>
+              <p className={styles.savedSearchBanner}>נשמר! נודיע לך כשתופיע נסיעה מתאימה.</p>
             ) : null}
           </div>
         ) : (
           <>
-            {s.results.length > 0 && user ? (
-              <div className={styles.saveAlertRow}>
-                {!s.alertSaved ? (
+            {s.results.length > 0 && (
+              <div className={styles.resultsHeader}>
+                <span className={styles.resultsLabel}>{s.results.length} נסיעות נמצאו</span>
+                {user && !s.alertSaved ? (
                   <button
                     type="button"
-                    className={`${styles.btn} ${styles.btnOutline}`}
+                    className={styles.saveAlertBtn}
                     onClick={() => void s.saveAlert()}
                     disabled={s.savingAlert}
                   >
-                    {s.savingAlert ? 'שומר...' : '🔔 שמור חיפוש זה להתראות'}
+                    {s.savingAlert ? 'שומר...' : 'שמור חיפוש להתראות'}
                   </button>
-                ) : (
-                  <p className={styles.savedSearchBanner}>✅ החיפוש נשמר להתראות</p>
-                )}
+                ) : s.alertSaved ? (
+                  <span className={styles.savedSearchBanner}>החיפוש נשמר</span>
+                ) : null}
               </div>
-            ) : null}
+            )}
+
             {s.results.map((r) => (
               <SearchRideCard
                 key={r.ride_id}
@@ -98,7 +97,8 @@ export default function SearchRides() {
                 onRequestJoin={s.sendRequestToJoin}
               />
             ))}
-            {s.resultsHasMore ? (
+
+            {s.resultsHasMore && (
               <div className={styles.loadMoreWrap}>
                 <button
                   type="button"
@@ -109,7 +109,7 @@ export default function SearchRides() {
                   {s.loadingMore ? 'טוען...' : 'טען עוד נסיעות'}
                 </button>
               </div>
-            ) : null}
+            )}
           </>
         )}
       </div>

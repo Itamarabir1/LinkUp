@@ -1,21 +1,88 @@
 .page {
-  padding: 32px 24px;
-  max-width: 1000px;
-  margin: 0 auto;
+  min-height: 0;
   text-align: right;
 }
 
 .pageError {
-  color: var(--danger-text);
-  margin-bottom: 1rem;
+  margin: 0 24px 1rem;
 }
 
 .pageLoading {
   text-align: center;
   color: var(--text-secondary);
   padding: 3rem;
+  font-family: var(--font-primary, "Heebo", sans-serif);
 }
 
+/* ── Section header ── */
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 12px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.sectionLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  font-family: var(--font-primary, "Heebo", sans-serif);
+}
+
+.sectionCount {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* ── Grid ── */
+.gridWrap {
+  padding: 0 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+
+/* ── Card wrap + delete button ── */
+.cardWrap { position: relative; }
+
+.cardDeleteBtn {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity var(--transition-fast, 180ms ease), background var(--transition-fast, 180ms ease);
+}
+
+.cardWrap:hover .cardDeleteBtn { opacity: 1; }
+.cardWrap:focus-within .cardDeleteBtn { opacity: 1; }
+.cardDeleteBtn:hover { background: var(--danger-border); border-color: var(--danger-border); }
+@media (hover: none) { .cardDeleteBtn { opacity: 1; } }
+
+/* ── Empty state ── */
 .emptyState {
   display: flex;
   flex-direction: column;
@@ -25,13 +92,10 @@
   text-align: center;
 }
 
-.emptyIcon {
-  color: var(--border);
-  margin-bottom: 1rem;
-}
+.emptyIcon { color: var(--border); margin-bottom: 1rem; }
 
 .emptyTitle {
-  font-family: "Heebo", sans-serif;
+  font-family: var(--font-primary, "Heebo", sans-serif);
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
@@ -39,7 +103,7 @@
 }
 
 .emptySubtitle {
-  font-family: "Heebo", sans-serif;
+  font-family: var(--font-primary, "Heebo", sans-serif);
   font-size: 14px;
   color: var(--text-secondary);
   margin: 0 0 1.5rem;
@@ -47,110 +111,23 @@
 
 .btnSearch {
   height: 38px;
-  padding: 0 18px;
+  padding: 0 20px;
   border: 1.5px solid var(--primary-soft-border);
   background: var(--primary-light);
   color: var(--primary);
   border-radius: var(--radius-md);
-  font-family: "Heebo", sans-serif;
+  font-family: var(--font-primary, "Heebo", sans-serif);
   font-size: 13px;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  transition: all 180ms ease;
+  transition: all var(--transition-fast, 180ms ease);
 }
 
 .btnSearch:hover {
   background: var(--primary);
-  color: white;
+  color: #fff;
   border-color: var(--primary);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-
-@media (max-width: 900px) {
-  .grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 600px) {
-  .grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.cardWrap {
-  position: relative;
-}
-
-.cardDeleteBtn {
-  position: absolute;
-  top: 0.6rem;
-  left: 0.6rem;
-  width: 26px;
-  height: 26px;
-  border: none;
-  background: var(--bg-secondary);
-  color: var(--text-tertiary);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  transition: all 180ms ease;
-  z-index: 1;
-  opacity: 0;
-}
-
-.cardWrap:hover .cardDeleteBtn {
-  opacity: 1;
-}
-
-.cardDeleteBtn:hover {
-  background: var(--danger-bg);
-  color: var(--danger-text);
-}
-
-.btnOutline {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  padding: 0.5rem 1.1rem;
-  border-radius: var(--radius-md);
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 180ms ease;
-  font-family: "Heebo", sans-serif;
-}
-
-.btnOutline:hover {
-  border-color: var(--primary-soft-border);
-  color: var(--primary);
-  background: var(--primary-light);
-}
-
-.btnDanger {
-  background: var(--danger-text);
-  color: var(--text-inverse);
-  border: none;
-  padding: 0.5rem 1.1rem;
-  border-radius: var(--radius-md);
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 180ms ease;
-  font-family: "Heebo", sans-serif;
-}
-
-.btnDanger:hover {
-  background: var(--danger-hover);
 }

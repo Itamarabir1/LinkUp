@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import func, or_, select, text
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, with_loader_criteria
 
 from app.core.exceptions.booking import ForbiddenRideActionError, NoSeatsAvailableError
 from app.domain.bookings.enum import BookingStatus
@@ -385,8 +385,40 @@ class CRUDBooking:
             .values(status=BookingStatus.COMPLETED.value),
         )
 
-    # app/domain/bookings/crud.py
+    async def get_driver_rides_with_passengers(self, db: AsyncSession, driver_id: UUID) -> list[Ride]:
+        """Driver rides with pending/confirmed bookings and group in one round-trip."""
+        did = UUID(str(driver_id)) if isinstance(driver_id, str) else driver_id
+        stmt = (
+            select(Ride)
+            .where(Ride.driver_id == did)
+            .options(
+                joinedload(Ride.bookings).joinedload(Booking.passenger_request).joinedload(PassengerRequest.user),
+                joinedload(Ride.group),
+                with_loader_criteria(
+                    Booking,
+                    Booking.status.in_([BookingStatus.PENDING, BookingStatus.CONFIRMED]),
+                ),
+            )
+            .order_by(Ride.departure_time.asc())
+        )
+        result = await db.execute(stmt)
+        return list(result.scalars().unique().all())
 
+    async def get_passenger_bookings_with_rides(self, db: AsyncSession, passenger_id: UUID) -> list[Booking]:
+        """Passenger bookings with ride, driver, and group in one round-trip."""
+        pid = UUID(str(passenger_id)) if isinstance(passenger_id, str) else passenger_id
+        stmt = (
+            select(Booking)
+            .join(Booking.ride)
+            .where(Booking.passenger_id == pid)
+            .options(
+                joinedload(Booking.ride).joinedload(Ride.driver),
+                joinedload(Booking.ride).joinedload(Ride.group),
+            )
+            .order_by(Ride.departure_time.asc())
+        )
+        result = await db.execute(stmt)
+        return list(result.scalars().unique().all())
 
     async def get_user_history(self, db: AsyncSession, user_id: UUID, role: str) -> list[Booking]:
         # joinedload avoids N+1 queries

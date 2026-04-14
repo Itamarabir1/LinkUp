@@ -142,3 +142,52 @@ async def test_reject_booking_changes_status_and_outbox(db_session: AsyncSession
 
     assert rejected.status == BookingStatus.REJECTED
     mock_publish.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_get_driver_summary_embeds_passengers(db_session: AsyncSession):
+    """Driver summary returns rides with pending/confirmed passengers in one service call."""
+    driver = await make_user(db_session, "drv_sum", email_suffix="bookings")
+    passenger = await make_user(db_session, "pax_sum", email_suffix="bookings")
+    ride = await make_ride(db_session, driver.user_id, seats=4)
+    p_req = await make_passenger_request(db_session, passenger.user_id)
+
+    with patch("app.domain.bookings.service.publish_to_outbox", new_callable=AsyncMock):
+        await BookingService.request_to_join(
+            db_session,
+            ride.ride_id,
+            p_req.request_id,
+            num_seats=1,
+            current_user_id=passenger.user_id,
+        )
+
+    summary = await BookingService.get_driver_summary(db_session, driver.user_id)
+    assert len(summary.rides) >= 1
+    match = next((r for r in summary.rides if str(r.ride_id) == str(ride.ride_id)), None)
+    assert match is not None
+    assert len(match.passengers) == 1
+    assert match.passengers[0].passenger_name
+
+
+@pytest.mark.asyncio
+async def test_get_passenger_summary_includes_driver_when_ride_open(db_session: AsyncSession):
+    """Passenger summary embeds driver for non-terminal ride statuses."""
+    driver = await make_user(db_session, "drv_ps", email_suffix="bookings")
+    passenger = await make_user(db_session, "pax_ps", email_suffix="bookings")
+    ride = await make_ride(db_session, driver.user_id, seats=4)
+    p_req = await make_passenger_request(db_session, passenger.user_id)
+
+    with patch("app.domain.bookings.service.publish_to_outbox", new_callable=AsyncMock):
+        await BookingService.request_to_join(
+            db_session,
+            ride.ride_id,
+            p_req.request_id,
+            num_seats=1,
+            current_user_id=passenger.user_id,
+        )
+
+    summary = await BookingService.get_passenger_summary(db_session, passenger.user_id)
+    assert len(summary.bookings) >= 1
+    row = summary.bookings[0]
+    assert row.driver is not None
+    assert row.driver.full_name

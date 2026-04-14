@@ -51,43 +51,47 @@ export function useMyBookings() {
     [openChat]
   );
 
+  /** Grouped view-model so tabs only depend on the slice they need. */
   return {
-    // identity
     user,
     myGroups,
-    // tab
     activeTab,
     setActiveTab,
-    // shared state
     error,
-    chatLoading,
-    trackDriverBookingId,
-    setTrackDriverBookingId,
-    sharingLocationBookingId,
-    setSharingLocationBookingId,
-    handleOpenChat,
-    // passenger
-    passengerList: passenger.passengerList,
-    passengerLoading: passenger.passengerLoading,
-    bookingToCancel: passenger.bookingToCancel,
-    setBookingToCancel: passenger.setBookingToCancel,
-    cancelling: passenger.cancelling,
-    confirmCancelBooking: passenger.confirmCancelBooking,
-    // driver
-    driverList: driver.driverList,
-    driverLoading: driver.driverLoading,
-    sharingRideId: driver.sharingRideId,
-    setSharingRideId: driver.setSharingRideId,
-    liveRideId: driver.liveRideId,
-    setLiveRideId: driver.setLiveRideId,
-    rideToCancel: driver.rideToCancel,
-    setRideToCancel: driver.setRideToCancel,
-    cancellingRide: driver.cancellingRide,
-    actionBookingId: driver.actionBookingId,
-    handleShareStart: driver.handleShareStart,
-    handleShareStop: driver.handleShareStop,
-    handleApprove: driver.handleApprove,
-    handleReject: driver.handleReject,
-    confirmCancelRide: driver.confirmCancelRide,
+    passenger: {
+      list: passenger.passengerList,
+      loading: passenger.passengerLoading,
+      bookingToCancel: passenger.bookingToCancel,
+      setBookingToCancel: passenger.setBookingToCancel,
+      cancelling: passenger.cancelling,
+      confirmCancelBooking: passenger.confirmCancelBooking,
+      sharingLocationBookingId,
+      setSharingLocationBookingId,
+      trackDriverBookingId,
+      setTrackDriverBookingId,
+    },
+    driver: {
+      list: driver.driverList,
+      loading: driver.driverLoading,
+      sharingRideId: driver.sharingRideId,
+      setSharingRideId: driver.setSharingRideId,
+      liveRideId: driver.liveRideId,
+      setLiveRideId: driver.setLiveRideId,
+      rideToCancel: driver.rideToCancel,
+      setRideToCancel: driver.setRideToCancel,
+      cancellingRide: driver.cancellingRide,
+      actionBookingId: driver.actionBookingId,
+      handleShareStart: driver.handleShareStart,
+      handleShareStop: driver.handleShareStop,
+      handleApprove: driver.handleApprove,
+      handleReject: driver.handleReject,
+      confirmCancelRide: driver.confirmCancelRide,
+    },
+    chat: {
+      loading: chatLoading,
+      onOpen: handleOpenChat,
+    },
   };
 }
+
+export type MyBookingsViewModel = ReturnType<typeof useMyBookings>;

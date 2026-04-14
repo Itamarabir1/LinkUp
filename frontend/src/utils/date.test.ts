@@ -1,5 +1,10 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { formatConversationTime, formatDateTimeNoSeconds, formatRideDate } from './date';
+import {
+  formatConversationTime,
+  formatDateTimeNoSeconds,
+  formatRelativeNotificationTime,
+  formatRideDate,
+} from './date';
 
 describe('formatDateTimeNoSeconds', () => {
   it('returns empty string for invalid input', () => {
@@ -65,5 +70,16 @@ describe('formatConversationTime', () => {
     vi.setSystemTime(now);
     const past = new Date(2026, 3, 1, 9, 5, 0);
     expect(formatConversationTime(past)).toBe('09:05');
+  });
+});
+
+describe('formatRelativeNotificationTime', () => {
+  it('returns empty string for invalid date', () => {
+    expect(formatRelativeNotificationTime('')).toBe('');
+    expect(formatRelativeNotificationTime('not-a-date')).toBe('');
+  });
+
+  it('returns "עכשיו" for current time', () => {
+    expect(formatRelativeNotificationTime(new Date().toISOString())).toBe('עכשיו');
   });
 });

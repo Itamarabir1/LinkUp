@@ -25,7 +25,6 @@ export default function GroupSettingsTab({ vm }: { vm: GroupManageViewModel }) {
       <hr className={styles.divider} />
 
       <div className={styles.dangerZone}>
-        <h3 className={styles.dangerTitle}>אזור מסוכן</h3>
         <button
           type="button"
           className={styles.btnDanger}

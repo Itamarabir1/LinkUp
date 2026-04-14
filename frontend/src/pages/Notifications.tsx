@@ -14,7 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { useChat, getNotificationItemKey } from '../context/ChatContext';
 import { api } from '../api/client';
 import type { NotificationItem } from '../types/api';
-import { formatDateTimeNoSeconds } from '../utils/date';
+import { formatRelativeNotificationTime } from '../utils/date';
 import styles from './Notifications.module.css';
 
 type DisplayType = 'booking_approved' | 'booking_rejected' | 'ride_cancelled' | 'booking_request' | 'booking_cancelled_by_passenger' | 'group_joined' | 'group_member_joined' | 'pending_approval' | 'default';
@@ -121,6 +121,32 @@ export default function Notifications() {
     if (target) navigate(target);
   };
 
+  function getAvatarColorClass(displayType: DisplayType): string {
+    if (displayType === 'booking_approved') return styles.avatarApproved;
+    if (displayType === 'booking_rejected') return styles.avatarRejected;
+    if (displayType === 'ride_cancelled') return styles.avatarCancelled;
+    if (displayType === 'booking_request' || displayType === 'pending_approval') return styles.avatarRequest;
+    if (displayType === 'group_joined' || displayType === 'group_member_joined') return styles.avatarGroup;
+    return styles.avatarDefault;
+  }
+
+  function getBadgeColorClass(displayType: DisplayType): string {
+    if (
+      displayType === 'booking_approved' ||
+      displayType === 'group_joined' ||
+      displayType === 'group_member_joined'
+    )
+      return styles.badgeGreen;
+    if (displayType === 'booking_rejected' || displayType === 'booking_cancelled_by_passenger')
+      return styles.badgeRed;
+    if (displayType === 'ride_cancelled') return styles.badgeAmber;
+    return styles.badgeBlue;
+  }
+
+  function getAvatarLetter(n: NotificationItem): string {
+    return (n.other_party_name || '?').charAt(0).toUpperCase();
+  }
+
   if (loading) {
     return (
       <div className={styles.page}>
@@ -171,23 +197,52 @@ export default function Notifications() {
                     className={`${styles.notificationRow} ${read ? '' : styles.unread}`}
                     onClick={() => handleRowClick(n)}
                   >
-                    <span className={`${styles.notifIcon} ${styles[`icon_${displayType}`]}`}>
-                      {displayType === 'booking_approved' && <CheckCircle size={16} />}
-                      {displayType === 'booking_rejected' && <XCircle size={16} />}
-                      {displayType === 'ride_cancelled' && <AlertTriangle size={16} />}
-                      {displayType === 'booking_request' && <UserPlus size={16} />}
-                      {displayType === 'booking_cancelled_by_passenger' && <UserMinus size={16} />}
-                      {displayType === 'group_joined' && <Users size={16} />}
-                      {displayType === 'group_member_joined' && <UserCheck size={16} />}
-                      {(displayType === 'pending_approval' || displayType === 'default') && <Bell size={16} />}
-                    </span>
+                    <div className={styles.avatarWrap}>
+                      <div className={`${styles.avatarCircle} ${getAvatarColorClass(displayType)}`}>
+                        {getAvatarLetter(n)}
+                      </div>
+                      <div className={`${styles.typeBadge} ${getBadgeColorClass(displayType)}`}>
+                        {displayType === 'booking_approved' && (
+                          <CheckCircle size={10} strokeWidth={2.5} color="#fff" />
+                        )}
+                        {displayType === 'booking_rejected' && (
+                          <XCircle size={10} strokeWidth={2.5} color="#fff" />
+                        )}
+                        {displayType === 'ride_cancelled' && (
+                          <AlertTriangle size={10} strokeWidth={2.5} color="#fff" />
+                        )}
+                        {displayType === 'booking_request' && (
+                          <UserPlus size={10} strokeWidth={2.5} color="#fff" />
+                        )}
+                        {displayType === 'booking_cancelled_by_passenger' && (
+                          <UserMinus size={10} strokeWidth={2.5} color="#fff" />
+                        )}
+                        {displayType === 'group_joined' && (
+                          <Users size={10} strokeWidth={2.5} color="#fff" />
+                        )}
+                        {displayType === 'group_member_joined' && (
+                          <UserCheck size={10} strokeWidth={2.5} color="#fff" />
+                        )}
+                        {(displayType === 'pending_approval' || displayType === 'default') && (
+                          <Bell size={10} strokeWidth={2.5} color="#fff" />
+                        )}
+                      </div>
+                    </div>
+
                     <div className={styles.notifContent}>
                       <p className={read ? styles.notifTitle : `${styles.notifTitle} ${styles.notifTitleUnread}`}>
                         {n.title}
                       </p>
                       {bodyLine && <p className={styles.notifBody}>{bodyLine}</p>}
-                      <p className={styles.notifTime}>{formatDateTimeNoSeconds(n.created_at)}</p>
+                      <p
+                        className={
+                          read ? styles.notifTime : `${styles.notifTime} ${styles.notifTimeUnread}`
+                        }
+                      >
+                        {formatRelativeNotificationTime(n.created_at)}
+                      </p>
                     </div>
+
                     {!read && <span className={styles.unreadDot} aria-hidden />}
                   </button>
                 );

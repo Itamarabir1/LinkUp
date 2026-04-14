@@ -399,7 +399,7 @@
 | **State גלובלי** | **`ChatContext`** + `chatReducer`; **`GroupContext`** — רשימת קבוצות, `activeChipId` משותף ל־**MyRides** / **MyRequests** (פילטר צ’יפים); איפוס צ’יפ אחרי leave/close קבוצה בזרימות ניהול. |
 | **פיד התראות (in-app)** | **`useChatNotificationsWebSocket`** (`useReconnectingWebSocket`, **`onOpen`** → רענון פיד + unread + `linkup-notifications-refresh`) + **`useChatNotificationsFeed`** — polling REST **~5 דקות** כגיבוי; משולב ב־`ChatContext`. |
 | **בקשות נוסע** | הוק **`useMyRequests`** — לוגיקת MyRequests מרוכזת. |
-| **הזמנות שלי (VM)** | **`useMyBookings`** — אגרגציה מפורשת מ־`useMyBookingsPassenger` + `useMyBookingsDriver` (ללא spread), חוזה גלוי ל־`MyBookings/index.tsx`. |
+| **הזמנות שלי (VM)** | **`useMyBookings`** — קומפוזיציה מ־`useMyBookingsPassenger` + `useMyBookingsDriver`; החזרה **מקוננת** (`passenger`, `driver`, `chat`) + יצוא **`MyBookingsViewModel`**. טעינה ב־**קריאת REST אחת לטאב** (`/bookings/driver-summary`, `/bookings/passenger-summary`) במקום N+1. כרטיס נוסע: **`PassengerBookingCard`**. |
 | **עיצוב** | **`tokens.css`**, `ThemeContext`, מצב כהה — פחות אינליין CSS בדפי auth. |
 | **איכות** | בדיקות יחידה ל־reducer ול־utils קריטיים (`chatReducer`, `apiError`, `myBookings.utils`, MessageThread WS, `ErrorBanner`) לפי [`FRONTEND_REFACTOR_AND_QUALITY.md`](../frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md). |
 | **Zod + WebSocket** | סכימות ב־**`src/types/wsEvents.ts`**; אימות בכניסה ב־hooks וב־**`processChatWebSocketMessage`** — ראו **סעיף 5**. |

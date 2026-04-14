@@ -1,30 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Car, Plus } from 'lucide-react';
+import { Car, Plus, X } from 'lucide-react';
 import { cancelRide, fetchMyRides } from '../api/rides';
 import type { Ride } from '../types/api';
 import { formatDateTimeNoSeconds } from '../utils/date';
-import { STORAGE_KEYS } from '../config/constants';
-import { WS_URLS } from '../config/wsUrls';
-import { RideEventSchema } from '../types/wsEvents';
 import { useGroup } from '../context/GroupContext';
 import Chips, { type ChipItem } from '../components/Chips/Chips';
 import RideCard from '../components/RideCard/RideCard';
 import ConfirmModal from '../components/ConfirmModal/ConfirmModal';
 import ErrorBanner from '../components/ErrorBanner';
 import { getApiErrorMessage } from '../utils/apiError';
-import { getRideSourceLabel } from '../utils/rideDisplay';
+import { getRideSourceLabel, getRideStatusLabel } from '../utils/rideDisplay';
 import HistorySection from '../components/HistorySection/HistorySection';
+import { useUserEvent } from '../hooks/useUserEvent';
+import { useRideWebSocket } from '../hooks/useRideWebSocket';
+import { LIVE_STATUSES } from '../constants/rideStatuses';
 import styles from './MyRides.module.css';
-
-function getStatusLabel(r: Ride): string {
-  if (r.status === 'cancelled') return 'בוטלה';
-  if (r.status === 'active') return 'פעילה';
-  const seats = r.available_seats ?? 0;
-  if (seats <= 0) return 'מלא';
-  if (seats === 1) return '1 מקום';
-  return `${seats} מקומות`;
-}
 
 export default function MyRides() {
   const navigate = useNavigate();
@@ -34,9 +25,6 @@ export default function MyRides() {
   const [error, setError] = useState('');
   const [rideToCancel, setRideToCancel] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
-  const wsRefs = useRef<Map<string, WebSocket>>(new Map());
-  const ridesRef = useRef<Ride[]>([]);
-  ridesRef.current = rides;
 
   const chipItems: ChipItem[] = [
     { id: 'all', label: 'הכל' },
@@ -49,8 +37,21 @@ export default function MyRides() {
     if (activeChipId === 'public') return !r.group_id;
     return r.group_id === activeChipId;
   });
-  const activeRides = displayedRides.filter((r) => r.status !== 'cancelled' && r.status !== 'completed');
-  const pastRides = displayedRides.filter((r) => r.status === 'cancelled' || r.status === 'completed');
+  const activeRides = displayedRides.filter(
+    (r) => r.status !== 'cancelled' && r.status !== 'completed'
+  );
+  const pastRides = displayedRides.filter(
+    (r) => r.status === 'cancelled' || r.status === 'completed'
+  );
+
+  // One WS slot: prefer the soonest departing live ride so updates match the trip the user cares about first.
+  const watchedRideId =
+    rides
+      .filter((r) => LIVE_STATUSES.has(r.status))
+      .sort(
+        (a, b) =>
+          new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime()
+      )[0]?.ride_id ?? null;
 
   const fetchRides = useCallback(async () => {
     try {
@@ -65,87 +66,44 @@ export default function MyRides() {
   }, []);
 
   useEffect(() => {
-    fetchRides();
+    void fetchRides();
   }, [fetchRides]);
 
-  useEffect(() => {
-    const onUserEvent = (evt: Event) => {
-      const detail = (evt as CustomEvent<{ event?: string; ride_id?: string; status?: string }>).detail;
-      if (!detail?.event || !detail.ride_id) return;
-      if (detail.event === 'RIDE_FINISHED' || detail.event === 'RIDE_CANCELLED') {
+  // Real-time updates from the user event stream (driver-owned events).
+  useUserEvent(
+    ['RIDE_FINISHED', 'RIDE_CANCELLED'],
+    useCallback(
+      (detail) => {
+        if (!detail.ride_id) return;
         setRides((prev) =>
           prev.map((r) =>
-            r.ride_id === detail.ride_id ? { ...r, status: (detail.status as Ride['status']) ?? 'completed' } : r
+            r.ride_id === detail.ride_id
+              ? { ...r, status: (detail.status as Ride['status']) ?? 'completed' }
+              : r
           )
         );
-      }
-    };
-    window.addEventListener('linkup:user-event', onUserEvent as EventListener);
-    return () => window.removeEventListener('linkup:user-event', onUserEvent as EventListener);
-  }, []);
+      },
+      []
+    )
+  );
 
-  useEffect(() => {
-    const rideIds = rides.map((r) => r.ride_id);
-    const currentIds = new Set(rideIds);
-    const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-    if (!token) return;
-
-    const handleMessage = (_rideId: string, ev: MessageEvent) => {
-      try {
-        const raw = JSON.parse(ev.data as string);
-        const result = RideEventSchema.safeParse(raw);
-        if (!result.success) return;
-        const { event } = result.data;
+  // Per-ride WS for the single live ride — catches RIDE_STARTED / RIDE_ENDED / RIDE_CANCELLED.
+  useRideWebSocket({
+    rideId: watchedRideId,
+    enabled: !!watchedRideId,
+    onMessage: useCallback(
+      (msg) => {
         if (
-          event === 'RIDE_CANCELLED' ||
-          event === 'RIDE_ENDED' ||
-          event === 'RIDE_STARTED'
+          msg.event === 'RIDE_CANCELLED' ||
+          msg.event === 'RIDE_ENDED' ||
+          msg.event === 'RIDE_STARTED'
         ) {
           void fetchRides();
         }
-      } catch {
-        /* ignore */
-      }
-    };
-
-    const openWs = (rideId: string) => {
-      if (wsRefs.current.has(rideId)) return;
-      try {
-        const ws = new WebSocket(WS_URLS.ride(rideId, token));
-        wsRefs.current.set(rideId, ws);
-        ws.onmessage = (ev) => handleMessage(rideId, ev);
-        ws.onclose = () => {
-          wsRefs.current.delete(rideId);
-          if (ridesRef.current.some((r) => r.ride_id === rideId)) {
-            setTimeout(() => {
-              if (wsRefs.current.has(rideId)) return;
-              if (!ridesRef.current.some((r) => r.ride_id === rideId)) return;
-              openWs(rideId);
-            }, 3000);
-          }
-        };
-        ws.onerror = () => ws.close();
-      } catch {
-        wsRefs.current.delete(rideId);
-      }
-    };
-
-    rideIds.forEach((rideId) => openWs(rideId));
-    wsRefs.current.forEach((sock, id) => {
-      if (!currentIds.has(id)) {
-        sock.close();
-        wsRefs.current.delete(id);
-      }
-    });
-  }, [rides, fetchRides]);
-
-  useEffect(() => {
-    const refs = wsRefs.current;
-    return () => {
-      refs.forEach((sock) => sock.close());
-      refs.clear();
-    };
-  }, []);
+      },
+      [fetchRides]
+    ),
+  });
 
   const handleConfirmCancel = useCallback(async () => {
     if (rideToCancel == null) return;
@@ -175,11 +133,8 @@ export default function MyRides() {
 
   return (
     <div className={styles.page}>
-      <Chips
-        items={chipItems}
-        activeId={activeChipId}
-        onChange={setActiveChipId}
-      />
+      <Chips items={chipItems} activeId={activeChipId} onChange={setActiveChipId} />
+
       {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
 
       {displayedRides.length === 0 ? (
@@ -198,62 +153,74 @@ export default function MyRides() {
         </div>
       ) : (
         <>
-          <div className={styles.grid}>
-            {activeRides.map((r) => (
-              <div key={r.ride_id} className={styles.cardWrap}>
-                <button
-                  type="button"
-                  className={styles.cardDeleteBtn}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setRideToCancel(r.ride_id);
-                  }}
-                  title="מחק נסיעה"
-                  aria-label="מחק נסיעה"
-                >
-                  ×
-                </button>
-                <RideCard
-                  route={`${r.origin_name ?? '?'} ← ${r.destination_name ?? '?'}`}
-                  scheduleCaption="זמן הנסיעה"
-                  time={formatDateTimeNoSeconds(r.departure_time)}
-                  status={getStatusLabel(r)}
-                  source={getRideSourceLabel(r.group_id, myGroups)}
-                />
+          {activeRides.length > 0 && (
+            <>
+              <div className={styles.sectionHeader}>
+                <span className={styles.sectionLabel}>נסיעות פעילות</span>
+                <span className={styles.sectionCount}>{activeRides.length} נסיעות</span>
               </div>
-            ))}
-          </div>
-          {pastRides.length > 0 ? (
-            <HistorySection title="נסיעות עבר">
-              <div className={styles.grid}>
-                {pastRides.map((r) => (
-                  <div key={r.ride_id} className={styles.cardWrap}>
-                    <RideCard
-                      route={`${r.origin_name ?? '?'} ← ${r.destination_name ?? '?'}`}
-                      scheduleCaption="זמן הנסיעה"
-                      time={formatDateTimeNoSeconds(r.departure_time)}
-                      status={getStatusLabel(r)}
-                      source={getRideSourceLabel(r.group_id, myGroups)}
-                    />
-                  </div>
-                ))}
+              <div className={styles.gridWrap}>
+                <div className={styles.grid}>
+                  {activeRides.map((r) => (
+                    <div key={r.ride_id} className={styles.cardWrap}>
+                      <button
+                        type="button"
+                        className={styles.cardDeleteBtn}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRideToCancel(r.ride_id);
+                        }}
+                        title="בטל נסיעה"
+                        aria-label="בטל נסיעה"
+                      >
+                        <X size={12} strokeWidth={2.5} />
+                      </button>
+                      <RideCard
+                        route={`${r.origin_name ?? '?'} → ${r.destination_name ?? '?'}`}
+                        scheduleCaption="זמן היציאה"
+                        time={formatDateTimeNoSeconds(r.departure_time)}
+                        status={getRideStatusLabel(r)}
+                        source={getRideSourceLabel(r.group_id, myGroups)}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-            </HistorySection>
-          ) : null}
+            </>
+          )}
+
+          {pastRides.length > 0 && (
+            <div className={styles.gridWrap}>
+              <HistorySection title={`נסיעות עבר · ${pastRides.length}`}>
+                <div className={styles.grid}>
+                  {pastRides.map((r) => (
+                    <div key={r.ride_id} className={styles.cardWrap}>
+                      <RideCard
+                        route={`${r.origin_name ?? '?'} → ${r.destination_name ?? '?'}`}
+                        scheduleCaption="זמן היציאה"
+                        time={formatDateTimeNoSeconds(r.departure_time)}
+                        status={getRideStatusLabel(r)}
+                        source={getRideSourceLabel(r.group_id, myGroups)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </HistorySection>
+            </div>
+          )}
         </>
       )}
 
       <ConfirmModal
         open={rideToCancel != null}
         onClose={() => setRideToCancel(null)}
-        title="האם אתה בטוח שאתה רוצה לבטל את הנסיעה?"
+        title="האם אתה בטוח שברצונך לבטל את הנסיעה?"
         confirmLabel="אישור"
         variant="danger"
         loading={cancelling}
         onConfirm={handleConfirmCancel}
         titleId="confirm-cancel-ride-title"
       />
-
     </div>
   );
 }

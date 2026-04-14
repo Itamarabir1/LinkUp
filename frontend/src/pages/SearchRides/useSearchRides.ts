@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchAddressFromCoords } from '../../api/geo';
 import {
@@ -17,8 +17,23 @@ function defaultDepartureDate(): Date {
   return d;
 }
 
+function useOperationToken() {
+  const tokenRef = useRef(0);
+  const claim = useCallback((): number => {
+    tokenRef.current += 1;
+    return tokenRef.current;
+  }, []);
+  const isCurrent = useCallback((token: number): boolean => {
+    return tokenRef.current === token;
+  }, []);
+  return { claim, isCurrent };
+}
+
 export function useSearchRides() {
   const { groupId } = useParams<{ groupId?: string }>();
+  const { claim: claimLocation, isCurrent: isLocationOpCurrent } = useOperationToken();
+  const { claim: claimSearch, isCurrent: isSearchOpCurrent } = useOperationToken();
+  const { claim: claimLoadMore, isCurrent: isLoadMoreOpCurrent } = useOperationToken();
   const [pickup, setPickup] = useState('');
   const [destination, setDestination] = useState('');
   const [searchRadius, setSearchRadius] = useState(1);
@@ -40,40 +55,47 @@ export function useSearchRides() {
   const [alertSaved, setAlertSaved] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const fillPickupFromMyLocation = () => {
+  const fillPickupFromMyLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setError('הדפדפן לא תומך במיקום');
       return;
     }
+    const token = claimLocation();
     setLocationLoading(true);
     setError('');
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
         try {
-          const { data } = await fetchAddressFromCoords(lat, lon);
-          setPickup(data.address ?? '');
+          const { data } = await fetchAddressFromCoords(
+            pos.coords.latitude,
+            pos.coords.longitude
+          );
+          if (isLocationOpCurrent(token)) setPickup(data.address ?? '');
         } catch (err) {
-          setError(getApiErrorMessage(err, 'לא נמצאה כתובת למיקום זה'));
+          if (isLocationOpCurrent(token))
+            setError(getApiErrorMessage(err, 'לא נמצאה כתובת למיקום זה'));
         } finally {
-          setLocationLoading(false);
+          if (isLocationOpCurrent(token)) setLocationLoading(false);
         }
       },
       () => {
-        setError('לא ניתן לקבל מיקום – בדוק הרשאות');
-        setLocationLoading(false);
+        if (isLocationOpCurrent(token)) {
+          setError('לא ניתן לקבל מיקום — בדוק הרשאות');
+          setLocationLoading(false);
+        }
       },
       { timeout: 10000 }
     );
-  };
+  }, [claimLocation, isLocationOpCurrent]);
 
-  const handleSwap = () => {
-    setPickup(destination);
-    setDestination(pickup);
-  };
+  const handleSwap = useCallback(() => {
+    setPickup((currentPickup) => {
+      setDestination(currentPickup);
+      return destination;
+    });
+  }, [destination]);
 
-  const buildSearchParams = (): Record<string, string | number | undefined> => {
+  const buildSearchParams = useCallback((): Record<string, string | number | undefined> => {
     const params: Record<string, string | number | undefined> = {
       pickup_name: pickup.trim(),
       destination_name: destination.trim(),
@@ -83,53 +105,76 @@ export function useSearchRides() {
     if (selectedDate) params.departure_time = selectedDate.toISOString();
     if (groupId) params.group_id = groupId;
     return params;
-  };
+  }, [pickup, destination, searchRadius, selectedDate, groupId]);
 
-  const search = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pickup.trim() || !destination.trim()) {
-      setError('נא למלא מוצא ויעד');
-      return;
-    }
-    setError('');
-    setSearching(true);
-    setResults([]);
-    setHasSearched(false);
-    setResultsNextCursor(null);
-    setResultsHasMore(false);
-    setRequestSuccessRideId(null);
-    setDriverInfoMap({});
-    setAlertSaved(false);
-    try {
-      const { data } = await searchRidesApi(buildSearchParams());
-      setResults(data?.items ?? []);
-      setResultsNextCursor(data?.next_cursor ?? null);
-      setResultsHasMore(data?.has_more ?? false);
-      setHasSearched(true);
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'חיפוש נכשל'));
-    } finally {
-      setSearching(false);
-    }
-  };
+  const search = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!pickup.trim() || !destination.trim()) {
+        setError('יש למלא מוצא ויעד');
+        return;
+      }
+      claimLocation();
+      const token = claimSearch();
+      setError('');
+      setSearching(true);
+      setResults([]);
+      setHasSearched(false);
+      setResultsNextCursor(null);
+      setResultsHasMore(false);
+      setRequestSuccessRideId(null);
+      setDriverInfoMap({});
+      setAlertSaved(false);
+      try {
+        const { data } = await searchRidesApi(buildSearchParams());
+        if (!isSearchOpCurrent(token)) return;
+        setResults(data?.items ?? []);
+        setResultsNextCursor(data?.next_cursor ?? null);
+        setResultsHasMore(data?.has_more ?? false);
+        setHasSearched(true);
+      } catch (err: unknown) {
+        if (isSearchOpCurrent(token)) setError(getApiErrorMessage(err, 'חיפוש נכשל'));
+      } finally {
+        if (isSearchOpCurrent(token)) setSearching(false);
+      }
+    },
+    [
+      buildSearchParams,
+      claimLocation,
+      claimSearch,
+      destination,
+      isSearchOpCurrent,
+      pickup,
+    ]
+  );
 
-  const loadMoreResults = async () => {
+  const loadMoreResults = useCallback(async () => {
     if (!resultsNextCursor || loadingMore || !pickup.trim() || !destination.trim()) return;
+    const token = claimLoadMore();
     setLoadingMore(true);
     setError('');
     try {
       const params = { ...buildSearchParams(), after: resultsNextCursor };
       const { data } = await searchRidesApi(params);
+      if (!isLoadMoreOpCurrent(token)) return;
       const newItems = data?.items ?? [];
       setResults((prev) => [...prev, ...newItems]);
       setResultsNextCursor(data?.next_cursor ?? null);
       setResultsHasMore(data?.has_more ?? false);
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'טעינה נכשלה'));
+      if (isLoadMoreOpCurrent(token)) setError(getApiErrorMessage(err, 'טעינה נכשלה'));
     } finally {
-      setLoadingMore(false);
+      if (isLoadMoreOpCurrent(token)) setLoadingMore(false);
     }
-  };
+  }, [
+    buildSearchParams,
+    claimLoadMore,
+    destination,
+    isLoadMoreOpCurrent,
+    loadingMore,
+    pickup,
+    resultsNextCursor,
+  ]);
 
   const saveAlert = async () => {
     if (!pickup.trim() || !destination.trim()) return;

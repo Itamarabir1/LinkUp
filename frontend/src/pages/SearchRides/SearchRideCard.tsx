@@ -1,6 +1,6 @@
 import type { Ride, DriverInfo } from '../../types/api';
 import { formatDateTimeNoSeconds } from '../../utils/date';
-import ErrorBanner from '../../components/ErrorBanner';
+import { Clock, CheckCircle } from 'lucide-react';
 import styles from './SearchRides.module.css';
 
 type Props = {
@@ -29,16 +29,23 @@ export function SearchRideCard({
   return (
     <div className={styles.card}>
       <div className={styles.cardRoute}>
-        {r.origin_name ?? '?'} ← {r.destination_name ?? '?'}
+        <span>{r.origin_name ?? '?'}</span>
+        <span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>→</span>
+        <span>{r.destination_name ?? '?'}</span>
       </div>
+
       <div className={styles.cardMeta}>
-        {formatDateTimeNoSeconds(r.departure_time)} · {r.available_seats} מושבים
+        <span>{formatDateTimeNoSeconds(r.departure_time)}</span>
+        <span className={styles.cardMetaSep} />
+        <span className={styles.seatsBadge}>{r.available_seats} מושבים</span>
+        {r.route_summary && (
+          <>
+            <span className={styles.cardMetaSep} />
+            <span>{r.route_summary}</span>
+          </>
+        )}
       </div>
-      {r.route_summary && (
-        <div className={`${styles.cardMeta} ${styles.cardRouteSummary}`}>
-          כביש מרכזי: {r.route_summary}
-        </div>
-      )}
+
       <div className={styles.cardActions}>
         <button
           type="button"
@@ -46,12 +53,19 @@ export function SearchRideCard({
           onClick={() => onFetchDriver(r.ride_id)}
           disabled={loadingDriverRideId === r.ride_id}
         >
-          {loadingDriverRideId === r.ride_id ? '...' : 'הצג פרטי הנהג'}
+          {loadingDriverRideId === r.ride_id ? '...' : 'פרטי נהג'}
         </button>
+
         {r.user_booking_status === 'pending_approval' ? (
-          <span className={styles.statusPending}>⏳ ממתין לאישור</span>
+          <span className={styles.statusPending}>
+            <Clock size={12} style={{ display: 'inline', marginLeft: 4 }} />
+            ממתין לאישור
+          </span>
         ) : r.user_booking_status === 'confirmed' ? (
-          <span className={styles.statusConfirmed}>✅ מאושר</span>
+          <span className={styles.statusConfirmed}>
+            <CheckCircle size={12} style={{ display: 'inline', marginLeft: 4 }} />
+            מאושר
+          </span>
         ) : (
           <button
             type="button"
@@ -60,29 +74,25 @@ export function SearchRideCard({
             disabled={sendingRequestRideId !== null || requestSuccessRideId === r.ride_id}
           >
             {requestSuccessRideId === r.ride_id
-              ? 'הבקשה נשלחה'
+              ? '✓ הבקשה נשלחה'
               : sendingRequestRideId === r.ride_id
-                ? 'מעבד...'
-                : 'בקש להצטרפות לנסיעה'}
+              ? 'שולח...'
+              : 'בקש להצטרף לנסיעה'}
           </button>
         )}
       </div>
+
       {requestErrorRideId === r.ride_id && requestErrorMessage ? (
-        <ErrorBanner
-          message={requestErrorMessage}
-          variant="compact"
-          className={`${styles.pageError} ${styles.requestErrorBanner}`.trim()}
-          role="status"
-        />
+        <div className={`${styles.pageError} ${styles.requestErrorBanner}`}>
+          {requestErrorMessage}
+        </div>
       ) : null}
+
       {driverInfo && (
-        <div className={`${styles.cardMeta} ${styles.driverInfoBox}`}>
+        <div className={styles.driverInfoBox}>
           <strong>נהג:</strong> {driverInfo.full_name}
           {driverInfo.phone_number && (
-            <>
-              {' '}
-              · <a href={`tel:${driverInfo.phone_number}`}>{driverInfo.phone_number}</a>
-            </>
+            <> · <a href={`tel:${driverInfo.phone_number}`}>{driverInfo.phone_number}</a></>
           )}
         </div>
       )}

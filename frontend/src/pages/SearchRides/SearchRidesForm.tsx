@@ -1,10 +1,42 @@
+import { forwardRef } from 'react';
 import { Link } from 'react-router-dom';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { he } from 'date-fns/locale';
-import { MapPin, ArrowUpDown } from 'lucide-react';
-import ErrorBanner from '../../components/ErrorBanner';
+import { MapPin, ArrowUpDown, Calendar } from 'lucide-react';
+import LoadingButton from '../../components/LoadingButton';
 import styles from './SearchRides.module.css';
+
+interface DateTriggerProps {
+  value?: string;
+  onClick?: () => void;
+  displayText: string;
+}
+
+const DateTrigger = forwardRef<HTMLButtonElement, DateTriggerProps>(
+  ({ onClick, displayText }, ref) => (
+    <button
+      type="button"
+      ref={ref}
+      onClick={onClick}
+      className={styles.datetimeTrigger}
+      aria-label={`שנה תאריך ושעה: ${displayText}`}
+    >
+      <Calendar size={14} strokeWidth={2} className={styles.datetimeIcon} />
+      <span>{displayText}</span>
+    </button>
+  )
+);
+
+function formatDateDisplay(date: Date): string {
+  const now = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(now.getDate() + 1);
+  const timeStr = date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+  if (date.toDateString() === now.toDateString()) return `היום, ${timeStr}`;
+  if (date.toDateString() === tomorrow.toDateString()) return `מחר, ${timeStr}`;
+  return date.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' }) + `, ${timeStr}`;
+}
 
 type Props = {
   error: string;
@@ -42,96 +74,120 @@ export function SearchRidesForm({
   return (
     <form onSubmit={onSubmit} className={styles.formBlock}>
       {error ? (
-        <ErrorBanner message={error} className={styles.pageError}>
-          {error.includes('פג תוקף') ? (
-            <>
-              {' '}
-              <Link to="/login" className={styles.errorInlineLink}>
-                התחבר מחדש
-              </Link>
-            </>
-          ) : null}
-        </ErrorBanner>
+        <div className={styles.pageError}>
+          {error}
+          {error.includes('פג תוקף') && (
+            <> · <Link to="/login" className={styles.errorInlineLink}>התחבר מחדש</Link></>
+          )}
+        </div>
       ) : null}
-      <div style={{ position: 'relative' }}>
-        <input
-          type="text"
-          placeholder="מוצא (כתובת איסוף)"
-          value={pickup}
-          onChange={(e) => setPickup(e.target.value)}
-          className={styles.formInput}
-          style={{ paddingLeft: '2.5rem' }}
-        />
-        <button
-          type="button"
-          onClick={onFillLocation}
-          disabled={locationLoading}
-          title="מיקום עצמי"
-          style={{
-            position: 'absolute',
-            left: '0.75rem',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            color: 'var(--primary)',
-            padding: 0,
-            display: 'flex',
-            alignItems: 'center',
-          }}
-        >
-          {locationLoading
-            ? <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>...</span>
-            : <MapPin size={18} strokeWidth={2} />
-          }
-        </button>
+
+      {/* Origin + Destination grouped */}
+      <div className={styles.routeSection}>
+        <div className={styles.fieldRow}>
+          <div className={`${styles.fieldIcon} ${styles.origin}`}>
+            <MapPin size={15} strokeWidth={2.5} />
+          </div>
+          <div className={styles.fieldContent}>
+            <div className={styles.fieldLabel}>מוצא</div>
+            <input
+              type="text"
+              className={styles.formInput}
+              placeholder="כתובת איסוף..."
+              value={pickup}
+              onChange={(e) => setPickup(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+          <button
+            type="button"
+            className={styles.gpsBtn}
+            onClick={onFillLocation}
+            disabled={locationLoading}
+            title="מיקום נוכחי"
+          >
+            {locationLoading ? '...' : 'GPS'}
+          </button>
+        </div>
+
+        <div className={styles.fieldDivider}>
+          <div className={styles.swapWrap}>
+            <button
+              type="button"
+              className={styles.swapBtn}
+              onClick={onSwap}
+              aria-label="החלף כיוון"
+            >
+              <ArrowUpDown size={12} strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.fieldRow}>
+          <div className={`${styles.fieldIcon} ${styles.dest}`}>
+            <MapPin size={15} strokeWidth={2} />
+          </div>
+          <div className={styles.fieldContent}>
+            <div className={styles.fieldLabel}>יעד</div>
+            <input
+              type="text"
+              className={styles.formInput}
+              placeholder="לאן אתה הולך?"
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              autoComplete="off"
+            />
+          </div>
+        </div>
       </div>
-      <div className={styles.swapWrap}>
-        <button
-          type="button"
-          className={styles.swapBtn}
-          onClick={onSwap}
-          aria-label="הפוך כיוון"
-          title="הפוך כיוון"
-        >
-          <ArrowUpDown size={18} />
-        </button>
+
+      {/* Datetime (first in DOM = right in RTL) + radius */}
+      <div className={styles.metaRow}>
+        <div className={`${styles.metaField} ${styles.metaFieldWide}`}>
+          <div className={styles.metaLabel}>תאריך ושעה</div>
+          <DatePicker
+            selected={selectedDate}
+            onChange={(date: Date | null) => date && setSelectedDate(date)}
+            showTimeSelect
+            timeFormat="HH:mm"
+            timeIntervals={15}
+            dateFormat="dd/MM/yyyy HH:mm"
+            locale={he}
+            minDate={new Date()}
+            wrapperClassName={styles.datetimeWrapper}
+            customInput={<DateTrigger displayText={formatDateDisplay(selectedDate)} />}
+          />
+        </div>
+
+        <div className={styles.metaField}>
+          <div className={styles.metaLabel}>רדיוס חיפוש</div>
+          <div className={styles.metaValue}>
+            <div className={styles.radiusControl}>
+              <button
+                type="button"
+                className={styles.radiusBtn}
+                onClick={() => setSearchRadius(Math.max(1, searchRadius - 1))}
+              >−</button>
+              <span className={styles.radiusValue}>{searchRadius}</span>
+              <button
+                type="button"
+                className={styles.radiusBtn}
+                onClick={() => setSearchRadius(Math.min(50, searchRadius + 1))}
+              >+</button>
+            </div>
+            <span className={styles.radiusUnit}>ק"מ</span>
+          </div>
+        </div>
       </div>
-      <input
-        type="text"
-        placeholder="יעד (כתובת)"
-        value={destination}
-        onChange={(e) => setDestination(e.target.value)}
-        className={styles.formInput}
-      />
-      <label className={styles.formLabel}>רדיוס חיפוש (ק"מ)</label>
-      <input
-        type="number"
-        min={0.1}
-        max={50}
-        step={0.1}
-        value={searchRadius}
-        onChange={(e) => setSearchRadius(parseFloat(e.target.value) || 1)}
-        className={styles.formInput}
-      />
-      <label className={styles.formLabel}>תאריך ושעת יציאה</label>
-      <DatePicker
-        selected={selectedDate}
-        onChange={(date: Date | null) => date && setSelectedDate(date)}
-        showTimeSelect
-        timeFormat="HH:mm"
-        timeIntervals={15}
-        dateFormat="dd/MM/yyyy HH:mm"
-        locale={he}
-        minDate={new Date()}
-        className={styles.datetimeInput}
-        placeholderText="בחר תאריך ושעה"
-        wrapperClassName={styles.datetimeWrapper}
-      />
-      <button type="submit" className={`${styles.btn} ${styles.btnSuccess}`} disabled={searching}>
-        {searching ? 'מחפש...' : 'חפש'}
-      </button>
+
+      <LoadingButton
+        type="submit"
+        className={styles.searchBtn}
+        loading={searching}
+        loadingLabel="מחפש..."
+      >
+        חפש
+      </LoadingButton>
     </form>
   );
 }

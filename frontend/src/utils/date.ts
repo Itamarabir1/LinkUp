@@ -47,3 +47,41 @@ export function formatRideDate(date: string | Date): string {
   if (diffDays > 1 && diffDays < 7) return `${DAY_NAMES[rideDay.getDay()]} ${time}`;
   return formatDateTimeNoSeconds(d);
 }
+
+/**
+ * Formats a notification timestamp relative to now.
+ * - Same day: "לפני X דקות" / "לפני X שעות"
+ * - Yesterday: "14:30"
+ * - This week: "ב' 14:30" (day abbreviation + time)
+ * - Older: "05/04"
+ */
+export function formatRelativeNotificationTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterdayStart = new Date(todayStart.getTime() - 86400000);
+  const weekStart = new Date(todayStart.getTime() - 6 * 86400000);
+
+  if (d >= todayStart) {
+    if (diffMins < 1) return 'עכשיו';
+    if (diffMins < 60) return `לפני ${diffMins} דקות`;
+    return `לפני ${diffHours} שעות`;
+  }
+
+  if (d >= yesterdayStart) {
+    return d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  if (d >= weekStart) {
+    const day = d.toLocaleDateString('he-IL', { weekday: 'short' });
+    const time = d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+    return `${day} ${time}`;
+  }
+
+  return d.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' });
+}

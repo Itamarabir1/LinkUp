@@ -157,7 +157,7 @@
 - **`frontend/src/pages/Messages.tsx`**  
   `conversation_id` כ-string (UUID) ב-routes ורשימת שיחות.
 
-- **`frontend/src/pages/MyBookings.tsx`**, **`frontend/src/pages/Notifications.tsx`**  
+- **`frontend/src/pages/MyBookings/index.tsx`**, **`frontend/src/pages/Notifications.tsx`**  
   ניווט ל-`/messages/${conversation.conversation_id}` – conversation_id כ-string (UUID).
 
 ---

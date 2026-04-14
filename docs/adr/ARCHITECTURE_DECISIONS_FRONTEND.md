@@ -72,9 +72,9 @@
 
 | | |
 |--|--|
-| **החלטה** | `AuthContext`, `ChatContext`, `GroupContext`; לוגיקת צ'אט/התראות מפוצלת ל-hooks קטנים (`useChatUnreadMessages`, וכו'). **הזמנות שלי**: קומפוזיציה ב-[`useMyBookings.ts`](../../frontend/src/pages/MyBookings/useMyBookings.ts) עם **אובייקט החזרה מפורש** (מיפוי שדה-שדה) — בלי spread של passenger/driver — כדי שחוזה ה-view-model למסך יהיה קריא במקום אחד. |
-| **למה** | פחות באגים ממיזוג אובייקטים; קל לראיון להסביר את מסך מורכב. |
-| **בקצרה לראיון** | "מפרידים hooks לפי אחריות; ב-My Bookים מחזירים מבנה מפורש במקום merge אוטומטי." |
+| **החלטה** | `AuthContext`, `ChatContext`, `GroupContext`; לוגיקת צ'אט/התראות מפוצלת ל-hooks קטנים (`useChatUnreadMessages`, וכו'). **הזמנות שלי**: קומפוזיציה ב-[`useMyBookings.ts`](../../frontend/src/pages/MyBookings/useMyBookings.ts) עם **מבנה החזרה מקונן** (`passenger`, `driver`, `chat`) — בלי spread של תוצאות ה-hooks לשטח אחד; יצוא טיפוס **`MyBookingsViewModel`**. נתונים נטענים מ־**endpoints מאוגדים** בבקאנד (`driver-summary` / `passenger-summary`) כדי למנוע N+1. |
+| **למה** | גבולות אחריות ברורים; חוזה VM קריא; פחות רשת ורינדורים מיותרים. |
+| **בקצרה לראיון** | "מפרידים hooks לפי דומיין; VM מקונן; שרת מאחד קריאות לטאב נהג/נוסע." |
 
 ---
 

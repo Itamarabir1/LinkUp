@@ -140,6 +140,11 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | created_at, updated_at | TIMESTAMPTZ | |
 | UNIQUE(ride_id, passenger_id) | | |
 
+**קריאות מאוגדות (מסך “הזמנות שלי”):**
+
+- **נהג:** `GET /bookings/driver-summary` — `select(Ride)` עם `joinedload` ל־`Ride.bookings` → `Booking.passenger_request` → `PassengerRequest.user`, ול־`Ride.group`; על ישות `Booking` בטעינה מוחלת **`with_loader_criteria`** כך שרק הזמנות בסטטוס **pending_approval** ו־**confirmed** נטענות לקולקציה (מימוש: [`get_driver_rides_with_passengers`](../../backend/app/domain/bookings/crud.py)).
+- **נוסע:** `GET /bookings/passenger-summary` — `select(Booking)` עם `join` ל־`Ride`, `joinedload` ל־`ride.driver` ו־`ride.group`, מיון לפי `Ride.departure_time` ([`get_passenger_bookings_with_rides`](../../backend/app/domain/bookings/crud.py)).
+
 ### conversations
 
 שיחת 1:1 בין שני משתמשים. user_id_1 < user_id_2 תמיד.

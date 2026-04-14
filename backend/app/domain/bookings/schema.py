@@ -91,6 +91,61 @@ class TripHistoryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class RideWithPassengersItem(BaseModel):
+    """Single ride with embedded confirmed/pending passengers."""
+
+    ride_id: UUID
+    origin_name: str | None
+    destination_name: str | None
+    departure_time: datetime
+    estimated_arrival_time: datetime | None
+    available_seats: int
+    price: float
+    status: str  # RideStatus.value
+    group_id: UUID | None = None
+    group_name: str | None = None
+    passengers: list[BookingManifestItem]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DriverSummaryResponse(BaseModel):
+    """Aggregated driver view: all rides with passengers embedded."""
+
+    rides: list[RideWithPassengersItem]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DriverSummaryInfo(BaseModel):
+    full_name: str
+    phone_number: str | None = None
+
+
+class PassengerBookingSummaryItem(BaseModel):
+    """Single booking with ride and driver info embedded."""
+
+    booking_id: UUID
+    booking_status: BookingStatus
+    ride_id: UUID
+    origin_name: str | None
+    destination_name: str | None
+    departure_time: datetime
+    estimated_arrival_time: datetime | None
+    ride_status: str
+    group_id: UUID | None = None
+    group_name: str | None = None
+    driver: DriverSummaryInfo | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PassengerSummaryResponse(BaseModel):
+    bookings: list[PassengerBookingSummaryItem]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # Notification list item (driver + passenger views)
 class NotificationItemResponse(BaseModel):
     type: str  # ride_request | booking_confirmed | booking_rejected | pending_approval

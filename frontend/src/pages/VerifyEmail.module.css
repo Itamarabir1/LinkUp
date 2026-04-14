@@ -1,103 +1,183 @@
+/* ── Page ── */
 .page {
-  max-width: 400px;
-  margin: 2rem auto;
-  padding: 1.5rem;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: var(--bg-secondary);
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2.5rem 2rem;
+  box-shadow: 0 4px 24px rgba(13, 15, 26, 0.08);
   text-align: right;
 }
 
-.title {
-  font-size: 1.75rem;
+/* Logo */
+.logoWrap {
+  display: flex;
+  justify-content: center;
   margin-bottom: 1.5rem;
 }
 
-.intro {
-  margin-bottom: 1rem;
-  color: var(--text-primary);
-  line-height: 1.5;
-}
-
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.error {
-  color: var(--danger-text);
-  font-size: 0.9rem;
-  margin: 0;
-}
-
-.input {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-md);
-  font-size: 1rem;
-  box-sizing: border-box;
-  text-align: right;
-  background: var(--input-bg);
-  color: var(--text-primary);
-}
-
-.input:focus {
-  outline: none;
-  border-color: var(--border-focus);
-}
-
-.button {
+.logoIcon {
+  width: 52px;
+  height: 52px;
   background: var(--primary);
-  color: var(--text-inverse);
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.35);
+}
+
+/* Email illustration */
+.emailIconWrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+
+.emailCircle {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Headings */
+.title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+  text-align: center;
+  letter-spacing: -0.02em;
+  font-family: var(--font-primary, "Heebo", sans-serif);
+}
+
+.intro {
+  font-size: 14px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0 0 1.75rem;
+  line-height: 1.6;
+  font-family: var(--font-primary, "Heebo", sans-serif);
+}
+
+/* Error / success */
+.error { font-size: 13px; margin: 0; }
+
+.successText {
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  text-align: center;
+  margin-bottom: 14px;
+  font-family: var(--font-primary, "Heebo", sans-serif);
+}
+
+/* OTP inputs */
+.otpWrap {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 1.25rem;
+  direction: ltr;
+}
+
+.otpDigit {
+  width: 46px;
+  height: 54px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  font-family: var(--font-primary, "Heebo", sans-serif);
+  transition: all var(--transition-fast, 150ms ease);
+  outline: none;
+  caret-color: var(--primary);
+}
+
+.otpDigit:focus {
+  border-color: var(--primary);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3px var(--focus-ring-primary);
+}
+
+/* Submit button */
+.button {
+  width: 100%;
+  height: 46px;
+  background: var(--primary);
   border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: var(--radius-md);
-  font-size: 1rem;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  margin-top: 0.5rem;
+  font-family: var(--font-primary, "Heebo", sans-serif);
+  box-shadow: 0 2px 10px rgba(79, 70, 229, 0.3);
+  transition: all var(--transition-fast, 180ms ease);
+  margin-bottom: 16px;
 }
 
 .button:hover:not(:disabled) {
   background: var(--primary-hover);
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.4);
+  transform: translateY(-1px);
 }
 
 .button:disabled {
-  opacity: 0.7;
+  opacity: 0.65;
   cursor: not-allowed;
+  transform: none;
 }
 
+/* Links */
 .link {
-  margin-top: 1.5rem;
+  margin-top: 8px;
   text-align: center;
+  font-family: var(--font-primary, "Heebo", sans-serif);
 }
 
 .link a {
   color: var(--primary);
   text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
 }
 
-.link a:hover {
-  text-decoration: underline;
-}
+.link a:hover { text-decoration: underline; }
 
-.successText {
-  color: var(--success-text);
-  margin: 0;
-}
-
-.linkSpaced {
-  margin-top: 1rem;
-}
+.linkSpaced { margin-top: 8px; }
 
 .resendBtn {
   background: none;
   border: none;
   color: var(--primary);
   cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--font-primary, "Heebo", sans-serif);
   padding: 0;
-  font-size: inherit;
+  transition: opacity var(--transition-fast, 150ms ease);
 }
 
-.resendBtn:disabled {
-  cursor: not-allowed;
-}
+.resendBtn:hover { text-decoration: underline; }
+.resendBtn:disabled { opacity: 0.5; cursor: not-allowed; }

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { cancelPassengerBooking, fetchMyBookings } from '../../api/bookings';
-import { fetchPassengerDriverInfo, fetchRideById } from '../../api/rides';
+import { useUserEvent } from '../../hooks/useUserEvent';
+import { cancelPassengerBooking, fetchPassengerBookingSummary } from '../../api/bookings';
 import { getApiErrorMessage } from '../../utils/apiError';
+import type { Ride } from '../../types/api';
 import { useRideWebSocket } from '../../hooks/useRideWebSocket';
 import type { RideEvent } from '../../types/wsEvents';
-import type { BookingRow, PassengerBookingItem } from './myBookings.types';
+import type { PassengerBookingItem } from './myBookings.types';
+import { LIVE_STATUSES } from '../../constants/rideStatuses';
 
 /** טעינה וביטול הזמנות במצב נוסע */
 export function useMyBookingsPassenger(
@@ -21,42 +23,30 @@ export function useMyBookingsPassenger(
     setPassengerLoading(true);
     setError('');
     try {
-      const { data } = await fetchMyBookings(50);
-      const asPassenger = data.filter(
-        (b) =>
-          b.passenger_id === userId
-      );
-      const byRideId = new Map<string, BookingRow>();
-      asPassenger.forEach((b) => {
-        if (!byRideId.has(b.ride_id)) byRideId.set(b.ride_id, b);
+      const { data } = await fetchPassengerBookingSummary();
+      const rows = data?.bookings ?? [];
+      const items: PassengerBookingItem[] = rows.map((row) => {
+        const ride: Ride = {
+          ride_id: row.ride_id,
+          driver_id: '',
+          group_id: row.group_id ?? null,
+          group_name: row.group_name ?? null,
+          origin_name: row.origin_name,
+          destination_name: row.destination_name,
+          departure_time: row.departure_time,
+          estimated_arrival_time: row.estimated_arrival_time,
+          available_seats: 0,
+          price: 0,
+          status: row.ride_status,
+          created_at: row.departure_time,
+        };
+        return {
+          ride,
+          bookingId: row.booking_id,
+          bookingStatus: row.booking_status,
+          driverName: row.driver?.full_name ?? null,
+        };
       });
-      const rideIds = Array.from(byRideId.keys());
-      const items: PassengerBookingItem[] = [];
-      await Promise.all(
-        rideIds.map(async (rideId) => {
-          try {
-            const rideRes = await fetchRideById(rideId);
-            const ride = rideRes.data;
-            const driverRes =
-              ride.status !== 'cancelled' && ride.status !== 'completed'
-                ? await fetchPassengerDriverInfo(rideId).catch(() => null)
-                : null;
-            const booking = byRideId.get(rideId)!;
-            items.push({
-              ride,
-              bookingId: booking.booking_id,
-              bookingStatus: booking.status,
-              driverName: driverRes?.data?.full_name ?? null,
-            });
-          } catch {
-            // skip ride
-          }
-        })
-      );
-      items.sort(
-        (a, b) =>
-          new Date(a.ride.departure_time).getTime() - new Date(b.ride.departure_time).getTime()
-      );
       setPassengerList(items);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'טעינת ההזמנות נכשלה'));
@@ -69,32 +59,39 @@ export function useMyBookingsPassenger(
     void fetchPassengerBookings();
   }, [fetchPassengerBookings]);
 
-  useEffect(() => {
-    const onUserEvent = (evt: Event) => {
-      const detail = (evt as CustomEvent<{ event?: string; booking_id?: string }>).detail;
-      if (
-        detail?.event === 'booking.approved_by_driver' ||
-        detail?.event === 'booking.rejected_by_driver'
-      ) {
-        void fetchPassengerBookings();
-        return;
-      }
-      if (detail?.event !== 'BOOKING_COMPLETED' || !detail.booking_id) return;
+  useUserEvent(
+    ['booking.approved_by_driver', 'booking.rejected_by_driver'],
+    useCallback(() => {
+      void fetchPassengerBookings();
+    }, [fetchPassengerBookings])
+  );
+
+  useUserEvent(
+    'BOOKING_COMPLETED',
+    useCallback((detail) => {
+      if (!detail.booking_id) return;
       setPassengerList((prev) =>
         prev.map((item) =>
-          item.bookingId === detail.booking_id ? { ...item, bookingStatus: 'completed' } : item
+          item.bookingId === detail.booking_id
+            ? { ...item, bookingStatus: 'completed' }
+            : item
         )
       );
-    };
-    window.addEventListener('linkup:user-event', onUserEvent as EventListener);
-    return () => window.removeEventListener('linkup:user-event', onUserEvent as EventListener);
-  }, [fetchPassengerBookings]);
+    }, [])
+  );
 
+  // Subscribed while ride is still open/full/active so cancel/start/end events arrive; pick soonest departure when multiple confirmed.
   const watchedRideId =
-    passengerList.find(
-      (item) =>
-        item.bookingStatus === 'confirmed' && item.ride.status !== 'active'
-    )?.ride.ride_id ?? null;
+    passengerList
+      .filter(
+        (item) =>
+          item.bookingStatus === 'confirmed' && LIVE_STATUSES.has(item.ride.status)
+      )
+      .sort(
+        (a, b) =>
+          new Date(a.ride.departure_time).getTime() -
+          new Date(b.ride.departure_time).getTime()
+      )[0]?.ride.ride_id ?? null;
 
   const onRideStatusMessage = useCallback(
     (msg: RideEvent) => {

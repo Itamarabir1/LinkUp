@@ -2,10 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { cancelPassengerRequest, fetchMyPassengerRequests } from '../api/passengers';
 import type { PassengerRequest } from '../types/api';
 import { getApiErrorMessage } from '../utils/apiError';
+import { useUserEvent } from '../hooks/useUserEvent';
+
+type RequestsStatus = 'loading' | 'idle' | 'error';
 
 export function useMyRequests() {
   const [requests, setRequests] = useState<PassengerRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fetchStatus, setFetchStatus] = useState<RequestsStatus>('loading');
   const [error, setError] = useState('');
   const [requestToCancel, setRequestToCancel] = useState<PassengerRequest | null>(null);
   const [cancelling, setCancelling] = useState(false);
@@ -15,10 +18,10 @@ export function useMyRequests() {
       const { data } = await fetchMyPassengerRequests();
       setRequests(Array.isArray(data) ? data : []);
       setError('');
+      setFetchStatus('idle');
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'טעינת בקשות נכשלה'));
-    } finally {
-      setLoading(false);
+      setFetchStatus('error');
     }
   }, []);
 
@@ -26,21 +29,17 @@ export function useMyRequests() {
     void fetchRequests();
   }, [fetchRequests]);
 
-  useEffect(() => {
-    const onUserEvent = (evt: Event) => {
-      const detail = (evt as CustomEvent<{ event?: string; request_id?: string }>).detail;
-      if (!detail?.event || !detail.request_id) return;
-      if (detail.event === 'REQUEST_EXPIRED') {
-        setRequests((prev) =>
-          prev.map((r) =>
-            r.request_id === detail.request_id ? { ...r, status: 'expired' } : r
-          )
-        );
-      }
-    };
-    window.addEventListener('linkup:user-event', onUserEvent as EventListener);
-    return () => window.removeEventListener('linkup:user-event', onUserEvent as EventListener);
-  }, []);
+  useUserEvent(
+    'REQUEST_EXPIRED',
+    useCallback((detail) => {
+      if (!detail.request_id) return;
+      setRequests((prev) =>
+        prev.map((r) =>
+          r.request_id === detail.request_id ? { ...r, status: 'expired' } : r
+        )
+      );
+    }, [])
+  );
 
   const confirmCancelRequest = useCallback(async () => {
     if (!requestToCancel) return;
@@ -63,7 +62,7 @@ export function useMyRequests() {
 
   return {
     requests,
-    loading,
+    loading: fetchStatus === 'loading',
     error,
     requestToCancel,
     setRequestToCancel,

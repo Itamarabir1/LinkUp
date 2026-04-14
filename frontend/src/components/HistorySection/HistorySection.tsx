@@ -12,7 +12,10 @@ export default function HistorySection({ title = 'היסטוריה', children, d
   return (
     <section className={styles.wrap}>
       <button type="button" className={styles.toggle} onClick={() => setOpen((v) => !v)}>
-        {open ? '▾' : '▸'} {title}
+        <span className={styles.toggleIcon} aria-hidden>
+          {open ? '▾' : '▸'}
+        </span>
+        {title}
       </button>
       {open ? <div className={styles.body}>{children}</div> : null}
     </section>

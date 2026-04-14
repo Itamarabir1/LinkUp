@@ -46,7 +46,7 @@ export default function Messages() {
         <header className={styles.sidebarHeader}>
           <h1 className={styles.title}>הודעות</h1>
           {unreadMessages > 0 && (
-            <span className={styles.newCount}>({unreadMessages} חדשות)</span>
+            <span className={styles.newCount}>{unreadMessages} חדשות</span>
           )}
         </header>
 
@@ -56,9 +56,9 @@ export default function Messages() {
           <ErrorBanner message={error} variant="compact" className={styles.error} />
         ) : list.length === 0 ? (
           <div className={styles.emptyList}>
-            <MessageCircle size={48} strokeWidth={1.5} className={styles.emptyIcon} />
+            <MessageCircle size={44} strokeWidth={1.5} className={styles.emptyIcon} />
             <p className={styles.emptyTitle}>אין הודעות עדיין</p>
-            <p className={styles.emptySub}>הודעות נשלחות דרך נסיעות</p>
+            <p className={styles.emptySub}>הודעות יישלחו דרך נסיעות</p>
           </div>
         ) : (
           <div className={styles.conversationList}>
@@ -73,11 +73,7 @@ export default function Messages() {
               >
                 <div className={styles.avatarWrap}>
                   {c.partner.avatar_url ? (
-                    <img
-                      src={c.partner.avatar_url}
-                      alt=""
-                      className={styles.avatar}
-                    />
+                    <img src={c.partner.avatar_url} alt="" className={styles.avatar} />
                   ) : (
                     <span className={styles.avatarLetter}>
                       {(c.partner.full_name || '?').charAt(0).toUpperCase()}
@@ -95,11 +91,8 @@ export default function Messages() {
                     </span>
                   </div>
                   {c.last_message_preview && (
-                    <p className={styles.lastPreview}>
-                      {c.last_message_preview}
-                    </p>
+                    <p className={styles.lastPreview}>{c.last_message_preview}</p>
                   )}
-                  {/* Optional route row when we have origin/destination in API */}
                 </div>
               </button>
             ))}
@@ -109,13 +102,10 @@ export default function Messages() {
 
       <section className={styles.panel}>
         {panelConversationId ? (
-          <MessageThread
-            conversationId={panelConversationId}
-            embedded
-          />
+          <MessageThread conversationId={panelConversationId} embedded />
         ) : (
           <div className={styles.panelPlaceholder}>
-            <MessageCircle size={56} strokeWidth={1.5} className={styles.placeholderIcon} />
+            <MessageCircle size={52} strokeWidth={1.5} className={styles.placeholderIcon} />
             <p className={styles.placeholderText}>בחר שיחה כדי להתחיל</p>
           </div>
         )}

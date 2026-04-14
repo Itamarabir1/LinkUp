@@ -1,12 +1,4 @@
-import type { Ride } from '../../types/api';
-
-export function getRideStatusLabel(r: Ride): string {
-  if (r.status === 'cancelled') return 'בוטלה';
-  const seats = r.available_seats ?? 0;
-  if (seats <= 0) return 'מלא';
-  if (seats === 1) return '1 מקום';
-  return `${seats} מקומות`;
-}
+export { getRideStatusLabel } from '../../utils/rideDisplay';
 
 export function isToday(d: Date): boolean {
   const today = new Date();

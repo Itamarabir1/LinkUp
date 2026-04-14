@@ -15,21 +15,33 @@ from app.core.exceptions.booking import (
     PassengerRequestNotFoundError,
     RideNotAvailableError,
 )
+from app.core.exceptions.validation import BadRequestError
 from app.domain.bookings.crud import crud_booking
 from app.domain.bookings.enum import BookingStatus
 from app.domain.bookings.model import Booking
 from app.domain.bookings.schema import (
     BookingManifestItem,
     BookingResponse,
+    DriverSummaryInfo,
+    DriverSummaryResponse,
     NotificationItemResponse,
     PaginatedBookingsResponse,
+    PassengerBookingSummaryItem,
+    PassengerSummaryResponse,
     RideManifestResponse,
+    RideWithPassengersItem,
 )
 from app.domain.events.enum import DispatchTarget
 
 # Events — outbox only
 from app.domain.events.outbox import publish_to_outbox
+from app.domain.geo.schema import DriverLocationReport, LocationUpdate, PassengerLocationReport
 from app.domain.notifications.constants import NotificationEvent
+from app.domain.users.model import User
+from app.infrastructure.location.location_service import (
+    broadcast_location_to_participants,
+    broadcast_passenger_location_to_driver,
+)
 from app.infrastructure.redis.publisher import publish_user_event
 
 # Models & enums
@@ -41,6 +53,39 @@ logger = logging.getLogger(__name__)
 
 
 class BookingService:
+    @staticmethod
+    def _booking_to_manifest_item(booking: Booking) -> BookingManifestItem | None:
+        """Shared manifest row for one booking (whatsapp/phone rules identical to driver manifest)."""
+        user = booking.passenger_request.user if booking.passenger_request else None
+        if not user:
+            return None
+        clean_phone = "".join(filter(str.isdigit, user.phone_number or ""))
+        if clean_phone.startswith("0"):
+            clean_phone = "972" + clean_phone[1:]
+        whatsapp_link = f"https://wa.me/{clean_phone}?text={quote('היי, אני הנהג שלך מהאפליקציה')}"
+        return BookingManifestItem(
+            booking_id=booking.booking_id,
+            passenger_id=user.user_id,
+            passenger_name=user.full_name,
+            phone=user.phone_number or "",
+            whatsapp_link=whatsapp_link,
+            num_seats=booking.num_seats,
+            status=booking.status,
+            pickup_name=booking.pickup_name,
+            pickup_time=booking.pickup_time,
+            destination_name=(booking.passenger_request.destination_name if booking.passenger_request else None),
+        )
+
+    @staticmethod
+    def _driver_to_summary(driver: User | None) -> DriverSummaryInfo | None:
+        """Map ride.driver to passenger-facing contact snippet (same fields as DriverInfoResponse)."""
+        if not driver:
+            return None
+        return DriverSummaryInfo(
+            full_name=driver.full_name or "נהג",
+            phone_number=getattr(driver, "phone_number", None),
+        )
+
     @staticmethod
     async def request_to_join(
         db: AsyncSession,
@@ -144,35 +189,130 @@ class BookingService:
         result = await db.execute(stmt)
         bookings = list(result.scalars().all())
 
-        manifest = []
+        manifest_items: list[BookingManifestItem] = []
         for b in bookings:
-            user = b.passenger_request.user if b.passenger_request else None
-            if not user:
-                continue
-            clean_phone = "".join(filter(str.isdigit, user.phone_number or ""))
-            if clean_phone.startswith("0"):
-                clean_phone = "972" + clean_phone[1:]
-            manifest.append(
-                {
-                    "booking_id": b.booking_id,
-                    "passenger_id": user.user_id,
-                    "passenger_name": user.full_name,
-                    "phone": user.phone_number or "",
-                    "whatsapp_link": f"https://wa.me/{clean_phone}?text={quote('היי, אני הנהג שלך מהאפליקציה')}",
-                    "num_seats": b.num_seats,
-                    "status": b.status,
-                    "pickup_name": b.pickup_name,
-                    "pickup_time": b.pickup_time,
-                    "destination_name": (b.passenger_request.destination_name if b.passenger_request else None),
-                },
-            )
+            item = BookingService._booking_to_manifest_item(b)
+            if item:
+                manifest_items.append(item)
 
         available_seats_left = max(0, ride.available_seats)
         return RideManifestResponse(
             ride_id=ride_id,
-            total_confirmed_passengers=len(manifest),
+            total_confirmed_passengers=len(manifest_items),
             available_seats_left=available_seats_left,
-            passengers=[BookingManifestItem(**item) for item in manifest],
+            passengers=manifest_items,
+        )
+
+    @staticmethod
+    async def get_driver_summary(db: AsyncSession, driver_id: UUID) -> DriverSummaryResponse:
+        """All driver rides with pending/confirmed passengers — single DB round-trip."""
+        rides = await crud_booking.get_driver_rides_with_passengers(db, driver_id)
+        items: list[RideWithPassengersItem] = []
+        for ride in rides:
+            raw_bookings = list(ride.bookings)
+            raw_bookings.sort(key=lambda b: b.created_at, reverse=True)
+            passengers: list[BookingManifestItem] = []
+            for b in raw_bookings:
+                m = BookingService._booking_to_manifest_item(b)
+                if m:
+                    passengers.append(m)
+            group_name = ride.group.name if ride.group is not None else None
+            status_val = ride.status.value if hasattr(ride.status, "value") else str(ride.status)
+            items.append(
+                RideWithPassengersItem(
+                    ride_id=ride.ride_id,
+                    origin_name=ride.origin_name,
+                    destination_name=ride.destination_name,
+                    departure_time=ride.departure_time,
+                    estimated_arrival_time=ride.estimated_arrival_time,
+                    available_seats=ride.available_seats,
+                    price=float(ride.price or 0),
+                    status=status_val,
+                    group_id=ride.group_id,
+                    group_name=group_name,
+                    passengers=passengers,
+                ),
+            )
+        return DriverSummaryResponse(rides=items)
+
+    @staticmethod
+    async def get_passenger_summary(db: AsyncSession, passenger_id: UUID) -> PassengerSummaryResponse:
+        """Passenger bookings with ride + driver — single DB round-trip."""
+        bookings = await crud_booking.get_passenger_bookings_with_rides(db, passenger_id)
+        out: list[PassengerBookingSummaryItem] = []
+        for b in bookings:
+            ride = b.ride
+            if not ride:
+                continue
+            driver_blob: DriverSummaryInfo | None = None
+            if ride.status not in (RideStatus.CANCELLED, RideStatus.COMPLETED):
+                driver_blob = BookingService._driver_to_summary(ride.driver)
+            group_name = ride.group.name if ride.group is not None else None
+            ride_status_val = ride.status.value if hasattr(ride.status, "value") else str(ride.status)
+            out.append(
+                PassengerBookingSummaryItem(
+                    booking_id=b.booking_id,
+                    booking_status=b.status,
+                    ride_id=ride.ride_id,
+                    origin_name=ride.origin_name,
+                    destination_name=ride.destination_name,
+                    departure_time=ride.departure_time,
+                    estimated_arrival_time=ride.estimated_arrival_time,
+                    ride_status=ride_status_val,
+                    group_id=ride.group_id,
+                    group_name=group_name,
+                    driver=driver_blob,
+                ),
+            )
+        return PassengerSummaryResponse(bookings=out)
+
+    @staticmethod
+    async def broadcast_driver_location(
+        db: AsyncSession,
+        booking_id: UUID,
+        driver_id: UUID,
+        body: DriverLocationReport,
+    ) -> None:
+        """Validate driver + active ride, then broadcast GPS to confirmed passengers."""
+        booking = await BookingService.get_booking(db, booking_id)
+        if not booking.ride:
+            raise BookingNotFoundError(booking_id=str(booking_id))
+        if str(booking.ride.driver_id) != str(driver_id):
+            raise ForbiddenRideActionError("גישה חסומה – רק נהג הנסיעה יכול לדווח מיקום")
+        if booking.ride.status != RideStatus.ACTIVE:
+            raise BadRequestError("ניתן לדווח מיקום רק בנסיעה פעילה (active)")
+        confirmed = await crud_booking.get_ride_bookings_by_status_async(db, booking.ride_id, BookingStatus.CONFIRMED)
+        involved = [row.booking_id for row in confirmed]
+        location_in = LocationUpdate(
+            booking_id=0,
+            lat=body.lat,
+            lon=body.lng,
+            heading=body.heading or 0.0,
+            speed=body.speed or 0.0,
+        )
+        await broadcast_location_to_participants(location_in, booking.ride_id, involved)
+
+    @staticmethod
+    async def broadcast_passenger_location(
+        db: AsyncSession,
+        booking_id: UUID,
+        passenger_id: UUID,
+        body: PassengerLocationReport,
+    ) -> None:
+        """Validate booking ownership, then broadcast passenger GPS to driver channel."""
+        booking = await BookingService.get_booking(db, booking_id)
+        if not booking.ride:
+            raise BookingNotFoundError(booking_id=str(booking_id))
+        if str(booking.passenger_id) != str(passenger_id):
+            raise ForbiddenRideActionError("גישה חסומה – רק הנוסע של ההזמנה יכול לדווח מיקום")
+        await broadcast_passenger_location_to_driver(
+            ride_id=booking.ride_id,
+            booking_id=booking.booking_id,
+            passenger_id=passenger_id,
+            lat=body.lat,
+            lng=body.lng,
+            heading=body.heading or 0.0,
+            speed=body.speed or 0.0,
         )
 
     @staticmethod
@@ -229,6 +369,10 @@ class BookingService:
         ):
             await db.rollback()
             raise
+        except Exception as e:
+            await db.rollback()
+            logger.error("approve_booking failed booking_id=%s: %s", booking_id, e)
+            raise
 
     @staticmethod
     async def reject_booking(db: AsyncSession, booking_id: UUID, driver_id: UUID) -> Booking:
@@ -258,6 +402,10 @@ class BookingService:
         except (BookingNotFoundError, ForbiddenRideActionError):
             await db.rollback()
             raise
+        except Exception as e:
+            await db.rollback()
+            logger.error("reject_booking failed booking_id=%s: %s", booking_id, e)
+            raise
 
     @staticmethod
     async def cancel_booking(db: AsyncSession, booking_id: UUID, current_user_id: UUID) -> Booking:
@@ -280,6 +428,10 @@ class BookingService:
             return await crud_booking.get_booking_by_id_async(db, booking_id)
         except (BookingNotFoundError, ForbiddenRideActionError, RideNotAvailableError):
             await db.rollback()
+            raise
+        except Exception as e:
+            await db.rollback()
+            logger.error("cancel_booking failed booking_id=%s: %s", booking_id, e)
             raise
 
     @staticmethod

@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  approveBooking,
-  fetchRideManifest,
-  rejectBooking,
-} from '../../api/bookings';
-import { cancelRide, endRide, fetchMyRides, startRide } from '../../api/rides';
+import { useUserEvent } from '../../hooks/useUserEvent';
+import { approveBooking, fetchDriverBookingSummary, rejectBooking } from '../../api/bookings';
+import type { Ride } from '../../types/api';
+import { cancelRide, endRide, startRide } from '../../api/rides';
 import { useLocationBroadcast } from '../../hooks/useLocationBroadcast';
 import { getApiErrorCode, getApiErrorMessage, getApiStatus } from '../../utils/apiError';
 import type { DriverBookingItem, TabKind } from './myBookings.types';
+
+type DriverStatus =
+  | { kind: 'idle' }
+  | { kind: 'loading'; busyBookingId?: string }
+  | { kind: 'action'; bookingId: string };
 
 /** טעינה, אישורים ושיתוף מיקום במצב נהג */
 export function useMyBookingsDriver(
@@ -17,53 +20,54 @@ export function useMyBookingsDriver(
 ) {
   const userId = user?.user_id;
   const [driverList, setDriverList] = useState<DriverBookingItem[]>([]);
-  const [driverLoading, setDriverLoading] = useState(false);
+  const [driverStatus, setDriverStatus] = useState<DriverStatus>({ kind: 'idle' });
   const [sharingRideId, setSharingRideId] = useState<string | null>(null);
   const [liveRideId, setLiveRideId] = useState<string | null>(null);
   const [rideToCancel, setRideToCancel] = useState<string | null>(null);
   const [cancellingRide, setCancellingRide] = useState(false);
-  const [actionBookingId, setActionBookingId] = useState<string | null>(null);
 
-  const fetchDriverBookings = useCallback(async () => {
+  const fetchDriverBookings = useCallback(async (busyBookingId?: string) => {
     if (!userId) return;
-    setDriverLoading(true);
+    setDriverStatus(
+      busyBookingId !== undefined ? { kind: 'loading', busyBookingId } : { kind: 'loading' }
+    );
     setError('');
     try {
-      const { data: myRides } = await fetchMyRides();
-      const allRides = Array.isArray(myRides) ? myRides : [];
+      const { data } = await fetchDriverBookingSummary();
+      const rows = data?.rides ?? [];
       const items: DriverBookingItem[] = [];
-      await Promise.all(
-        allRides.map(async (ride) => {
-          try {
-            const manifestRes = await fetchRideManifest(ride.ride_id);
-            const passengers = manifestRes.data?.passengers ?? [];
-            const mappedPassengers = passengers.map((p) => ({
-                bookingId: p.booking_id,
-                passengerName: p.passenger_name ?? 'נוסע',
-                numSeats: p.num_seats,
-                status: p.status,
-                pickupName: p.pickup_name ?? null,
-                pickupTime: p.pickup_time ?? null,
-                dropoffName: p.destination_name ?? null,
-              }));
-
-            if (mappedPassengers.length > 0) {
-              items.push({ ride, passengers: mappedPassengers });
-            }
-          } catch {
-            // skip ride
-          }
-        })
-      );
-      items.sort(
-        (a, b) =>
-          new Date(a.ride.departure_time).getTime() - new Date(b.ride.departure_time).getTime()
-      );
+      for (const row of rows) {
+        const mappedPassengers = (row.passengers ?? []).map((p) => ({
+          bookingId: p.booking_id,
+          passengerName: p.passenger_name ?? 'נוסע',
+          numSeats: p.num_seats,
+          status: p.status,
+          pickupName: p.pickup_name ?? null,
+          pickupTime: p.pickup_time ?? null,
+          dropoffName: p.destination_name ?? null,
+        }));
+        if (mappedPassengers.length === 0) continue;
+        const ride: Ride = {
+          ride_id: row.ride_id,
+          driver_id: userId,
+          group_id: row.group_id ?? null,
+          group_name: row.group_name ?? null,
+          origin_name: row.origin_name,
+          destination_name: row.destination_name,
+          departure_time: row.departure_time,
+          estimated_arrival_time: row.estimated_arrival_time,
+          available_seats: row.available_seats,
+          price: row.price,
+          status: row.status,
+          created_at: row.departure_time,
+        };
+        items.push({ ride, passengers: mappedPassengers });
+      }
       setDriverList(items);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'טעינת ההזמנות נכשלה'));
     } finally {
-      setDriverLoading(false);
+      setDriverStatus({ kind: 'idle' });
     }
   }, [userId, setError]);
 
@@ -71,27 +75,32 @@ export function useMyBookingsDriver(
     if (activeTab === 'driver') void fetchDriverBookings();
   }, [activeTab, fetchDriverBookings]);
 
-  useEffect(() => {
-    const onUserEvent = (evt: Event) => {
-      const detail = (evt as CustomEvent<{ event?: string; ride_id?: string; status?: string }>).detail;
-      if (detail?.event === 'booking.passenger_join_request') {
-        void fetchDriverBookings();
-        return;
-      }
-      if (!detail?.event || !detail.ride_id) return;
-      if (detail.event === 'RIDE_FINISHED') {
-        setDriverList((prev) =>
-          prev.map((item) =>
-            item.ride.ride_id === detail.ride_id
-              ? { ...item, ride: { ...item.ride, status: (detail.status as typeof item.ride.status) ?? 'completed' } }
-              : item
-          )
-        );
-      }
-    };
-    window.addEventListener('linkup:user-event', onUserEvent as EventListener);
-    return () => window.removeEventListener('linkup:user-event', onUserEvent as EventListener);
-  }, [fetchDriverBookings]);
+  useUserEvent(
+    'booking.passenger_join_request',
+    useCallback(() => {
+      void fetchDriverBookings();
+    }, [fetchDriverBookings])
+  );
+
+  useUserEvent(
+    'RIDE_FINISHED',
+    useCallback((detail) => {
+      if (!detail.ride_id) return;
+      setDriverList((prev) =>
+        prev.map((item) =>
+          item.ride.ride_id === detail.ride_id
+            ? {
+                ...item,
+                ride: {
+                  ...item.ride,
+                  status: (detail.status as typeof item.ride.status) ?? 'completed',
+                },
+              }
+            : item
+        )
+      );
+    }, [])
+  );
 
   const handleShareStart = useCallback(
     async (rideId: string) => {
@@ -148,15 +157,15 @@ export function useMyBookingsDriver(
   const handleApprove = useCallback(
     async (bookingId: string) => {
       if (!userId) return;
-      setActionBookingId(bookingId);
+      setDriverStatus({ kind: 'action', bookingId });
       setError('');
       try {
         await approveBooking(bookingId);
-        await fetchDriverBookings();
+        await fetchDriverBookings(bookingId);
       } catch (err: unknown) {
         setError(getApiErrorMessage(err, 'אישור הבקשה נכשל'));
       } finally {
-        setActionBookingId(null);
+        setDriverStatus({ kind: 'idle' });
       }
     },
     [userId, fetchDriverBookings, setError]
@@ -165,15 +174,15 @@ export function useMyBookingsDriver(
   const handleReject = useCallback(
     async (bookingId: string) => {
       if (!userId) return;
-      setActionBookingId(bookingId);
+      setDriverStatus({ kind: 'action', bookingId });
       setError('');
       try {
         await rejectBooking(bookingId);
-        await fetchDriverBookings();
+        await fetchDriverBookings(bookingId);
       } catch (err: unknown) {
         setError(getApiErrorMessage(err, 'דחיית הבקשה נכשלה'));
       } finally {
-        setActionBookingId(null);
+        setDriverStatus({ kind: 'idle' });
       }
     },
     [userId, fetchDriverBookings, setError]
@@ -203,9 +212,16 @@ export function useMyBookingsDriver(
     }
   }, [rideToCancel, sharingRideId, fetchDriverBookings, setError]);
 
+  const actionBookingIdForUi =
+    driverStatus.kind === 'action'
+      ? driverStatus.bookingId
+      : driverStatus.kind === 'loading' && driverStatus.busyBookingId !== undefined
+        ? driverStatus.busyBookingId
+        : null;
+
   return {
     driverList,
-    driverLoading,
+    driverLoading: driverStatus.kind === 'loading',
     sharingRideId,
     setSharingRideId,
     liveRideId,
@@ -213,7 +229,7 @@ export function useMyBookingsDriver(
     rideToCancel,
     setRideToCancel,
     cancellingRide,
-    actionBookingId,
+    actionBookingId: actionBookingIdForUi,
     handleShareStart,
     handleShareStop,
     handleApprove,

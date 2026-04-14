@@ -44,6 +44,15 @@ Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 Endpoints for operators only: FastAPI dependency **`get_current_admin_user`** (`app/api/dependencies/admin.py`) requires `User.is_admin`. Router: **`app/domain/admin/router.py`**, mounted in **`app/api/v1/api_router.py`** with prefix **`/admin`**. Includes stats, health, user list + PATCH (active/admin flag), rides/groups lists and ride cancel, outbox list/detail + requeue for FAILED events, ride/booking lookup; sensitive actions log with **`[admin_audit]`**.  
 **Web UI** lives in the main frontend: **`frontend/src/features/admin/`** → routes under **`/admin`** — see root **`ADMIN_DASHBOARD.md`**.
 
+## Bookings — aggregated reads (My Bookings)
+
+- **`GET /api/v1/bookings/driver-summary`** (auth): all rides for the current driver with **pending + confirmed** bookings and passenger contact fields in **one** `AsyncSession.execute` — `CRUDBooking.get_driver_rides_with_passengers` uses `joinedload(Ride.bookings → passenger_request → user)`, `joinedload(Ride.group)`, and `with_loader_criteria(Booking, …)` so cancelled/rejected rows are not loaded into the collection.
+- **`GET /api/v1/bookings/passenger-summary`** (auth): all bookings for the current passenger with ride, **driver**, and **group** in **one** query — `get_passenger_bookings_with_rides`.
+- **Shared manifest mapping:** `BookingService._booking_to_manifest_item` feeds both the per-ride manifest endpoint and driver-summary passengers.
+- **GPS REST:** `BookingService.broadcast_driver_location` / `broadcast_passenger_location` centralize permission checks; routers delegate only.
+
+See `docs/architecture/API.md` and `docs/architecture/DATABASE.md`.
+
 ## Async architecture updates (rides / bookings / passengers)
 
 - Core flows in passenger requests, bookings, and rides were refactored to SQLAlchemy 2.0 async patterns:

@@ -8,20 +8,9 @@ import RideCard from '../components/RideCard/RideCard';
 import ConfirmModal from '../components/ConfirmModal/ConfirmModal';
 import ErrorBanner from '../components/ErrorBanner';
 import { formatDateTimeNoSeconds } from '../utils/date';
-import { getRideSourceLabel } from '../utils/rideDisplay';
+import { getRideSourceLabel, getRequestStatusLabel } from '../utils/rideDisplay';
 import HistorySection from '../components/HistorySection/HistorySection';
 import styles from './MyRequests.module.css';
-
-const statusLabels: Record<string, string> = {
-  active: 'מחפש',
-  pending: 'ממתין לאישור',
-  approved: 'אושר',
-  rejected: 'נדחה',
-  completed: 'הושלם',
-  expired: 'פג תוקף',
-  matched: 'נמצאה נסיעה',
-  cancelled: 'בוטל',
-};
 
 export default function MyRequests() {
   const navigate = useNavigate();
@@ -62,7 +51,9 @@ export default function MyRequests() {
   return (
     <div className={styles.page}>
       <Chips items={chipItems} activeId={activeChipId} onChange={setActiveChipId} />
+
       {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
+
       {displayedRequests.length === 0 ? (
         <div className={styles.emptyState}>
           <Search size={48} strokeWidth={1.5} className={styles.emptyIcon} />
@@ -79,52 +70,66 @@ export default function MyRequests() {
         </div>
       ) : (
         <>
-          <div className={styles.grid}>
-            {activeRequests.map((r) => (
-              <div key={r.request_id} className={styles.cardWrap}>
-                <button
-                  type="button"
-                  className={styles.cardDeleteBtn}
-                  onClick={() => setRequestToCancel(r)}
-                  aria-label="הסר בקשת טרמפ"
-                  title="הסר בקשה"
-                >
-                  <X size={14} strokeWidth={2.5} />
-                </button>
-                <RideCard
-                  route={`${r.pickup_name ?? '?'} ← ${r.destination_name ?? '?'}`}
-                  scheduleCaption="זמן מבוקש לנסיעה"
-                  time={formatDateTimeNoSeconds(r.requested_departure_time)}
-                  status={statusLabels[r.status] || r.status}
-                  source={getRideSourceLabel(r.group_id, myGroups)}
-                />
+          {activeRequests.length > 0 && (
+            <>
+              <div className={styles.sectionHeader}>
+                <span className={styles.sectionLabel}>בקשות פעילות</span>
+                <span className={styles.sectionCount}>{activeRequests.length} בקשות</span>
               </div>
-            ))}
-          </div>
-          {pastRequests.length > 0 ? (
-            <HistorySection title="בקשות עבר">
-              <div className={styles.grid}>
-                {pastRequests.map((r) => (
-                  <div key={r.request_id} className={styles.cardWrap}>
-                    <RideCard
-                      route={`${r.pickup_name ?? '?'} ← ${r.destination_name ?? '?'}`}
-                      scheduleCaption="זמן מבוקש לנסיעה"
-                      time={formatDateTimeNoSeconds(r.requested_departure_time)}
-                      status={statusLabels[r.status] || r.status}
-                      source={getRideSourceLabel(r.group_id, myGroups)}
-                    />
-                  </div>
-                ))}
+              <div className={styles.gridWrap}>
+                <div className={styles.grid}>
+                  {activeRequests.map((r) => (
+                    <div key={r.request_id} className={styles.cardWrap}>
+                      <button
+                        type="button"
+                        className={styles.cardDeleteBtn}
+                        onClick={() => setRequestToCancel(r)}
+                        aria-label="הסר בקשת טרמפ"
+                        title="הסר בקשה"
+                      >
+                        <X size={12} strokeWidth={2.5} />
+                      </button>
+                      <RideCard
+                        route={`${r.pickup_name ?? '?'} → ${r.destination_name ?? '?'}`}
+                        scheduleCaption="זמן מבוקש ליציאה"
+                        time={formatDateTimeNoSeconds(r.requested_departure_time)}
+                        status={getRequestStatusLabel(r.status)}
+                        source={getRideSourceLabel(r.group_id, myGroups)}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-            </HistorySection>
-          ) : null}
+            </>
+          )}
+
+          {pastRequests.length > 0 && (
+            <div className={styles.gridWrap}>
+              <HistorySection title={`בקשות עבר · ${pastRequests.length}`}>
+                <div className={styles.grid}>
+                  {pastRequests.map((r) => (
+                    <div key={r.request_id} className={styles.cardWrap}>
+                      <RideCard
+                        route={`${r.pickup_name ?? '?'} → ${r.destination_name ?? '?'}`}
+                        scheduleCaption="זמן מבוקש ליציאה"
+                        time={formatDateTimeNoSeconds(r.requested_departure_time)}
+                        status={getRequestStatusLabel(r.status)}
+                        source={getRideSourceLabel(r.group_id, myGroups)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </HistorySection>
+            </div>
+          )}
         </>
       )}
+
       <ConfirmModal
         open={requestToCancel != null}
         onClose={() => setRequestToCancel(null)}
-        title="האם אתה בטוח שאתה רוצה להסיר את בקשת הטרמפ הזו?"
-        description="זה יבטל גם בקשות הצטרפות שנשלחו לנהגים (אם קיימות)."
+        title="האם אתה בטוח שרוצה להסיר את בקשת הטרמפ הזו?"
+        description="זה יבטל גם בקשות ההצטרפות שנשלחו לנהגים (אם קיימות)."
         confirmLabel="אישור"
         variant="danger"
         loading={cancelling}

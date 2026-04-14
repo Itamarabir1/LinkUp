@@ -1,6 +1,6 @@
+import type { ReactNode } from 'react';
 import { MapPin, Maximize2, X, Send } from 'lucide-react';
 import ChatErrorBoundary from '../ChatErrorBoundary/ChatErrorBoundary';
-import { formatDateTimeNoSeconds } from '../../utils/date';
 import { useChatPopup } from './useChatPopup';
 import styles from './ChatPopup.module.css';
 
@@ -57,6 +57,11 @@ function ChatPopupContent({ conversationId }: ChatPopupProps) {
   const partnerAvatar = conversation.partner?.avatar_url;
   const routeLabel = conversation.route_label?.trim() || null;
 
+  function formatBubbleTime(dateStr: string): string {
+    const d = new Date(dateStr);
+    return d.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+  }
+
   return (
     <div className={styles.popup}>
       <header className={styles.header}>
@@ -100,20 +105,31 @@ function ChatPopupContent({ conversationId }: ChatPopupProps) {
         {messages.length === 0 ? (
           <p className={styles.emptyMsg}>אין הודעות. שלח הודעה ראשונה.</p>
         ) : (
-          messages.map((m) => {
+          messages.reduce<ReactNode[]>((acc, m, i) => {
             const isMe = m.sender_id === user?.user_id;
-            return (
-              <div
-                key={m.message_id}
-                className={isMe ? styles.bubbleOut : styles.bubbleIn}
-              >
-                <div className={styles.bubbleText}>{m.body}</div>
-                <div className={styles.bubbleTime}>
-                  {formatDateTimeNoSeconds(m.created_at)}
+            const msgDate = new Date(m.created_at).toDateString();
+            const prevDate = i > 0 ? new Date(messages[i - 1].created_at).toDateString() : null;
+            if (msgDate !== prevDate) {
+              const label = new Date(m.created_at).toLocaleDateString('he-IL', {
+                day: 'numeric',
+                month: 'long',
+              });
+              acc.push(
+                <div key={`day-${msgDate}-${i}`} className={styles.dayDivider}>
+                  <div className={styles.dayLine} aria-hidden />
+                  <span className={styles.dayLabel}>{label}</span>
+                  <div className={styles.dayLine} aria-hidden />
                 </div>
+              );
+            }
+            acc.push(
+              <div key={m.message_id} className={isMe ? styles.bubbleOut : styles.bubbleIn}>
+                <div className={styles.bubbleText}>{m.body}</div>
+                <div className={styles.bubbleTime}>{formatBubbleTime(m.created_at)}</div>
               </div>
             );
-          })
+            return acc;
+          }, [])
         )}
         <div ref={messagesEndRef} />
       </div>

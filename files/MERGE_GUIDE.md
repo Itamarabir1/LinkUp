@@ -43,10 +43,13 @@ frontend/src/pages/MyRides.tsx
 frontend/src/pages/MyRequests.tsx
 frontend/src/pages/useMyRequests.ts
 frontend/src/pages/MyBookings/index.tsx
+frontend/src/pages/MyBookings/PassengerBookingCard.tsx
 frontend/src/pages/MyBookings/DriverBookingsTab.tsx
 frontend/src/pages/MyBookings/PassengerBookingsTab.tsx
+frontend/src/pages/MyBookings/useMyBookings.ts
 frontend/src/pages/MyBookings/useMyBookingsDriver.ts
 frontend/src/pages/MyBookings/useMyBookingsPassenger.ts
+frontend/src/api/bookings.ts
 
 ## בדיקות לאחר מיזוג
 1. alembic upgrade head — בדוק שה-migration עולה נקי

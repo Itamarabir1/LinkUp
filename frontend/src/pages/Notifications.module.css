@@ -1,49 +1,58 @@
 .page {
-  max-width: 680px;
+  max-width: 640px;
   margin: 0 auto;
-  padding: 24px 20px;
+  padding: 24px 16px;
   text-align: right;
 }
 
+/* ── Header ── */
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 8px;
 }
 
 .pageTitle {
-  font-family: "Rubik", "Heebo", sans-serif;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+  letter-spacing: -0.02em;
+  font-family: var(--font-primary, "Heebo", sans-serif);
 }
 
 .markAllRead {
-  font-family: "Heebo", sans-serif;
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 600;
   color: var(--primary);
-  background: none;
-  border: none;
+  background: var(--primary-light);
+  border: 1px solid var(--primary-soft-border);
+  border-radius: 8px;
+  padding: 6px 14px;
   cursor: pointer;
-  padding: 0;
+  font-family: var(--font-primary, "Heebo", sans-serif);
+  transition: all var(--transition-fast, 150ms ease);
 }
 
 .markAllRead:hover {
-  text-decoration: underline;
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
 }
 
+/* ── States ── */
 .pageError {
   color: var(--danger-text);
   margin-bottom: 1rem;
+  font-family: var(--font-primary, "Heebo", sans-serif);
 }
 
 .pageLoading {
   text-align: center;
   color: var(--text-secondary);
-  padding: 2rem;
+  padding: 3rem;
+  font-family: var(--font-primary, "Heebo", sans-serif);
 }
 
 .empty {
@@ -52,140 +61,128 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
-.emptyIcon {
-  color: var(--text-tertiary);
-}
+.emptyIcon { color: var(--border); }
 
 .emptyTitle {
-  font-family: "Heebo", sans-serif;
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
+  font-family: var(--font-primary, "Heebo", sans-serif);
 }
 
 .emptySub {
-  font-family: "Heebo", sans-serif;
   font-size: 14px;
-  font-weight: 400;
   color: var(--text-secondary);
   margin: 0;
+  font-family: var(--font-primary, "Heebo", sans-serif);
 }
 
+/* ── Groups ── */
 .groups {
   display: flex;
   flex-direction: column;
 }
 
 .group {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .groupTitle {
-  font-family: "Heebo", sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin: 16px 0 8px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 20px 0 4px;
+  padding: 0 4px;
+  font-family: var(--font-primary, "Heebo", sans-serif);
 }
 
-.groupTitle:first-child {
-  margin-top: 0;
-}
+.groupTitle:first-child { margin-top: 4px; }
 
+/* ── Notification row ── */
 .notificationRow {
   width: 100%;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px 16px;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  cursor: pointer;
-  transition: background 150ms, box-shadow 150ms;
-  text-align: right;
-  font-family: inherit;
-}
-
-.notificationRow:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.notificationRow.unread {
-  background: var(--primary-light);
-}
-
-.notifIcon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 12px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: background var(--transition-fast, 150ms ease);
+  text-align: right;
+  font-family: inherit;
+  position: relative;
+}
+
+.notificationRow:hover { background: var(--bg-secondary); }
+
+.notificationRow.unread { background: var(--primary-light); }
+.notificationRow.unread:hover { background: var(--info-tint-bg, #e0e7ff); }
+
+/* ── Avatar + badge ── */
+.avatarWrap {
+  position: relative;
   flex-shrink: 0;
 }
 
-.icon_booking_approved {
-  background: var(--success-bg);
-  color: var(--success-text);
+.avatarCircle {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--font-primary, "Heebo", sans-serif);
 }
 
-.icon_booking_rejected {
-  background: var(--danger-bg);
-  color: var(--danger-text);
+/* Avatar color variants by notification type */
+.avatarApproved  { background: var(--success-bg);  color: var(--success-text); }
+.avatarRejected  { background: var(--danger-bg);   color: var(--danger-text);  }
+.avatarCancelled { background: var(--warning-bg);  color: var(--warning-text); }
+.avatarRequest   { background: var(--primary-light); color: var(--primary);    }
+.avatarGroup     { background: var(--info-bg);     color: var(--info-text);    }
+.avatarDefault   { background: var(--bg-secondary); color: var(--text-secondary); }
+
+.typeBadge {
+  position: absolute;
+  bottom: -2px;
+  left: -2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.icon_ride_cancelled {
-  background: var(--warning-bg);
-  color: var(--warning-text);
-}
+.badgeGreen  { background: var(--success-text); }
+.badgeRed    { background: var(--danger-text);  }
+.badgeAmber  { background: var(--warning-text); }
+.badgeBlue   { background: var(--primary);      }
 
-.icon_booking_request {
-  background: var(--info-bg);
-  color: var(--info-text);
-}
-
-.icon_booking_cancelled_by_passenger {
-  background: var(--danger-bg);
-  color: var(--danger-text);
-}
-
-.icon_group_joined {
-  background: var(--success-bg);
-  color: var(--success-text);
-}
-
-.icon_group_member_joined {
-  background: var(--info-bg);
-  color: var(--info-text);
-}
-
-.icon_pending_approval,
-.icon_default {
-  background: var(--info-bg);
-  color: var(--info-text);
-}
-
+/* ── Content ── */
 .notifContent {
   flex: 1;
   min-width: 0;
 }
 
 .notifTitle {
-  font-family: "Heebo", sans-serif;
   font-size: 14px;
   font-weight: 400;
   color: var(--text-primary);
-  margin: 0;
+  margin: 0 0 2px;
+  line-height: 1.4;
+  font-family: var(--font-primary, "Heebo", sans-serif);
 }
 
 .notifTitleUnread {
@@ -193,26 +190,32 @@
 }
 
 .notifBody {
-  font-family: "Heebo", sans-serif;
   font-size: 13px;
-  font-weight: 400;
   color: var(--text-secondary);
-  margin: 2px 0 0;
+  margin: 0 0 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-primary, "Heebo", sans-serif);
 }
 
 .notifTime {
-  font-family: "Heebo", sans-serif;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
   color: var(--text-tertiary);
-  margin: 4px 0 0;
+  font-family: var(--font-primary, "Heebo", sans-serif);
 }
 
+.notifTimeUnread {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+/* ── Unread dot ── */
 .unreadDot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--primary);
   flex-shrink: 0;
-  margin-top: 4px;
 }

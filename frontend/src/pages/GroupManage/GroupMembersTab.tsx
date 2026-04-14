@@ -98,7 +98,7 @@ export default function GroupMembersTab({ vm }: { vm: GroupManageViewModel }) {
           </ul>
           {vm.members.length > vm.membersPreview && (
             <button type="button" className={styles.seeMoreBtn} onClick={() => vm.setMembersModalOpen(true)}>
-              See More · עוד ({vm.members.length} חברים)
+              הצג את כל החברים · {vm.members.length}
             </button>
           )}
           {vm.membersModalOpen && (

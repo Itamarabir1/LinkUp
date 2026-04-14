@@ -111,9 +111,11 @@ Authorization: Bearer <access_token>
 | PATCH | /{booking_id}/approve | לא (query) | query: booking_id, driver_id. אישור הזמנה. |
 | PATCH | /{booking_id}/reject | לא (query) | query: booking_id, driver_id. דחיית הזמנה. |
 | POST | /{booking_id}/cancel | כן | ביטול הזמנה (בעלים). |
-| POST | /{booking_id}/location | כן | **GPS נהג**: body: lat, lng, heading?, speed?. דורש: משתמש=נהג הנסיעה, נסיעה ב-ACTIVE. מפיץ מיקום לנוסעים המאושרים (204). |
-| POST | /{booking_id}/passenger-location | כן | **GPS נוסע**: body: lat, lng, heading?, speed?. דורש: משתמש=נוסע הבוקינג. מפיץ מיקום לנהג בערוץ ride_{ride_id}:passenger_locations (204). |
+| POST | /{booking_id}/location | כן | **GPS נהג**: body: lat, lng, heading?, speed?. דורש: משתמש=נהג הנסיעה, נסיעה ב-ACTIVE. מפיץ מיקום לנוסעים המאושרים (204). לוגיקה ב־`BookingService.broadcast_driver_location`. |
+| POST | /{booking_id}/passenger-location | כן | **GPS נוסע**: body: lat, lng, heading?, speed?. דורש: משתמש=נוסע הבוקינג. מפיץ מיקום לנהג בערוץ ride_{ride_id}:passenger_locations (204). לוגיקה ב־`BookingService.broadcast_passenger_location`. |
 | GET | /my-bookings | לא (query) | query: user_id, status?, page (default 1), limit (default 20, max 50). **Pagination**: page-based. תגובה: items, total, page, limit, has_more. |
+| GET | /driver-summary | כן | כל נסיעות הנהג עם נוסעים (pending/confirmed) בשאילתת DB אחת — `DriverSummaryResponse`. |
+| GET | /passenger-summary | כן | כל הזמנות הנוסע עם פרטי נסיעה ונהג (כשהנסיעה לא cancelled/completed) — `PassengerSummaryResponse`. |
 | GET | /ride/{ride_id}/manifest | לא (query) | query: ride_id, driver_id. מניפסט נסיעה. |
 | GET | /ride/{ride_id}/pending | לא (query) | query: ride_id, driver_id. בקשות ממתינות. |
 | GET | /{booking_id} | לא | פרטי הזמנה. |

@@ -5,28 +5,22 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import WsUser, get_current_user, get_current_user_ws
-from app.core.exceptions.booking import BookingNotFoundError, ForbiddenRideActionError
+from app.core.exceptions.booking import ForbiddenRideActionError
 from app.core.exceptions.validation import BadRequestError
 from app.db.session import get_db
-from app.domain.bookings.crud import crud_booking
-from app.domain.bookings.enum import BookingStatus
 from app.domain.bookings.schema import (
     BookingCreate,
     BookingResponse,
+    DriverSummaryResponse,
+    PassengerSummaryResponse,
     RideManifestResponse,
 )
 from app.domain.bookings.service import BookingService
 from app.domain.geo.schema import (
     DriverLocationReport,
-    LocationUpdate,
     PassengerLocationReport,
 )
-from app.domain.rides.enum import RideStatus
 from app.domain.users.model import User
-from app.infrastructure.location.location_service import (
-    broadcast_location_to_participants,
-    broadcast_passenger_location_to_driver,
-)
 from app.infrastructure.redis.broadcast import broadcast
 from app.infrastructure.redis.keys import get_booking_channel
 
@@ -96,6 +90,24 @@ async def get_user_bookings(
     return result.items
 
 
+@router.get("/driver-summary", response_model=DriverSummaryResponse)
+async def get_driver_summary(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Aggregated driver rides + passengers (single query); must stay before /{booking_id}."""
+    return await BookingService.get_driver_summary(db, current_user.user_id)
+
+
+@router.get("/passenger-summary", response_model=PassengerSummaryResponse)
+async def get_passenger_summary(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Passenger bookings with ride + driver (single query); must stay before /{booking_id}."""
+    return await BookingService.get_passenger_summary(db, current_user.user_id)
+
+
 @router.get("/ride/{ride_id}/manifest", response_model=RideManifestResponse)
 async def get_ride_manifest(
     ride_id: UUID,
@@ -137,23 +149,7 @@ async def report_driver_location(
     Driver reports location during the ride. Broadcast to confirmed passengers over WebSocket.
     Requires: ride driver, ride in active status.
     """
-    booking = await BookingService.get_booking(db, booking_id)
-    if not booking or not booking.ride:
-        raise BookingNotFoundError(booking_id)
-    if str(booking.ride.driver_id) != str(current_user.user_id):
-        raise ForbiddenRideActionError("גישה חסומה – רק נהג הנסיעה יכול לדווח מיקום")
-    if booking.ride.status != RideStatus.ACTIVE:
-        raise BadRequestError("ניתן לדווח מיקום רק בנסיעה פעילה (active)")
-    confirmed = await crud_booking.get_ride_bookings_by_status_async(db, booking.ride_id, BookingStatus.CONFIRMED)
-    involved = [b.booking_id for b in confirmed]
-    location_in = LocationUpdate(
-        booking_id=0,
-        lat=body.lat,
-        lon=body.lng,
-        heading=body.heading or 0.0,
-        speed=body.speed or 0.0,
-    )
-    await broadcast_location_to_participants(location_in, booking.ride_id, involved)
+    await BookingService.broadcast_driver_location(db, booking_id, current_user.user_id, body)
     return
 
 
@@ -168,20 +164,7 @@ async def report_passenger_location(
     Passenger reports location during the ride. Broadcast to driver on ride_{ride_id}:passenger_locations.
     Requires: the booking’s passenger.
     """
-    booking = await BookingService.get_booking(db, booking_id)
-    if not booking or not booking.ride:
-        raise BookingNotFoundError(booking_id)
-    if str(booking.passenger_id) != str(current_user.user_id):
-        raise ForbiddenRideActionError("גישה חסומה – רק הנוסע של ההזמנה יכול לדווח מיקום")
-    await broadcast_passenger_location_to_driver(
-        ride_id=booking.ride_id,
-        booking_id=booking.booking_id,
-        passenger_id=current_user.user_id,
-        lat=body.lat,
-        lng=body.lng,
-        heading=body.heading or 0.0,
-        speed=body.speed or 0.0,
-    )
+    await BookingService.broadcast_passenger_location(db, booking_id, current_user.user_id, body)
     return
 
 

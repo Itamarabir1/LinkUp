@@ -12,4 +12,5 @@ export const STATUS_LABEL: Record<string, string> = {
   confirmed: 'אושר',
   rejected: 'נדחה',
   cancelled: 'בוטל',
+  completed: 'הושלם',
 };

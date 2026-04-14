@@ -18,7 +18,8 @@
 | חיפוש נסיעות | `passengers` + `rides` + `geo` ב־`useSearchRides` | ✅ |
 | צ'אט (REST) | `api/chat.ts` ← MessageThread, ChatPopup, Messages, `useMyBookings` | ✅ |
 | התראות / unread | `users.fetchMyNotifications` + `chat.fetchUnreadMessageCount` ב־`ChatContext`; פיד חי — `useChatNotificationsWebSocket` (`useReconnectingWebSocket`, **`onOpen`** מרענן פיד + unread); גיבוי — `useChatNotificationsFeed` (polling REST ~5 דקות) | ✅ |
-| מיקום | `bookings.postDriverBookingLocation` / `postPassengerBookingLocation` + `fetchRideManifest`; הוקים `useLocationBroadcast`, `usePassengerLocationBroadcast`, `useLocationWatcher` (throttle 1.5s, `maximumAge: 0`); WS `useDriverLocation`, `usePassengerLocations`; `useMapMarker` + `LiveMapModal` / `LiveRideMapModal` | ✅ |
+| מיקום | `bookings.postDriverBookingLocation` / `postPassengerBookingLocation`; טעינת רשימת נהג: `fetchDriverBookingSummary` (מחליף N+1 של מניפסטים); מניפסט לנסיעה בודדת — `fetchRideManifest` אם נדרש. הוקים `useLocationBroadcast`, `usePassengerLocationBroadcast`, `useLocationWatcher` (throttle 1.5s, `maximumAge: 0`); WS `useDriverLocation`, `usePassengerLocations`; `useMapMarker` + `LiveMapModal` / `LiveRideMapModal` | ✅ |
+| הזמנות שלי (REST) | `fetchPassengerBookingSummary`, `fetchDriverBookingSummary` ב־`api/bookings.ts`; הוקים `useMyBookingsPassenger`, `useMyBookingsDriver`; VM מקונן ב־`useMyBookings` + `PassengerBookingCard` | ✅ |
 | WebSocket read | `chat.markConversationRead` (כולל `useChatWebSocket`) | ✅ |
 | מפתח מפות | `geo.fetchMapsKey` ב־`useGoogleMapsKey` (וב־`RouteMapModal`) | ✅ |
 | FCM | `users.patchFcmToken` ← `fcm.ts`, `useFCMCheck` | ✅ |
@@ -64,7 +65,7 @@
 
 | אזור | סטטוס |
 |------|--------|
-| CreateRide / Profile / Notifications / FCMCheck / Layout / ChatPopup / MessageThread / GroupManage / MyBookings נהג (כולל מפה חיה + GPS) / **MyRequests + `useMyRequests`** / GoogleSignIn | ✅ |
+| CreateRide / Profile / Notifications / FCMCheck / Layout / ChatPopup / MessageThread / GroupManage / **MyBookings** (טאב נהג+נוסע, סיכומים מאוגדים, מפה חיה + GPS, `PassengerBookingCard`) / **MyRequests + `useMyRequests`** / GoogleSignIn | ✅ |
 
 ---
 

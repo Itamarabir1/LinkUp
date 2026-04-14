@@ -433,8 +433,18 @@ frontend/
     │   ├── Messages.tsx
     │   ├── MessageThread.module.css
     │   ├── MessageThread.tsx
-    │   ├── MyBookings.module.css
-    │   ├── MyBookings.tsx
+    │   ├── MyBookings/
+    │   │   ├── index.tsx
+    │   │   ├── MyBookings.module.css
+    │   │   ├── PassengerBookingCard.tsx
+    │   │   ├── PassengerBookingsTab.tsx
+    │   │   ├── DriverBookingsTab.tsx
+    │   │   ├── useMyBookings.ts
+    │   │   ├── useMyBookingsDriver.ts
+    │   │   ├── useMyBookingsPassenger.ts
+    │   │   ├── myBookings.types.ts
+    │   │   ├── myBookings.constants.ts
+    │   │   └── myBookings.utils.ts
     │   ├── MyRequests.module.css
     │   ├── MyRequests.tsx
     │   ├── MyRides.module.css

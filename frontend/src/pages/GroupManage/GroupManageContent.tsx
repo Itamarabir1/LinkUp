@@ -20,7 +20,7 @@ export default function GroupManageContent({ vm }: GroupManageContentProps) {
           type="button"
           role="tab"
           aria-selected={vm.activeTab === 'rides'}
-          className={vm.activeTab === 'rides' ? styles.tabActive : styles.tab}
+          className={vm.activeTab === 'rides' ? `${styles.tab} ${styles.tabActive}` : styles.tab}
           onClick={() => vm.setActiveTab('rides')}
         >
           נסיעות
@@ -29,7 +29,7 @@ export default function GroupManageContent({ vm }: GroupManageContentProps) {
           type="button"
           role="tab"
           aria-selected={vm.activeTab === 'members'}
-          className={vm.activeTab === 'members' ? styles.tabActive : styles.tab}
+          className={vm.activeTab === 'members' ? `${styles.tab} ${styles.tabActive}` : styles.tab}
           onClick={() => vm.setActiveTab('members')}
         >
           חברים
@@ -39,7 +39,7 @@ export default function GroupManageContent({ vm }: GroupManageContentProps) {
             type="button"
             role="tab"
             aria-selected={vm.activeTab === 'settings'}
-            className={vm.activeTab === 'settings' ? styles.tabActive : styles.tab}
+            className={vm.activeTab === 'settings' ? `${styles.tab} ${styles.tabActive}` : styles.tab}
             onClick={() => vm.setActiveTab('settings')}
           >
             הגדרות
@@ -49,9 +49,11 @@ export default function GroupManageContent({ vm }: GroupManageContentProps) {
 
       {vm.error ? <ErrorBanner message={vm.error} className={styles.pageError} /> : null}
 
-      {vm.activeTab === 'rides' && <GroupRidesTab vm={vm} />}
-      {vm.activeTab === 'members' && <GroupMembersTab vm={vm} />}
-      {vm.activeTab === 'settings' && isAdmin && <GroupSettingsTab vm={vm} />}
+      <div className={styles.contentArea}>
+        {vm.activeTab === 'rides' && <GroupRidesTab vm={vm} />}
+        {vm.activeTab === 'members' && <GroupMembersTab vm={vm} />}
+        {vm.activeTab === 'settings' && isAdmin && <GroupSettingsTab vm={vm} />}
+      </div>
 
       <ConfirmModal
         open={vm.confirmLeave}

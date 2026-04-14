@@ -10,12 +10,6 @@ export default function Layout() {
     showChatPopup,
     messagesBadge,
     notificationsBadge,
-    profileOpen,
-    setProfileOpen,
-    profileRef,
-    notifPermission,
-    handleLogout,
-    handleEnableNotifications,
   } = useLayoutShell();
 
   return (
@@ -69,7 +63,7 @@ export default function Layout() {
             </Link>
           </div>
           <div className={styles.iconBtnWrapper}>
-            <Link to="/notifications" className={styles.iconBtn} aria-label="התראות">
+            <Link to="/notifications" className={styles.iconBtn} aria-label="התראות" title="התראות">
               <Bell size={16} />
               {notificationsBadge && (
                 <span className={styles.badge} aria-hidden>
@@ -78,47 +72,15 @@ export default function Layout() {
               )}
             </Link>
           </div>
-          <div className={styles.profileWrap} ref={profileRef}>
-            <button
-              type="button"
+          <div className={styles.iconBtnWrapper}>
+            <Link
+              to="/profile"
               className={styles.iconBtn}
-              onClick={() => setProfileOpen((o) => !o)}
               aria-label="פרופיל"
-              aria-expanded={profileOpen}
-              aria-haspopup="true"
+              title="הפרופיל שלי"
             >
               <User size={16} />
-            </button>
-            {profileOpen && (
-              <div className={styles.profileDropdown} role="menu">
-                <Link
-                  to="/profile"
-                  className={styles.profileDropdownItem}
-                  onClick={() => setProfileOpen(false)}
-                >
-                  הפרופיל שלי
-                </Link>
-                {notifPermission !== 'granted' && (
-                  <button
-                    type="button"
-                    className={styles.profileDropdownItem}
-                    onClick={handleEnableNotifications}
-                  >
-                    {notifPermission === 'denied'
-                      ? '🔕 התראות חסומות בדפדפן'
-                      : '🔔 הפעל התראות'}
-                  </button>
-                )}
-                <div className={styles.profileDropdownDivider} />
-                <button
-                  type="button"
-                  className={styles.profileDropdownItem}
-                  onClick={handleLogout}
-                >
-                  התנתק
-                </button>
-              </div>
-            )}
+            </Link>
           </div>
           <div className={styles.navDivider} />
           <Link to="/search" className={styles.btnSearch}>
