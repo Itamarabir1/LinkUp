@@ -163,9 +163,7 @@ class PassengerService:
             p_lat, p_lon = pickup_coords
             d_lat, d_lon = dest_coords
 
-            radius = _radius_km_to_meters(
-                getattr(search_data, "search_radius", None) or getattr(search_data, "radius", _DEFAULT_SEARCH_RADIUS_KM)
-            )
+            radius = _radius_km_to_meters(getattr(search_data, "search_radius", None) or getattr(search_data, "radius", _DEFAULT_SEARCH_RADIUS_KM))
 
             matches, has_more = await crud_passenger.find_rides_by_coordinates(
                 db,

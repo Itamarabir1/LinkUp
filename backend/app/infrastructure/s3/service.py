@@ -74,7 +74,7 @@ class StorageService:
         await self.list_and_delete_prefix(prefix)
         logger.info("Deleted avatar folder for user %s", uid_str)
 
-    async def generate_group_image_upload_url(self, group_id: UUID | str, expiration: int = 300    ) -> tuple[str, str]:
+    async def generate_group_image_upload_url(self, group_id: UUID | str, expiration: int = 300) -> tuple[str, str]:
         """
         Creates a presigned URL for direct S3 upload of a group image.
         Key: GROUPS/<group_id>/<uuid>.webp

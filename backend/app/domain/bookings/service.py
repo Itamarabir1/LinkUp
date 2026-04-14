@@ -220,19 +220,22 @@ class BookingService:
                 clean_phone = "".join(filter(str.isdigit, user.phone_number or ""))
                 if clean_phone.startswith("0"):
                     clean_phone = "972" + clean_phone[1:]
-                passengers.append(BookingManifestItem(
-                    booking_id=b.booking_id,
-                    passenger_id=user.user_id,
-                    passenger_name=user.full_name or "נוסע",
-                    phone=user.phone_number or "",
-                    whatsapp_link=f"https://wa.me/{clean_phone}?text={quote('היי, אני הנהג שלך מהאפליקציה')}",
-                    num_seats=b.num_seats,
-                    status=b.status,
-                    pickup_name=b.pickup_name,
-                    pickup_time=b.pickup_time,
-                    destination_name=(b.passenger_request.destination_name if b.passenger_request else None),
-                ))
-            items.append(RideWithPassengersItem(
+                passengers.append(
+                    BookingManifestItem(
+                        booking_id=b.booking_id,
+                        passenger_id=user.user_id,
+                        passenger_name=user.full_name or "נוסע",
+                        phone=user.phone_number or "",
+                        whatsapp_link=f"https://wa.me/{clean_phone}?text={quote('היי, אני הנהג שלך מהאפליקציה')}",
+                        num_seats=b.num_seats,
+                        status=b.status,
+                        pickup_name=b.pickup_name,
+                        pickup_time=b.pickup_time,
+                        destination_name=(b.passenger_request.destination_name if b.passenger_request else None),
+                    )
+                )
+            items.append(
+                RideWithPassengersItem(
                     ride_id=ride.ride_id,
                     origin_name=ride.origin_name,
                     destination_name=ride.destination_name,
@@ -244,7 +247,8 @@ class BookingService:
                     group_id=ride.group.group_id if ride.group else None,
                     group_name=ride.group.name if ride.group else None,
                     passengers=passengers,
-                ))
+                )
+            )
         return DriverSummaryResponse(rides=items)
 
     @staticmethod
@@ -259,7 +263,8 @@ class BookingService:
             if not ride:
                 continue
             driver = ride.driver
-            items.append(PassengerBookingSummaryItem(
+            items.append(
+                PassengerBookingSummaryItem(
                     booking_id=b.booking_id,
                     booking_status=b.status,
                     ride_id=ride.ride_id,
@@ -273,8 +278,11 @@ class BookingService:
                     driver=DriverSummaryInfo(
                         full_name=driver.full_name or "נהג",
                         phone_number=getattr(driver, "phone_number", None),
-                    ) if driver else None,
-                ))
+                    )
+                    if driver
+                    else None,
+                )
+            )
         return PassengerSummaryResponse(bookings=items)
 
     @staticmethod

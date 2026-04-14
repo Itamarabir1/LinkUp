@@ -299,11 +299,7 @@ class CRUDPassenger:
         max_date = ride_date + timedelta(days=_RIDE_DATE_WINDOW_DAYS_AFTER)
 
         ride_group_id = getattr(ride, "group_id", None)
-        group_match = (
-            PassengerRequest.group_id == ride_group_id
-            if ride_group_id is not None
-            else PassengerRequest.group_id.is_(None)
-        )
+        group_match = PassengerRequest.group_id == ride_group_id if ride_group_id is not None else PassengerRequest.group_id.is_(None)
 
         stmt = (
             select(PassengerRequest)

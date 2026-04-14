@@ -3,6 +3,7 @@ Email renderer — delegates to the React Email microservice.
 Drop-in replacement for the old Jinja2 renderer.
 Interface is identical: render_email_template(template_name, **context) -> str
 """
+
 import logging
 from typing import Any
 
