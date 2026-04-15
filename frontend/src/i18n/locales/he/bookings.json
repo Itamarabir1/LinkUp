@@ -29,8 +29,8 @@
   ,"startRide": "התחל נסיעה"
   ,"endRide": "סיים נסיעה"
   ,"openRide": "פתוחה"
-  ,"requestsCount": "{{count}} בקשות"
-  ,"approvedCount": "{{count}} מאושרים"
+  ,"requestsCount": "{count, plural, one {# בקשה} other {# בקשות}}"
+  ,"approvedCount": "{count, plural, one {# מאושר} other {# מאושרים}}"
   ,"pickup": "עולה"
   ,"dropoff": "יורד"
 }

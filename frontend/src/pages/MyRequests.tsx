@@ -1,4 +1,6 @@
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Search, X } from 'lucide-react';
 import { useGroup } from '../context/GroupContext';
 import { useMyRequests } from './useMyRequests';
@@ -14,6 +16,7 @@ import styles from './MyRequests.module.css';
 
 export default function MyRequests() {
   const navigate = useNavigate();
+  const { t } = useTranslation(['rides', 'common']);
   const { myGroups, activeChipId, setActiveChipId } = useGroup();
 
   const {
@@ -26,11 +29,14 @@ export default function MyRequests() {
     confirmCancelRequest,
   } = useMyRequests();
 
-  const chipItems: ChipItem[] = [
-    { id: 'all', label: 'הכל' },
-    { id: 'public', label: 'ציבורי' },
-    ...myGroups.map((g) => ({ id: g.group_id, label: g.name })),
-  ];
+  const chipItems: ChipItem[] = useMemo(
+    () => [
+      { id: 'all', label: t('common:all') },
+      { id: 'public', label: t('common:public') },
+      ...myGroups.map((g) => ({ id: g.group_id, label: g.name })),
+    ],
+    [t, myGroups]
+  );
 
   const displayedRequests = requests.filter((r) => {
     if (activeChipId === 'all') return true;
@@ -43,7 +49,7 @@ export default function MyRequests() {
   if (loading) {
     return (
       <div className={styles.page}>
-        <div className={styles.pageLoading}>טוען...</div>
+        <div className={styles.pageLoading}>{t('common:loading')}</div>
       </div>
     );
   }
@@ -57,15 +63,15 @@ export default function MyRequests() {
       {displayedRequests.length === 0 ? (
         <div className={styles.emptyState}>
           <Search size={48} strokeWidth={1.5} className={styles.emptyIcon} />
-          <h2 className={styles.emptyTitle}>אין בקשות טרמפ פעילות</h2>
-          <p className={styles.emptySubtitle}>חפש טרמפ כדי להתחיל</p>
+          <h2 className={styles.emptyTitle}>{t('rides:myRequests_emptyTitle')}</h2>
+          <p className={styles.emptySubtitle}>{t('rides:myRequests_emptySubtitle')}</p>
           <button
             type="button"
             className={styles.btnSearch}
             onClick={() => navigate('/search')}
           >
             <Search size={14} />
-            חפש טרמפ
+            {t('rides:searchTitle')}
           </button>
         </div>
       ) : (
@@ -73,8 +79,10 @@ export default function MyRequests() {
           {activeRequests.length > 0 && (
             <>
               <div className={styles.sectionHeader}>
-                <span className={styles.sectionLabel}>בקשות פעילות</span>
-                <span className={styles.sectionCount}>{activeRequests.length} בקשות</span>
+                <span className={styles.sectionLabel}>{t('rides:myRequests_activeLabel')}</span>
+                <span className={styles.sectionCount}>
+                  {t('rides:myRequests_activeCount', { count: activeRequests.length })}
+                </span>
               </div>
               <div className={styles.gridWrap}>
                 <div className={styles.grid}>
@@ -84,14 +92,14 @@ export default function MyRequests() {
                         type="button"
                         className={styles.cardDeleteBtn}
                         onClick={() => setRequestToCancel(r)}
-                        aria-label="הסר בקשת טרמפ"
-                        title="הסר בקשה"
+                        aria-label={t('rides:removeRequestAria')}
+                        title={t('rides:removeRequestTitle')}
                       >
                         <X size={12} strokeWidth={2.5} />
                       </button>
                       <RideCard
                         route={`${r.pickup_name ?? '?'} → ${r.destination_name ?? '?'}`}
-                        scheduleCaption="זמן מבוקש ליציאה"
+                        scheduleCaption={t('rides:requestScheduleCaption')}
                         time={formatDateTimeNoSeconds(r.requested_departure_time)}
                         status={getRequestStatusLabel(r.status)}
                         source={getRideSourceLabel(r.group_id, myGroups)}
@@ -105,13 +113,13 @@ export default function MyRequests() {
 
           {pastRequests.length > 0 && (
             <div className={styles.gridWrap}>
-              <HistorySection title={`בקשות עבר · ${pastRequests.length}`}>
+              <HistorySection title={t('rides:myRequests_pastTitle', { count: pastRequests.length })}>
                 <div className={styles.grid}>
                   {pastRequests.map((r) => (
                     <div key={r.request_id} className={styles.cardWrap}>
                       <RideCard
                         route={`${r.pickup_name ?? '?'} → ${r.destination_name ?? '?'}`}
-                        scheduleCaption="זמן מבוקש ליציאה"
+                        scheduleCaption={t('rides:requestScheduleCaption')}
                         time={formatDateTimeNoSeconds(r.requested_departure_time)}
                         status={getRequestStatusLabel(r.status)}
                         source={getRideSourceLabel(r.group_id, myGroups)}
@@ -128,9 +136,9 @@ export default function MyRequests() {
       <ConfirmModal
         open={requestToCancel != null}
         onClose={() => setRequestToCancel(null)}
-        title="האם אתה בטוח שרוצה להסיר את בקשת הטרמפ הזו?"
-        description="זה יבטל גם בקשות ההצטרפות שנשלחו לנהגים (אם קיימות)."
-        confirmLabel="אישור"
+        title={t('rides:confirmCancelRequestTitle')}
+        description={t('rides:confirmCancelRequestDescription')}
+        confirmLabel={t('common:confirm')}
         variant="danger"
         loading={cancelling}
         onConfirm={confirmCancelRequest}

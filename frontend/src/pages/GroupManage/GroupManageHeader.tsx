@@ -1,6 +1,7 @@
 /* View-model bundles refs with state; ref props and handlers are valid in render. */
 /* eslint-disable react-hooks/refs -- false positives when vm includes RefObjects */
 import { Camera, Pencil, Plus, Search, Settings } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { Group } from '../../types/api';
 import type { GroupManageViewModel } from './useGroupManage';
 import styles from './GroupManage.module.css';
@@ -11,7 +12,9 @@ export interface GroupManageHeaderProps {
 }
 
 export default function GroupManageHeader({ vm, group }: GroupManageHeaderProps) {
+  const { t } = useTranslation(['groups', 'common']);
   const { groupId, navigate, isAdmin } = vm;
+  const memberCount = group.member_count ?? vm.members.length;
 
   return (
     <header className={styles.groupHeader}>
@@ -20,7 +23,7 @@ export default function GroupManageHeader({ vm, group }: GroupManageHeaderProps)
           type="button"
           className={styles.headerSettingsBtn}
           onClick={() => vm.setActiveTab('settings')}
-          title="הגדרות קבוצה"
+          title={t('groups:groupSettingsTitle')}
         >
           <Settings size={18} />
         </button>
@@ -67,7 +70,7 @@ export default function GroupManageHeader({ vm, group }: GroupManageHeaderProps)
               type="button"
               className={styles.editIconBtn}
               onClick={() => vm.setIsEditingName(true)}
-              aria-label="ערוך שם קבוצה"
+              aria-label={t('groups:editGroupNameAria')}
             >
               <Pencil size={14} />
             </button>
@@ -118,14 +121,14 @@ export default function GroupManageHeader({ vm, group }: GroupManageHeaderProps)
       {!vm.isEditingDesc ? (
         <div className={styles.descRow}>
           <p className={styles.headerDescription}>
-            {group.description || (isAdmin ? 'הוסף תיאור...' : '')}
+            {group.description || (isAdmin ? t('groups:addDescriptionPlaceholder') : '')}
           </p>
           {isAdmin && (
             <button
               type="button"
               className={styles.editIconBtn}
               onClick={() => vm.setIsEditingDesc(true)}
-              aria-label="ערוך תיאור קבוצה"
+              aria-label={t('groups:editGroupDescriptionAria')}
             >
               <Pencil size={14} />
             </button>
@@ -148,7 +151,7 @@ export default function GroupManageHeader({ vm, group }: GroupManageHeaderProps)
               onClick={() => void vm.handleDescSave()}
               disabled={vm.headerSaving}
             >
-              שמור
+              {t('common:save')}
             </button>
             <button
               type="button"
@@ -159,15 +162,15 @@ export default function GroupManageHeader({ vm, group }: GroupManageHeaderProps)
               }}
               disabled={vm.headerSaving}
             >
-              ביטול
+              {t('common:cancel')}
             </button>
           </div>
         </div>
       )}
 
       <p className={styles.groupMeta}>
-        👥 {group.member_count ?? vm.members.length} חברים
-        {group.is_active === false && ' · לא פעילה'}
+        👥 {t('groups:membersLabel', { count: memberCount })}
+        {group.is_active === false && t('groups:groupInactiveSuffix')}
       </p>
 
       <div className={styles.headerActions}>
@@ -175,19 +178,19 @@ export default function GroupManageHeader({ vm, group }: GroupManageHeaderProps)
           type="button"
           className={styles.headerBtn}
           onClick={() => navigate(`/groups/${groupId}/rides/search`)}
-          title="חפש בקבוצה"
+          title={t('groups:searchRideInGroupTitle')}
         >
           <Search size={18} />
-          חפש נסיעה בקבוצה
+          {t('groups:searchRideInGroup')}
         </button>
         <button
           type="button"
           className={styles.headerBtnPrimary}
           onClick={() => navigate(`/groups/${groupId}/rides/create`)}
-          title="הצע נסיעה לקבוצה"
+          title={t('groups:offerRideToGroupTitle')}
         >
           <Plus size={18} />
-          הצע נסיעה לקבוצה
+          {t('groups:offerRideToGroup')}
         </button>
       </div>
     </header>

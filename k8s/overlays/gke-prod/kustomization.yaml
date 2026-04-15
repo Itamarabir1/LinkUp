@@ -1,0 +1,68 @@
+# GKE production overlay: Cloud SQL (Auth Proxy sidecar), Memorystore + RabbitMQ in-cluster,
+# nginx Ingress + cert-manager (unchanged from base backend ingress).
+#
+# Before build: edit configMapGenerator literals INSTANCE_CONNECTION_NAME below.
+# Secrets must use DATABASE_URL / REDIS_URL pointing at 127.0.0.1:5432 (DB) and Memorystore (Redis).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: linkup
+
+resources:
+  - ../../base/namespace.yaml
+  - ../../infra/configmap.yaml
+  - ../../infra/rabbitmq.yaml
+  - ../../infra/migrate-job.yaml
+  - ../../email-renderer
+  - ../../backend
+  - ../../worker
+  - ../../chat-ws
+  - ../../frontend
+  - serviceaccount-cloudsql.yaml
+
+configMapGenerator:
+  - name: linkup-gke-install-config
+    options:
+      disableNameSuffixHash: true
+    literals:
+      # Example: my-gcp-project:europe-west1:linkup-db
+      - INSTANCE_CONNECTION_NAME=REPLACE_ME_PROJECT:europe-west1:REPLACE_ME_INSTANCE
+
+# Patches must run before replacements so the cloud-sql-proxy container exists.
+patches:
+  - path: patches/backend-cloud-sql-proxy.yaml
+  - path: patches/worker-cloud-sql-proxy.yaml
+  - target:
+      kind: Job
+      name: linkup-migrate
+    path: patches/migrate-job-proxy-json.yaml
+  - path: patches/email-renderer-replicas.yaml
+  - path: patches/chat-ws-replicas.yaml
+  - path: patches/frontend-replicas.yaml
+
+# Strategic merge orders containers by name: cloud-sql-proxy (index 0), backend/worker (index 1).
+replacements:
+  - source:
+      kind: ConfigMap
+      name: linkup-gke-install-config
+      fieldPath: data.INSTANCE_CONNECTION_NAME
+    targets:
+      - select:
+          kind: Deployment
+          name: linkup-backend
+        fieldPaths:
+          - spec.template.spec.containers.0.args.2
+      - select:
+          kind: Deployment
+          name: linkup-worker
+        fieldPaths:
+          - spec.template.spec.containers.0.args.2
+      - select:
+          kind: Job
+          name: linkup-migrate
+        fieldPaths:
+          - spec.template.spec.containers.1.args.2
+
+commonLabels:
+  app.kubernetes.io/part-of: linkup
+  environment: production

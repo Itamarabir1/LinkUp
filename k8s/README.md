@@ -2,6 +2,12 @@
 
 Manifests under `k8s/` match [docker-compose.yml](../docker-compose.yml) and [backend/app/core/config.py](../backend/app/core/config.py).
 
+## GKE production (Cloud SQL + Memorystore)
+
+Use overlay **[overlays/gke-prod](overlays/gke-prod/)** instead of in-cluster Postgres/Redis: Cloud SQL Auth Proxy sidecar, nginx Ingress + cert-manager unchanged, Workload Identity, and Secret layout for Memorystore **`REDIS_URL`**. See [overlays/gke-prod/README.md](overlays/gke-prod/README.md). Build with:
+
+`kubectl kustomize k8s/overlays/gke-prod --load-restrictor LoadRestrictionsNone`
+
 ## Deploy order
 
 1. Create namespace: `kubectl apply -f k8s/base/namespace.yaml`

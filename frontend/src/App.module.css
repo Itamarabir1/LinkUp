@@ -5,3 +5,20 @@
   font-size: 1rem;
   background: var(--bg-page);
 }
+
+/* Theme + language: single stack so they never overlap (was both fixed bottom-start). */
+.floatingControls {
+  position: fixed;
+  z-index: 1200;
+  inset-block-end: var(--space-4);
+  inset-inline-start: var(--space-4);
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  align-items: flex-start;
+  pointer-events: none;
+}
+
+.floatingControls > * {
+  pointer-events: auto;
+}

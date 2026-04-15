@@ -18,7 +18,7 @@
   ,"viewImageExpanded": "הצג תמונה בהגדלה"
   ,"profileImageExpanded": "תמונת פרופיל מוגדלת"
   ,"profileImage": "תמונת פרופיל"
-  ,"maxImageSize": "גודל מקסימלי {{size}}MB"
+  ,"maxImageSize": "גודל מקסימלי {size}MB"
   ,"allowedImageTypes": "סוג קובץ: JPEG, PNG או WebP בלבד"
   ,"uploadFailed": "העלאת תמונה נכשלה"
   ,"removeFailed": "הסרת תמונה נכשלה"

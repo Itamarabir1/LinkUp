@@ -1,3 +1,4 @@
+import { NOTIFICATIONS_REFRESH_EVENT } from '../config/constants';
 import { WS_URLS } from '../config/wsUrls';
 import { NotificationRefreshEventSchema } from '../types/wsEvents';
 import { useReconnectingWebSocket } from '../hooks/useReconnectingWebSocket';
@@ -13,7 +14,7 @@ export function useChatNotificationsWebSocket(
   const onRefresh = () => {
     void refreshUnreadNotifications();
     void refreshUnread();
-    window.dispatchEvent(new CustomEvent('linkup-notifications-refresh'));
+    window.dispatchEvent(new CustomEvent(NOTIFICATIONS_REFRESH_EVENT));
   };
 
   useReconnectingWebSocket({

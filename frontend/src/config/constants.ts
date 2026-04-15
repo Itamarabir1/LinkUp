@@ -7,6 +7,9 @@ export const STORAGE_KEYS = {
   REFRESH_TOKEN: 'linkup_refresh_token',
 } as const;
 
+/** `window` CustomEvent name: notifications list should refetch (WS reconnect / server push). */
+export const NOTIFICATIONS_REFRESH_EVENT = 'linkup-notifications-refresh' as const;
+
 /** Shared user-facing error messages. */
 export const ERROR_MESSAGES = {
   BACKEND_TIMEOUT:

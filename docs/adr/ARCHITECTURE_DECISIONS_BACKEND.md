@@ -51,22 +51,22 @@
 
 ---
 
-## 5. תזמון (scheduled work)
-
-## 4א. Email rendering service (React Email, Node.js)
+## 5. רינדור מיילים — שירות Node.js (Express, React Email)
 
 | | |
 |--|--|
-| **הקשר** | רינדור מיילים בוצע מקומית ב-Jinja2 בתוך הבקאנד; נדרש מעבר לתבניות מודרניות, רכיבים משותפים ו-preview נוח. |
-| **החלטה** | מיקרו-שירות `email-renderer` (Node.js + Express + React Email) אחראי על רינדור HTML. הבקאנד/worker שולחים `template + props` ל-`POST /render`. |
-| **למה (סקייל)** | הפרדת אחריות: orchestration ושליחה נשארים ב-Python (Outbox/worker), rendering מרוכז בשירות ייעודי שניתן להרחיב ולעדכן בנפרד. |
-| **חוזה** | `EMAIL_MAP` בבקאנד משתמש ב-template names ב-**PascalCase**; ב-renderer יש `TEMPLATE_REGISTRY` + fail-fast validation מול `EMAIL_MAP_KEYS` בזמן startup. |
-| **Trade-off** | תלות רשת נוספת (timeout/health/startup ordering). ב-Compose הוגדר healthcheck ו-`depends_on` ל-`email-renderer` עבור `backend` ו-`outbox-worker`. |
-| **בקצרה לראיון** | "הפרדנו רינדור מייל לשירות Node עם React Email; הבקאנד נשאר אחראי לאירועים ושליחה אמינה דרך Outbox." |
+| **הקשר** | רינדור מיילים בוצע מקומית ב-Jinja2 בתוך הבקאנד; נדרש מעבר לתבניות מודרניות, רכיבים משותפים עם הפרונט ו-preview נוח. |
+| **החלטה** | מיקרו-שירות **`email-renderer`** (Node.js + TypeScript + Express + React / `@react-email/components`) מחזיר HTML; הבקאנד וה-`outbox-worker` שולחים `template + props` ל-**`POST /render`**. |
+| **למה Node.js** | תבניות מבוססות **React Email** נרנדרות בשרת עם **`renderToStaticMarkup`** — אותו דפוס כמו SSR בדפדפן, בלי להטמיע מנוע JavaScript בתוך תהליך Python; TypeScript וכלים (`react-email`) מיושרים לצוות הפרונט. |
+| **למה (סקייל / תפעול)** | **הפרדת אחריות**: orchestration, Outbox ושליחת SMTP נשארים ב-Python; רינדור HTML מרוכז בשירות שניתן לסקייל, לגרסאות ולפריסה עצמאית. |
+| **חוזה** | `EMAIL_MAP` בבקאנד משתמש ב-template names ב-**PascalCase**; ב-renderer יש `TEMPLATE_REGISTRY` + אימות fail-fast מול `EMAIL_MAP_KEYS` בזמן startup. |
+| **Trade-off** | תלות רשת נוספת (timeout, health, סדר עלייה). ב-Docker Compose: **healthcheck** ו-**`depends_on`** מ-`email-renderer` ל-`backend` ול-`outbox-worker`. |
+| **אלטרנטיבות** | להישאר ב-Jinja2 בלבד; MJML/ HTML סטטי בלי קומפוננטות; או ספק SaaS לתבניות — פחות שליטה ושכפול לוגיקה מול המוצר. |
+| **בקצרה לראיון** | "העברנו רינדור מייל לשירות Node עם React Email כדי לשמור על תבניות מודרניות ו-SSR טבעי; Python ממשיך לנהל אירועים ואמינות דרך Outbox." |
 
 ---
 
-## 5. תזמון (scheduled work)
+## 6. תזמון (scheduled work)
 
 | | |
 |--|--|
@@ -77,7 +77,7 @@
 
 ---
 
-## 6. Python, FastAPI, async SQLAlchemy
+## 7. Python, FastAPI, async SQLAlchemy
 
 | | |
 |--|--|
@@ -88,7 +88,7 @@
 
 ---
 
-## 7. Uvicorn workers ו-connection pool ל-Postgres
+## 8. Uvicorn workers ו-connection pool ל-Postgres
 
 | | |
 |--|--|
@@ -98,7 +98,7 @@
 
 ---
 
-## 8. נעילות ורaces (הזמנות)
+## 9. נעילות ורaces (הזמנות)
 
 | | |
 |--|--|
@@ -108,7 +108,7 @@
 
 ---
 
-## 9. Cursor pagination
+## 10. Cursor pagination
 
 | | |
 |--|--|
@@ -118,7 +118,7 @@
 
 ---
 
-## 10. S3 ו-CloudFront (אופציונלי)
+## 11. S3 ו-CloudFront (אופציונלי)
 
 | | |
 |--|--|
@@ -128,7 +128,7 @@
 
 ---
 
-## 11. אבטחה ועומס (auth)
+## 12. אבטחה ועומס (auth)
 
 | | |
 |--|--|
@@ -138,7 +138,7 @@
 
 ---
 
-## 12. WebSocket על FastAPI — JWT בלי DB ב-handshake
+## 13. WebSocket על FastAPI — JWT בלי DB ב-handshake
 
 | | |
 |--|--|
@@ -150,7 +150,7 @@
 
 ---
 
-## 13. שגיאות API אחידות (`LinkupError`)
+## 14. שגיאות API אחידות (`LinkupError`)
 
 | | |
 |--|--|
@@ -160,7 +160,7 @@
 
 ---
 
-## 14. AI לסיכום צ'אט (Groq)
+## 15. AI לסיכום צ'אט (Groq)
 
 | | |
 |--|--|
@@ -170,7 +170,7 @@
 
 ---
 
-## 15. מבדקי עומס (k6)
+## 16. מבדקי עומס (k6)
 
 | | |
 |--|--|
@@ -180,7 +180,7 @@
 
 ---
 
-## 16. חיפוש נוסע לעומת שמירת בקשה והתראה
+## 17. חיפוש נוסע לעומת שמירת בקשה והתראה
 
 | | |
 |--|--|

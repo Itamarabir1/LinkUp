@@ -29,8 +29,8 @@
   ,"startRide": "Start ride"
   ,"endRide": "End ride"
   ,"openRide": "Open"
-  ,"requestsCount": "{{count}} requests"
-  ,"approvedCount": "{{count}} approved"
+  ,"requestsCount": "{count, plural, one {# request} other {# requests}}"
+  ,"approvedCount": "{count, plural, one {# approved} other {# approved}}"
   ,"pickup": "Pickup"
   ,"dropoff": "Dropoff"
 }

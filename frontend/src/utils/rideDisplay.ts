@@ -26,7 +26,7 @@ export function getRideStatusLabel(r: Ride): string {
 }
 
 const REQUEST_STATUS_LABELS: Record<string, string> = {
-  active: 'rides:searchTitle',
+  active: 'rides:status_open',
   pending: 'rides:pendingApproval',
   approved: 'bookings:bookingStatus_approved',
   rejected: 'bookings:bookingStatus_rejected',

@@ -128,8 +128,10 @@ export default function App() {
           <AuthProvider>
             <GroupProvider>
               <ChatProvider>
-                <ThemeToggle />
-                <LangToggle />
+                <div className={styles.floatingControls}>
+                  <ThemeToggle />
+                  <LangToggle />
+                </div>
                 <AppRoutes />
                 <NotificationToast />
               </ChatProvider>

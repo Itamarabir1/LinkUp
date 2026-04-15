@@ -54,7 +54,7 @@
 **תגיד:**  
 “כשנהג יוצר נסיעה, ה-worker מריץ התאמה מול בקשות פעילות — פונקציה כמו `find_passengers_for_ride_notification` — ומסנן בקשות עם התראה כבויה או קבוצה שלא תואמת.”
 
-**החלטה מתועדת:** `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` — **סעיף 16**.
+**החלטה מתועדת:** `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` — **סעיף 17**.
 
 **פרונט:** `frontend/src/pages/SearchRides/` + `useSearchRides` + `saveSearchAlert` ב-`src/api/passengers.ts`; מצב `hasSearched` כדי להציג ‘אין תוצאות’ רק אחרי חיפוש אמיתי.
 
@@ -67,7 +67,7 @@
 - JWT access + refresh ב-DB; WebSocket מאמת JWT ב-handshake **בלי** SELECT ל-DB כדי להגן על ה-connection pool.
 - bcrypt ב-thread pool; rate limit על auth; שגיאות אחידות עם `error_code` ו-`trace_id` — `docs/ERRORS.md`.
 - אדמין: `/api/v1/admin/*` + ממשק React ב-`/admin`.
-- פריסה: Docker Compose; מניפסטים ל-Kubernetes ב-repo.
+- פריסה: Docker Compose (כולל `migrate`, `email-renderer`, `outbox-worker`); מניפסטים ל-Kubernetes ב־`k8s/` (כולל `email-renderer`).
 
 ---
 
@@ -106,7 +106,7 @@
 | סקירת מערכת | `ARCHITECTURE.md`, `README.md` (שורש) |
 | אירועים ותורים | `docs/architecture/EVENTS.md` |
 | WS ו-GPS | `docs/architecture/REALTIME.md` |
-| ADR בקאנד כולל נוסע §16 | `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` |
+| ADR בקאנד כולל נוסע (סעיף 17) | `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` |
 | ADR פרונט | `docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md` |
 | chat-ws מול API | `chat-ws/ARCHITECTURE.md` |
 | ארכיטקטורת פרונט | `frontend/docs/ARCHITECTURE.md` |
@@ -132,8 +132,8 @@
 |-----------|------|-------------------|
 | +1:00–2:00 | **מסד נתונים** | PostgreSQL + **PostGIS** — איפה נכנס הגיאו; טבלאות ליבה (`rides`, `bookings`, `passenger_requests`, `outbox_events`, …); למה אינדקסים חשובים לחיפוש ולהזמנות. מקור: `docs/architecture/DATABASE.md`. |
 | +0:45–1:15 | **מיגרציות וסכימה** | Alembic כמקור שינויי סכימה; שירות **`migrate`** ב-Docker Compose לפני עליית ה-API; `db/schema.sql` כעזר. |
-| +1:00–1:45 | **פריסה מקומית מול K8s** | Compose: db, redis, rabbitmq, backend, outbox-worker, chat-ws; healthcheck; `UVICORN_WORKERS`. אז מעבר קצר ל-`k8s/` — רק מפת שירותים, בלי לעבור כל מניפסט. |
-| +0:45–1:00 | **CI/CD** | שלושת ה-workflows ב-`.github/workflows/`; lint/tests/build; דחיפה ל-GHCR. |
+| +1:00–1:45 | **פריסה מקומית מול K8s** | Compose: **db**, **redis**, **rabbitmq**, **`migrate`** (Job לפני API), **`email-renderer`**, **backend**, **outbox-worker**, **chat-ws**; `depends_on` + healthchecks; `UVICORN_WORKERS`. אז מעבר קצר ל־`k8s/` — מפת שירותים (כולל `k8s/email-renderer`), בלי לעבור כל מניפסט. |
+| +0:45–1:00 | **CI/CD** | **ארבעה** workflows ב־`.github/workflows/`: `backend-ci`, `frontend-ci`, `chat-ws-ci`, **`email-renderer-ci`** — lint/tests/build; ב־`main` דחיפת תמונות ל־GHCR (frontend ו־email-renderer). |
 | +1:15–2:00 | **chat-ws לעומק** | למה **Go** ל-WS; `PSubscribe` ל-Redis; אין DB בשרת — רק forward; JWT; `presence` + debounce; קריאת `last_seen` מ-REST הבקאנד. `chat-ws/ARCHITECTURE.md`, `docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`. |
 | +1:00–1:30 | **ערוצי התראות** | הפרדה: צ’אט (`chat:notification:*` דרך chat-ws) מול פיד האפליקציה (`/api/v1/notifications/ws` על FastAPI); Outbox → RabbitMQ → **Brevo** / **FCM**; **למה FCM רק מפת `data`** — `docs/FCM_SYSTEM_SUMMARY.md`, `docs/adr/FCM_AND_PUSH.md`. |
 | +0:45–1:00 | **אבטחה מפורטת** | rate limit על auth; **מניעת user enumeration** בלוגין; `get_current_user_ws` בלי DB ב-connect — trade-off. |
@@ -153,3 +153,4 @@
 | הדגשים כלליים | `docs/ENGINEERING_HIGHLIGHTS.md` |
 | שגיאות | `docs/ERRORS.md` |
 | אדמין | `ADMIN_DASHBOARD.md` (בשורש) |
+| Kubernetes (סדר פריסה) | `k8s/README.md` |

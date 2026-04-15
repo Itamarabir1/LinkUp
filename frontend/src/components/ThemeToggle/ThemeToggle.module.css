@@ -1,8 +1,6 @@
 .wrap {
-  position: fixed;
-  z-index: 200;
-  bottom: var(--space-4);
-  inset-inline-start: var(--space-4);
+  /* Positioning lives on App floatingControls wrapper */
+  display: block;
 }
 
 .btn {

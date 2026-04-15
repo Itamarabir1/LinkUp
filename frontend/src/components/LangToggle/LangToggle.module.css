@@ -1,8 +1,5 @@
 .button {
-  position: fixed;
-  inset-block-end: 18px;
-  inset-inline-start: 18px;
-  z-index: 1200;
+  /* Positioning lives on App floatingControls wrapper */
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-primary);

@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
+import type { ChipItem } from '../../components/Chips/Chips';
 import { useAuth } from '../../context/AuthContext';
 import { useGroup } from '../../context/GroupContext';
-import { DATE_CHIP_ITEMS, GROUP_AVATAR_COLORS, MEMBERS_PREVIEW } from './groupManage.constants';
+import { GROUP_AVATAR_COLORS, MEMBERS_PREVIEW } from './groupManage.constants';
 import type { GroupTab } from './groupManage.types';
 import { isThisWeek, isToday, isTomorrow } from './groupManage.utils';
 import { useGroupManageHeader } from './useGroupManageHeader';
@@ -11,6 +13,7 @@ import { useGroupManageLists } from './useGroupManageLists';
 import { useGroupManageMutations } from './useGroupManageMutations';
 
 export function useGroupManage() {
+  const { t } = useTranslation(['groups', 'common']);
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -59,6 +62,16 @@ export function useGroupManage() {
     [members, membersSearch]
   );
 
+  const dateChipItems = useMemo<ChipItem[]>(
+    () => [
+      { id: 'all', label: t('common:all') },
+      { id: 'today', label: t('common:today') },
+      { id: 'tomorrow', label: t('common:tomorrow') },
+      { id: 'week', label: t('groups:thisWeek') },
+    ],
+    [t]
+  );
+
   const displayedRides = useMemo(() => {
     return rides.filter((r) => {
       if (r.status === 'cancelled') return false;
@@ -98,7 +111,7 @@ export function useGroupManage() {
     setMembersSearch,
     filteredMembers,
     displayedRides,
-    dateChipItems: DATE_CHIP_ITEMS,
+    dateChipItems,
     membersPreview: MEMBERS_PREVIEW,
     avatarColors: GROUP_AVATAR_COLORS,
   };

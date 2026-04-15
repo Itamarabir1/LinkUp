@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -18,6 +18,7 @@ import type { NotificationItem } from '../types/api';
 import { formatMonthYearLong, formatRelativeNotificationTime, formatWeekdayLong } from '../utils/date';
 import { getApiErrorMessage } from '../utils/apiError';
 import { apiErr } from '../utils/i18nError';
+import { NOTIFICATIONS_REFRESH_EVENT } from '../config/constants';
 import styles from './Notifications.module.css';
 
 type DisplayType = 'booking_approved' | 'booking_rejected' | 'ride_cancelled' | 'booking_request' | 'booking_cancelled_by_passenger' | 'group_joined' | 'group_member_joined' | 'pending_approval' | 'default';
@@ -47,7 +48,11 @@ export default function Notifications() {
   const [error, setError] = useState('');
 
   const fetchNotifications = useCallback(async () => {
-    if (!user?.user_id) return;
+    if (!user?.user_id) {
+      setList([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -86,14 +91,14 @@ export default function Notifications() {
     const onRefresh = () => {
       void fetchNotifications();
     };
-    window.addEventListener('linkup-notifications-refresh', onRefresh);
-    return () => window.removeEventListener('linkup-notifications-refresh', onRefresh);
+    window.addEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
   }, [fetchNotifications]);
 
-  const grouped = useCallback(() => {
+  const groupedList = useMemo(() => {
     const groups: Record<string, { label: string; date: Date; items: NotificationItem[] }> = {};
 
-    list.forEach((n) => {
+    for (const n of list) {
       const label = getTimeGroup(n.created_at);
       if (!groups[label]) {
         groups[label] = {
@@ -103,12 +108,9 @@ export default function Notifications() {
         };
       }
       groups[label].items.push(n);
-    });
+    }
 
-    // Sort groups: most recent first
-    return Object.values(groups).sort(
-      (a, b) => b.date.getTime() - a.date.getTime()
-    );
+    return Object.values(groups).sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [list, getTimeGroup]);
 
   const getNotificationTarget = (type: string): string | null => {
@@ -130,12 +132,15 @@ export default function Notifications() {
     }
   };
 
-  const handleRowClick = (n: NotificationItem) => {
-    const key = getNotificationItemKey(n);
-    if (!isNotificationRead(key)) markNotificationRead(key);
-    const target = getNotificationTarget(n.type);
-    if (target) navigate(target);
-  };
+  const handleRowClick = useCallback(
+    (n: NotificationItem) => {
+      const key = getNotificationItemKey(n);
+      if (!isNotificationRead(key)) markNotificationRead(key);
+      const target = getNotificationTarget(n.type);
+      if (target) navigate(target);
+    },
+    [isNotificationRead, markNotificationRead, navigate]
+  );
 
   function getAvatarColorClass(displayType: DisplayType): string {
     if (displayType === 'booking_approved') return styles.avatarApproved;
@@ -183,7 +188,7 @@ export default function Notifications() {
         </div>
       ) : (
         <div className={styles.groups}>
-          {list.length > 0 && unreadNotifications > 0 && (
+          {unreadNotifications > 0 && (
             <div className={styles.markAllWrap}>
               <button
                 type="button"
@@ -194,7 +199,7 @@ export default function Notifications() {
               </button>
             </div>
           )}
-          {grouped().map(({ label, items }) => (
+          {groupedList.map(({ label, items }) => (
             <div key={label} className={styles.group}>
               <h2 className={styles.groupTitle}>{label}</h2>
               {items.map((n) => {

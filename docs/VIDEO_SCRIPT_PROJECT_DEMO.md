@@ -74,4 +74,6 @@
 
 - חיפוש: `GET /api/v1/passenger/passengers/search-rides`
 - שמירת התראה: `POST /api/v1/passenger/passengers/` עם גוף כמו יצירת בקשה (`is_notification_active`, ואופציונלית `group_id` בחיפוש בתוך קבוצה)
-- תיעוד מלא: `docs/architecture/API.md`, `ARCHITECTURE.md`, `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` סעיף 16
+- תיעוד מלא: `docs/architecture/API.md`, `ARCHITECTURE.md`, `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` סעיף 17
+- CI: ארבעה workflows ב־`.github/workflows/` — `backend-ci`, `frontend-ci`, `chat-ws-ci`, `email-renderer-ci`
+- סרטון ארכיטקטורה מפורט: `docs/VIDEO_SCRIPT_ARCHITECTURE.md`
