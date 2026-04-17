@@ -11,6 +11,19 @@
 
 ---
 
+## Latest architecture updates
+
+- **WebSocket notifications unified via `chat-ws`**: user refresh/domain events are pushed on the existing chat socket (`user:*:events`), reducing concurrent client WebSocket connections.
+- **Outbox dispatch improved**: LISTEN/NOTIFY flow is now primary, with safe fallback behavior to avoid fixed-interval-only polling.
+- **Worker split completed**: `notification-worker`, `task-worker`, `ai-worker` each has dedicated runtime responsibilities and K8s HPA policies.
+- **DB pool caps per worker**: explicit `DB_POOL_SIZE` + `DB_MAX_OVERFLOW` were tuned per worker to keep total PostgreSQL connections in a safe range.
+- **Redis reconnect resilience**: reconnect retry strategy now uses exponential backoff for long-lived pub/sub channels.
+- **Geocode resilience**: Google geocoding calls use bounded retries with `tenacity` for transient transport/provider failures.
+- **Chat reliability/UX**: missed messages are fetched after reconnect (`after=message_id`), and read receipts now use a DB-level message cursor (`last_read_message_id`) so `✓✓` renders correctly on all outgoing messages up to the partner's read position.
+- **Task scheduler safety**: `task-worker` is fixed to a single replica to prevent duplicate scheduled task publishing.
+
+---
+
 ## 1. מה בנינו (מוצר + יכולות)
 
 | תחום | יכולות |
@@ -18,9 +31,9 @@
 | **נסיעות** | פרסום נסיעות, חיפוש (כולל גיאו / PostGIS), סטטוסים, שיוך לקבוצה / ציבורי |
 | **נוסעים / התראות חיפוש** | חיפוש **`GET …/passenger/passengers/search-rides`** — ללא שורת DB; **שמירת בקשה + התראה** — **`POST …/passengers/`** עם `is_notification_active`, `group_id` אופציונלי; בעת יצירת נסיעה — worker מתאים בקשות פעילות (`find_passengers_for_ride_notification`) |
 | **הזמנות** | בקשה, אישור/דחייה, race-safe (locks) |
-| **צ’אט** | הודעות real-time, typing, נראות (online / last seen), **unread** (Redis→WS), קריאת שיחה; **Zod** על הודעה נכנסת ב־WS — `ChatMessageSchema` + מיפוי מפורש ל־`MessageResponse` ב־`processChatWebSocketMessage` |
+| **צ’אט** | הודעות real-time, typing, נראות (online / last seen), **unread** (Redis→WS), קריאת שיחה; **DB-level read cursor** (`last_read_message_id`) ל-read receipts על כל ההודעות היוצאות; **Zod** על הודעה נכנסת ב־WS — `ChatMessageSchema` + מיפוי מפורש ל־`MessageResponse` ב־`processChatWebSocketMessage` |
 | **קבוצות** | יצירה, **קוד הזמנה** Base62 (8 תווים, `secrets`), יצירה עם **`flush` + retry על `IntegrityError`** רק ל־duplicate על `invite_code`, **`commit`** אחד לקבוצה + חבר admin יוצר; אחרי כשלונות חוזרים — `LinkupError` **`INVITE_CODE_GENERATION_FAILED`** (`app/domain/groups/crud.py`) |
-| **AI** | סיום שיחה → ניתוח (Groq) → שמירה + התראות |
+| **AI** | סיום שיחה → ניתוח (Groq) → שמירה + התראות; בנוסף free-text parsing לנסיעות (`ai-parse-search`) עבור SearchRides (נוסע) ו-CreateRide (נהג, עם כללי זמן מחמירים יותר) |
 | **התראות** | מייל (**Brevo**) עם רינדור HTML דרך **email-renderer (React Email)**, Push (**FCM** — מהשרת רק מפת `data` ב־FCM, בלי שדה `notification` של Firebase; בחזית **Toast קופץ + צליל**, ברקע התראת מערכת דרך SW), in-app |
 | **משתמשים** | JWT + Refresh ב-DB, **כניסה עם Google** (OAuth / `id_token`), אווטאר (S3 + worker; **קריאה:** CloudFront כשמוגדר או presigned); שדה **`is_admin`** לגישה ל־`/api/v1/admin/*` |
 | **אדמין / תפעול** | ממשק ווב **`/admin`** (מודול `features/admin`): סטטיסטיקות, בריאות, משתמשים (הפעלה/הרשאת אדמין), נסיעות (ביטול), קבוצות, Outbox (requeue), lookup; **lazy routes**, מעטפת **דסקטופ** (ללא drawer מובייל), **`AdminRoute`** מינימלי (`is_admin` מ־AuthContext); אישור לפני מוטציות, toasts; בקאנד **`get_current_admin_user`** + לוג `[admin_audit]` — **`ADMIN_DASHBOARD.md`** |
@@ -79,16 +92,15 @@
 
 ## 2א. Workers: מה רץ כל הזמן ומה לפי זמן
 
-תהליך **`outbox-worker`** (`python -m app.workers.main_worker`) מריץ **במקביל** כמה לולאות:
+תהליכי ה-worker פוצלו לפי אחריות: **`notification-worker`**, **`task-worker`**, **`ai-worker`**.
 
 ### רצים כל הזמן (כל עוד ה-worker חי)
 
 | רכיב | תפקיד |
 |------|--------|
-| **3 consumers ל-RabbitMQ** | `notifications_queue` (מייל+FCM), `avatar_upload_queue`, `scheduled_tasks_queue` — **מאזינים** לתור ומטפלים בהודעות כשהן מגיעות. |
-| **Outbox poller** | סורק `outbox_events` (PENDING) ומפרסם ל-RabbitMQ — רצוף/תדיר. |
-| **Redis listener — סיום צ’אט** | מאזין ל-`chat:completion:*` (DB 1), מפעיל ניתוח **AI (Groq)** ושמירה ל-DB. |
-| **Scheduled publisher (לולאה)** | כל ~**60 שניות** בודק אם “הגיע הזמן” לפרסם משימה מתוזמנת ל-exchange `scheduled` (הלוגיקה הכבידה רצה ב-consumer, לא כאן). |
+| **`notification-worker`** | Outbox LISTEN/NOTIFY + fallback polling, consumer ל-`notifications_queue` (מייל+FCM+user refresh). |
+| **`task-worker`** | consumers ל-`avatar_upload_queue` ו-`scheduled_tasks_queue`, plus scheduled publisher loop כל ~**60 שניות**. |
+| **`ai-worker`** | מאזין ל-`chat:completion:*` (Redis DB 1), מפעיל ניתוח **AI (Groq)** ושומר תוצאות ל-DB. |
 
 ### משימות לפי מרווח זמן (מתוזמנות דרך התור)
 
@@ -252,7 +264,7 @@
 ## 8. AI וצ’אט “חכם”
 
 - סיום שיחה → publish ל-`chat:completion:*` על Redis DB 1.
-- **outbox-worker** (`run_chat_completion_redis_listener`) מאזין, קורא ל-**Groq** (Llama), שומר תוצאות; אפשר המשך דרך outbox (התראות וכו’).
+- **ai-worker** (`run_chat_completion_redis_listener`) מאזין, קורא ל-**Groq** (Llama), שומר תוצאות; אפשר המשך דרך outbox (התראות וכו’).
 - ייצוא **iCal** ו-API לניתוח — ב-backend בלבד (לא ב-Go).
 
 ### FCM + מייל (איפה בקוד)
@@ -265,7 +277,7 @@
 
 ## 9. DevOps ופריסה
 
-- **Docker Compose**: healthchecks (כולל **backend** על `/api/v1/health`), סיסמת Redis, volumes ל-RabbitMQ ו-Postgres; שירות **`migrate`** (`alembic upgrade head`, `restart: no`) לפני **backend** ו־**outbox-worker**; שירותי פיתוח (`db`, `redis`, `rabbitmq`, `migrate`, `outbox-worker`, `backend` עם **8000 ל-host**, `chat-ws`) ב־`docker compose up -d`; **frontend** סטטי + **nginx** באותו `docker-compose.yml` עם `profiles: ["prod"]` — סטאק מלא על פורט 80 עם `docker compose --profile prod up -d --build`, **nginx** אחרי **backend** ב־`service_healthy`. קובץ שירות Firebase נטען מ־host ל־**backend** ול־**outbox-worker** (volume read-only; `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env`) — נדרש ל־FCM מה־worker. **פריסה בלי Compose** (למשל image בלבד / K8s): להריץ מיגרציה כ־Job או שלב init נפרד — לא מוטמע ב־`CMD` של image ה-production.
+- **Docker Compose**: healthchecks (כולל **backend** על `/api/v1/health`), סיסמת Redis, volumes ל-RabbitMQ ו-Postgres; שירות **`migrate`** (`alembic upgrade head`, `restart: no`) לפני **backend** וכל ה-workers; שירותי פיתוח (`db`, `redis`, `rabbitmq`, `migrate`, `backend`, `notification-worker`, `task-worker`, `ai-worker`, `chat-ws`) ב־`docker compose up -d`; **frontend** סטטי + **nginx** באותו `docker-compose.yml` עם `profiles: ["prod"]` — סטאק מלא על פורט 80 עם `docker compose --profile prod up -d --build`, **nginx** אחרי **backend** ב־`service_healthy`. קובץ שירות Firebase נטען מ־host ל־**backend** ול־**notification-worker** (volume read-only; `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env`) — נדרש ל־FCM מה־worker. **פריסה בלי Compose** (למשל image בלבד / K8s): להריץ מיגרציה כ־Job או שלב init נפרד — לא מוטמע ב־`CMD` של image ה-production.
 - **`.env` כפול לפי תפקיד:** `.env` **בשורש** (מ־`.env.example`) — רק credentials ש־Compose צורך להקמת Postgres / Redis / RabbitMQ; **`backend/.env`** — כל הגדרות הבקאנד. חייב **יישור** (סיסמאות DB/Redis/RabbitMQ) בין הקבצים. אחרי **שינוי `backend/.env`** — לרענן משתנים בקונטיינר: `docker compose up -d --force-recreate backend` (**לא** מספיק `restart` בלבד — ה-env נצרך בעת יצירת הקונטיינר).
 - **גרסאות תמונות קבועות** (לא `latest` בשירותים קריטיים) — builds חוזרים.
 - **K8s**: deployment ל-`chat-ws` עם env (למשל `BACKEND_URL`) ל-worker של last-seen.

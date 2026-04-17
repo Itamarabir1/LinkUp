@@ -56,7 +56,7 @@ flowchart LR
 ```
 
 - **Frontend / Mobile** → REST to backend, WebSocket to chat-ws.  
-- **Backend / outbox-worker** → PostgreSQL (data), Redis DB=0 (cache, rate limit, ride `broadcast`, outbox worker), Redis DB=1 (**chat** + **`publish_user_event`** / `user:{id}:events`, chat completion), RabbitMQ (async tasks, notifications), **email-renderer** (`POST /render` for HTML generation).  
+- **Backend / workers** → PostgreSQL (data), Redis DB=0 (cache, rate limit, ride `broadcast`), Redis DB=1 (**chat** + **`publish_user_event`** / `user:{id}:events`, chat completion), RabbitMQ (async tasks, notifications), **email-renderer** (`POST /render` for HTML generation).  
 - **chat-ws** → Redis DB=1 only (subscribe to chat channels, presence, **`user:online` / `user:offline`**, and per-user domain events pattern **`user:*:events`**, fan out to connected clients).
 
 ---
@@ -65,7 +65,10 @@ flowchart LR
 
 | Service   | Language        | Role |
 |----------|------------------|------|
-| backend  | Python (FastAPI) | REST API, auth, rides, bookings, chat CRUD, **groups**, passengers (requests/matches), **admin JSON API** (`/api/v1/admin/*`), AI summary pipeline (Redis completion + outbox-worker listener), notifications, outbox worker |
+| backend  | Python (FastAPI) | REST API, auth, rides, bookings, chat CRUD, **groups**, passengers (requests/matches), **admin JSON API** (`/api/v1/admin/*`), events via Outbox + LISTEN/NOTIFY |
+| notification-worker | Python | Outbox dispatcher + notifications consumer (email/push/user refresh events) |
+| task-worker | Python | Avatar pipeline + scheduled tasks + scheduled publisher (**single replica**) |
+| ai-worker | Python | Chat completion listener + AI conversation analysis |
 | chat-ws  | Go               | WebSocket server; chat + typing + presence; Redis Pub/Sub including **`user:online` / `user:offline`** and **`user:*:events`** (ride/maintenance-style JSON to the logged-in client) |
 | email-renderer | Node.js / Express / React Email | Dedicated email HTML rendering microservice (`/health`, `/render`), shared by backend notification flow |
 | frontend | React / TypeScript | Web app (Vite); Hebrew RTL |
@@ -95,12 +98,20 @@ flowchart LR
 - ✅ **Scheduled notifications & Redis publisher:** pickup/driver reminders use the `scheduled_notifications` table (Alembic **008**); `ReminderScheduler` loads due rows and hands off to the notification handler. [`publisher.py`](backend/app/infrastructure/redis/publisher.py): **`publish_ride_event`** → `broadcast` / **DB 0**; **`publish_user_event`** → [`redis_chat_pubsub`](backend/app/infrastructure/redis/chat_pubsub.py) / **`REDIS_CHAT_URL`** (אותו DB כמו chat-ws) לערוץ `user:{user_id}:events` מ-[`keys.py`](backend/app/infrastructure/redis/keys.py). Legacy `reminder_sent` columns were removed from ORM/API after migration **008**; dead reminder/expiry CRUD and `ride_expiry.py` were deleted.
 - ✅ **Frontend user event stream:** [`useUserEventStream`](frontend/src/hooks/useUserEventStream.ts) on the chat WebSocket parses **Zod**-validated `UserEvent` messages ([`wsEvents.ts`](frontend/src/types/wsEvents.ts)); **HistorySection** and My Rides / Bookings hooks consume these for active vs past UI.
 - ✅ **Chat WS inbound validation:** new chat messages on the same WebSocket are validated with **`ChatMessageSchema`** ([`wsEvents.ts`](frontend/src/types/wsEvents.ts)) in [`processChatWebSocketMessage.ts`](frontend/src/pages/MessageThread/processChatWebSocketMessage.ts); validated payloads are mapped explicitly to **`MessageResponse`** (no loose `as unknown as` casts).
+- ✅ **Missed messages + read receipts:** chat reconnect fetches missed messages using `after=message_id`; read receipts now use a DB-level cursor (`conversation_participants.last_read_message_id`) and color `✓✓` on every outgoing message whose `message_id` is covered by the partner's read cursor.
+- ✅ **Unified WebSocket notifications via `chat-ws`:** user-domain refresh events (`user:*:events`) are delivered over the same `chat-ws` connection to reduce concurrent sockets per client.
+- ✅ **Worker split + autoscaling:** legacy monolith worker was split into `notification-worker`, `task-worker`, `ai-worker`; each has dedicated K8s deployment/HPA.
+- ✅ **Task worker safety:** `task-worker` is pinned to one replica to avoid duplicate scheduled task publishing.
+- ✅ **Per-worker DB connection caps:** explicit `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` per worker keeps total DB usage below Postgres defaults.
+- ✅ **Redis reconnect hardening:** reconnect loop uses retry with exponential backoff for resilient long-lived pub/sub connections.
+- ✅ **Geocode retry hardening:** Google geocoding flow includes bounded retries via `tenacity` for transient failures/timeouts.
 - ✅ **Notification worker (async):** [`notification_tasks.py`](backend/app/workers/tasks/notification_tasks.py) uses `await db.execute(select(...))` for ride-cancel fan-out (no `run_sync` in app code paths); **`ride.cancelled_by_driver`** notifies only bookings still **PENDING** or **CONFIRMED** (not already cancelled by the passenger).
 - ✅ **Frontend types vs Phase 9:** `reminder_sent` removed from booking-related TypeScript types ([`api.ts`](frontend/src/types/api.ts), [`myBookings.types.ts`](frontend/src/pages/MyBookings/myBookings.types.ts)) to match the public API after migration **008**.
 - ✅ **Passenger requests (בקשות טרמפ):** חיפוש נסיעות (`GET …/passengers/search-rides`) בלי שמירה; **שמירת התראה** — `POST …/passengers/` עם אותם פרמטרי מסלול + `is_notification_active` / `group_id`; הצטרפות מתוצאות (`request-ride-from-search`); ביטול בקשה; התאמות; קישור אופציונלי מבוקינג לבקשה
 - ✅ **Groups:** create group, join by invite code, manage members (remove, promote to admin), group rides and search; group avatar & description (S3); leave group / close group (admin)
 - ✅ Real-time chat (WebSocket) between driver and passenger; **presence**: `users.last_active_at` + debounced PATCH on disconnect; **WS** `user_online` / `user_offline` for immediate header status (see `docs/architecture/REALTIME.md`)
 - ✅ AI conversation summary (Groq / Llama) and email on chat end
+- ✅ **AI free-text assistants (rides):** both passenger search and driver CreateRide use `POST /api/v1/passenger/passengers/ai-parse-search` to prefill route fields; CreateRide keeps stricter rules (future date+time required) and never auto-submits.
 - ✅ Push (**FCM**): מהשרת רק מפת **`data`** ב־FCM; בחזית Toast ב־`App.tsx` + צליל, ברקע SW (`push`); רישום טוקן ב־`AuthContext` אחרי login, ניקוי ב־logout; מייל (**Brevo**) — **`docs/FCM_SYSTEM_SUMMARY.md`**
 - ✅ **In-app notification feed (web):** חיבור ראשי ל־**`GET /api/v1/notifications/ws?token=JWT`** דרך [`useChatNotificationsWebSocket`](frontend/src/context/useChatNotificationsWebSocket.ts) על גבי [`useReconnectingWebSocket`](frontend/src/hooks/useReconnectingWebSocket.ts); ב־**`onOpen`** (כולל אחרי reconnect) — רענון פיד, unread ואירוע מותאם `linkup-notifications-refresh`. גיבוי: [`useChatNotificationsFeed`](frontend/src/context/useChatNotificationsFeed.ts) — polling REST כל **~5 דקות**. פירוט: [`ARCHITECTURE.md`](ARCHITECTURE.md) (סעיף In-app notifications), [`docs/architecture/REALTIME.md`](docs/architecture/REALTIME.md).
 - ✅ Google OAuth and email/password auth with JWT + refresh
@@ -139,9 +150,9 @@ cp frontend/.env.example frontend/.env
 
 - **`.env` בשורש** — רק משתנים ש־`docker-compose` צורך להקמת Postgres / Redis / RabbitMQ; יישור עם `POSTGRES_*`, `REDIS_PASSWORD`, `RABBITMQ_*` ב־`backend/.env`.
 - **`chat-ws/.env`** — כולל `REDIS_URL` (לדוקר: `redis://:<סיסמה>@redis:6379/1`) ו־`JWT_SECRET` זהה ל־`SECRET_KEY` ב־`backend/.env`.
-- **FCM בדוקר:** `firebase-credentials.json` ממופה read-only ל־**backend** ול־**outbox-worker**; ב־`backend/.env` הגדר `FIREBASE_SERVICE_ACCOUNT_PATH` (נתיב בקונטיינר: `/app/infrastructure/firebase_core/firebase-credentials.json`).
+- **FCM בדוקר:** `firebase-credentials.json` ממופה read-only ל־**backend** ול־**notification-worker**; ב־`backend/.env` הגדר `FIREBASE_SERVICE_ACCOUNT_PATH` (נתיב בקונטיינר: `/app/infrastructure/firebase_core/firebase-credentials.json`).
 
-**מיגרציות:** ב־**Docker Compose** שירות **`migrate`** מריץ `alembic upgrade head` פעם אחת לפני **backend** ו־**outbox-worker** (קונטיינר `linkup_migrate` יוצא עם `Exited (0)`); אם המיגרציה נכשלת ה־API וה־worker לא יעלו. **לוקאלי בלי Compose:** `cd backend && alembic upgrade head` (עם `db/schema.sql` כעזר) לפני `uvicorn`.
+**מיגרציות:** ב־**Docker Compose** שירות **`migrate`** מריץ `alembic upgrade head` פעם אחת לפני **backend** וכל ה־workers (`notification-worker`, `task-worker`, `ai-worker`). אם המיגרציה נכשלת ה־API וה־workers לא יעלו. **לוקאלי בלי Compose:** `cd backend && alembic upgrade head` (עם `db/schema.sql` כעזר) לפני `uvicorn`.
 
 ### פיתוח יומיומי
 
@@ -186,15 +197,15 @@ docker compose ps            # סטטוס (backend: healthy / ממתין)
 
 | Folder      | Description |
 |------------|-------------|
-| `backend/` | FastAPI app: API, domain logic, workers (outbox, notifications, chat completion listener), Alembic migrations |
+| `backend/` | FastAPI app: API, domain logic, split workers (`notification_worker`, `task_worker`, `ai_worker`), Alembic migrations |
 | `chat-ws/` | Go WebSocket server: Redis subscribe, JWT auth, message fan-out to clients |
 | `frontend/`| React (Vite) web app; Dockerfile + `nginx.conf` לתוך image סטטי; מודול אדמין ב־`src/features/admin/` (מסלולים `/admin/*`); WebSocket — [`frontend/README.md`](frontend/README.md), חוזי JSON ב־[`docs/architecture/REALTIME.md`](docs/architecture/REALTIME.md) |
 | `nginx/`   | קונפיג Nginx ל־Compose — reverse proxy (פורט 80): API, chat-ws, פרונט |
 | `mobile/`  | React Native (Expo) app |
-| `k8s/`     | Kubernetes base, backend, chat-ws, frontend, email-renderer (Node), worker, infra (Postgres, Redis, RabbitMQ) |
+| `k8s/`     | Kubernetes base, backend, chat-ws, frontend, email-renderer (Node), workers (`notification-worker`, `task-worker`, `ai-worker`, legacy compatibility worker), infra (Postgres, Redis, RabbitMQ) |
 | `db/`      | Reference schema (`schema.sql`) and utility scripts; migrations live in `backend/alembic/` |
 | `docs/`    | Architecture: `docs/architecture/` — API.md, DATABASE.md, EVENTS.md (outbox, DLQ, retry), REALTIME.md (GPS, chat), DEVELOPMENT.md; ADR תחת `docs/adr/`; סיכום portfolio — `docs/ENGINEERING_HIGHLIGHTS.md`; תסריטי וידאו — `docs/VIDEO_SCRIPT_*.md` |
-| `email-renderer/` | Node microservice (Express + React Email): `GET /health`, `POST /render`; תבניות ב־`src/emails/`; נקרא מ־backend/outbox-worker דרך `EMAIL_RENDERER_URL` |
+| `email-renderer/` | Node microservice (Express + React Email): `GET /health`, `POST /render`; תבניות ב־`src/emails/`; נקרא מ־backend/notification-worker דרך `EMAIL_RENDERER_URL` |
 | `files/`   | מדריכי מיזוג / עזר (למשל `MERGE_GUIDE.md`) — לא מקור אמת לקוד חי |
 
 ---
@@ -217,7 +228,7 @@ docker compose ps            # סטטוס (backend: healthy / ממתין)
 
 - **Redis DB separation (DB=0 vs DB=1).** Backend uses Redis for cache, rate limiting, and outbox-related state on DB=0. Chat traffic (pub/sub for messages and completion events) uses DB=1 so that chat-ws and the backend’s chat-completion listener can share the same Redis instance without key or namespace clashes and without backend cache evictions affecting chat.
 
-- **Redis completion listener + outbox-worker for AI chat summary (not a separate service).** The AI flow is “on conversation end, analyze and persist.” The backend publishes a completion event to Redis DB=1; the outbox-worker subscribes and runs `handle_conversation_completion`. This keeps deployment surface small while preserving async execution.
+- **Redis completion listener + `ai-worker` for AI chat summary (not a separate service).** The AI flow is “on conversation end, analyze and persist.” The backend publishes a completion event to Redis DB=1; the `ai-worker` subscribes and runs `handle_conversation_completion`. This keeps deployment surface small while preserving async execution.
 
 - **Outbox pattern.** Notifications (email, push) and other side effects are triggered by domain events. Publishing directly to RabbitMQ in the same transaction as the DB write would risk losing events on crash or broker failure. Writing the event to an `outbox_events` table in the same transaction, then having a worker poll and publish to RabbitMQ, keeps “at-least-once” delivery and keeps the API response fast and independent of broker latency.
 

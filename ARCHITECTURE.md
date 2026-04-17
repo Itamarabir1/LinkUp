@@ -9,11 +9,13 @@
 | Service | Path | Language | Port | Purpose |
 |---------|------|----------|------|---------|
 | backend | backend/ | Python / FastAPI | 8000 | REST API, auth, rides, bookings, chat, groups, geo, **admin JSON API** |
-| outbox-worker | backend/ (same image) | Python | — | Outbox → RabbitMQ, notifications, avatar tasks, scheduled, chat completion |
+| notification-worker | backend/ (same image) | Python | — | Outbox -> RabbitMQ, notifications, user refresh events |
+| task-worker | backend/ (same image) | Python | — | Avatar tasks, scheduled tasks, scheduled publisher (**replicas=1**) |
+| ai-worker | backend/ (same image) | Python | — | Redis chat completion listener + AI analysis |
 | email-renderer | email-renderer/ | Node.js / Express / React Email | 3001 | Renders email HTML from template name + props (`POST /render`) |
 | chat-ws | chat-ws/ | Go | 8081 | WebSocket server for real-time chat (JWT, Redis Pub/Sub) |
 | db | Docker | PostgreSQL 15 + PostGIS | 5432 | Primary data store |
-| redis | Docker | Redis Stack 7.2 | 6379 | **שרת Redis אחד** — DB 0: backend/worker; DB 1: chat-ws (צ'אט, presence, `user:online` / `user:offline`, completion) |
+| redis | Docker | Redis Stack 7.2 | 6379 | Single Redis server - DB 0: backend + task/notification infra; DB 1: chat-ws + AI completion + user events |
 | rabbitmq | Docker | RabbitMQ 3 + Management | 5672, 15672 | Message broker (events, tasks) |
 
 ---
@@ -26,7 +28,7 @@
 | Cache / Pub-Sub | Redis | 7.2.0-v10 | DB 0: ride per-ride + **rides:list**, cache, OTP; DB 1: chat + **`user:{id}:events`** (דרך `redis_chat_pubsub`), completion, presence |
 | Message Broker | RabbitMQ | 3-management | אירועים (Outbox), תורי משימות (notifications, avatar, scheduled) |
 | Email rendering | Node.js + Express + React Email | Node 20 | microservice called by backend/worker to render transactional email HTML |
-| Runtime | Docker Compose | — | פיתוח: db, redis, rabbitmq, **migrate** (Alembic פעם אחת), backend (**8000** ל-host; uvicorn בלבד, בלי alembic בפקודת ההרצה), outbox-worker, chat-ws; פרוד מקומי: **frontend** סטטי + **nginx** (80) מאותו `docker-compose.yml` + `--profile prod` — nginx אחרי **backend healthy** |
+| Runtime | Docker Compose | — | Dev: db, redis, rabbitmq, **migrate** (once), backend (**8000** host), `notification-worker`, `task-worker`, `ai-worker`, chat-ws; local prod: static frontend + nginx (80) with `--profile prod` |
 | CDN (אופציונלי) | **Amazon CloudFront** | — | דומיין ציבורי מול אותו bucket S3; מופעל כש־**`CLOUDFRONT_DOMAIN`** מוגדר — URLs יציבים לתמונות (אווטאר/קבוצות); ללא דומיין — presigned GET ישירות ל-S3 |
 
 ---
@@ -43,17 +45,22 @@ Clients (Web/Mobile)
     │                                    ├── PostgreSQL (asyncpg)
     │                                    ├── Redis DB 0 (broadcast, cache)
     │                                    ├── Redis DB 1 PUB (chat messages, user:*:events, chat:completion)
-    │                                    └── Outbox table ──► outbox-worker
+    │                                    └── Outbox table ──► notification-worker
     │
     └── WebSocket /chat ────────► chat-ws:8081 (Go)
                                        │
                                        └── Redis DB 1 SUB (chat:conversation:*, chat:typing:*, chat:notification:*, user:*:events)
 
-outbox-worker
-    ├── Poll outbox_events (PENDING) ──► Publish to RabbitMQ (exchanges: user, ride, booking, tasks, scheduled)
-    ├── notifications_queue consumer ──► Render email via email-renderer (`POST /render`) ──► Send email (Brevo), push (Firebase FCM, **`data` map only** — title/body strings in `data`; UI: toast+chime / SW notification)
+notification-worker
+    ├── Outbox LISTEN/NOTIFY + fallback polling ──► Publish to RabbitMQ (user, ride, booking, tasks, scheduled)
+    └── notifications_queue consumer ──► Render email via email-renderer (`POST /render`) ──► Send email/push/user-refresh
+
+task-worker
     ├── avatar_upload_queue consumer ──► S3 resize, DB update
-    ├── scheduled_tasks_queue consumer ──► ReminderScheduler (DB `scheduled_notifications`), fuel scan, maintenance
+    ├── scheduled_tasks_queue consumer ──► reminders, maintenance, fuel scan
+    └── scheduled publisher loop (kept single-replica to avoid duplicate dispatch)
+
+ai-worker
     └── Redis DB 1 SUB (chat:completion:*) ──► AI analysis (Groq), save ChatAnalysis, optional outbox
 ```
 
@@ -66,6 +73,7 @@ outbox-worker
 - **Avatar / Group images (S3)**: העלאה ישירה עם presigned PUT (`/users/me/avatar/upload-url`, `/groups/{id}/upload-image`). אווטאר משתמש: אחרי worker, `avatar_key` מצביע ל-prefix **גרסתי immutable** `avatars/{user_id}/v{version}/` (מחיקת גרסה קודמת רק אחרי commit ל-DB). קריאה: `CLOUDFRONT_DOMAIN` אם מוגדר (URL יציב ל-CDN), אחרת presigned GET ל-S3. קבוצות: מפתח GROUPS/ כמו קודם.
 - **Geocode cache (24h)**: תוצאות כתובת→קואורדינטות נשמרות ב־Redis ל־24 שעות כדי לצמצם קריאות חוזרות ל־**Google Geocoding** עבור אותן כתובות. המימוש fail-open כדי לא לחסום flow אם Redis לא זמין.
 - **נוסע — חיפוש לעומת שמירת התראה:** `GET /api/v1/passenger/passengers/search-rides` מחזיר נסיעות פתוחות ב-cursor pagination **בלי** ליצור שורה ב-`passenger_requests`. כדי לקבל מייל/פוש כשיופרסמה נסיעה חדשה שמתאימה למסלול — `POST /api/v1/passenger/passengers/` (`PassengerRequestCreate`) עם `is_notification_active=True` (ברירת מחדל) ואופציונלית `group_id` כשהחיפוש הוא בהקשר קבוצה. ה-worker (`notification_tasks`) משתמש ב-`find_passengers_for_ride_notification` ומסנן בקשות עם התראה כבויה או קבוצה לא תואמת.
+- **AI free-text לרכיבה (נוסע + נהג):** endpoint משותף `POST /api/v1/passenger/passengers/ai-parse-search` משרת שני flows: (1) `SearchRides` לנוסע; (2) `CreateRide` לנהג עם constraints מחמירים יותר (`departure_time` עתידי חובה, `departure_date` לבדו לא מספיק), מילוי טופס בלבד וללא auto-submit.
 - **Admin (תפעול):** REST תחת **`/api/v1/admin/*`** — רק משתמש עם `users.is_admin`; dependency ב־`app/api/dependencies/admin.py` (`get_current_admin_user`). ראוטר דומיין: `backend/app/domain/admin/router.py` (סטטיסטיקות, בריאות, משתמשים, נסיעות, קבוצות, Outbox, lookup); פעולות רגישות עם לוג **`[admin_audit]`**. במקביל נשאר **SQLAdmin** (`app/admin/setup.py`) לדפדפן ניהול DB קלאסי. **ממשק React** למפעילים: `frontend/src/features/admin/` — מסלולים `/admin`, `/admin/health`, `/admin/users`, `/admin/rides`, `/admin/groups`, `/admin/outbox`, `/admin/lookup` (טעינה עצלה, RTL); **מעטפת דסקטופ בלבד** (ללא drawer/סיידבר מובייל) — שימוש אדמין מכוון לדפדפן; אפליקציית **mobile/** נפרדת. מקור אמת למסך ול־API: **`ADMIN_DASHBOARD.md`**.
 
 ---
@@ -78,6 +86,7 @@ outbox-worker
 - **JWT Auth**: Access Token (קצר) + Refresh Token (ארוך, נשמר ב-DB). אותו SECRET_KEY בין backend ל-chat-ws לאימות WebSocket.
 - **WebSocket auth (FastAPI)**: `get_current_user_ws` ב-`app/api/dependencies/auth.py` מאמת **רק JWT** (`decode_access_token`: חתימה, `exp`, base64 קנוני) ומחזיר `WsUser` עם `user_id` מה-`sub` — **בלי קריאת DB** בזמן חיבור, כדי לא להעמיס על ה-connection pool תחת עומס. HTTP (`get_current_user`) עדיין טוען `User` מ-DB ובודק `is_active`.
 - **Cursor-based Pagination**: נסיעות (חיפוש), הודעות צ'אט — `after` / `before` + `limit`, תגובה עם `next_cursor`, `has_more`.
+- **Chat read cursor**: `conversation_participants.last_read_message_id` is the source of truth for read receipts. `mark_conversation_read` advances it monotonically; REST returns `partner_read_up_to_message_id`, and `message_read` WS events carry `read_up_to_message_id` so the UI can mark every outgoing message up to that cursor as read.
 - **Page-based Pagination**: הזמנות שלי — `page`, `limit`, תגובה עם `total`, `has_more`.
 - **Pessimistic Locking**: `approve_booking`, `cancel_booking` — שליפת נסיעה עם `SELECT ... FOR UPDATE` כדי למנוע race. **שגיאות טרנזקציה:** `approve_booking`, `reject_booking`, `cancel_booking` — `rollback` גם על `Exception` לא צפוי אחרי `flush`, עם לוג — עקבי עם `request_to_join`.
 - **Race Condition Protection**: אישור/ביטול הזמנה תחת lock על ה-ride; ביטול מחזיר נסיעה ל-OPEN רק אם לא CANCELLED.

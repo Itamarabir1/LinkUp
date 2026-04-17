@@ -20,10 +20,17 @@ Authorization: Bearer <access_token>
 
 ## Pagination
 
+## AI Ride Parsing (shared endpoint)
+
+- `POST /api/v1/passenger/passengers/ai-parse-search` מחזיר `AISearchResult` (מוצא/יעד/זמן/שדות הבהרה) לשימוש גם במסך חיפוש נוסעים וגם במסך יצירת נסיעה לנהג.
+- במסך `CreateRide` הלקוח מחיל כללים מחמירים יותר: `departure_time` עתידי הוא חובה; `departure_date` ללא שעה מפעיל follow-up; אין שליחת חיפוש/יצירה אוטומטית.
+
+---
+
 ### Cursor-based (נסיעות חיפוש, הודעות צ'אט)
 
 - **נסיעות (חיפוש נוסע)** (`GET /api/v1/passenger/passengers/search-rides`): `after` (UUID של `ride_id` אחרון בעמוד הקודם), `limit`. תגובה: `items`, `next_cursor` (= `ride_id` להמשך), `has_more`.
-- **הודעות** (`GET /chat/conversations/{id}/messages`): `before` (message_id — טעינת הודעות ישנות יותר), `limit`. תגובה: `items`, `next_cursor`, `has_more`.
+- **הודעות** (`GET /chat/conversations/{id}/messages`): `before` (message_id — טעינת הודעות ישנות יותר), `after` (message_id — השלמת missed messages אחרי reconnect), `limit`. תגובה: `items`, `next_cursor`, `has_more`.
 
 ### Page-based (הזמנות שלי)
 
@@ -149,10 +156,16 @@ Authorization: Bearer <access_token>
 | POST | /conversations | כן | body: ConversationCreate (other_user_id). יוצר או מחזיר שיחה. מחזיר ConversationDetail (201). |
 | POST | /conversations/by-booking/{booking_id} | כן | שיחה לפי booking (נהג–נוסע). |
 | GET | /conversations | כן | רשימת השיחות שלי. |
-| GET | /conversations/{conversation_id} | כן | פרטי שיחה. |
+| GET | /conversations/{conversation_id} | כן | פרטי שיחה. `ConversationDetail` כולל גם `partner_last_read_at` וגם `partner_read_up_to_message_id` (cursor מונוטוני ל-read receipts). |
 | POST | /conversations/{conversation_id}/messages | כן | body: MessageCreate (body). שליחת הודעה (201). |
-| GET | /conversations/{conversation_id}/messages | כן | הודעות. query: limit (default 30), before (message_id ל-cursor). **Pagination**: cursor-based. תגובה: items, next_cursor, has_more. |
+| GET | /conversations/{conversation_id}/messages | כן | הודעות. query: limit (default 30), `before` (message_id לטעינת ישנות), `after` (message_id להשלמת missed messages). **Pagination**: cursor-based. תגובה: items, next_cursor, has_more. |
 | POST | /conversations/{conversation_id}/read | כן | סימון שיחה כנקראה (204). |
+הערת read receipts: `POST /conversations/{conversation_id}/read` מעדכן ב־DB גם `last_read_at` וגם `last_read_message_id` עבור המשתמש הקורא. לאחר מכן מתפרסם אירוע WebSocket מסוג `message_read` עם `read_up_to_message_id`, והפרונט מסמן כ־read כל הודעה יוצאת עם `message_id <= partner_read_up_to_message_id`.
+
+שדות רלוונטיים ב־`ConversationDetail`:
+- `partner_last_read_at` — נשמר לתאימות לאחור
+- `partner_read_up_to_message_id` — מקור האמת החדש ל־read receipts פר הודעה
+
 | GET | /unread-count | כן | `{ "count": number }` — מספר שיחות עם הודעות שלא נקראו. |
 | GET | /conversations/{conversation_id}/calendar.ics | כן | ייצוא ללוח שנה — כרגע `LinkupError` **501** (`CHAT_CALENDAR_NOT_IMPLEMENTED`). |
 

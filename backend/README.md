@@ -12,21 +12,24 @@ For production, use Docker (see root `docker-compose.yml`).
 - **Uvicorn workers (Docker):** `backend/entrypoint.sh` מריץ `uvicorn ... --workers` לפי **`UVICORN_WORKERS`** ב-`backend/.env` (ברירת מחדל 1). ב-`.env.example`: **`UVICORN_WORKERS=4`**. פיתוח לוקאלי בלי דוקר: `run-backend.sh` / `run-backend.bat` — `--reload`, worker אחד.
 - **WebSocket auth:** `get_current_user_ws` מאמת **JWT בלבד** (אובייקט `WsUser`), בלי `SELECT` ל-DB בזמן חיבור — ראו `app/api/dependencies/auth.py`. HTTP endpoints עם `get_current_user` עדיין טוענים משתמש מ-DB.
 
-**Push (FCM):** ב־Compose קובץ השירות של Firebase נטען מ־volume לנתיב בקונטיינר; הגדר `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env` (גם ל־`outbox-worker`) — פירוט ב־`docs/FCM_SYSTEM_SUMMARY.md` וב־README בשורש.
+**Push (FCM):** ב־Compose קובץ השירות של Firebase נטען מ־volume לנתיב בקונטיינר; הגדר `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env` (נדרש ל־`notification-worker`) — פירוט ב־`docs/FCM_SYSTEM_SUMMARY.md` וב־README בשורש.
 
 ## Email rendering architecture
 
 - Email HTML rendering now runs through a dedicated **Node.js + Express + React Email** service in `../email-renderer/`.
-- Backend/outbox-worker call [`app/domain/notifications/channels/email/renderer.py`](app/domain/notifications/channels/email/renderer.py), which delegates to:
+- Backend/notification-worker call [`app/domain/notifications/channels/email/renderer.py`](app/domain/notifications/channels/email/renderer.py), which delegates to:
   - `POST {EMAIL_RENDERER_URL}/render` with `{ template, props }`
 - Configure endpoint in `backend/.env`:
   - `EMAIL_RENDERER_URL=http://email-renderer:3001`
 - Template names are mapped in [`app/domain/notifications/config/templates_map/email_conf.py`](app/domain/notifications/config/templates_map/email_conf.py) as **PascalCase** registry keys (not Jinja paths).
-- Compose runtime expects `email-renderer` healthy before `backend`/`outbox-worker` start.
+- Compose runtime expects `email-renderer` healthy before `backend`/`notification-worker` start.
 
 ## Environment
 
 Copy `.env.example` to `.env` and set your values. See root README for full setup.
+
+**Groq (optional):** for chat summaries (`ai-worker`) and passenger AI ride search parsing, set **`GROQ_API_KEY`** or **`GROK_API_KEY`** in `backend/.env` (see `app/domain/chat/ai/client.py`). Docker Compose already loads `backend/.env` into the backend and worker containers — no duplicate key in `docker-compose.yml`.
+The same parser endpoint (`POST /api/v1/passenger/passengers/ai-parse-search`) is shared by both passenger search and driver CreateRide in the frontend; business rule differences are enforced client-side per flow.
 
 **Database connection pool** (optional tuning): `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT`, `DB_POOL_RECYCLE` — documented in `.env.example` and `docs/architecture/DEVELOPMENT.md`.
 
@@ -90,7 +93,7 @@ Alembic is in `alembic/`. Run migrations with:
 alembic upgrade head
 ```
 
-With **Docker Compose** at the repo root, the **`migrate`** service runs `alembic upgrade head` once before **backend** and **outbox-worker** start; the production **Dockerfile** does **not** run migrations in `CMD` (only `gunicorn` / `uvicorn`). If you deploy **without** Compose (e.g. raw image or Kubernetes), run migrations as a one-off Job, init container, or CI step — do not rely on the API container entrypoint alone.
+With **Docker Compose** at the repo root, the **`migrate`** service runs `alembic upgrade head` once before **backend** and worker services (`notification-worker`, `task-worker`, `ai-worker`) start; the production **Dockerfile** does **not** run migrations in `CMD` (only `gunicorn` / `uvicorn`). If you deploy **without** Compose (e.g. raw image or Kubernetes), run migrations as a one-off Job, init container, or CI step — do not rely on the API container entrypoint alone.
 
 **Recent:** קובץ **`007_add_last_active_at.py`** — מזהה רוויזיה ב-Alembic: **`007_last_active_at`** (`users.last_active_at`). **`008_scheduled_notifications`** — `down_revision` חייב להיות **`007_last_active_at`** (לא שם הקובץ); טבלת `scheduled_notifications`, אינדקס חלקי, הסרת `reminder_sent` מ-rides/bookings. ORM, API וטיפוסי הפרונט מיושרים (אין `reminder_sent` בתגובות / ב-`frontend` types). See `docs/architecture/DATABASE.md` and `docs/architecture/EVENTS.md`.
 

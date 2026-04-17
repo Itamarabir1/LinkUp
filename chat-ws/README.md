@@ -1,6 +1,6 @@
 # chat-ws – WebSocket server for real-time chat
 
-שרת WebSocket נפרד (Go) לצ'אט real-time. עובד יחד עם ה־API ב־Python (FastAPI). ניתוח AI של שיחות רץ ב-backend worker (outbox-worker).
+שרת WebSocket נפרד (Go) לצ'אט real-time. עובד יחד עם ה־API ב־Python (FastAPI). ניתוח AI של שיחות רץ ב־`ai-worker` מתוך ה-backend codebase.
 
 ## איך זה משתלב בפרויקט
 
@@ -8,7 +8,8 @@
 - **שני processes ל-chat:**
   - **backend (Python):** REST API, DB, שליחת הודעות (POST) + publish ל־Redis; בסיום שיחה מפרסם אירוע ל-Redis DB 1.
   - **chat-ws (Go):** WebSocket, Subscribe ל־Redis, דחיפה ל־clients.
-- **ניתוח AI:** רץ ב־outbox-worker (backend): מאזין ל-Redis DB 1 לאירועי סיום שיחה, מנתח (Groq), שומר ל-DB.
+- **ניתוח AI:** רץ ב־`ai-worker` (backend): מאזין ל-Redis DB 1 לאירועי סיום שיחה, מנתח (Groq), שומר ל-DB.
+- **AI ride parsing (לא ב-chat-ws):** endpoint `POST /api/v1/passenger/passengers/ai-parse-search` מנוהל כולו ב-backend ומשמש את מסכי SearchRides/CreateRide בפרונט.
 
 ## מבנה תיקיות
 
@@ -72,7 +73,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ### זרימת ניתוח AI (מה שקיים בפועל)
 
 1. backend מפרסם אירוע completion ל-Redis DB 1 (`chat:completion:{conversation_id}`).
-2. outbox-worker (באותו שירות backend) מאזין לערוץ completion ומריץ את ניתוח השיחה.
+2. `ai-worker` (באותו codebase backend) מאזין לערוץ completion ומריץ את ניתוח השיחה.
 3. התוצאה נשמרת ב-DB; צריכה עתידית להעברה ב-WS תתווסף בנפרד אם תוגדר.
 
 ## Presence ו-last seen (תקציר)
@@ -107,4 +108,4 @@ import (
 
 ### ניתוח AI
 
-ניתוח AI של שיחות רץ ב-backend (outbox-worker). לבדיקה: הרץ את ה-worker והפעל סיום שיחה מהאפליקציה; התוצאות נשמרות ב-DB ונגישות ב-`GET /api/v1/chat/conversations/{id}/analysis`.
+ניתוח AI של שיחות רץ ב-backend (`ai-worker`). לבדיקה: הרץ את ה-worker והפעל סיום שיחה מהאפליקציה; התוצאות נשמרות ב-DB ונגישות ב-`GET /api/v1/chat/conversations/{id}/analysis`.

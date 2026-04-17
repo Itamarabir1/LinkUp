@@ -4,7 +4,16 @@ import { enUS, he } from 'date-fns/locale';
 import { forwardRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDurationMinutes } from '../utils/duration';
-import { MapPin, ArrowUpDown, ChevronRight, Map, Calendar } from 'lucide-react';
+import {
+  MapPin,
+  ArrowUpDown,
+  ChevronRight,
+  Map,
+  Calendar,
+  Sparkles,
+  RotateCcw,
+  Bot,
+} from 'lucide-react';
 import LoadingButton from '../components/LoadingButton';
 import RouteMapModal from '../components/RouteMapModal';
 import { useGroup } from '../context/GroupContext';
@@ -62,11 +71,37 @@ export default function CreateRide() {
   const { t } = useTranslation(['rides', 'common']);
   const { myGroups } = useGroup();
   const {
-    groupId, originName, setOriginName, destinationName, setDestinationName,
-    selectedDate, setSelectedDate, seats, setSeats, loading, preview,
-    selectedRouteIndex, setSelectedRouteIndex, creating, error, locationLoading,
-    mapPreviewData, setMapPreviewData, fillOriginFromMyLocation, handleSwap,
-    requestPreview, createRide,
+    groupId,
+    originName,
+    setOriginName,
+    destinationName,
+    setDestinationName,
+    selectedDate,
+    setSelectedDate,
+    seats,
+    setSeats,
+    loading,
+    preview,
+    selectedRouteIndex,
+    setSelectedRouteIndex,
+    creating,
+    error,
+    locationLoading,
+    mapPreviewData,
+    setMapPreviewData,
+    fillOriginFromMyLocation,
+    handleSwap,
+    requestPreview,
+    createRide,
+    aiQuery,
+    setAiQuery,
+    aiParsing,
+    aiError,
+    aiResult,
+    aiFollowUp,
+    conversationHistory,
+    parseWithAI,
+    resetAI,
   } = useCreateRide();
 
   const activeGroupName = groupId
@@ -109,6 +144,113 @@ export default function CreateRide() {
             <p className={styles.pageMeta}>
               {t('rides:fillRouteAndTime')}
             </p>
+          </div>
+
+          {/* ══ AI Ride Creation Assistant ══ */}
+          <div className={styles.aiBlock}>
+            <div className={styles.aiHeader}>
+              <div className={styles.aiHeaderLeft}>
+                <Sparkles
+                  size={13}
+                  strokeWidth={2.5}
+                  className={styles.aiSparkle}
+                  aria-hidden
+                />
+                <span className={styles.aiTitle}>
+                  {t('rides:aiCreateTitle')}
+                </span>
+              </div>
+              {(aiResult !== null || conversationHistory.length > 0) && (
+                <button
+                  type="button"
+                  className={styles.aiResetBtn}
+                  onClick={resetAI}
+                  disabled={aiParsing}
+                  aria-label={t('rides:aiCreateReset')}
+                  title={t('rides:aiCreateReset')}
+                >
+                  <RotateCcw size={11} strokeWidth={2.5} aria-hidden />
+                </button>
+              )}
+            </div>
+
+            {conversationHistory.length > 0 && aiFollowUp && (
+              <div className={styles.aiHistory}>
+                {conversationHistory.map((turn, i) => (
+                  <div
+                    key={`${turn.role}-${i}-${turn.content.slice(0, 24)}`}
+                    className={
+                      turn.role === 'user'
+                        ? styles.aiHistoryUser
+                        : styles.aiHistoryAssistant
+                    }
+                  >
+                    {turn.content}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className={styles.aiInputRow}>
+              <textarea
+                className={`${styles.aiTextarea}${
+                  aiParsing ? ` ${styles.aiTextareaParsing}` : ''
+                }`}
+                placeholder={aiFollowUp ?? t('rides:aiCreatePlaceholder')}
+                value={aiQuery}
+                onChange={(e) => setAiQuery(e.target.value)}
+                rows={2}
+                maxLength={400}
+                dir="auto"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    void parseWithAI();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className={styles.aiSendBtn}
+                onClick={() => void parseWithAI()}
+                disabled={aiParsing || !aiQuery.trim()}
+                aria-label={t('rides:aiCreateParseBtn')}
+                title={t('rides:aiCreateParseBtn')}
+              >
+                {aiParsing ? (
+                  <span className={styles.aiSpinner} aria-hidden />
+                ) : (
+                  <>
+                    <Sparkles size={14} strokeWidth={2} aria-hidden />
+                    <span>{t('rides:aiCreateParseBtn')}</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {aiFollowUp && !aiError && (
+              <div className={styles.aiFollowUp} role="status" aria-live="polite">
+                <Bot
+                  size={14}
+                  strokeWidth={2}
+                  className={styles.aiFollowUpIcon}
+                  aria-hidden
+                />
+                <span>{aiFollowUp}</span>
+              </div>
+            )}
+
+            {aiError && (
+              <p className={styles.aiErrorMsg} role="alert">
+                {aiError}
+              </p>
+            )}
+
+            <div className={styles.aiDivider}>
+              <span className={styles.aiDividerLabel}>
+                {t('rides:aiCreateDivider')}
+              </span>
+            </div>
           </div>
 
           <form onSubmit={requestPreview}>
