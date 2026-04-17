@@ -2,7 +2,7 @@
 
 מיגרציות מרוכזות תחת `versions/`. **`env.py`** מייבא `app.db.models` אחרי `Base` כדי ש־`target_metadata` יכלול את מודלי הדומיין שנרשמים דרך registry זה לצורך **`revision --autogenerate`**.
 
-**Docker Compose:** שירות **`migrate`** מריץ `alembic upgrade head` פעם אחת לפני עליית **backend** ו־**outbox-worker** — ראו [`docs/architecture/DEVELOPMENT.md`](../../docs/architecture/DEVELOPMENT.md). סכמת ייחוס: [`db/schema.sql`](../../db/schema.sql) (עזר, לא מקור אמת למיגרציות).
+**Docker Compose:** שירות **`migrate`** מריץ `alembic upgrade head` פעם אחת לפני עליית **backend** וכל ה-workers (`notification-worker`, `task-worker`, `ai-worker`) — ראו [`docs/architecture/DEVELOPMENT.md`](../../docs/architecture/DEVELOPMENT.md). סכמת ייחוס: [`db/schema.sql`](../../db/schema.sql) (עזר, לא מקור אמת למיגרציות).
 
 ## הרצה
 

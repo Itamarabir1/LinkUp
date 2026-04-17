@@ -61,7 +61,7 @@
 
 - **`backend/app/domain/chat/crud.py`**  
   - `get_messages(..., before_message_id: int | None)` – מקבל **int** (תואם ל-BIGINT).  
-  - `Message.message_id` משמש ב-subquery ל-pagination.  
+  - pagination מבוסס message_id לשני הכיוונים (`before` / `after`) ללא תלות ב-`created_at`.  
   - כל שאר הפונקציות משתמשות ב-`conversation_id` / `sender_id` כ-UUID.
 
 - **`backend/app/domain/chat/ai/crud.py`**  
@@ -146,9 +146,9 @@
 
 ### 3.2 צ'אט והודעות (BIGINT)
 
-- **`frontend/src/api/client.ts`**  
-  - `MessageResponse`: `message_id: number`, `conversation_id: string`, `sender_id: string` (או דומה).  
-  - `getMessages(conversationId, params?: { limit?: number; before_message_id?: number })` – **before_message_id כ-number** (תואם ל-BIGINT).  
+- **`frontend/src/api/chat.ts`**  
+  - `MessageResponse`: `message_id: number`, `conversation_id: string`, `sender_id: string`.  
+  - `getMessages(conversationId, params?: { limit?: number; before?: number; after?: number })` – cursorים כ-number (תואם ל-BIGINT).  
   חשוב: אם ה-API יחזיר `message_id` כמחרוזת (למשל "1234567890123456789"), ב-JS מספרים מעל 2^53 מאבדים דיוק – לכן BIGINT גדול מאוד עלול לדרוש טיפול כ-string בפרונט אם יגדלו המזהים. כרגע עם autoincrement סביר שיישאר בטווח בטוח.
 
 - **`frontend/src/pages/MessageThread.tsx`**  
@@ -203,7 +203,7 @@
    - בנויים מ-`str(user_id)`. מעבר מ-1 ל-UUID משנה את מבנה הנתיבים; קבצים ישנים יישארו תחת נתיב עם "1" וחדשים תחת UUID – צריך החלטה אם להעביר או להשאיר backward compatibility.
 
 8. **Frontend – כל ה-IDs כ-string**  
-   - חוץ מ-`message_id` (ו-before_message_id) שכולם number – תואם ל-UUID כ-string ול-BIGINT כ-number.
+   - חוץ מ-`message_id` (ו-cursors `before`/`after`) שהם number – תואם ל-UUID כ-string ול-BIGINT כ-number.
 
 ---
 
@@ -215,7 +215,7 @@
 | מודל Message/ChatAnalysis ו-BIGINT | `backend/app/domain/chat/model.py` |
 | Auth + JWT sub | `backend/app/domain/auth/service.py`, `backend/app/api/dependencies/auth.py` |
 | CRUD User + get_by_id | `backend/app/domain/users/crud.py` |
-| Chat pagination (before_message_id) | `backend/app/domain/chat/crud.py`, `backend/app/domain/chat/service.py`, `backend/app/api/v1/routers/chat.py` |
+| Chat pagination (before/after by message_id) | `backend/app/domain/chat/crud.py`, `backend/app/domain/chat/service.py`, `backend/app/domain/chat/router.py`, `frontend/src/api/chat.ts` |
 | סכמות צ'אט (message_id int) | `backend/app/domain/chat/schema.py` |
 | Redis OTP keys | `backend/app/infrastructure/redis/keys.py`, `backend/app/domain/auth/verification_service.py` |
 | Outbox/RabbitMQ payloads | `backend/app/domain/auth/service.py`, `backend/app/domain/notifications/core/builders/chat_builder.py`, `backend/app/domain/chat/completion/service.py`, `backend/app/workers/tasks/ride_task.py` |

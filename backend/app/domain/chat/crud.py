@@ -158,6 +158,7 @@ async def get_messages(
     conversation_id: UUID,
     limit: int = 50,
     before_message_id: int | None = None,
+    after_message_id: int | None = None,
 ) -> tuple[list[Message], bool]:
     """
     Message history for a conversation (pagination).
@@ -166,12 +167,13 @@ async def get_messages(
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
     q = select(Message).where(Message.conversation_id == cid).order_by(desc(Message.created_at)).limit(limit + 1)
     if before_message_id is not None:
-        sub = select(Message.created_at).where(Message.message_id == before_message_id)
-        q = q.where(Message.created_at < sub.scalar_subquery())
+        q = q.where(Message.message_id < before_message_id)
+    if after_message_id is not None:
+        q = q.where(Message.message_id > after_message_id)
     result = await db.execute(q)
     rows = list(result.scalars().unique().all())
     has_more = len(rows) > limit
-    items = rows[:limit][::-1]  # ישן → חדש
+    items = rows[:limit][::-1]  # oldest -> newest
     return (items, has_more)
 
 
@@ -200,11 +202,23 @@ async def get_last_message(db: AsyncSession, conversation_id: UUID) -> Message |
 
 
 async def mark_conversation_read(db: AsyncSession, conversation_id: UUID, user_id: UUID) -> None:
-    """Updates last_read_at for a user in a conversation."""
+    """Updates last_read_at and last_read_message_id for a user in a conversation."""
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
     uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
 
     now = datetime.now(UTC)
+    # Assumes the full conversation is visible when the thread opens.
+    # "Read all" = max message_id from the other party at open time.
+    # If partial scroll or lazy rendering is added in future,
+    # update this to track scroll position instead.
+    msg_result = await db.execute(
+        select(func.max(Message.message_id)).where(
+            Message.conversation_id == cid,
+            Message.sender_id != uid,
+        )
+    )
+    max_message_id = msg_result.scalar_one_or_none()
+
     result = await db.execute(
         select(ConversationParticipant).where(
             ConversationParticipant.conversation_id == cid,
@@ -215,7 +229,38 @@ async def mark_conversation_read(db: AsyncSession, conversation_id: UUID, user_i
     if not participant:
         return
     participant.last_read_at = now
+    if max_message_id is not None and (
+        participant.last_read_message_id is None or max_message_id > participant.last_read_message_id
+    ):
+        participant.last_read_message_id = max_message_id
     await db.commit()
+
+
+async def get_partner_read_up_to_message_id(
+    db: AsyncSession,
+    conversation_id: UUID,
+    current_user_id: UUID,
+) -> int | None:
+    """
+    Returns the partner's last_read_message_id - the highest
+    message_id sent by current_user that the partner has read.
+    """
+    cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
+    uid = UUID(str(current_user_id)) if isinstance(current_user_id, str) else current_user_id
+
+    conv = await get_conversation_by_id(db, cid, uid)
+    if not conv:
+        return None
+
+    partner_id = conv.user_id_2 if conv.user_id_1 == uid else conv.user_id_1
+
+    result = await db.execute(
+        select(ConversationParticipant.last_read_message_id).where(
+            ConversationParticipant.conversation_id == cid,
+            ConversationParticipant.user_id == partner_id,
+        )
+    )
+    return result.scalar_one_or_none()
 
 
 async def get_unread_conversations_count(db: AsyncSession, user_id: UUID) -> int:

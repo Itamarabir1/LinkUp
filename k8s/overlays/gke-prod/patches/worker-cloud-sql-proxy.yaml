@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: linkup-worker
 spec:
-  replicas: 2
+  replicas: 0
   template:
     spec:
       serviceAccountName: linkup-cloudsql

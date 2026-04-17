@@ -7,7 +7,7 @@ import { TYPING_THROTTLE_MS } from './messageThread.constants';
 import { processChatWebSocketMessage } from './processChatWebSocketMessage';
 
 /**
- * WebSocket לצ'אט: הודעות בזמן אמת, הקלדה, unread, נוכחות.
+ * Chat WebSocket: real-time messages, typing, unread, and presence.
  */
 export function useChatWebSocket(options: {
   cid: string;
@@ -19,6 +19,9 @@ export function useChatWebSocket(options: {
   setPartnerTyping: React.Dispatch<React.SetStateAction<boolean>>;
   setPartnerTypingName: React.Dispatch<React.SetStateAction<string | null>>;
   setPartnerPresence: React.Dispatch<React.SetStateAction<PartnerPresence | null>>;
+  lastMessageIdRef: React.MutableRefObject<number | null>;
+  fetchMissedMessages: (afterId: number) => Promise<void>;
+  setConversationRead: (readUpToId: number) => void;
 }) {
   const {
     cid,
@@ -30,6 +33,9 @@ export function useChatWebSocket(options: {
     setPartnerTyping,
     setPartnerTypingName,
     setPartnerPresence,
+    lastMessageIdRef,
+    fetchMissedMessages,
+    setConversationRead,
   } = options;
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -77,6 +83,12 @@ export function useChatWebSocket(options: {
       }
       wsRef.current = ws;
 
+      ws.onopen = () => {
+        if (lastMessageIdRef.current !== null) {
+          void fetchMissedMessages(lastMessageIdRef.current);
+        }
+      };
+
       ws.onmessage = (event) => {
         const chunks = String(event.data).split('\n');
         for (const line of chunks) {
@@ -97,6 +109,7 @@ export function useChatWebSocket(options: {
             setPartnerTypingName,
             setPartnerPresence,
             typingHideTimeoutRef,
+            setConversationRead,
           });
         }
       };
@@ -137,6 +150,9 @@ export function useChatWebSocket(options: {
     setPartnerTyping,
     setPartnerTypingName,
     setPartnerPresence,
+    lastMessageIdRef,
+    fetchMissedMessages,
+    setConversationRead,
   ]);
 
   const sendTypingIfNeeded = useCallback(

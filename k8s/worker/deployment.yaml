@@ -7,7 +7,8 @@ metadata:
   annotations:
     app.kubernetes.io/version: "latest"
 spec:
-  replicas: 1
+  # Legacy compatibility deployment: keep disabled during split-worker rollout.
+  replicas: 0
   selector:
     matchLabels:
       app: linkup-worker

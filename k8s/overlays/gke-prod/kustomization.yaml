@@ -16,6 +16,9 @@ resources:
   - ../../email-renderer
   - ../../backend
   - ../../worker
+  - ../../notification-worker
+  - ../../task-worker
+  - ../../ai-worker
   - ../../chat-ws
   - ../../frontend
   - serviceaccount-cloudsql.yaml
@@ -31,7 +34,9 @@ configMapGenerator:
 # Patches must run before replacements so the cloud-sql-proxy container exists.
 patches:
   - path: patches/backend-cloud-sql-proxy.yaml
-  - path: patches/worker-cloud-sql-proxy.yaml
+  - path: patches/notification-worker-cloud-sql-proxy.yaml
+  - path: patches/task-worker-cloud-sql-proxy.yaml
+  - path: patches/ai-worker-cloud-sql-proxy.yaml
   - target:
       kind: Job
       name: linkup-migrate
@@ -54,7 +59,17 @@ replacements:
           - spec.template.spec.containers.0.args.2
       - select:
           kind: Deployment
-          name: linkup-worker
+          name: linkup-notification-worker
+        fieldPaths:
+          - spec.template.spec.containers.0.args.2
+      - select:
+          kind: Deployment
+          name: linkup-task-worker
+        fieldPaths:
+          - spec.template.spec.containers.0.args.2
+      - select:
+          kind: Deployment
+          name: linkup-ai-worker
         fieldPaths:
           - spec.template.spec.containers.0.args.2
       - select:

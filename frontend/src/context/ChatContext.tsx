@@ -4,13 +4,14 @@
  */
 import { createContext, useContext, useMemo, useReducer } from 'react';
 import { useLocation } from 'react-router-dom';
+import { NOTIFICATIONS_REFRESH_EVENT } from '../config/constants';
 import { useAuth } from './AuthContext';
 import type { ChatContextValue, ChatProviderProps } from './chatContext.types';
 import { chatReducer, initialChatState } from './chatState';
 import { useChatNotificationsFeed } from './useChatNotificationsFeed';
-import { useChatNotificationsWebSocket } from './useChatNotificationsWebSocket';
 import { useChatOpenClose } from './useChatOpenClose';
 import { useChatUnreadMessages } from './useChatUnreadMessages';
+import { useUserEvent } from '../hooks/useUserEvent';
 
 export { getNotificationItemKey } from './chatNotificationStorage';
 
@@ -39,7 +40,20 @@ export function ChatProvider({ children }: ChatProviderProps) {
     notificationsError,
   } = useChatNotificationsFeed(user?.user_id, state.notificationList, dispatch);
 
-  useChatNotificationsWebSocket(user?.user_id, refreshUnreadNotifications, refreshUnread);
+  // Must match backend REFRESH_EVENTS in websocket_provider.py.
+  useUserEvent(
+    [
+      'booking.passenger_join_request',
+      'booking.approved_by_driver',
+      'booking.rejected_by_driver',
+      'ride.cancelled_by_driver',
+    ],
+    () => {
+      void refreshUnreadNotifications();
+      void refreshUnread();
+      window.dispatchEvent(new CustomEvent(NOTIFICATIONS_REFRESH_EVENT));
+    }
+  );
 
   const value = useMemo<ChatContextValue>(
     () => ({

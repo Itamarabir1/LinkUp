@@ -21,10 +21,10 @@ services:
       - linkup_network
 
   # --- Cache & Pub/Sub: Redis ---
-  # DB 0 → backend + outbox-worker
-  # DB 1 → chat-ws (pub/sub) + outbox-worker (chat completion listener)
+  # DB 0 -> backend + compatibility outbox-worker
+  # DB 1 -> chat-ws pub/sub + chat completion listener
   redis:
-    image: redis/redis-stack:7.2.0-v10 # גרסה קבועה, לא latest
+    image: redis/redis-stack:7.2.0-v10 # pinned version, not latest
     container_name: linkup_redis
     restart: unless-stopped
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
@@ -45,7 +45,7 @@ services:
     restart: unless-stopped
     ports:
       - "5672:5672" # AMQP
-      - "15672:15672" # ממשק ניהול גרפי
+      - "15672:15672" # management UI
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
@@ -55,7 +55,7 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq # שומר queues בין restarts
+      - rabbitmq_data:/var/lib/rabbitmq # persist queues across restarts
     networks:
       - linkup_network
 
@@ -78,7 +78,7 @@ services:
     networks:
       - linkup_network
 
-  # --- DB Migration — רץ פעם אחת לפני backend ו-outbox-worker ---
+  # --- DB migration: runs once before backend/workers ---
   migrate:
     build:
       context: ./backend
@@ -95,19 +95,112 @@ services:
       - linkup_network
     restart: "no"
 
-  # --- Outbox & Notifications Worker ---
-  outbox-worker:
+  # --- Notification Worker (notifications consumer + outbox dispatcher) ---
+  notification-worker:
     build:
       context: ./backend
       target: worker
+    command: python -m app.workers.notification_worker
+    container_name: linkup_notification_worker
+    env_file:
+      - ./backend/.env
+    environment:
+      - POSTGRES_HOST=db
+      - REDIS_HOST=redis
+      - REDIS_DB=0
+      - REDIS_CHAT_DB=1
+      - RABBITMQ_HOST=rabbitmq
+      - DB_POOL_SIZE=3
+      - DB_MAX_OVERFLOW=5
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      email-renderer:
+        condition: service_healthy
+    networks:
+      - linkup_network
+    restart: unless-stopped
+    volumes:
+      - ./backend/app/infrastructure/firebase_core/firebase-credentials.json:/app/infrastructure/firebase_core/firebase-credentials.json:ro
+
+  # --- Task Worker (avatar + scheduled tasks) ---
+  task-worker:
+    build:
+      context: ./backend
+      target: worker
+    command: python -m app.workers.task_worker
+    container_name: linkup_task_worker
+    env_file:
+      - ./backend/.env
+    environment:
+      - POSTGRES_HOST=db
+      - REDIS_HOST=redis
+      - REDIS_DB=0
+      - REDIS_CHAT_DB=1
+      - RABBITMQ_HOST=rabbitmq
+      - DB_POOL_SIZE=2
+      - DB_MAX_OVERFLOW=3
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - linkup_network
+    restart: unless-stopped
+
+  # --- AI Worker (chat completion listener) ---
+  ai-worker:
+    build:
+      context: ./backend
+      target: worker
+    command: python -m app.workers.ai_worker
+    container_name: linkup_ai_worker
+    env_file:
+      - ./backend/.env
+    environment:
+      - POSTGRES_HOST=db
+      - REDIS_HOST=redis
+      - REDIS_DB=0
+      - REDIS_CHAT_DB=1
+      - DB_POOL_SIZE=2
+      - DB_MAX_OVERFLOW=3
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - linkup_network
+    restart: unless-stopped
+
+  # --- Temporary compatibility alias (opt-in profile) ---
+  outbox-worker:
+    profiles: ["compat"]
+    build:
+      context: ./backend
+      target: worker
+    command: python -m app.workers.notification_worker
     container_name: linkup_outbox_worker
     env_file:
       - ./backend/.env
     environment:
       - POSTGRES_HOST=db
       - REDIS_HOST=redis
-      - REDIS_DB=0 # מפורש: DB 0 לbackend
-      - REDIS_CHAT_DB=1 # listener לאירועי סיום שיחה
+      - REDIS_DB=0
+      - REDIS_CHAT_DB=1
       - RABBITMQ_HOST=rabbitmq
     depends_on:
       migrate:
@@ -138,8 +231,8 @@ services:
     environment:
       - POSTGRES_HOST=db
       - REDIS_HOST=redis
-      - REDIS_DB=0 # מפורש: DB 0 לbackend
-      - REDIS_CHAT_DB=1 # אותו DB כמו chat-ws — Pub/Sub אירועי משתמש/צ'אט
+      - REDIS_DB=0 # explicit: DB 0 for backend
+      - REDIS_CHAT_DB=1 # same DB as chat-ws for chat/user pubsub
       - RABBITMQ_HOST=rabbitmq
       - DOCKER_MODE=true
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
@@ -168,19 +261,19 @@ services:
     volumes:
       - ./backend/app/infrastructure/firebase_core/firebase-credentials.json:/app/infrastructure/firebase_core/firebase-credentials.json:ro
     ports:
-      - "8000:8000" # פיתוח: Vite על המחשב → proxy ל-localhost:8000
+      - "8000:8000" # dev: local Vite proxies to localhost:8000
     networks:
       - linkup_network
 
   # --- WebSocket: Chat (Go) ---
-  # JWT_SECRET חייב להיות זהה לזה שב-backend/.env
+  # JWT_SECRET must match backend/.env
   chat-ws:
     build:
       context: ./chat-ws
       dockerfile: Dockerfile
     container_name: linkup_chat_ws
     restart: unless-stopped
-    # פיתוח: 8081 ל-host — Vite proxy (ws + /presence) → localhost:8081
+    # dev: expose 8081; Vite proxies ws + /presence to localhost:8081
     ports:
       - "8081:8081"
     env_file:
@@ -205,7 +298,7 @@ services:
     networks:
       - linkup_network
 
-  # --- Reverse proxy: פורט 80 בלבד החוצה ---
+  # --- Reverse proxy: expose only port 80 ---
   nginx:
     profiles: ["prod"]
     image: nginx:1.25-alpine

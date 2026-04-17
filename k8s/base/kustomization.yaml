@@ -9,6 +9,9 @@ resources:
   - ../frontend
   - ../chat-ws
   - ../worker
+  - ../notification-worker
+  - ../task-worker
+  - ../ai-worker
 
 commonLabels:
   app.kubernetes.io/part-of: linkup

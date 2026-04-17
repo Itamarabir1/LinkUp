@@ -2,7 +2,7 @@ import type { MutableRefObject } from 'react';
 import { markConversationRead } from '../../api/chat';
 import type { PartnerPresence } from '../../api/presence';
 import type { MessageResponse } from '../../types/api';
-import { ChatMessageSchema, ChatPresenceEventSchema } from '../../types/wsEvents';
+import { ChatMessageSchema, ChatPresenceEventSchema, MessageReadEventSchema } from '../../types/wsEvents';
 import { TYPING_DISPLAY_TIMEOUT_MS } from './messageThread.constants';
 
 export interface ChatWebSocketProcessContext {
@@ -15,10 +15,12 @@ export interface ChatWebSocketProcessContext {
   setPartnerTypingName: React.Dispatch<React.SetStateAction<string | null>>;
   setPartnerPresence: React.Dispatch<React.SetStateAction<PartnerPresence | null>>;
   typingHideTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
+  setConversationRead: (readUpToId: number) => void;
 }
 
 /**
- * מעבד הודעת JSON אחת מ־WebSocket הצ'אט (typing, unread, הודעה חדשה וכו').
+ * Process a single JSON frame from the chat WebSocket
+ * (typing, unread count, incoming message, read receipts).
  */
 export function processChatWebSocketMessage(
   data: Record<string, unknown>,
@@ -54,7 +56,11 @@ export function processChatWebSocketMessage(
       return;
     }
 
-    if (event.type === 'typing_start' && event.user_id !== ctx.userId) {
+    if (
+      event.type === 'typing_start' &&
+      event.user_id !== ctx.userId &&
+      event.conversation_id === ctx.cid
+    ) {
       ctx.setPartnerTyping(true);
       ctx.setPartnerTypingName(event.full_name ?? null);
       if (ctx.typingHideTimeoutRef.current) clearTimeout(ctx.typingHideTimeoutRef.current);
@@ -84,6 +90,7 @@ export function processChatWebSocketMessage(
   const msgResult = ChatMessageSchema.safeParse(data);
   if (msgResult.success) {
     const d = msgResult.data;
+    if (d.conversation_id !== ctx.cid) return;
     const msg: MessageResponse = {
       message_id: d.message_id,
       conversation_id: d.conversation_id,
@@ -91,12 +98,26 @@ export function processChatWebSocketMessage(
       body: d.body,
       created_at: d.created_at,
     };
-    if (msg.conversation_id === ctx.cid) {
-      void markConversationRead(ctx.cid)
-        .then(() => ctx.refreshUnread())
-        .catch(() => {});
-    }
-    ctx.setMessages((prev) => [...prev, msg]);
+    void markConversationRead(ctx.cid)
+      .then(() => ctx.refreshUnread())
+      .catch(() => {});
+    ctx.setMessages((prev) => {
+      if (prev.some((existing) => existing.message_id === msg.message_id)) return prev;
+      return [...prev, msg];
+    });
     if (msg.sender_id !== ctx.userId) ctx.setPartnerTyping(false);
+    return;
+  }
+
+  const msgReadResult = MessageReadEventSchema.safeParse(data);
+  if (msgReadResult.success) {
+    const e = msgReadResult.data;
+    if (
+      e.conversation_id === ctx.cid &&
+      e.reader_id !== ctx.userId &&
+      e.read_up_to_message_id !== undefined
+    ) {
+      ctx.setConversationRead(e.read_up_to_message_id);
+    }
   }
 }

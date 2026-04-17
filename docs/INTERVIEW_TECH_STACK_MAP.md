@@ -60,7 +60,7 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| Worker נפרד מה-API | תהליך **`outbox-worker`** (אותו codebase Python, entry נפרד) — צרכני RabbitMQ, outbox poller, מתזמנים — [`docs/ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) §2א, [`docs/architecture/EVENTS.md`](architecture/EVENTS.md). |
+| Worker נפרד מה-API | תהליכי **`notification-worker`**, **`task-worker`**, **`ai-worker`** (אותו codebase Python, entries נפרדים) — outbox dispatch, notifications, scheduled/avatar tasks, AI completion — [`docs/ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) §2א, [`docs/architecture/EVENTS.md`](architecture/EVENTS.md). |
 | תורים נפרדים | למשל `notifications_queue`, `avatar_upload_queue`, `scheduled_tasks_queue`. |
 
 ---
@@ -171,7 +171,7 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| Docker Compose (מקומי / אינטגרציה) | [`docker-compose.yml`](../../docker-compose.yml) — db, redis, rabbitmq, migrate, **email-renderer**, backend, **outbox-worker**, **chat-ws**; פרופיל prod עם frontend + nginx. |
+| Docker Compose (מקומי / אינטגרציה) | [`docker-compose.yml`](../../docker-compose.yml) — db, redis, rabbitmq, migrate, **email-renderer**, backend, **notification-worker**, **task-worker**, **ai-worker**, **chat-ws**; פרופיל prod עם frontend + nginx. |
 | GitHub Actions | [`.github/workflows/`](../../.github/workflows/) — `backend-ci`, `frontend-ci`, `chat-ws-ci`, `email-renderer-ci`; פריסה: `deploy-gke.yml`. |
 | Kubernetes | [`k8s/`](../../k8s/) — base, overlays, infra (Postgres, Redis, RabbitMQ), שירותים נפרדים ל-backend, worker, chat-ws, email-renderer, frontend. |
 

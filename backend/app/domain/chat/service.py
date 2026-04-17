@@ -5,6 +5,7 @@ After saving a message — publishes to Redis Pub/Sub (Go WS server subscribes).
 
 import json
 import logging
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -26,6 +27,7 @@ from app.core.exceptions.user import UserNotFoundError
 from app.domain.bookings.enum import BookingStatus
 from app.domain.bookings.model import Booking
 from app.domain.chat import crud as chat_crud
+from app.domain.chat.model import ConversationParticipant
 from app.domain.chat.schema import (
     ConversationDetail,
     ConversationListItem,
@@ -40,6 +42,28 @@ from app.infrastructure.s3.service import storage_service
 from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 
 logger = logging.getLogger(__name__)
+
+
+async def _get_partner_last_read_at(db: AsyncSession, conversation_id: UUID, current_user_id: UUID) -> datetime | None:
+    conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
+    if not conv:
+        return None
+    partner_id = conv.user_id_2 if conv.user_id_1 == current_user_id else conv.user_id_1
+    result = await db.execute(
+        select(ConversationParticipant.last_read_at).where(
+            ConversationParticipant.conversation_id == conv.conversation_id,
+            ConversationParticipant.user_id == partner_id,
+        ),
+    )
+    return result.scalar_one_or_none()
+
+
+async def _get_partner_read_up_to_message_id(
+    db: AsyncSession,
+    conversation_id: UUID,
+    current_user_id: UUID,
+) -> int | None:
+    return await chat_crud.get_partner_read_up_to_message_id(db, conversation_id, current_user_id)
 
 
 async def _require_booking_and_ride_for_chat(db: AsyncSession, booking_id: UUID, current_user_id: UUID) -> tuple[Booking, Ride]:
@@ -90,6 +114,10 @@ async def get_or_create_conversation(db: AsyncSession, current_user_id: UUID, ot
         conversation_id=conv.conversation_id,
         partner=partner,
         created_at=conv.created_at,
+        partner_last_read_at=await _get_partner_last_read_at(db, conv.conversation_id, current_user_id),
+        partner_read_up_to_message_id=await _get_partner_read_up_to_message_id(
+            db, conv.conversation_id, current_user_id
+        ),
     )
 
 
@@ -127,6 +155,10 @@ async def get_or_create_conversation_by_booking(db: AsyncSession, booking_id: UU
         partner=partner,
         created_at=conv.created_at,
         booking_id=booking.booking_id,
+        partner_last_read_at=await _get_partner_last_read_at(db, conv.conversation_id, current_user_id),
+        partner_read_up_to_message_id=await _get_partner_read_up_to_message_id(
+            db, conv.conversation_id, current_user_id
+        ),
     )
 
 
@@ -181,6 +213,10 @@ async def get_conversation_detail(db: AsyncSession, conversation_id: UUID, curre
         conversation_id=conv.conversation_id,
         partner=partner,
         created_at=conv.created_at,
+        partner_last_read_at=await _get_partner_last_read_at(db, conv.conversation_id, current_user_id),
+        partner_read_up_to_message_id=await _get_partner_read_up_to_message_id(
+            db, conv.conversation_id, current_user_id
+        ),
     )
 
 
@@ -249,6 +285,7 @@ async def get_messages(
     current_user_id: UUID,
     limit: int = 50,
     before_message_id: int | None = None,
+    after_message_id: int | None = None,
 ) -> PaginatedMessagesResponse:
     """
     Message history for a conversation (pagination).
@@ -261,6 +298,7 @@ async def get_messages(
         conversation_id=conversation_id,
         limit=limit,
         before_message_id=before_message_id,
+        after_message_id=after_message_id,
     )
     items = [
         MessageResponse(
@@ -278,3 +316,30 @@ async def get_messages(
         next_cursor=next_cursor,
         has_more=has_more,
     )
+
+
+async def publish_read_receipt(db: AsyncSession, conversation_id: UUID, reader_id: UUID) -> None:
+    try:
+        conv = await chat_crud.get_conversation_by_id(db, conversation_id, reader_id)
+        if not conv:
+            return
+        reader_result = await db.execute(
+            select(ConversationParticipant.last_read_message_id).where(
+                ConversationParticipant.conversation_id == conversation_id,
+                ConversationParticipant.user_id == reader_id,
+            )
+        )
+        read_up_to = reader_result.scalar_one_or_none()
+        payload: dict[str, str | int] = {
+            "type": "message_read",
+            "conversation_id": str(conversation_id),
+            "reader_id": str(reader_id),
+        }
+        if read_up_to is not None:
+            payload["read_up_to_message_id"] = read_up_to
+        await redis_chat_pubsub.publish(
+            f"chat:conversation:{conversation_id}",
+            json.dumps(payload),
+        )
+    except Exception as e:
+        logger.warning("publish_read_receipt failed: %s", e, exc_info=True)

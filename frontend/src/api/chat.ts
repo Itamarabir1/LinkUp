@@ -21,7 +21,7 @@ export function getConversation(conversationId: string) {
   return api.get<ConversationDetail>(`/chat/conversations/${conversationId}`);
 }
 
-export function getMessages(conversationId: string, params?: { limit?: number; before?: number }) {
+export function getMessages(conversationId: string, params?: { limit?: number; before?: number; after?: number }) {
   return api.get<PaginatedMessagesResponse>(`/chat/conversations/${conversationId}/messages`, { params });
 }
 

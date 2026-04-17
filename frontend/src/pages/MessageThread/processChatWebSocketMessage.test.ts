@@ -22,6 +22,7 @@ function makeCtx(overrides: Partial<ChatWebSocketProcessContext> = {}): ChatWebS
     setPartnerTyping: vi.fn(),
     setPartnerTypingName: vi.fn(),
     setPartnerPresence: vi.fn(),
+    setConversationRead: vi.fn(),
     typingHideTimeoutRef: { current: null },
     ...overrides,
   };
@@ -141,6 +142,21 @@ describe('processChatWebSocketMessage', () => {
     expect(ctx.setPartnerTypingName).toHaveBeenLastCalledWith(null);
   });
 
+  it('ignores typing_start for other conversation', () => {
+    const ctx = makeCtx();
+    processChatWebSocketMessage(
+      {
+        type: 'typing_start',
+        user_id: 'partner-1',
+        full_name: 'Bob',
+        conversation_id: 'conv-2',
+        recipient_id: 'recipient-123',
+      },
+      ctx
+    );
+    expect(ctx.setPartnerTyping).not.toHaveBeenCalled();
+  });
+
   it('typing_stop clears typing and pending timeout', () => {
     const ctx = makeCtx();
     processChatWebSocketMessage(
@@ -167,5 +183,62 @@ describe('processChatWebSocketMessage', () => {
     expect(ctx.setPartnerTypingName).toHaveBeenCalledWith(null);
     vi.advanceTimersByTime(TYPING_DISPLAY_TIMEOUT_MS);
     expect(ctx.setPartnerTyping).toHaveBeenCalledTimes(1);
+  });
+
+  it('sets conversation read on message_read from partner in same conversation', () => {
+    const ctx = makeCtx();
+    processChatWebSocketMessage(
+      {
+        type: 'message_read',
+        conversation_id: 'conv-1',
+        reader_id: 'partner-1',
+        read_up_to_message_id: 42,
+      },
+      ctx
+    );
+    expect(ctx.setConversationRead).toHaveBeenCalledWith(42);
+  });
+
+  it('dedupes repeated message frames by message_id', () => {
+    const setMessages = vi.fn() as Dispatch<SetStateAction<MessageResponse[]>>;
+    const ctx = makeCtx({ setMessages });
+    const msg: MessageResponse = {
+      message_id: 3,
+      conversation_id: 'conv-1',
+      sender_id: 'partner-1',
+      body: 'hello',
+      created_at: 't',
+    };
+    processChatWebSocketMessage(msg as unknown as Record<string, unknown>, ctx);
+    const updater = (setMessages as ReturnType<typeof vi.fn>).mock.calls[0][0] as (
+      p: MessageResponse[]
+    ) => MessageResponse[];
+    expect(updater([msg])).toEqual([msg]);
+  });
+
+  it('ignores message_read for self or other conversation', () => {
+    const ctx = makeCtx();
+    processChatWebSocketMessage(
+      { type: 'message_read', conversation_id: 'conv-1', reader_id: 'u-me' },
+      ctx
+    );
+    processChatWebSocketMessage(
+      {
+        type: 'message_read',
+        conversation_id: 'conv-2',
+        reader_id: 'partner-1',
+        read_up_to_message_id: 42,
+      },
+      ctx
+    );
+    processChatWebSocketMessage(
+      {
+        type: 'message_read',
+        conversation_id: 'conv-1',
+        reader_id: 'partner-1',
+      },
+      ctx
+    );
+    expect(ctx.setConversationRead).not.toHaveBeenCalled();
   });
 });

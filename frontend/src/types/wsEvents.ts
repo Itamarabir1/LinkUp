@@ -68,14 +68,23 @@ export const UnreadCountEventSchema = z.object({
   type: z.literal('unread_count'),
 });
 
+export const MessageReadEventSchema = z.object({
+  type: z.literal('message_read'),
+  conversation_id: z.string(),
+  reader_id: z.string(),
+  read_up_to_message_id: z.number().optional(),
+});
+
 export const ChatPresenceEventSchema = z.discriminatedUnion('type', [
   UserOnlineEventSchema,
   UserOfflineEventSchema,
   TypingStartEventSchema,
   TypingStopEventSchema,
   UnreadCountEventSchema,
+  MessageReadEventSchema,
 ]);
 export type ChatPresenceEvent = z.infer<typeof ChatPresenceEventSchema>;
+export type MessageReadEvent = z.infer<typeof MessageReadEventSchema>;
 
 /** Chat message frame arriving over WS (parallel to API MessageResponse). */
 export const ChatMessageSchema = z
@@ -88,13 +97,6 @@ export const ChatMessageSchema = z
   })
   .passthrough();
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
-
-// --- Notifications WebSocket (FastAPI /notifications/ws) ---
-export const NotificationRefreshEventSchema = z
-  .object({
-    type: z.literal('notifications_refresh'),
-  })
-  .strict();
 
 // --- User Events (channel: user:{user_id}:events via chat-ws) ---
 export const UserEventSchema = z

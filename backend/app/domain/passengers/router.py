@@ -1,5 +1,7 @@
+import asyncio
 import logging
 from datetime import datetime
+from functools import partial
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -17,6 +19,8 @@ from app.core.exceptions.infrastructure import GeocodingError
 from app.db.session import get_db
 from app.domain.bookings.schema import BookingResponse
 from app.domain.bookings.service import BookingService
+from app.domain.passengers.ai_search_schema import AISearchQuery, AISearchResult
+from app.domain.passengers.ai_search_service import parse_ride_search_query
 from app.domain.passengers.schema import (
     PassengerRequestCreate,
     PassengerRequestResponse,
@@ -144,6 +148,49 @@ async def request_ride_from_search(
         except Exception:
             detail = "שגיאה בשליחת הבקשה – נסה שוב או פנה לתמיכה"
         raise HTTPException(status_code=500, detail=detail)
+
+
+# 2b. AI parse free-text into search fields (sync Groq in thread pool; no auto search)
+@router.post(
+    "/ai-parse-search",
+    response_model=AISearchResult,
+    summary="ניתוח חיפוש נסיעה בטקסט חופשי (AI)",
+)
+async def ai_parse_search(
+    body: AISearchQuery,
+    current_user: User | None = Depends(get_current_user_optional),
+):
+    """
+    Parse Hebrew/English free text into structured pickup/destination/time/radius.
+    Does not run search — client fills the form and calls GET /search-rides.
+    """
+    _ = current_user
+    loop = asyncio.get_running_loop()
+    try:
+        result = await loop.run_in_executor(
+            None,
+            partial(parse_ride_search_query, body.query, body.conversation_history),
+        )
+        logger.info(
+            "ai_parse_search ok query_len=%s needs_clarification=%s",
+            len(body.query),
+            getattr(result, "needs_clarification", None),
+        )
+        return result
+    except Exception as e:
+        logger.warning("ai_parse_search failed: %s", e)
+        return AISearchResult(
+            pickup_name=None,
+            destination_name=None,
+            departure_time=None,
+            search_radius=None,
+            confidence=0.0,
+            raw_interpretation="",
+            needs_clarification=True,
+            missing_fields=["pickup_name", "destination_name"],
+            ambiguity_reasons=[],
+            follow_up_question="אירעה שגיאה. נסה שוב או מלא את הטופס ידנית.",
+        )
 
 
 # 3. Free search (does not persist; use POST / to save alerts)

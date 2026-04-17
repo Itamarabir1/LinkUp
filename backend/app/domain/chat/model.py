@@ -99,6 +99,7 @@ class ConversationParticipant(Base):
     )
     joined_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     last_read_at = Column(DateTime(timezone=True), nullable=True)
+    last_read_message_id = Column(BigInteger, nullable=True)
 
     conversation = relationship("Conversation", foreign_keys=[conversation_id])
     user = relationship("User", foreign_keys=[user_id])

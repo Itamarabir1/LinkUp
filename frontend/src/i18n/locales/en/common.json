@@ -100,6 +100,8 @@
   "msg_empty_thread": "No messages yet. Send the first one.",
   "msg_compose_placeholder": "Write a message...",
   "msg_send": "Send",
+  "msg_sent": "Sent",
+  "msg_read": "Read",
   "msg_back_aria": "Back",
   "chat_popup_loading": "Loading...",
   "chat_popup_empty": "No messages yet. Send the first one.",

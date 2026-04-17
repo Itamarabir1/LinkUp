@@ -70,6 +70,8 @@ export interface ConversationDetail {
   };
   created_at: string;
   booking_id?: string;
+  partner_last_read_at?: string | null;
+  partner_read_up_to_message_id?: number | null;
   /** Optional backend summary shown in chat header (e.g. origin ← destination). */
   route_label?: string | null;
 }

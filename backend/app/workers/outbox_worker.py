@@ -1,41 +1,77 @@
 import asyncio
 import logging
 
+from app.core.config import settings
 from app.db.session import SessionLocal  # ייבוא ה-sessionmaker האסינכרוני
 from app.domain.system.outbox_service import OutboxService
 from app.infrastructure.events.dispatcher.base import EventDispatcher
+from app.infrastructure.outbox.listener import OutboxListener
 from app.infrastructure.outbox.repository import OutboxRepository
 
 logger = logging.getLogger("OutboxWorker")
+FALLBACK_POLL_INTERVAL = 30.0
 
 
-async def run_outbox_worker(dispatcher: EventDispatcher, interval: float = 2.0):
+async def run_outbox_worker(dispatcher: EventDispatcher):
     service = OutboxService(repo=OutboxRepository(), dispatcher=dispatcher)
+    listener: OutboxListener | None = OutboxListener()
+    dsn = settings.DATABASE_URL_RAW or settings.DATABASE_URL
 
-    _poll_count = 0
-    while True:
+    try:
         try:
-            _poll_count += 1
-            async with SessionLocal() as db:
-                events = await service.repo.get_pending_events(db, batch_size=50)
-            if _poll_count % 30 == 0:
-                n = len(events) if events else 0
-                print(f"[NOTIF] Worker: poll #{_poll_count} -> {n} pending", flush=True)
-                logger.info("[NOTIF] Outbox: poll #%s -> %s pending events", _poll_count, n)
-            if events:
-                logger.info("[NOTIF] Outbox: fetched %s pending event(s)", len(events))
-                for e in events:
-                    logger.info(
-                        "[NOTIF] Outbox: processing event_id=%s event_name=%s",
-                        e.id,
-                        e.event_name,
-                    )
+            await listener.connect(dsn)
+            logger.info("[NOTIF] Outbox listener connected on channel outbox_new_event")
+        except Exception as e:
+            logger.warning(
+                "LISTEN/NOTIFY unavailable: %s — falling back to 30s polling",
+                e,
+            )
+            listener = None
+
+        while True:
+            try:
+                if listener:
+                    try:
+                        await listener.wait_for_notify(timeout=FALLBACK_POLL_INTERVAL)
+                    except Exception as wait_err:
+                        logger.warning(
+                            "LISTEN wait failed: %s — trying to reconnect and using fallback polling",
+                            wait_err,
+                        )
+                        try:
+                            await listener.close()
+                        except Exception:
+                            pass
+                        try:
+                            await listener.connect(dsn)
+                            logger.info("[NOTIF] Outbox listener reconnected")
+                        except Exception as reconnect_err:
+                            logger.warning(
+                                "LISTEN reconnect failed: %s — switching to polling mode",
+                                reconnect_err,
+                            )
+                            listener = None
+                else:
+                    await asyncio.sleep(FALLBACK_POLL_INTERVAL)
+
+                async with SessionLocal() as db:
+                    events = await service.repo.get_pending_events(db, batch_size=50)
+
+                for event in events:
                     try:
                         async with SessionLocal() as db:
-                            await service.process_single_event(db, e)
+                            await service.process_single_event(db, event)
                     except Exception as ex:
-                        logger.exception("Outbox event %s failed: %s", e.id, ex)
-        except Exception as e:
-            logger.critical("🚨 Outbox Loop Error: %s", e)
+                        logger.exception("Event %s failed: %s", event.id, ex)
 
-        await asyncio.sleep(interval)
+                if listener and events:
+                    # Drain potential backlog that arrived while processing.
+                    listener.wake()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.critical("Outbox loop error: %s", e)
+                await asyncio.sleep(5.0)
+    finally:
+        if listener:
+            await listener.close()

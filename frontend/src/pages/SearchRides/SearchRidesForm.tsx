@@ -4,9 +4,10 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { enUS, he } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
-import { MapPin, ArrowUpDown, Calendar } from 'lucide-react';
+import { MapPin, ArrowUpDown, Calendar, Sparkles, RotateCcw } from 'lucide-react';
 import LoadingButton from '../../components/LoadingButton';
 import { useLang } from '../../context/LangContext';
+import type { AISearchResult, ConversationTurn } from '../../api/passengers';
 import styles from './SearchRides.module.css';
 
 interface DateTriggerProps {
@@ -56,6 +57,14 @@ type Props = {
   onFillLocation: () => void;
   onSwap: () => void;
   onSubmit: (e: React.FormEvent) => void;
+  aiQuery: string;
+  setAiQuery: (v: string) => void;
+  aiParsing: boolean;
+  aiError: string;
+  aiResult: AISearchResult | null;
+  conversationHistory: ConversationTurn[];
+  onParseAI: () => void;
+  onResetAI: () => void;
 };
 
 export function SearchRidesForm({
@@ -73,10 +82,106 @@ export function SearchRidesForm({
   onFillLocation,
   onSwap,
   onSubmit,
+  aiQuery,
+  setAiQuery,
+  aiParsing,
+  aiError,
+  aiResult,
+  conversationHistory,
+  onParseAI,
+  onResetAI,
 }: Props) {
   const { t } = useTranslation(['rides', 'common', 'auth']);
   const { lang } = useLang();
+
   return (
+    <>
+      {/* ══ AI Search Block ══ */}
+      <div
+        className={styles.aiBlock}
+        role="region"
+        aria-label={t('rides:aiBlockTitle')}
+      >
+        <div className={styles.aiHeader}>
+          <div className={styles.aiHeaderLeft}>
+            <Sparkles
+              size={13}
+              strokeWidth={2.5}
+              className={styles.aiSparkle}
+              aria-hidden
+            />
+            <span className={styles.aiTitle}>{t('rides:aiBlockTitle')}</span>
+          </div>
+          {(aiResult !== null || conversationHistory.length > 0) && (
+            <button
+              type="button"
+              className={styles.aiResetBtn}
+              onClick={onResetAI}
+              disabled={aiParsing}
+              aria-label={t('rides:aiResetAria')}
+              title={t('rides:aiReset')}
+            >
+              <RotateCcw size={11} strokeWidth={2.5} aria-hidden />
+            </button>
+          )}
+        </div>
+
+        {conversationHistory.length > 0 && aiResult?.follow_up_question && (
+          <div className={styles.aiHistory}>
+            {conversationHistory.map((turn, i) => (
+              <div
+                key={`${turn.role}-${i}-${turn.content.slice(0, 24)}`}
+                className={
+                  turn.role === 'user' ? styles.aiHistoryUser : styles.aiHistoryAssistant
+                }
+              >
+                {turn.content}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className={styles.aiInputRow}>
+          <textarea
+            className={`${styles.aiTextarea}${aiParsing ? ` ${styles.aiTextareaParsing}` : ''}`}
+            placeholder={
+              aiResult?.follow_up_question?.trim() || t('rides:aiPlaceholder')
+            }
+            value={aiQuery}
+            onChange={(e) => setAiQuery(e.target.value)}
+            rows={2}
+            maxLength={400}
+            dir="auto"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                void onParseAI();
+              }
+            }}
+          />
+          <button
+            type="button"
+            className={styles.aiSendBtn}
+            onClick={() => void onParseAI()}
+            disabled={aiParsing || !aiQuery.trim()}
+            aria-label={t('rides:aiParse')}
+            title={t('rides:aiParse')}
+          >
+            {aiParsing ? (
+              <span className={styles.aiSpinner} aria-hidden />
+            ) : (
+              <Sparkles size={16} strokeWidth={2} aria-hidden />
+            )}
+          </button>
+        </div>
+
+        {aiError ? <p className={styles.aiErrorMsg}>{aiError}</p> : null}
+
+        <div className={styles.aiDivider}>
+          <span className={styles.aiDividerLabel}>{t('rides:aiManualDivider')}</span>
+        </div>
+      </div>
+
     <form onSubmit={onSubmit} className={styles.formBlock}>
       {error ? (
         <div className={styles.pageError}>
@@ -194,5 +299,6 @@ export function SearchRidesForm({
         {t('common:search')}
       </LoadingButton>
     </form>
+    </>
   );
 }

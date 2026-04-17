@@ -100,6 +100,8 @@
   "msg_empty_thread": "אין הודעות. שלח הודעה ראשונה.",
   "msg_compose_placeholder": "כתוב הודעה...",
   "msg_send": "שלח",
+  "msg_sent": "נשלח",
+  "msg_read": "נקרא",
   "msg_back_aria": "חזרה",
   "chat_popup_loading": "טוען...",
   "chat_popup_empty": "אין הודעות. שלח הודעה ראשונה.",

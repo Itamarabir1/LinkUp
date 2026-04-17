@@ -3,6 +3,7 @@
 All routes require authentication (get_current_user).
 """
 
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, status
@@ -27,12 +28,14 @@ from app.domain.chat.service import (
     get_or_create_conversation,
     get_or_create_conversation_by_booking,
     list_my_conversations,
+    publish_read_receipt,
     send_message,
 )
 from app.domain.users.crud import crud_user
 from app.domain.users.model import User
 
 router = APIRouter(tags=["Chat"])
+logger = logging.getLogger(__name__)
 
 
 @router.post(
@@ -138,6 +141,7 @@ async def list_conversation_messages(
     conversation_id: UUID,
     limit: int = Query(30, ge=1, le=100),
     before: int | None = Query(None, description="לפני message_id (טעינת הודעות ישנות יותר)"),
+    after: int | None = Query(None, description="after message_id"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -148,6 +152,7 @@ async def list_conversation_messages(
         current_user_id=current_user.user_id,
         limit=limit,
         before_message_id=before,
+        after_message_id=after,
     )
 
 
@@ -193,6 +198,10 @@ async def mark_read(
     db: AsyncSession = Depends(get_db),
 ):
     await chat_crud.mark_conversation_read(db, conversation_id, current_user.user_id)
+    try:
+        await publish_read_receipt(db, conversation_id, current_user.user_id)
+    except Exception as e:
+        logger.warning("publish_read_receipt failed: %s", e)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

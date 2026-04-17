@@ -29,6 +29,7 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
     partnerTyping,
     partnerTypingName,
     partnerPresence,
+    partnerReadUpToId,
     messagesEndRef,
     loadMoreMessages,
     handleSend,
@@ -119,6 +120,7 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
         ) : (
           messages.reduce<ReactNode[]>((acc, m, i) => {
             const isMe = m.sender_id === user?.user_id;
+            const msgIsRead = partnerReadUpToId !== null && m.message_id <= partnerReadUpToId;
             const msgDay = new Date(m.created_at).toDateString();
             const prevDay = i > 0 ? new Date(messages[i - 1].created_at).toDateString() : null;
 
@@ -136,7 +138,37 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
               <div key={m.message_id} className={isMe ? styles.msgBubbleMe : styles.msgBubbleThem}>
                 <div className={styles.msgBody}>
                   <div className={styles.msgText}>{m.body}</div>
-                  <div className={styles.msgTime}>{formatTimeHm(m.created_at)}</div>
+                  <div className={styles.msgTime}>
+                    {formatTimeHm(m.created_at)}
+                    {isMe && (
+                      <span
+                        className={styles.readReceipt}
+                        aria-label={msgIsRead ? t('msg_read') : t('msg_sent')}
+                        aria-live="polite"
+                      >
+                        <svg
+                          width="16"
+                          height="10"
+                          viewBox="0 0 16 10"
+                          fill="none"
+                          className={msgIsRead ? styles.readReceiptRead : styles.readReceiptSent}
+                        >
+                          <polyline
+                            points="1,6 4,9 9,2"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <polyline
+                            points="5,6 8,9 13,2"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             );

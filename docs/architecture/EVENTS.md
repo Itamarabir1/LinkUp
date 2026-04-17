@@ -7,8 +7,8 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 ## Pattern: Outbox → RabbitMQ → Worker
 
 1. **Backend** כותב אירוע ל-tבלת `outbox_events` (status=PENDING) באותה transaction עם שינוי עסקי.
-2. **outbox-worker** קורא רשומות PENDING, מפרסם ל-RabbitMQ לפי `get_routing_metadata(event_name)`, מעדכן status ל-DONE (או retry).
-3. **Consumers** ב-worker מקשיבים לתורים, מפעילים handlers (מייל, פוש, S3, וכו').
+2. **notification-worker** מריץ `run_outbox_worker`, קורא רשומות PENDING ומפרסם ל-RabbitMQ לפי `get_routing_metadata(event_name)`, ואז מעדכן status ל-DONE (או retry).
+3. **Consumers** רצים ב-workers הייעודיים (notification/task) ומפעילים handlers (מייל, פוש, S3, וכו').
 
 יתרון: at-least-once, אין איבוד אירועים אם RabbitMQ נופל.
 
@@ -81,16 +81,13 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 
 ---
 
-## Workers (main_worker.py)
+## Workers (split entrypoints)
 
-| Task | תיאור |
-|------|--------|
-| run_outbox_worker | Poll outbox_events (PENDING), publish ל-RabbitMQ לפי routing. |
-| notifications_consumer.consume(handle_notification_event) | צורך notifications_queue, מפעיל handler — מייל/פוש לפי NotificationEvent. `handle_ride_cancelled_by_driver` טוען הזמנות ב-async SQL ושולח התראה רק ל-**PENDING** / **CONFIRMED** (לא לבוקינג שכבר **CANCELLED**). |
-| avatar_upload_consumer.consume(handle_avatar_upload_event) | צורך avatar_upload_queue — עיבוד `avatar_tasks` (גרסתי immutable + cleanup). |
-| scheduled_tasks_consumer.consume(handle_scheduled_task) | צורך scheduled_tasks_queue, מפעיל reminders/fuel/maintenance/chat_timeout. |
-| run_scheduled_tasks_publisher | מפרסם משימות מתוזמנות ל-scheduled exchange. |
-| run_chat_completion_redis_listener | מאזין ל-Redis DB 1 (chat:completion:*), מפעיל ניתוח AI ושמירה. |
+| Worker | Tasks | תיאור |
+|--------|-------|--------|
+| notification-worker | `run_outbox_worker`, `notifications_consumer.consume(handle_notification_event)` | עיבוד outbox והתראות (מייל/פוש/refresh UI). |
+| task-worker | `avatar_upload_consumer.consume(handle_avatar_upload_event)`, `scheduled_tasks_consumer.consume(handle_scheduled_task)`, `run_scheduled_tasks_publisher` | משימות כבדות + scheduler. |
+| ai-worker | `run_chat_completion_redis_listener` | מאזין ל-Redis DB 1 (`chat:completion:*`) ומריץ ניתוח AI. |
 
 ---
 

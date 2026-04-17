@@ -24,6 +24,10 @@ export function useMessageThread(conversationIdOverride?: string) {
     loadingMore,
     error,
     setError,
+    partnerReadUpToId,
+    setConversationRead,
+    lastMessageIdRef,
+    fetchMissedMessages,
     messagesEndRef,
     loadMoreMessages,
     refreshUnread,
@@ -82,6 +86,9 @@ export function useMessageThread(conversationIdOverride?: string) {
     setPartnerTyping,
     setPartnerTypingName,
     setPartnerPresence,
+    lastMessageIdRef,
+    fetchMissedMessages,
+    setConversationRead,
   });
 
   const recipientId = conversation?.partner?.user_id;
@@ -145,6 +152,7 @@ export function useMessageThread(conversationIdOverride?: string) {
     partnerTyping,
     partnerTypingName,
     partnerPresence,
+    partnerReadUpToId,
     messagesEndRef,
     loadMoreMessages,
     handleSend,

@@ -9,7 +9,6 @@ from app.domain.bookings.router import router as bookings_router
 from app.domain.chat.router import router as chat_router
 from app.domain.geo.router import router as geo_router
 from app.domain.groups.router import router as groups_router
-from app.domain.notifications.router import router as notifications_ws_router
 from app.domain.passengers.router import (
     passenger_rides_router,
 )
@@ -29,6 +28,5 @@ api_router.include_router(user_router, prefix="/users", tags=["Users"])
 api_router.include_router(auth_router, prefix="/auth", tags=["Auth"])
 api_router.include_router(geo_router, prefix="/geo", tags=["Geo"])
 api_router.include_router(chat_router, prefix="/chat", tags=["Chat"])
-api_router.include_router(notifications_ws_router, prefix="/notifications", tags=["Notifications"])
 api_router.include_router(admin_router, prefix="/admin", tags=["Admin"])
 api_router.include_router(groups_router, prefix="/groups", tags=["Groups"])

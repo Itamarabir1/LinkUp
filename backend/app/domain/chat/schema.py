@@ -72,5 +72,7 @@ class ConversationDetail(BaseModel):
     partner: ConversationPartner
     created_at: datetime
     booking_id: UUID | None = None  # Set when conversation was opened via a booking
+    partner_last_read_at: datetime | None = None
+    partner_read_up_to_message_id: int | None = None
 
     model_config = ConfigDict(from_attributes=True)

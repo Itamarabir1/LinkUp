@@ -42,6 +42,14 @@ export default function SearchRides() {
         onFillLocation={s.fillPickupFromMyLocation}
         onSwap={s.handleSwap}
         onSubmit={s.search}
+        aiQuery={s.aiQuery}
+        setAiQuery={s.setAiQuery}
+        aiParsing={s.aiParsing}
+        aiError={s.aiError}
+        aiResult={s.aiResult}
+        conversationHistory={s.conversationHistory}
+        onParseAI={s.parseWithAI}
+        onResetAI={s.resetAI}
       />
 
       <div className={styles.cardList}>

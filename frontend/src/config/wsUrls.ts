@@ -2,8 +2,8 @@ import { getChatWebSocketUrl, getWsBaseUrl } from './env';
 import { STORAGE_KEYS } from './constants';
 
 /**
- * מקור אמת יחיד לכל WebSocket URLs.
- * שינוי נתיב API — שינוי כאן בלבד.
+ * Single source of truth for all WebSocket URLs.
+ * If API paths change, update this file only.
  */
 export function getWsToken(): string | null {
   return localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
@@ -20,7 +20,4 @@ export const WS_URLS = {
     `${getWsBaseUrl()}/bookings/ws/${bookingId}/location?token=${encodeURIComponent(token)}`,
 
   chat: (token: string) => getChatWebSocketUrl(token),
-
-  notifications: (token: string) =>
-    `${getWsBaseUrl()}/notifications/ws?token=${encodeURIComponent(token)}`,
 } as const;

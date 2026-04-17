@@ -3,7 +3,7 @@ import logging
 from typing import Any
 
 from app.domain.notifications.providers.base import BaseNotificationProvider
-from app.infrastructure.redis.broadcast import broadcast
+from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class WebSocketProvider(BaseNotificationProvider):
     """
     WebSocket Provider (Real-time UI Updates).
-    Publishes to Redis channel user_{id} — API streams to the user's WebSocket.
+    Publishes user-specific events to Redis chat pub/sub (DB1) channel user:{id}:events.
     """
 
     def can_send(self, user: Any) -> bool:
@@ -39,18 +39,23 @@ class WebSocketProvider(BaseNotificationProvider):
         }
 
         if event_key in REFRESH_EVENTS:
-            payload = {"type": "notifications_refresh", "event": event_key}
+            payload = {
+                "type": "notifications_refresh",
+                "event": event_key,
+                "user_id": str(user_id),
+            }
         else:
-            payload = {"type": "UI_UPDATE", "event": event_key}
+            payload = {
+                "type": "UI_UPDATE",
+                "event": event_key,
+                "user_id": str(user_id),
+            }
 
-        channel = f"user_{user_id}"
+        channel = f"user:{user_id}:events"
 
         try:
-            # 2. Publish to Redis
-            # default=str so values like UUID serialize safely to JSON strings
             message_json = json.dumps(payload, ensure_ascii=False, default=str)
-
-            await broadcast.publish(channel=channel, message=message_json)
+            await redis_chat_pubsub.publish(channel, message_json)
             logger.debug(f"📡 [WS Provider] Published to {channel}")
 
         except Exception as e:

@@ -34,9 +34,9 @@
 
 ## AI Analysis - איפה?
 
-**ניתוח AI רץ ב-backend worker (outbox-worker):**
+**ניתוח AI רץ ב-backend worker (`ai-worker`):**
 - Backend מפרסם אירוע סיום שיחה ל-Redis DB 1 (`chat:completion:{conversation_id}`).
-- ה-outbox-worker מאזין ל-Redis DB 1, מפעיל `handle_conversation_completion` (domain/chat/ai), שומר ל-DB ושולח ל-outbox.
+- ה-`ai-worker` מאזין ל-Redis DB 1, מפעיל `handle_conversation_completion` (domain/chat/ai), שומר ל-DB ושולח ל-outbox.
 
 **API Endpoint** (ב-backend):
 - `GET /api/v1/chat/conversations/{id}/analysis`
@@ -57,11 +57,11 @@
 **מיקום קוד:**
 - ✅ `backend/app/domain/chat/calendar/` - לוגיקת calendar (נדרש)
 - ✅ `backend/app/domain/chat/router.py` — endpoints REST (כולל `calendar.ics` — כרגע 501)
-- ❌ אין שירות AI נפרד; ניתוח רץ ב-backend worker
+- ❌ אין microservice AI נפרד; ניתוח רץ ב-`ai-worker` מתוך backend image
 
 **למה לא ב-chat-ws?**
 - ייצוא iCal וניתוח שיחה הם לוגיקת API/DB; chat-ws הוא רק real-time fan-out
-- ניתוח רץ ב-outbox-worker אחרי `chat:completion:*`; התוצאה נשמרת ב-DB ונקראת דרך REST
+- ניתוח רץ ב-`ai-worker` אחרי `chat:completion:*`; התוצאה נשמרת ב-DB ונקראת דרך REST
 
 ## זרימה מומלצת
 
@@ -73,12 +73,12 @@ Client → POST /api/v1/chat/conversations/{id}/messages (backend)
        → chat-ws מקבל מ-Redis → שולח ל-WebSocket
        → לאחר שליחה: backend מעדכן גם **`users.last_active_at`**
        → אם הודעת סיום: Backend מפרסם ל-Redis DB 1 (chat:completion:{id})
-       → outbox-worker מאזין → מנתח (AI) → שומר תוצאה + outbox
+       → ai-worker מאזין → מנתח (AI) → שומר תוצאה + outbox
 ```
 
 ### 2. ניתוח AI (רקע)
 ```
-outbox-worker ← Redis DB1 (chat:completion:{id})
+ai-worker ← Redis DB1 (chat:completion:{id})
               → ניתוח (Groq) → שמירה ל-chat_analysis ב-DB
 ```
 (אין כרגע endpoint REST ייעודי ב-spa לקריאת JSON הניתוח — התוצאה קיימת ב-DB.)
@@ -106,7 +106,7 @@ Client → GET /api/v1/chat/conversations/{id}/calendar.ics (backend)
 | In-app notification **feed** WS (app bell / list) | backend (FastAPI `/notifications/ws`) | אותו מחזור חיים כמו WS נסיעות; Redis נפרד מערוצי הצ'אט |
 | Chat-related notification fan-out | chat-ws (via `chat:notification:*`) | חיבור WS יחיד לשיחה |
 | Calendar export | backend (Python) | API endpoint |
-| AI analysis | backend worker (outbox-worker) | Async, Redis DB 1 listener |
+| AI analysis | backend worker (`ai-worker`) | Async, Redis DB 1 listener |
 | AI analysis persistence | backend DB (`chat_analysis`) | worker אחרי completion |
 | Business logic | backend (Python) | Centralized |
 | Auth load testing (k6) | `backend/load_test.js` | עומס על REST register/login — לא ב-chat-ws |

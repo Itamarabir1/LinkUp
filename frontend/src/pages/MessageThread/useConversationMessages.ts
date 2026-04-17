@@ -14,7 +14,10 @@ export function useConversationMessages(cid: string, userId: string | undefined)
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [partnerReadUpToId, setPartnerReadUpToId] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastMessageIdRef = useRef<number | null>(null);
+  const isFetchingMissedRef = useRef(false);
 
   const fetchConversation = useCallback(async () => {
     if (!cid || !userId) return;
@@ -54,6 +57,29 @@ export function useConversationMessages(cid: string, userId: string | undefined)
     }
   }, [cid, messagesNextCursor, loadingMore]);
 
+  const fetchMissedMessages = useCallback(
+    async (afterMessageId: number) => {
+      if (!cid || isFetchingMissedRef.current) return;
+      isFetchingMissedRef.current = true;
+      try {
+        const res = await getMessages(cid, { after: afterMessageId, limit: 30 });
+        const newMsgs = res.data?.items ?? [];
+        if (newMsgs.length === 0) return;
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.message_id));
+          const toAdd = newMsgs.filter((m) => !existingIds.has(m.message_id));
+          if (toAdd.length === 0) return prev;
+          return [...prev, ...toAdd].sort((a, b) => a.message_id - b.message_id);
+        });
+      } catch {
+        // ignore reconnect backfill errors
+      } finally {
+        isFetchingMissedRef.current = false;
+      }
+    },
+    [cid]
+  );
+
   useEffect(() => {
     fetchConversation();
   }, [fetchConversation]);
@@ -64,6 +90,25 @@ export function useConversationMessages(cid: string, userId: string | undefined)
       .then(() => refreshUnread())
       .catch(() => {});
   }, [cid, refreshUnread]);
+
+  useEffect(() => {
+    setPartnerReadUpToId(null);
+  }, [cid]);
+
+  useEffect(() => {
+    const maxId = messages.reduce((max, m) => Math.max(max, m.message_id), 0);
+    lastMessageIdRef.current = maxId || null;
+  }, [messages]);
+
+  useEffect(() => {
+    const id = conversation?.partner_read_up_to_message_id;
+    if (id == null) return;
+    setPartnerReadUpToId((prev) => (prev !== null ? Math.max(prev, id) : id));
+  }, [conversation?.partner_read_up_to_message_id]);
+
+  const setConversationRead = useCallback((readUpToId: number) => {
+    setPartnerReadUpToId((prev) => (prev !== null ? Math.max(prev, readUpToId) : readUpToId));
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -78,6 +123,10 @@ export function useConversationMessages(cid: string, userId: string | undefined)
     loadingMore,
     error,
     setError,
+    partnerReadUpToId,
+    setConversationRead,
+    lastMessageIdRef,
+    fetchMissedMessages,
     messagesEndRef,
     loadMoreMessages,
     refreshUnread,

@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: linkup-task-worker
+  labels:
+    app: linkup-task-worker
+  annotations:
+    app.kubernetes.io/version: "latest"
+spec:
+  # WARNING: Do not scale beyond 1 replica.
+  # run_scheduled_tasks_publisher is not leader-election aware.
+  # Scaling will cause duplicate scheduled task publishing.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: linkup-task-worker
+  template:
+    metadata:
+      labels:
+        app: linkup-task-worker
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      containers:
+        - name: task-worker
+          image: ghcr.io/Itamarabir1/linkup-backend:latest
+          imagePullPolicy: Always
+          command: ["python", "-m", "app.workers.task_worker"]
+          envFrom:
+            - configMapRef:
+                name: linkup-backend-config
+          env:
+            - name: DATABASE_URL_RAW
+              valueFrom:
+                secretKeyRef:
+                  name: linkup-backend-secret
+                  key: DATABASE_URL
+            - name: REDIS_URL_RAW
+              valueFrom:
+                secretKeyRef:
+                  name: linkup-backend-secret
+                  key: REDIS_URL
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: linkup-backend-secret
+                  key: SECRET_KEY
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: linkup-backend-secret
+                  key: RABBITMQ_PASSWORD
+            - name: BREVO_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: linkup-backend-secret
+                  key: BREVO_API_KEY
+            - name: GOOGLE_MAPS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: linkup-backend-secret
+                  key: GOOGLE_MAPS_API_KEY
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: linkup-backend-secret
+                  key: GOOGLE_CLIENT_ID
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: linkup-backend-secret
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: linkup-backend-secret
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: linkup-redis-secret
+                  key: password
+            - name: DB_POOL_SIZE
+              value: "2"
+            - name: DB_MAX_OVERFLOW
+              value: "3"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "kill -0 1"]
+            initialDelaySeconds: 30
+            periodSeconds: 60
