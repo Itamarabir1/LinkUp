@@ -86,4 +86,4 @@ jobs:
           context: ./backend
           target: production
           push: true
-          tags: ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup-backend:latest
+          tags: ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/backend:latest

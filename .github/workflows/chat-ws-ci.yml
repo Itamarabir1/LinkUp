@@ -58,4 +58,4 @@ jobs:
         with:
           context: ./chat-ws
           push: true
-          tags: ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup-chat-ws:latest
+          tags: ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/chat-ws:latest
