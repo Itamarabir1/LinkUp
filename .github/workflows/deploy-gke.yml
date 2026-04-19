@@ -22,7 +22,7 @@ jobs:
       contents: read
       id-token: write
     # Skip entire job if not configured (set vars after enabling).
-    if: ${{ vars.GCP_ARTIFACT_REGISTRY != '' && secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '' }}
+    if: ${{ vars.GCP_ARTIFACT_REGISTRY != '' }}
 
     steps:
       - uses: actions/checkout@v4

@@ -51,7 +51,6 @@ from app.domain.users.schema import UserCreate
 from app.infrastructure.outbox.model import OutboxEvent
 from app.infrastructure.outbox.repository import OutboxRepository
 from app.infrastructure.rabbitmq.client import rabbit_client
-from app.infrastructure.redis.client import redis_client
 
 logger = logging.getLogger(__name__)
 
