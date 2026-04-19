@@ -2,7 +2,7 @@ import uuid
 from typing import Any
 
 
-class LinkupError(Exception):
+class LinkUpError(Exception):
     """Base for all domain errors — enables a central handler and trace_id."""
 
     message: str = "שגיאת מערכת"

@@ -98,7 +98,8 @@ export default function MyRequests() {
                         <X size={12} strokeWidth={2.5} />
                       </button>
                       <RideCard
-                        route={`${r.pickup_name ?? '?'} → ${r.destination_name ?? '?'}`}
+                        originLabel={r.pickup_name ?? '?'}
+                        destinationLabel={r.destination_name ?? '?'}
                         scheduleCaption={t('rides:requestScheduleCaption')}
                         time={formatDateTimeNoSeconds(r.requested_departure_time)}
                         status={getRequestStatusLabel(r.status)}
@@ -118,7 +119,8 @@ export default function MyRequests() {
                   {pastRequests.map((r) => (
                     <div key={r.request_id} className={styles.cardWrap}>
                       <RideCard
-                        route={`${r.pickup_name ?? '?'} → ${r.destination_name ?? '?'}`}
+                        originLabel={r.pickup_name ?? '?'}
+                        destinationLabel={r.destination_name ?? '?'}
                         scheduleCaption={t('rides:requestScheduleCaption')}
                         time={formatDateTimeNoSeconds(r.requested_departure_time)}
                         status={getRequestStatusLabel(r.status)}

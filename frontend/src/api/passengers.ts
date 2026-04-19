@@ -1,3 +1,4 @@
+import type { AxiosResponse } from 'axios';
 import { api } from './client';
 import type { PassengerRequest, RideSearchResponse } from '../types/api';
 
@@ -57,11 +58,20 @@ export function searchRides(params: Record<string, string | number | undefined>)
   return api.get<RideSearchResponse>('/passenger/passengers/search-rides', { params });
 }
 
-export function requestRideFromSearch(body: {
-  ride_id: string;
-  pickup_name: string;
-  destination_name: string;
-  num_seats: number;
-}) {
-  return api.post('/passenger/passengers/request-ride-from-search', body);
+export async function requestRideFromSearch(
+  body: {
+    ride_id: string;
+    pickup_name: string;
+    destination_name: string;
+    num_seats: number;
+    request_id?: string;
+  },
+  idempotencyKey?: string
+): Promise<AxiosResponse> {
+  const key = idempotencyKey ?? crypto.randomUUID();
+  return api.post('/passenger/passengers/request-ride-from-search', body, {
+    headers: {
+      'Idempotency-Key': key,
+    },
+  });
 }

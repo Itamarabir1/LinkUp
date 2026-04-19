@@ -4,7 +4,8 @@ from datetime import datetime
 from functools import partial
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_current_user, get_current_user_optional
@@ -21,6 +22,10 @@ from app.domain.bookings.schema import BookingResponse
 from app.domain.bookings.service import BookingService
 from app.domain.passengers.ai_search_schema import AISearchQuery, AISearchResult
 from app.domain.passengers.ai_search_service import parse_ride_search_query
+from app.domain.passengers.ride_join_idempotency import (
+    idempotency_redis_key,
+    request_fingerprint,
+)
 from app.domain.passengers.schema import (
     PassengerRequestCreate,
     PassengerRequestResponse,
@@ -32,6 +37,7 @@ from app.domain.passengers.schema import (
 from app.domain.passengers.service import PassengerService
 from app.domain.rides.schema import DriverInfoResponse, RideResponse
 from app.domain.users.model import User
+from app.infrastructure.redis.client import redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -103,13 +109,59 @@ async def request_ride_from_search(
     body: RequestRideFromSearch,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    idempotency_key: str | None = Header(
+        None,
+        alias="Idempotency-Key",
+        description="UUID ייחודי לכל כוונת הצטרפות — מניע כפילות בלחיצה כפולה",
+    ),
 ):
-    """Use request_id from search if present, else create one. Creates booking and outbox event; worker emails driver."""
+    """
+    Join request from search results.
+    Optional Idempotency-Key header prevents duplicate bookings on retry/double-click.
+    Same key + different body → 422. Same key + same body → returns original result.
+    """
     logger.info(
-        "[NOTIF] API: request_ride_from_search called ride_id=%s, request_id=%s",
+        "[NOTIF] request_ride_from_search ride_id=%s request_id=%s idempotency_key=%s",
         body.ride_id,
         body.request_id,
+        bool(idempotency_key),
     )
+
+    redis_key: str | None = None
+    claimed = False
+
+    if idempotency_key:
+        fingerprint = request_fingerprint(body)
+        redis_key = idempotency_redis_key(str(current_user.user_id), idempotency_key)
+        state = await redis_client.idempotency_try_begin(redis_key, fingerprint)
+
+        if state == "mismatch":
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "idempotency_key_mismatch",
+                    "message": "Idempotency-Key שימש בעבר עם גוף בקשה שונה",
+                },
+            )
+        if state == "in_progress":
+            return JSONResponse(
+                status_code=status.HTTP_409_CONFLICT,
+                content={"detail": "בקשה זו כבר בעיבוד — נסה שוב בעוד רגע"},
+                headers={"Retry-After": "1"},
+            )
+        if state.startswith("completed:"):
+            cached_json = state[len("completed:") :]
+            try:
+                return Response(
+                    content=cached_json,
+                    status_code=status.HTTP_201_CREATED,
+                    media_type="application/json",
+                )
+            except Exception:
+                pass
+
+        claimed = True
+
     try:
         request_id = body.request_id
         if not request_id:
@@ -122,32 +174,49 @@ async def request_ride_from_search(
             )
             request_id = new_request.request_id
 
-        return await BookingService.request_to_join(
+        booking = await BookingService.request_to_join(
             db,
             ride_id=body.ride_id,
             request_id=request_id,
             num_seats=body.num_seats,
             current_user_id=current_user.user_id,
         )
-    except GeocodingError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except RideNotAvailableError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except BookingAlreadyExistsError as e:
-        raise HTTPException(status_code=409, detail=str(e))
-    except PassengerRequestNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ForbiddenRideActionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+
+        if claimed and redis_key:
+            result_json = BookingResponse.model_validate(booking).model_dump_json()
+            await redis_client.idempotency_set_result(redis_key, result_json)
+
+        return booking
+
+    except (
+        GeocodingError,
+        RideNotAvailableError,
+        BookingAlreadyExistsError,
+        PassengerRequestNotFoundError,
+        ForbiddenRideActionError,
+    ) as e:
+        if claimed and redis_key:
+            await redis_client.idempotency_delete(redis_key)
+        if isinstance(e, GeocodingError):
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        if isinstance(e, RideNotAvailableError):
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        if isinstance(e, BookingAlreadyExistsError):
+            raise HTTPException(status_code=409, detail=str(e)) from e
+        if isinstance(e, PassengerRequestNotFoundError):
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        raise HTTPException(status_code=403, detail=str(e)) from e
     except Exception as e:
+        if claimed and redis_key:
+            await redis_client.idempotency_delete(redis_key)
         logger.error("request_ride_from_search failed: %s", e, exc_info=True)
         try:
             from app.core.config import settings
 
-            detail = str(e) if getattr(settings, "DEBUG", False) else "שגיאה בשליחת הבקשה – נסה שוב או פנה לתמיכה"
+            detail = str(e) if getattr(settings, "DEBUG", False) else "שגיאה בשליחת הבקשה — נסה שוב"
         except Exception:
-            detail = "שגיאה בשליחת הבקשה – נסה שוב או פנה לתמיכה"
-        raise HTTPException(status_code=500, detail=detail)
+            detail = "שגיאה בשליחת הבקשה — נסה שוב"
+        raise HTTPException(status_code=500, detail=detail) from e
 
 
 # 2b. AI parse free-text into search fields (sync Groq in thread pool; no auto search)

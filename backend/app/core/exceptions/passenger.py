@@ -1,9 +1,9 @@
 from uuid import UUID
 
-from .base import LinkupError
+from .base import LinkUpError
 
 
-class ActiveBookingExistsError(LinkupError):
+class ActiveBookingExistsError(LinkUpError):
     message = "כבר יש לך נסיעה פעילה"
     status_code = 409
     error_code = "PSG_ACTIVE_BOOKING"
@@ -20,7 +20,7 @@ class ActiveBookingExistsError(LinkupError):
         )
 
 
-class InsufficientPermissionsForRide(LinkupError):
+class InsufficientPermissionsForRide(LinkUpError):
     message = "אין לך הרשאה לגשת לנסיעה זו"
     status_code = 403
     error_code = "PSG_RIDE_ACCESS_DENIED"

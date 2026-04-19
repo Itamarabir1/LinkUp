@@ -6,12 +6,12 @@ Callers must pass source with required relationships loaded (driver, passenger, 
 import logging
 from typing import Any
 
-from app.core.exceptions.base import LinkupError
+from app.core.exceptions.base import LinkUpError
 
 logger = logging.getLogger(__name__)
 
 
-class ResolverError(LinkupError):
+class ResolverError(LinkUpError):
     """Failed to resolve notification recipient."""
 
     def __init__(self, message: str):

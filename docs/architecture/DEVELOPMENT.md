@@ -21,7 +21,7 @@
    - `chat-ws/.env` — העתק מ־`chat-ws/.env.example` (כולל `REDIS_URL`, `JWT_SECRET` זהה ל־`SECRET_KEY` בבקאנד).
 
 2. **הרצה עם Docker**
-  - `docker-compose.yml`: ל־`db`, `redis`, `rabbitmq`, **`migrate`**, `notification-worker`, `task-worker`, `ai-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **`migrate`** מריץ `alembic upgrade head` פעם אחת ויוצא (`restart: "no"`); **backend** וה־workers תלויים ב־`service_completed_successfully:migrate`. **backend** עם **`8000:8000`** ל־host, **healthcheck** על `/api/v1/health`. **`frontend`** ו־**`nginx`** מוגדרים באותו קובץ עם `profiles: ["prod"]` — עולים רק עם `docker compose --profile prod`; **nginx** תלוי ב־**backend** ב־`service_healthy`.
+  - `docker-compose.yml`: ל־`db`, `redis`, `rabbitmq`, **`migrate`**, `notification-worker`, `task-worker`, `ai-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **`migrate`** מריץ `alembic upgrade head` פעם אחת ויוצא (`restart: "no"`); **backend** וה־workers תלויים ב־`service_completed_successfully:migrate`. **backend** עם **`8000:8000`** ל־host, **healthcheck** על `/api/v1/health` (גוף התשובה כולל גם **`circuit_breakers`** למעגלי Google Maps — מידע תפעולי; **`status`** נקבע רק מ־DB/Redis/RabbitMQ — ראו **`docs/architecture/API.md`**). **`frontend`** ו־**`nginx`** מוגדרים באותו קובץ עם `profiles: ["prod"]` — עולים רק עם `docker compose --profile prod`; **nginx** תלוי ב־**backend** ב־`service_healthy`.
   - **פיתוח:** `docker compose up -d` → תשתית + **migrate** + 3 workers + backend (**8000**) + chat-ws (**8081**). פרונט: **`npm run dev`** בתיקיית `frontend`, לא קונטיינר.
    - **WebSocket בפיתוח:** צ'אט — `ws://localhost:8081/ws` (chat-ws); נסיעות / מיקום / **פיד התראות in-app** — `ws://localhost:8000/api/v1/...` (backend). מרוכז ב־[`frontend/src/config/env.ts`](../../frontend/src/config/env.ts).
    - **סטאק מלא מאחורי Nginx (פורט 80):** `docker compose --profile prod up -d --build`.
@@ -168,7 +168,7 @@ alembic revision --autogenerate -m "description"
 ## Project Structure
 
 ```
-Linkup/
+LinkUp/
 ├── backend/                 # FastAPI
 │   ├── app/
 │   │   ├── api/v1/          # Routers, api_router.py

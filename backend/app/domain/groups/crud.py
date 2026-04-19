@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.exceptions.base import LinkupError
+from app.core.exceptions.base import LinkUpError
 from app.domain.groups.model import Group, GroupMember
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ async def create_group(
                 raise
             if attempt == 4:
                 logger.warning("Failed to generate unique invite_code after 5 attempts")
-                raise LinkupError(
+                raise LinkUpError(
                     message="שגיאה ביצירת קוד הזמנה",
                     status_code=500,
                     error_code="INVITE_CODE_GENERATION_FAILED",

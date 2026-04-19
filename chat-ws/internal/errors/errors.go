@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// AppError wraps domain/infrastructure failures for HTTP JSON aligned with Linkup FastAPI.
+// AppError wraps domain/infrastructure failures for HTTP JSON aligned with LinkUp FastAPI.
 type AppError struct {
 	Code       string
 	Message    string

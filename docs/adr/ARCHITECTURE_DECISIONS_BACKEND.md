@@ -44,7 +44,8 @@
 | | |
 |--|--|
 | **הקשר** | אחרי commit ל-DB צריך לשלוח אירוע לברוקר בלי לאבד אותו אם השרת קורס. |
-| **החלטה** | כתיבת שורה ל-`outbox_events` **באותה טרנזקציה** עם השינוי העסקי; `outbox-worker` מושך PENDING ומפרסם ל-RabbitMQ. |
+| **החלטה** | כתיבת שורה ל-`outbox_events` **באותה טרנזקציה** עם השינוי העסקי; worker (`notification-worker`) מפרסם ל-RabbitMQ (LISTEN/NOTIFY + fallback). |
+| **דוגמאות routing keys** | לדוגמה: `ride.created`, `ride.cancelled_by_driver`, `booking.passenger_join_request`, `booking.approved_by_driver`, `booking.rejected_by_driver`, `auth.email_verification`, `auth.password_reset_code`, `user.registered` — רשימה מלאה ב-`docs/architecture/EVENTS.md`. |
 | **למה** | **At-least-once**; ה-API לא תלוי ב-latency או זמינות הברוקר בזמן התשובה ללקוח. |
 | **אלטרנטיבה** | Publish ישיר אחרי commit — race/crash עלולים לאבד אירוע. |
 | **בקצרה לראיון** | "אאוטבוקס מבטיח שהאירוע והנתונים ב-DB יהיו עקביים — זה דפוס מוכר במערכות event-driven." |
@@ -150,7 +151,7 @@
 
 ---
 
-## 14. שגיאות API אחידות (`LinkupError`)
+## 14. שגיאות API אחידות (`LinkUpError`)
 
 | | |
 |--|--|
@@ -185,10 +186,59 @@
 | | |
 |--|--|
 | **הקשר** | נוסע רוצה לראות נסיעות זמינות בלי “לזהם” את ה-DB; וגם לקבל עדכון כשנהג מפרסם נסיעה חדשה שמתאימה. |
-| **החלטה** | **חיפוש** — `GET /passenger/passengers/search-rides`: שאילתה בלבד (PostGIS / פילטרים), **ללא** `INSERT` ל-`passenger_requests`. **שמירה והתראה** — אותו מסלול כמו יצירת בקשה: `POST /passenger/passengers/` עם `PassengerRequestCreate` (`is_notification_active`, `group_id` אופציונלי). Worker על אירוע יצירת נסיעה קורא ל-`find_passengers_for_ride_notification` ומדלג על בקשות עם `is_notification_active=False` ועל אי-התאמת קבוצה. |
+| **החלטה** | **חיפוש** — `GET /passenger/passengers/search-rides`: שאילתה בלבד (PostGIS / פילטרים), **ללא** `INSERT` ל-`passenger_requests`. **שמירה והתראה** — אותו מסלול כמו יצירת בקשה: `POST /passenger/passengers/` עם `PassengerRequestCreate` (`is_notification_active`, `group_id` אופציונלי). **שרשרת אסינכרונית לנוסעים:** ב-Outbox נרשם **`ride.created`** (לא שם אחר); `notification-worker` מפרסם ל-RabbitMQ ואז **`handle_ride_created`** טוען את הנסיעה, מריץ `find_passengers_for_ride_notification` (סינון: סטטוס פעיל, התראות פעילות, חלון תאריכים, התאמת `group_id` לנסיעה, קרבה גיאוגרפית ליעד ולמסלול), ולכל נוסע מתאים מפעיל את שכבת ההתראות עם אירוע הפנימי **`ride.created_for_passengers`** (מייל Brevo וכו’) — ראו `docs/architecture/EVENTS.md`. |
 | **למה** | הפרדה בין “צפייה חד-פעמית” לבין מנוי לאירועים; מקור אמת אחד לבקשה (`passenger_requests`) גם להתאמות מיידיות (`matching_rides`) וגם לתור התראות. |
 | **אלטרנטיבה** | לשמור כל חיפוש כ-row — עומס DB ורעש; או התראות בלי row — קשה לניהול ביטול והרשאות. |
 | **בקצרה לראיון** | “חיפוש הוא read-only; רק POST יוצר בקשה שנכנסת לתזמורת ההתראות.” |
+
+---
+
+## 18. JWT — `jti` ו-denylist ב-Redis (ביטול access מיידי ב-logout)
+
+| | |
+|--|--|
+| **הקשר** | Stateless JWT access קצר; רק ניקוי **refresh** ב-DB לא מבטל את ה-access הנוכחי עד לפקיעת `exp`. |
+| **החלטה** | כל access token כולל **`jti`** (UUID). ב-**`POST /auth/logout`** עם **`Authorization: Bearer`** — אחרי ניקוי refresh, פענוח ה-access, חישוב **`TTL = max(0, int(exp − now))`** (שניות Unix), ו-**`SETEX denylist:{jti}`** ב-Redis DB0. ב-**`get_current_user`** / **`get_current_user_optional`** — אחרי `decode_access_token`, אם `jti` ב-denylist → 401 או `None`. |
+| **Fail-open** | **`add_to_denylist`** — שגיאת Redis נרשמת, לא מפילה logout; **`is_denied`** — אם Redis לא זמין → **לא** חוסם (מעדיף זמינות על פני revocation קשיח בזמן תקלה). |
+| **Trade-off** | WebSocket (`get_current_user_ws`) — **עדיין לא** בודק denylist (TODO); חיבורים קיימים תקפים עד פקיעת JWT. |
+| **בקצרה לראיון** | “הוספתי `jti` וביטול מיידי דרך Redis כדי שלא נשאר access תקף אחרי logout — עם fail-open כדי לא לנעול משתמשים כש-Redis למטה.” |
+
+---
+
+## 19. Idempotency-Key — הצטרפות לנסיעה מחיפוש (`request-ride-from-search`)
+
+| | |
+|--|--|
+| **הקשר** | לחיצה כפולה / retry רשת על **`POST …/passengers/request-ride-from-search`** עלולות ליצור שתי הזמנות לאותה נסיעה; **`BookingAlreadyExistsError`** לא מכסה כל מרוץ. |
+| **החלטה** | כותרת אופציונלית **`Idempotency-Key`**; Redis **`SET NX`** על `idempotency:request_ride:{user_id}:{key}` לערך **`PROCESSING`**; SHA-256 של גוף קנוני ב־**`:fingerprint`**; אחרי **201** — שמירת JSON של **`BookingResponse`** (TTL ~5 דק׳); אותו מפתח + fingerprint → החזרת תשובה שמורה; בתהליך — **409** + **`Retry-After`**; fingerprint שונה — **422**; שגיאת דומיין — **`DELETE`** המפתחות לאפשר ניסוי חוזר. |
+| **Stripe-style** | נשמרת רק **תשובת הצלחה**; שגיאות לא “ננעלות” כתוצאה זמינה. |
+| **Fail-open** | Redis לא זמין → **`idempotency_try_begin`** מחזיר **`leader`** (אין dedup). |
+| **פרונט** | **`requestRideFromSearch`** (`passengers.ts`) מקבל מפתח אופציונלי; **`useJoinRide`** שומר **`idempotencyKeyRef`** — UUID חדש לכל ניסיון הצטרפות, איפוס אחרי הצלחה, אותו מפתח ב-retry אחרי שגיאה; נקרא מ־**`useSearchRides`**. |
+| **בקצרה לראיון** | “אותו דפוס כמו Stripe — `SET NX` + fingerprint + cache של 201 בלבד; בלי לשנות את לוגיקת **`BookingService.request_to_join`**.” |
+
+---
+
+## 20. Circuit Breaker — קריאות Google Maps Platform בבקאנד
+
+| | |
+|--|--|
+| **הקשר** | Geocoding, Directions ו-Distance Matrix הם תלות חיצונית; תקלות ברשת, בצד Google או quota יכולות ליצור **סערת retries** ולהעמיס על ה-API והספק בו-זמנית. |
+| **החלטה** | שלושה **singletons** in-memory ב־**`backend/app/infrastructure/geo/circuit_breaker.py`**: **`google_geocoding_cb`**, **`google_directions_cb`**, **`google_distance_matrix_cb`**. לפני כל קריאת HTTP מתאימה — **`allow_request()`**; הצלחה/כשל מעדכנים את המעגל (**CLOSED → OPEN** אחרי **5** כשלונות רצופים; **OPEN → HALF_OPEN** אחרי **~60 שניות** התאוששות; חזרה ל-**CLOSED** אחרי בקשה מוצלחת). כשהמעגל **OPEN** — **אין** קריאה ל-Google (fail-fast: `None` / רשימה ריקה לפי הזרימה). |
+| **חשיפת מצב** | **`GET /api/v1/health`** כולל **`circuit_breakers`** עם שמות המצבים — **מידע תפעולי בלבד**; **`status`** (`healthy` / `unhealthy`) נקבע **רק** מ־**database**, **redis**, **rabbitmq** כדי שלא יסומן ה-backend כלא-זמין רק בגלל Google. |
+| **Fail-open בתוך המעגל** | שגיאות פנימיות בלוגיקת המעגל (`allow_request` וכו’) במקרה קיצון מחזירות **להמשיך** או לבלוע שגיאה — העדפה לא לחסום את האפליקציה במלואה אם לוגיקת המעגל נכשלת (ראו קוד). |
+| **בקצרה לראיון** | “עטפתי את שלוש קריאות ה-Maps בבקאנד במעגלים נפרדים — כשהספק נופל, אני נכשל מהר ולא מציף את Google; את מצב המעגל רואים ב-health בלי לשבור readiness של השרת.” |
+
+---
+
+## 21. PgBouncer — מתוכנן (לא ממומש בפרויקט)
+
+| | |
+|--|--|
+| **הקשר** | כשמספר מופעי API גדל (למשל **10+**) או פריסה serverless-ית, כל מופע פותח חיבורי SQLAlchemy ל-PostgreSQL — סכום מהיר של חיבורים פיזיים. |
+| **החלטה (עתידית)** | להציב **PgBouncer** (או pooler דומה) בין האפליקציה ל-DB, לרכז אלפי חיבורי לקוח לפחות חיבורים לשרת Postgres. |
+| **מצב נוכחי** | **אין** PgBouncer ב-Compose או ב-K8s בקוד הבסיס; **SQLAlchemy async pool** (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, …) + מספר workers (`UVICORN_WORKERS`) — Postgres נוח בטווח של **מאות** חיבורים עם tuning. |
+| **למה לא עכשיו** | עלות תפעול ומורכבות; לסקלה הנוכחית ה-pool המקומי מספיק. |
+| **בקצרה לראיון** | “כשאעלה לריבוי מופעים אגרסיבי, אוסיף PgBouncer; היום ה-pool של SQLAlchemy ומגבלות worker מכסים.” |
 
 ---
 

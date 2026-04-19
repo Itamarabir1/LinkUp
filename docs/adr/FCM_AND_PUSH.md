@@ -1,6 +1,6 @@
 # FCM (Web Push) — למה בחרנו במסלול הזה
 
-מסמך לראיון על **החלטות Push** ב-Linkup. מקור מפורט: [../FCM_SYSTEM_SUMMARY.md](../FCM_SYSTEM_SUMMARY.md).
+מסמך לראיון על **החלטות Push** ב-LinkUp. מקור מפורט: [../FCM_SYSTEM_SUMMARY.md](../FCM_SYSTEM_SUMMARY.md).
 
 ---
 

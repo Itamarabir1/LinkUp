@@ -6,7 +6,7 @@ No real Groq calls — all mocked.
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
@@ -33,9 +33,11 @@ _TZ_IL = ZoneInfo("Asia/Jerusalem")
 class TestAISearchResult:
 
     def test_both_locations_present_clears_follow_up(self):
+        """Locations + time anchor => ready to search (no follow-up)."""
         result = AISearchResult(
             pickup_name="תל אביב",
             destination_name="חיפה",
+            departure_date=date(2030, 6, 15),
             confidence=0.95,
         )
         assert result.needs_clarification is False
@@ -70,10 +72,11 @@ class TestAISearchResult:
         assert result.follow_up_question is not None
 
     def test_llm_follow_up_cleared_when_locations_present(self):
-        """LLM may return follow_up even when locations found — validator clears it."""
+        """LLM follow-up cleared when locations + time anchor present."""
         result = AISearchResult(
             pickup_name="תל אביב",
             destination_name="חיפה",
+            departure_date=date(2030, 6, 15),
             follow_up_question="שאלה לא רלוונטית מה-LLM",
             confidence=0.9,
         )

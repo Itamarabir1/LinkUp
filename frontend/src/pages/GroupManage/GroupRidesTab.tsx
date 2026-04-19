@@ -23,7 +23,8 @@ export default function GroupRidesTab({ vm }: { vm: GroupManageViewModel }) {
           {vm.displayedRides.map((r) => (
             <RideCard
               key={r.ride_id}
-              route={`${r.origin_name ?? '?'} ← ${r.destination_name ?? '?'}`}
+              originLabel={r.origin_name ?? '?'}
+              destinationLabel={r.destination_name ?? '?'}
               time={formatRideDate(r.departure_time)}
               status={getRideStatusLabel(r)}
             />

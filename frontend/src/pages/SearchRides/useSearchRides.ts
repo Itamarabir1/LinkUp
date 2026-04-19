@@ -4,7 +4,6 @@ import { useParams } from 'react-router-dom';
 import { fetchAddressFromCoords } from '../../api/geo';
 import {
   parseRideSearchWithAI,
-  requestRideFromSearch,
   saveSearchAlert,
   searchRides as searchRidesApi,
   type AISearchResult,
@@ -14,6 +13,7 @@ import { fetchPassengerDriverInfo } from '../../api/rides';
 import type { Ride, DriverInfo } from '../../types/api';
 import { getApiErrorMessage, getApiStatus } from '../../utils/apiError';
 import { apiErr } from '../../utils/i18nError';
+import { useJoinRide } from './useJoinRide';
 
 /** AI response may include these before `AISearchResult` in passengers.ts is extended. */
 export type AIParsedSearch = AISearchResult & {
@@ -99,6 +99,14 @@ export function useSearchRides() {
   const { claim: claimSearch, isCurrent: isSearchOpCurrent } = useOperationToken();
   const { claim: claimLoadMore, isCurrent: isLoadMoreOpCurrent } = useOperationToken();
   const { claim: claimAiParse, isCurrent: isAiParseCurrent } = useOperationToken();
+  const {
+    sendingRequestRideId,
+    requestSuccessRideId,
+    requestErrorRideId,
+    requestErrorMessage,
+    sendRequestToJoin: joinRide,
+    resetJoinState,
+  } = useJoinRide();
   const [pickup, setPickup] = useState('');
   const [destination, setDestination] = useState('');
   const [searchRadius, setSearchRadius] = useState(1);
@@ -112,10 +120,6 @@ export function useSearchRides() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [driverInfoMap, setDriverInfoMap] = useState<Record<string, DriverInfo>>({});
   const [loadingDriverRideId, setLoadingDriverRideId] = useState<string | null>(null);
-  const [sendingRequestRideId, setSendingRequestRideId] = useState<string | null>(null);
-  const [requestSuccessRideId, setRequestSuccessRideId] = useState<string | null>(null);
-  const [requestErrorRideId, setRequestErrorRideId] = useState<string | null>(null);
-  const [requestErrorMessage, setRequestErrorMessage] = useState('');
   const [savingAlert, setSavingAlert] = useState(false);
   const [alertSaved, setAlertSaved] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -264,7 +268,7 @@ export function useSearchRides() {
         setHasSearched(false);
         setResultsNextCursor(null);
         setResultsHasMore(false);
-        setRequestSuccessRideId(null);
+        resetJoinState();
         setDriverInfoMap({});
         setAlertSaved(false);
         try {
@@ -296,6 +300,7 @@ export function useSearchRides() {
     groupId,
     isAiParseCurrent,
     isSearchOpCurrent,
+    resetJoinState,
     t,
   ]);
 
@@ -326,7 +331,7 @@ export function useSearchRides() {
       setHasSearched(false);
       setResultsNextCursor(null);
       setResultsHasMore(false);
-      setRequestSuccessRideId(null);
+      resetJoinState();
       setDriverInfoMap({});
       setAlertSaved(false);
       try {
@@ -349,6 +354,7 @@ export function useSearchRides() {
       destination,
       isSearchOpCurrent,
       pickup,
+      resetJoinState,
     ]
   );
 
@@ -420,44 +426,24 @@ export function useSearchRides() {
     }
   };
 
-  const sendRequestToJoin = async (r: Ride) => {
-    if (!pickup.trim() || !destination.trim()) {
-      setError('נא למלא מוצא ויעד לפני שליחת בקשה');
-      return;
-    }
-    setSendingRequestRideId(r.ride_id);
-    setRequestErrorRideId(null);
-    setRequestErrorMessage('');
-    setError('');
-    try {
-      await requestRideFromSearch({
-        ride_id: r.ride_id,
-        pickup_name: pickup.trim(),
-        destination_name: destination.trim(),
-        num_seats: 1,
-      });
-      setRequestSuccessRideId(r.ride_id);
-    } catch (err: unknown) {
-      const status = getApiStatus(err);
-      if (status === 401) {
-        setError('פג תוקף ההתחברות – אנא התחבר מחדש כדי לשלוח בקשה.');
+  const sendRequestToJoin = useCallback(
+    async (r: Ride) => {
+      if (!pickup.trim() || !destination.trim()) {
+        setError('יש למלא מוצא ויעד לפני שליחת בקשה');
         return;
       }
-      if (status === 409) {
-        const msg = getApiErrorMessage(err, apiErr('err_ride_full'));
-        setRequestErrorRideId(r.ride_id);
-        setRequestErrorMessage(msg);
-        setError(msg);
-        return;
-      }
-      const msg = getApiErrorMessage(err, apiErr('err_join_request'));
-      setRequestErrorRideId(r.ride_id);
-      setRequestErrorMessage(msg);
-      setError(msg);
-    } finally {
-      setSendingRequestRideId(null);
-    }
-  };
+      setError('');
+      await joinRide(
+        r,
+        pickup,
+        destination,
+        () => {},
+        (msg) => setError(msg),
+        () => setError('פג תוקף ההתחברות'),
+      );
+    },
+    [pickup, destination, joinRide],
+  );
 
   return {
     pickup,

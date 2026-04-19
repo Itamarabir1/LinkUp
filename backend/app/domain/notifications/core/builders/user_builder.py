@@ -25,14 +25,14 @@ class UserBuilder(BaseContextBuilder):
         # 2. Map copy by event kind
         event_content_map = {
             "registered": {
-                "subject": f"ברוך הבא ל-Linkup, {first_name}!",
+                "subject": f"ברוך הבא ל-LinkUp, {first_name}!",
                 "hero_text": "שמחים שהצטרפת אלינו",
                 "description": "חשבונך נוצר בהצלחה. עכשיו אפשר להתחיל לחפש טרמפים או להציע נסיעות משלך.",
                 "cta_label": "מעבר לפרופיל שלי",
                 "cta_path": "/profile",
             },
             "password": {
-                "subject": "שחזור סיסמה - Linkup",
+                "subject": "שחזור סיסמה - LinkUp",
                 "hero_text": "איפוס סיסמה",
                 "description": "קיבלנו בקשה לאיפוס הסיסמה שלך. אם לא ביקשת זאת, אפשר להתעלם מהמייל.",
                 "cta_label": "בחר סיסמה חדשה",
@@ -61,7 +61,7 @@ class UserBuilder(BaseContextBuilder):
 
     def _get_default_content(self) -> dict[str, str]:
         return {
-            "subject": "עדכון מחשבון Linkup",
+            "subject": "עדכון מחשבון LinkUp",
             "hero_text": "עדכון מערכת",
             "description": "שלום, יש לנו עדכון לגבי החשבון שלך במערכת.",
             "cta_label": "כניסה לאתר",

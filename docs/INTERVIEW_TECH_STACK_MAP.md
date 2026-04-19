@@ -1,9 +1,9 @@
-# Linkup — מיפוי טכנולוגיות לראיון (מול קורות החיים)
+# LinkUp — מיפוי טכנולוגיות לראיון (מול קורות החיים)
 
 מסמך זה **משלים** את [`ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md): לכל ניסוח טיפוסי בקורות החיים / בפיץ’ — **איפה זה מופיע בפועל בפרויקט** (שירותים, תיקיות, קבצים מרכזיים). מומלץ להדפיס או לפתוח לצד ההיילייטס בראיון.
 
 **שורת CV (אנגלית) — עוגן:**  
-*Linkup — Full-Stack Ride-Sharing Platform | React, TypeScript, Python, Go, Node.js, PostgreSQL, Redis (2025–2026)*
+*LinkUp — Full-Stack Ride-Sharing Platform | React, TypeScript, Python, Go, Node.js, PostgreSQL, Redis (2025–2026)*
 
 ---
 
@@ -87,7 +87,7 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| Cache, rate limit, pub/sub | שימושים: geocode cache, ride preview, OTP, auth rate limit, broadcast, צ’אט — מסוכמים ב-ADR ובהיילייטס §2–3. |
+| Cache, rate limit, pub/sub, denylist, idempotency | שימושים: geocode cache, ride preview, OTP, auth rate limit, **JWT denylist (`denylist:{jti}`)**, **Idempotency-Key** ל־**`request-ride-from-search`** (`SET NX`, fingerprint), broadcast, צ’אט — מסוכמים ב-ADR §18–**§19** ובהיילייטס §2–3, **§7ד**, **§7ה**. |
 
 ---
 
@@ -123,7 +123,7 @@
 | בקורות חיים | בפרויקט |
 |-------------|---------|
 | Google Sign-In | אימות `id_token` בבקאנד — [`backend/docs/GOOGLE_OAUTH.md`](../../backend/docs/GOOGLE_OAUTH.md). |
-| JWT + Refresh | טוקנים ורענון ב-DB (תיאור בהיילייטס §1). |
+| JWT + Refresh | טוקנים ורענון ב-DB; **access עם `jti`**; **logout** מוסיף denylist ב-Redis — [`ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) **§7ד**, ADR §18. |
 | bcrypt ללא חסימת event loop | `run_in_executor` — ADR §12 ב-backend ADR. |
 | Rate limiting | Redis על register/login — ADR §12, מימוש ב-auth domain. |
 | מניעת user enumeration | אותה תגובת שגיאה ללוגין — ADR §12. |
@@ -152,7 +152,7 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| `LinkupError` + `error_code` + `trace_id` | [`backend/app/core/exceptions/`](../../backend/app/core/exceptions/), handlers ב-`main.py` — [`docs/ERRORS.md`](ERRORS.md), סיכום ב-[`ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) §2ב. |
+| `LinkUpError` + `error_code` + `trace_id` | [`backend/app/core/exceptions/`](../../backend/app/core/exceptions/), handlers ב-`main.py` — [`docs/ERRORS.md`](ERRORS.md), סיכום ב-[`ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) §2ב. |
 | Frontend | `useErrorHandler`, `i18nError` / מפתחות `common:err_*` — בהיילייטס §2. |
 | chat-ws | תגובות וקודי סגירה מתועדים — `ERRORS.md`. |
 
@@ -177,12 +177,21 @@
 
 ---
 
+## 19. Google Maps Platform (backend) + Circuit Breaker
+
+| בקורות חיים | בפרויקט |
+|-------------|---------|
+| הגנה על תלות חיצונית (Maps APIs) | שלושה **singletons** ב־[`backend/app/infrastructure/geo/circuit_breaker.py`](../../backend/app/infrastructure/geo/circuit_breaker.py); אינטגרציה ב־[`geocoding.py`](../../backend/app/infrastructure/geo/geocoding.py) ו־[`client.py`](../../backend/app/infrastructure/geo/client.py). |
+| ניטור | מצב מעגלים ב־**`GET /api/v1/health`** תחת **`circuit_breakers`** — [`docs/architecture/API.md`](architecture/API.md#health), ADR [**§20**](adr/ARCHITECTURE_DECISIONS_BACKEND.md), [`ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) (Latest architecture updates). |
+
+---
+
 ## קישורים מהירים לראיון
 
 | נושא | מסמך |
 |------|------|
 | סיפור “מה בנינו” + דגשים | [`ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) |
-| החלטות backend/worker | [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](adr/ARCHITECTURE_DECISIONS_BACKEND.md) |
+| החלטות backend/worker | [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](adr/ARCHITECTURE_DECISIONS_BACKEND.md) (כולל **§20** — Circuit Breaker ל-Google Maps) |
 | WS מתי ולמה | [`docs/adr/WEBSOCKETS.md`](adr/WEBSOCKETS.md) |
 | FCM | [`docs/adr/FCM_AND_PUSH.md`](adr/FCM_AND_PUSH.md) |
 | סקירה כללית | [`ARCHITECTURE.md`](../ARCHITECTURE.md) |

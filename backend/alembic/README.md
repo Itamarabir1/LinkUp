@@ -1,4 +1,4 @@
-# Alembic – Linkup Backend
+# Alembic – LinkUp Backend
 
 מיגרציות מרוכזות תחת `versions/`. **`env.py`** מייבא `app.db.models` אחרי `Base` כדי ש־`target_metadata` יכלול את מודלי הדומיין שנרשמים דרך registry זה לצורך **`revision --autogenerate`**.
 

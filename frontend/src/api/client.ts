@@ -3,7 +3,7 @@ import { STORAGE_KEYS } from '../config/constants';
 import { API_BASE_URL, API_TIMEOUT_MS } from '../config/env';
 
 // Log resolved API base (browser devtools console)
-console.log('[Linkup Frontend] API Base URL:', API_BASE_URL);
+console.log('[LinkUp Frontend] API Base URL:', API_BASE_URL);
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -116,7 +116,7 @@ api.interceptors.response.use(
   (res) => res,
   (err: AxiosError) => {
     if (err.response?.status !== 401) {
-      console.error('[Linkup] API Error:', {
+      console.error('[LinkUp] API Error:', {
         error_code: (err.response?.data as { error_code?: string } | undefined)?.error_code,
         message: (err.response?.data as { message?: string } | undefined)?.message,
         trace_id: (err.response?.data as { trace_id?: string } | undefined)?.trace_id,

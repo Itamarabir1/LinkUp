@@ -5,7 +5,7 @@ from geoalchemy2.shape import to_shape
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions.base import LinkupError
+from app.core.exceptions.base import LinkUpError
 from app.core.exceptions.booking import ForbiddenRideActionError, PassengerRequestNotFoundError
 from app.core.exceptions.infrastructure import GeocodingError
 from app.core.exceptions.ride import InvalidRideStatusError, RideNotFoundError
@@ -209,7 +209,7 @@ class PassengerService:
         driver = ride.driver
         if not driver:
             logger.error("Ride %s has no driver relation loaded", ride_id)
-            raise LinkupError(
+            raise LinkUpError(
                 message="פרטי נהג לא זמינים לנסיעה זו",
                 status_code=500,
                 error_code="RIDE_DRIVER_MISSING",

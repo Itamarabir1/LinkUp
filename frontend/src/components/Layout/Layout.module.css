@@ -115,7 +115,7 @@
 }
 
 .btnSearch {
-  height: 38px;
+  height: 36px;
   padding: 0 16px;
   border: 1.5px solid var(--primary-soft-border);
   background: var(--primary-light);
@@ -132,10 +132,11 @@
 }
 
 .btnSearch:hover {
-  background: var(--primary);
-  color: #fff;
+  background: var(--primary-light);
   border-color: var(--primary);
+  color: var(--primary-hover);
   text-decoration: none;
+  box-shadow: 0 2px 8px var(--focus-ring-primary);
 }
 
 .btnCreateRide {

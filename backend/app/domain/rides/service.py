@@ -5,7 +5,7 @@ from uuid import UUID
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions.base import LinkupError
+from app.core.exceptions.base import LinkUpError
 from app.core.exceptions.infrastructure import RouteNotFoundError
 from app.core.exceptions.ride import (
     InvalidRideStatusError,
@@ -214,7 +214,7 @@ class RideService:
         if payload.available_seats is not None:
             update_dict["available_seats"] = payload.available_seats
         if not update_dict:
-            raise LinkupError(
+            raise LinkUpError(
                 message="נדרש לפחות שדה אחד לעדכון (departure_time או available_seats)",
                 status_code=400,
                 error_code="RIDE_UPDATE_EMPTY_FIELDS",

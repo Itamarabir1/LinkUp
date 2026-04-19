@@ -1,4 +1,4 @@
-# Linkup Backend
+# LinkUp Backend
 
 FastAPI application: auth, rides, bookings, notifications, chat, workers.
 
@@ -50,7 +50,9 @@ Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 
 **Error responses (JSON, `error_code`, `trace_id`, handlers):** [`docs/ERRORS.md`](../docs/ERRORS.md).
 
-**Logging (JSON):** בפרודקשן `LOG_FORMAT=json` עם **python-json-logger** (v3+). ה-formatter נטען מ־`pythonjsonlogger.json` — בקוד: `from pythonjsonlogger import json as jsonlogger` ב־`app/core/logging.py`.
+**Health & Google Maps circuit breakers:** `GET /api/v1/health` runs DB, Redis, and RabbitMQ checks; response includes **`status`** (`healthy` if all three are `ok`, else `unhealthy` — **503** in that case) and informational **`circuit_breakers`** (`google_geocoding`, `google_directions`, `google_distance_matrix` — values `closed` / `open` / `half_open`). See [`../docs/architecture/API.md`](../docs/architecture/API.md#health) and [`../docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md) §20.
+
+**Logging (structured):** בפרודקשן `LOG_FORMAT=json` עם **structlog** (`JSONRenderer`); בפיתוח `LOG_FORMAT=text` עם `ConsoleRenderer` — ראו `app/core/logging.py` ו־`RequestIDMiddleware` ב־`app/main.py` (מקור אמת: `ARCHITECTURE.md` — Observability).
 
 ## Admin API (`/api/v1/admin`)
 
@@ -59,10 +61,11 @@ Endpoints for operators only: FastAPI dependency **`get_current_admin_user`** (`
 
 ## Bookings — aggregated reads (My Bookings)
 
+- **Service split (SRP):** read-only aggregations live in [`app/domain/bookings/booking_reads_service.py`](app/domain/bookings/booking_reads_service.py) (`BookingReadsService`); GPS broadcast validation lives in [`app/domain/bookings/location_service.py`](app/domain/bookings/location_service.py) (`BookingLocationService`). Lifecycle mutations (`request_to_join`, approve/reject/cancel, etc.) stay in [`app/domain/bookings/service.py`](app/domain/bookings/service.py) (`BookingService`). Both helper modules are also re-exported from `service.py` for backward-compatible imports.
 - **`GET /api/v1/bookings/driver-summary`** (auth): all rides for the current driver with **pending + confirmed** bookings and passenger contact fields in **one** `AsyncSession.execute` — `CRUDBooking.get_driver_rides_with_passengers` uses `joinedload(Ride.bookings → passenger_request → user)`, `joinedload(Ride.group)`, and `with_loader_criteria(Booking, …)` so cancelled/rejected rows are not loaded into the collection.
 - **`GET /api/v1/bookings/passenger-summary`** (auth): all bookings for the current passenger with ride, **driver**, and **group** in **one** query — `get_passenger_bookings_with_rides`.
-- **Shared manifest mapping:** `BookingService._booking_to_manifest_item` feeds both the per-ride manifest endpoint and driver-summary passengers.
-- **GPS REST:** `BookingService.broadcast_driver_location` / `broadcast_passenger_location` centralize permission checks; routers delegate only.
+- **Shared manifest mapping:** `booking_to_manifest_item` in [`app/domain/bookings/manifest_mapping.py`](app/domain/bookings/manifest_mapping.py) feeds both the per-ride manifest endpoint and driver-summary passengers (both surfaced via `BookingReadsService`).
+- **GPS REST:** `BookingLocationService.broadcast_driver_location` / `broadcast_passenger_location` centralize permission checks; routers delegate only.
 - **Frontend contract:** web client consumes these endpoints via `fetchDriverSummary` / `fetchPassengerSummary` and maps payloads in `frontend/src/pages/MyBookings/myBookings.mappers.ts` to keep transport DTOs decoupled from UI view models.
 
 See `docs/architecture/API.md` and `docs/architecture/DATABASE.md`.
@@ -141,7 +144,7 @@ k6 run k6/scripts/load_test_auth.js
 ## Groups — invite codes
 
 - New groups receive a random **Base62** `invite_code` (8 characters, `secrets.choice` over `a-zA-Z0-9`).
-- **`create_group`** uses **`flush`**, catches **`IntegrityError`**, and retries only when the violation is on **`invite_code`** uniqueness (PostgreSQL `23505` / message match); after **5** failed attempts it raises **`LinkupError`** with **`INVITE_CODE_GENERATION_FAILED`**.
+- **`create_group`** uses **`flush`**, catches **`IntegrityError`**, and retries only when the violation is on **`invite_code`** uniqueness (PostgreSQL `23505` / message match); after **5** failed attempts it raises **`LinkUpError`** with **`INVITE_CODE_GENERATION_FAILED`**.
 - A single **`commit`** persists the group and the creator’s **admin** `GroupMember` row. Implementation: **`app/domain/groups/crud.py`**.
 
 ## Media (S3, CloudFront, avatars)

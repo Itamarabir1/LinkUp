@@ -6,7 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from app.core.exceptions.base import LinkupError
+from app.core.exceptions.base import LinkUpError
 
 logger = logging.getLogger("linkup")
 
@@ -34,15 +34,15 @@ def _error_json(
     return response
 
 
-async def linkup_exception_handler(request: Request, exc: LinkupError):
+async def link_up_exception_handler(request: Request, exc: LinkUpError):
     """
-    Central handler for all LinkupError subclasses.
+    Central handler for all LinkUpError subclasses.
     """
     request_id = getattr(request.state, "request_id", None) or ""
     # Align JSON trace_id with X-Request-ID / other handlers (validation, DB).
     trace_id = request_id or exc.trace_id
     logger.error(
-        "LinkupError: %s | trace_id=%s | message=%s",
+        "LinkUpError: %s | trace_id=%s | message=%s",
         exc.error_code,
         trace_id,
         exc.message,

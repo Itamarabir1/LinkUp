@@ -179,7 +179,8 @@ export default function MyRides() {
                         <X size={12} strokeWidth={2.5} />
                       </button>
                       <RideCard
-                        route={`${r.origin_name ?? '?'} → ${r.destination_name ?? '?'}`}
+                        originLabel={r.origin_name ?? '?'}
+                        destinationLabel={r.destination_name ?? '?'}
                         scheduleCaption={t('rides:rideTimeLabel')}
                         time={formatDateTimeNoSeconds(r.departure_time)}
                         status={getRideStatusLabel(r)}
@@ -199,7 +200,8 @@ export default function MyRides() {
                   {pastRides.map((r) => (
                     <div key={r.ride_id} className={styles.cardWrap}>
                       <RideCard
-                        route={`${r.origin_name ?? '?'} → ${r.destination_name ?? '?'}`}
+                        originLabel={r.origin_name ?? '?'}
+                        destinationLabel={r.destination_name ?? '?'}
                         scheduleCaption={t('rides:rideTimeLabel')}
                         time={formatDateTimeNoSeconds(r.departure_time)}
                         status={getRideStatusLabel(r)}

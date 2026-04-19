@@ -1,4 +1,4 @@
-# Kubernetes (Linkup)
+# Kubernetes (LinkUp)
 
 Manifests under `k8s/` match [docker-compose.yml](../docker-compose.yml) and [backend/app/core/config.py](../backend/app/core/config.py).
 

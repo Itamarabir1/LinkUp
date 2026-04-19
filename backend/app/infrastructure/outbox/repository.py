@@ -40,7 +40,7 @@ class OutboxRepository:
             )
         except Exception as e:
             logger.error(f"❌ Failed to persist outbox event: {e!s}")
-            # Could wrap in LinkupError if desired
+            # Could wrap in LinkUpError if desired
             raise
 
     async def get_pending_events(self, db: AsyncSession, batch_size: int = BATCH_SIZE_DEFAULT) -> list[OutboxEvent]:

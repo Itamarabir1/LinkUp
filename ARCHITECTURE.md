@@ -1,4 +1,4 @@
-# Linkup — Architecture Overview
+# LinkUp — Architecture Overview
 
 תיעוד רמה גבוהה של המערכת. לעדכונים מפורטים: `docs/DATABASE.md`, `docs/API.md`, `docs/EVENTS.md`, `docs/architecture/REALTIME.md`, `docs/DEVELOPMENT.md`. **שגיאות API אחידות (JSON, trace_id, Sentry):** [`docs/ERRORS.md`](docs/ERRORS.md). **להצגת הפרויקט (פיצ’רים, סקייל, טריקים):** `docs/ENGINEERING_HIGHLIGHTS.md`. **מסך אדמין + מפת API:** `ADMIN_DASHBOARD.md` (בשורש).
 
@@ -25,7 +25,7 @@
 | Component | Technology | Version | Purpose |
 |-----------|------------|---------|---------|
 | Database | PostgreSQL + PostGIS | 15-3.3 | טבלאות, גיאומטריה, חיפוש מרחבי |
-| Cache / Pub-Sub | Redis | 7.2.0-v10 | DB 0: ride per-ride + **rides:list**, cache, OTP; DB 1: chat + **`user:{id}:events`** (דרך `redis_chat_pubsub`), completion, presence |
+| Cache / Pub-Sub | Redis | 7.2.0-v10 | DB 0: ride per-ride + **rides:list**, cache, OTP, **JWT denylist** (`denylist:{jti}`), **idempotency keys** (`idempotency:request_ride:{user_id}:{key}`); DB 1: chat + **`user:{id}:events`** (דרך `redis_chat_pubsub`), completion, presence |
 | Message Broker | RabbitMQ | 3-management | אירועים (Outbox), תורי משימות (notifications, avatar, scheduled) |
 | Email rendering | Node.js + Express + React Email | Node 20 | microservice called by backend/worker to render transactional email HTML |
 | Runtime | Docker Compose | — | Dev: db, redis, rabbitmq, **migrate** (once), backend (**8000** host), `notification-worker`, `task-worker`, `ai-worker`, chat-ws; local prod: static frontend + nginx (80) with `--profile prod` |
@@ -68,11 +68,12 @@ ai-worker
 
 ## Features
 
-- **GPS Tracking**: מיקום נהג ונוסעים בזמן אמת במהלך נסיעה פעילה. נהג: **התחל/סיים נסיעה** מטאב "אני נהג" ב־My Bookings (דורש לפחות הזמנה אחת מאושרת), שידור מיקום ל־POST /bookings/{id}/location; נוסעים מקבלים עדכונים ב־WebSocket /bookings/ws/{id}/location. נוסעים יכולים לשתף מיקום ל־POST /bookings/{id}/passenger-location; נהג מאזין ב־WebSocket /rides/ws/{id}/passengers. **אימות הרשאות וסטטוס נסיעה** ל־POSTי המיקום — ב־`BookingService.broadcast_driver_location` / `broadcast_passenger_location`; הראוטר קורא לשירות בלבד. ערוצי Redis: `booking_{booking_id}` (מיקום נהג), `ride_{ride_id}:passenger_locations` (מיקום נוסעים) — שמות מרוכזים ב־`app/infrastructure/redis/keys.py`. **עדכוני סטטוס נסיעה** ללקוח (ערוץ `ride_{ride_id}`): `publish_ride_event` ב־`app/infrastructure/redis/publisher.py`; **רשימת נסיעות** (`rides:list`) נשארת דרך `app/infrastructure/redis/broadcast.py` (Broadcast). **אירועי משתמש** (תחזוקה וכו'): `publish_user_event` → **`redis_chat_pubsub`** על **`REDIS_CHAT_URL`** (DB 1) → ערוץ `user:{user_id}:events` → **chat-ws** נרשם ל-pattern `user:*:events` ומעביר ל־WebSocket של אותו משתמש. **פרונט:** throttle לשידור ~1.5s; `useLocationBroadcast` משתמש ב־`booking_id` של נוסע **מאושר** מתוך רשימת הנוסעים שנטענת עם טאב הנהג (אותו מידע כמו ב־driver-summary); `useUserEventStream` מפרש אירועי משתמש (Zod) על אותו חיבור chat-ws — פירוט ב־`docs/architecture/REALTIME.md`. ראה גם `docs/architecture/API.md`.
+- **GPS Tracking**: מיקום נהג ונוסעים בזמן אמת במהלך נסיעה פעילה. נהג: **התחל/סיים נסיעה** מטאב "אני נהג" ב־My Bookings (דורש לפחות הזמנה אחת מאושרת), שידור מיקום ל־POST /bookings/{id}/location; נוסעים מקבלים עדכונים ב־WebSocket /bookings/ws/{id}/location. נוסעים יכולים לשתף מיקום ל־POST /bookings/{id}/passenger-location; נהג מאזין ב־WebSocket /rides/ws/{id}/passengers. **אימות הרשאות וסטטוס נסיעה** ל־POSTי המיקום — ב־`BookingLocationService.broadcast_driver_location` / `broadcast_passenger_location` ([`location_service.py`](backend/app/domain/bookings/location_service.py); גם ייצוא מ־[`service.py`](backend/app/domain/bookings/service.py)); הראוטר קורא לשירות בלבד. ערוצי Redis: `booking_{booking_id}` (מיקום נהג), `ride_{ride_id}:passenger_locations` (מיקום נוסעים) — שמות מרוכזים ב־`app/infrastructure/redis/keys.py`. **עדכוני סטטוס נסיעה** ללקוח (ערוץ `ride_{ride_id}`): `publish_ride_event` ב־`app/infrastructure/redis/publisher.py`; **רשימת נסיעות** (`rides:list`) נשארת דרך `app/infrastructure/redis/broadcast.py` (Broadcast). **אירועי משתמש** (תחזוקה וכו'): `publish_user_event` → **`redis_chat_pubsub`** על **`REDIS_CHAT_URL`** (DB 1) → ערוץ `user:{user_id}:events` → **chat-ws** נרשם ל-pattern `user:*:events` ומעביר ל־WebSocket של אותו משתמש. **פרונט:** throttle לשידור ~1.5s; `useLocationBroadcast` משתמש ב־`booking_id` של נוסע **מאושר** מתוך רשימת הנוסעים שנטענת עם טאב הנהג (אותו מידע כמו ב־driver-summary); `useUserEventStream` מפרש אירועי משתמש (Zod) על אותו חיבור chat-ws — פירוט ב־`docs/architecture/REALTIME.md`. ראה גם `docs/architecture/API.md`.
 - **Ride preview cache**: תצוגת מקדימה לנסיעה (3 מסלולים) נשמרת ב־Redis 24 שעות; סריאליזציה עם `driver_id` כ־string. תג קבוצה בכרטיסיות (group_name או "ציבורי") מ־RideResponse (כולל group).
 - **Avatar / Group images (S3)**: העלאה ישירה עם presigned PUT (`/users/me/avatar/upload-url`, `/groups/{id}/upload-image`). אווטאר משתמש: אחרי worker, `avatar_key` מצביע ל-prefix **גרסתי immutable** `avatars/{user_id}/v{version}/` (מחיקת גרסה קודמת רק אחרי commit ל-DB). קריאה: `CLOUDFRONT_DOMAIN` אם מוגדר (URL יציב ל-CDN), אחרת presigned GET ל-S3. קבוצות: מפתח GROUPS/ כמו קודם.
 - **Geocode cache (24h)**: תוצאות כתובת→קואורדינטות נשמרות ב־Redis ל־24 שעות כדי לצמצם קריאות חוזרות ל־**Google Geocoding** עבור אותן כתובות. המימוש fail-open כדי לא לחסום flow אם Redis לא זמין.
-- **נוסע — חיפוש לעומת שמירת התראה:** `GET /api/v1/passenger/passengers/search-rides` מחזיר נסיעות פתוחות ב-cursor pagination **בלי** ליצור שורה ב-`passenger_requests`. כדי לקבל מייל/פוש כשיופרסמה נסיעה חדשה שמתאימה למסלול — `POST /api/v1/passenger/passengers/` (`PassengerRequestCreate`) עם `is_notification_active=True` (ברירת מחדל) ואופציונלית `group_id` כשהחיפוש הוא בהקשר קבוצה. ה-worker (`notification_tasks`) משתמש ב-`find_passengers_for_ride_notification` ומסנן בקשות עם התראה כבויה או קבוצה לא תואמת.
+- **Google Maps — Circuit Breaker**: קריאות ה-API בבקאנד (**Geocoding**, **Directions**, **Distance Matrix**) עטופות במעגלים in-memory נפרדים ב־**`app/infrastructure/geo/circuit_breaker.py`**; כשלונות מצטברים פותחים את המעגל ומונעים קריאות חיצוניות עד התאוששות. מצב המעגלים מוחזר ב־**`GET /api/v1/health`** תחת **`circuit_breakers`** ואינו משפיע על **`status`** הכללי (נקבע רק מ-DB / Redis / RabbitMQ).
+- **נוסע — חיפוש לעומת שמירת התראה:** `GET /api/v1/passenger/passengers/search-rides` מחזיר נסיעות פתוחות ב-cursor pagination **בלי** ליצור שורה ב-`passenger_requests`. כדי לקבל מייל/פוש כשיופרסמה נסיעה חדשה שמתאימה למסלול — `POST /api/v1/passenger/passengers/` (`PassengerRequestCreate`) עם `is_notification_active=True` (ברירת מחדל) ואופציונלית `group_id` כשהחיפוש הוא בהקשר קבוצה. **שרשרת אסינכרונית:** Outbox **`ride.created`** (לא `ride.created_for_passengers`) → `notification-worker` → `handle_ride_created` → `find_passengers_for_ride_notification` → אירוע פנימי **`ride.created_for_passengers`** per passenger ב-`notification_handler` (מייל Brevo). אין יצירת booking אוטומטית. פירוט מדויק: `docs/architecture/EVENTS.md` (סעיף Ride) + `docs/ENGINEERING_HIGHLIGHTS.md` §6.4.
 - **AI free-text לרכיבה (נוסע + נהג):** endpoint משותף `POST /api/v1/passenger/passengers/ai-parse-search` משרת שני flows: (1) `SearchRides` לנוסע; (2) `CreateRide` לנהג עם constraints מחמירים יותר (`departure_time` עתידי חובה, `departure_date` לבדו לא מספיק), מילוי טופס בלבד וללא auto-submit.
 - **Admin (תפעול):** REST תחת **`/api/v1/admin/*`** — רק משתמש עם `users.is_admin`; dependency ב־`app/api/dependencies/admin.py` (`get_current_admin_user`). ראוטר דומיין: `backend/app/domain/admin/router.py` (סטטיסטיקות, בריאות, משתמשים, נסיעות, קבוצות, Outbox, lookup); פעולות רגישות עם לוג **`[admin_audit]`**. במקביל נשאר **SQLAdmin** (`app/admin/setup.py`) לדפדפן ניהול DB קלאסי. **ממשק React** למפעילים: `frontend/src/features/admin/` — מסלולים `/admin`, `/admin/health`, `/admin/users`, `/admin/rides`, `/admin/groups`, `/admin/outbox`, `/admin/lookup` (טעינה עצלה, RTL); **מעטפת דסקטופ בלבד** (ללא drawer/סיידבר מובייל) — שימוש אדמין מכוון לדפדפן; אפליקציית **mobile/** נפרדת. מקור אמת למסך ול־API: **`ADMIN_DASHBOARD.md`**.
 
@@ -80,11 +81,11 @@ ai-worker
 
 ## Key Patterns
 
-- **Outbox Pattern**: אירועים נכתבים ל-`outbox_events` ב-DB; ה-worker קורא ומפרסם ל-RabbitMQ. מבטיח at-least-once ולא מאבד אירועים.
+- **Outbox Pattern**: אירועים נכתבים ל-`outbox_events` ב-DB **באותה טרנזקציה** עם השינוי העסקי; ה-worker (`notification-worker`) מפרסם ל-RabbitMQ (LISTEN/NOTIFY + fallback polling). מבטיח **at-least-once** ולא מאבד אירועים אם RabbitMQ זמנית למטה. **דוגמאות routing keys / אירועים:** `ride.created`, `ride.cancelled_by_driver`, `booking.passenger_join_request`, `booking.approved_by_driver`, `booking.rejected_by_driver`, `auth.email_verification`, `auth.password_reset_code`, `user.registered` (מקור אמת מלא: [`docs/architecture/EVENTS.md`](docs/architecture/EVENTS.md)). קוד: [`app/infrastructure/outbox/`](backend/app/infrastructure/outbox/), [`app/domain/events/outbox.py`](backend/app/domain/events/outbox.py).
 - **Domain-Driven Design**: כל דומיין (users, rides, bookings, passengers, chat, groups, **admin**, auth, …) — model, schema, crud, service; ראוטרים תחת `backend/app/domain/*/router.py` ונרשמים ב־[`api/v1/api_router.py`](backend/app/api/v1/api_router.py). **רישום מודלי SQLAlchemy:** `import app.db.models` נטען מוקדם כדי לרשום את מודלי הדומיינים שנדרשים לטעינת API/relationships. הוא לא אמור להיתפס כרשימה ממצה של כל מודל אפשרי בריפו (למשל מודלים תשתיתיים כמו outbox). ב־[`alembic/env.py`](backend/alembic/env.py) אותו ייבוא לפני `target_metadata` ל־autogenerate. ב־Ruff: `per-file-ignores` ל־F401 על קבצי registry (`api_router.py`, `app/db/models.py`, `alembic/env.py`, `main_worker.py`) — ראו [`backend/pyproject.toml`](backend/pyproject.toml).
 - **Dependency Injection (FastAPI Depends)**: `RideService` ו-`AuthService` נוצרים דרך factories ב-`backend/app/api/dependencies/services.py`, והראוטרים מזריקים אותם עם `Depends(get_ride_service)` / `Depends(get_auth_service)` (במקום singletons גלובליים).
-- **JWT Auth**: Access Token (קצר) + Refresh Token (ארוך, נשמר ב-DB). אותו SECRET_KEY בין backend ל-chat-ws לאימות WebSocket.
-- **WebSocket auth (FastAPI)**: `get_current_user_ws` ב-`app/api/dependencies/auth.py` מאמת **רק JWT** (`decode_access_token`: חתימה, `exp`, base64 קנוני) ומחזיר `WsUser` עם `user_id` מה-`sub` — **בלי קריאת DB** בזמן חיבור, כדי לא להעמיס על ה-connection pool תחת עומס. HTTP (`get_current_user`) עדיין טוען `User` מ-DB ובודק `is_active`.
+- **JWT Auth**: Access Token (קצר, כולל **`jti`** ייחודי לכל הנפקה) + Refresh Token (ארוך, נשמר ב-DB). **`POST /auth/logout`** (עם Bearer) מנקה refresh ומוסיף את ה-access הנוכחי ל-**Redis denylist** עד פקיעת ה-`exp` (`SETEX denylist:{jti}`); `get_current_user` / `get_current_user_optional` בודקים denylist אחרי פענוח (Redis **fail-open** ב-`is_denied` — אם Redis נופל, לא חוסמים את כל המשתמשים). יצירת טוקן: `create_access_token` ב-`app/core/security.py`; denylist: **`app/infrastructure/redis/client.py`**, logout: **`app/domain/auth/service.py`**, תלות HTTP: **`app/api/dependencies/auth.py`**. אותו SECRET_KEY בין backend ל-chat-ws לאימות WebSocket.
+- **WebSocket auth (FastAPI)**: `get_current_user_ws` ב-`app/api/dependencies/auth.py` מאמת **רק JWT** (`decode_access_token`: חתימה, `exp`, base64 קנוני) ומחזיר `WsUser` עם `user_id` מה-`sub` — **בלי קריאת DB** בזמן חיבור, כדי לא להעמיס על ה-connection pool תחת עומס. HTTP (`get_current_user`) עדיין טוען `User` מ-DB ובודק `is_active`. **הערה:** denylist מבוסס-HTTP עדיין **לא** נבדק ב-handshake של WebSocket (TODO בקוד) — חיבורי WS עדיין תקפים עד פקיעת JWT.
 - **Cursor-based Pagination**: נסיעות (חיפוש), הודעות צ'אט — `after` / `before` + `limit`, תגובה עם `next_cursor`, `has_more`.
 - **Chat read cursor**: `conversation_participants.last_read_message_id` is the source of truth for read receipts. `mark_conversation_read` advances it monotonically; REST returns `partner_read_up_to_message_id`, and `message_read` WS events carry `read_up_to_message_id` so the UI can mark every outgoing message up to that cursor as read.
 - **Page-based Pagination**: הזמנות שלי — `page`, `limit`, תגובה עם `total`, `has_more`.
@@ -96,7 +97,8 @@ ai-worker
   - **ביטול נסיעה — התראות:** רק הזמנות במצב **PENDING** או **CONFIRMED** מקבלות `ride.cancelled_by_driver` (לא הזמנות שכבר **CANCELLED**).
 - **תזכורות**: אין עוד `reminder_sent` על `rides`/`bookings` ב-ORM או ב-API ציבורי (מיגרציה **008**); תזמון בשכבת `scheduled_notifications` + `ReminderScheduler` + notification handler; סימון נשלח ב-`sent_at`.
 - **תחזוקת סטטוסים (maintenance)**: `MaintenanceCRUD` מחזיר `PendingUserEvent` עם RETURNING; אחרי `commit` מוצלח, `MaintenanceService` מפרסם `publish_user_event` (מוגן ב-`USER_EVENTS_ENABLED` ב-config).
-- **שגיאות API מרוכזות**: תת־מחלקות של `LinkupError` לפי דומיין ב־`app/core/exceptions/`; ב־`main.py` handlers גלובליים ל־Pydantic (`RequestValidationError` → 422), `IntegrityError` / `SQLAlchemyError`, ו־`LinkupError`. פורמט JSON, Sentry, פרונט ו-chat-ws: [`docs/ERRORS.md`](docs/ERRORS.md).
+- **שגיאות API מרוכזות**: תת־מחלקות של `LinkUpError` לפי דומיין ב־`app/core/exceptions/`; ב־`main.py` handlers גלובליים ל־Pydantic (`RequestValidationError` → 422), `IntegrityError` / `SQLAlchemyError`, ו־`LinkUpError`. פורמט JSON, Sentry, פרונט ו-chat-ws: [`docs/ERRORS.md`](docs/ERRORS.md).
+- **Idempotency-Key (Stripe-style)** ל־**`POST /passenger/passengers/request-ride-from-search`**: כותרת אופציונלית **`Idempotency-Key`** + Redis (**`SET NX`** ל-claim, fingerprint SHA-256 לגוף קנוני) — מניע כפילות בקשות הצטרפות בלחיצה כפולה / retry רשת; נשמר ב-Redis רק **תשובת 201 מוצלחת** (TTL ~5 דק׳); שגיאות עסקיות מוחקות את הנעילה לאפשר ניסוי חוזר; Redis לא זמין → **fail-open**. **קוד:** `app/domain/passengers/router.py` (עזרי fingerprint/מפתח ב־[`ride_join_idempotency.py`](backend/app/domain/passengers/ride_join_idempotency.py)), `app/infrastructure/redis/client.py`. **פרונט:** `frontend/src/api/passengers.ts`, **`useJoinRide`** ([`useJoinRide.ts`](frontend/src/pages/SearchRides/useJoinRide.ts)) נקרא מ־**`useSearchRides`** — **`idempotencyKeyRef`**. פירוט: **`docs/ENGINEERING_HIGHLIGHTS.md` סעיף 7ה / 0א**, **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §19**.
 
 ---
 
@@ -144,28 +146,30 @@ ai-worker
 - **Connection Pool** (`backend/app/db/session.py`): `pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle` מ-**config** (`DB_POOL_*` ב-`.env`; ברירות מחדל ב-`Settings`), `pool_pre_ping=True`.
 - **Indexes**: ראה `docs/DATABASE.md` — כולל 11 ה-indexes מ-migration 004 (rides, bookings, group_members, passenger_requests).
 - **Caching**: Redis לפי צורך — TTL וכו' לפי סוג (למשל OTP, broadcast channels).
-- **My Bookings — קריאות מאוגדות**: `GET /bookings/driver-summary` ו־`GET /bookings/passenger-summary` נטענים בשאילתת DB אחת לכל מסך (ראו `bookings/crud.py`: `joinedload` + `with_loader_criteria` על הזמנות pending/confirmed לנהג), במקום סדרת קריאות per-ride. בפרונט יש שכבת mapping ייעודית (`frontend/src/pages/MyBookings/myBookings.mappers.ts`) שממירה DTOs ל-view-model של UI — פירוט ב־`docs/architecture/DATABASE.md` ו־`docs/architecture/API.md`.
+- **My Bookings — קריאות מאוגדות**: `GET /bookings/driver-summary` ו־`GET /bookings/passenger-summary` ממומשים ב־**`BookingReadsService`** ([`booking_reads_service.py`](backend/app/domain/bookings/booking_reads_service.py)) — שאילתת DB אחת לכל מסך (ראו `bookings/crud.py`: `joinedload` + `with_loader_criteria` על הזמנות pending/confirmed לנהג), במקום סדרת קריאות per-ride. בפרונט יש שכבת mapping ייעודית (`frontend/src/pages/MyBookings/myBookings.mappers.ts`) שממירה DTOs ל-view-model של UI — פירוט ב־`docs/architecture/DATABASE.md` ו־`docs/architecture/API.md`.
 
 ---
 
 ## Observability
 
-### Logging
-- Format: JSON (production) / text (development)
-- Library: **python-json-logger** v3+ (import: `from pythonjsonlogger import json as jsonlogger` ב־`app/core/logging.py`)
-- Fields: timestamp, level, service, message; `request_id` בכל שורה דרך `RequestIDFilter` כשמוגדר
-- Controlled via: `LOG_FORMAT`, `LOG_LEVEL` env vars
+### Logging (structured + correlation)
+- **Library:** **structlog** — `JSONRenderer` בפרודקשן (`LOG_FORMAT=json`), `ConsoleRenderer` צבעוני בפיתוח (`LOG_FORMAT=text`). הגדרה ב-[`app/core/logging.py`](backend/app/core/logging.py) (`setup_logging`): processors כוללים `request_id` מ-**ContextVar** (`request_id_ctx`).
+- **Correlation ID:** [`RequestIDMiddleware`](backend/app/main.py) ב-[`main.py`](backend/app/main.py) מקצה **8 תווים** מ-UUID לכל בקשה, שומר ב-`request.state.request_id`, מעדכן את ה-ContextVar, ומחזיר כותרת **`X-Request-ID`** בתגובה. `RequestIDFilter` מחבר stdlib logging ל-structlog כך שכל שורה נשאבת לאותה בקשה.
+- **שגיאות API:** `trace_id` / `request_id` מיושרים ל-handlers — ראו [`docs/ERRORS.md`](docs/ERRORS.md).
+- **משתני סביבה:** `LOG_FORMAT`, `LOG_LEVEL`.
 
 ### Request Tracing
-- Every request gets a unique Request ID (8 chars)
-- Returned in response header: X-Request-ID
-- Use to trace a specific request across logs
+- מזהה ייחודי קצר (8 תווים) לכל בקשה HTTP; כותרת תגובה **`X-Request-ID`**; חיפוש בלוגים לפי אותו מזהה.
+
+### Health endpoint וניטור
+- **Current:** `GET /api/v1/health` (DB, Redis, RabbitMQ + `circuit_breakers` אינפורמטיבי) + **structlog** + **`X-Request-ID`** (ראו לעיל).
+- **Future:** Prometheus **`/metrics`** + Grafana dashboard — **not yet implemented**.
 
 ---
 
 ## Security
 
-- **JWT**: HS256, `SECRET_KEY` חובה בפרודקשן. Access/Refresh expiry מ-config.
+- **JWT**: HS256, `SECRET_KEY` חובה בפרודקשן. Access/Refresh expiry מ-config. **Access:** claim **`jti`** + **Redis denylist** לאחר logout — ביטול מיידי של אותו access token (במקביל לניקוי refresh ב-DB).
 - **WebSocket (backend)**: אימות ב-`get_current_user_ws` מבוסס JWT בלבד — אין בדיקת `is_active` בזמן ה-handshake; משתמש מושבת עם טוקן תקף עדיין יכול להתחבר ל-WS עד פקיעת הטוקן (מול מניעת עומס על DB בחיבור).
 - **CORS**: `CORS_ORIGINS` או `FRONTEND_URL`; ב-DEBUG גם localhost regex.
 - **Rate Limiting**: Auth endpoints — חלון שניות + מקסימום בקשות ל-IP (`RATE_LIMIT_AUTH_*`); כולל **`POST /register`** לצד login/refresh וכו’.
@@ -192,3 +196,5 @@ ai-worker
 
 - **Kafka**: הוחלף ב-RabbitMQ לפשטות בסקלה הנוכחית.
 - **Horizontal scaling**: מתוכנן — backend stateless; DB/Redis/RabbitMQ מרכזיים.
+- **PgBouncer (מתוכנן, לא ממומש):** pooler בין האפליקציה ל-PostgreSQL — רלוונטי בעיקר כשעולים ל-**10+ מופעי API** / פריסה serverless-ית, כדי לרכז אלפי חיבורי לקוח לפחות חיבורי DB פיזיים. **מצב נוכחי:** SQLAlchemy async pool (`DB_POOL_*`) + `UVICORN_WORKERS` (למשל 4 workers × pool) — Postgres סביר עד מאות חיבורים לפי tuning; אין PgBouncer ב-Compose או ב-K8s כרגע.
+- **N+1 / בדיקת שאילתות (המלצה):** No automated EXPLAIN ANALYZE pipeline exists. Manual review recommended on heavy paths (search, matching) using `pg_stat_statements` or Django-style query logging.

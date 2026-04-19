@@ -44,7 +44,7 @@ export default function AdminLayout() {
   return (
     <div className={shell.shell} dir="rtl">
       <aside className={shell.sidebar}>
-        <div className={shell.sidebarBrand}>Linkup Admin</div>
+        <div className={shell.sidebarBrand}>LinkUp Admin</div>
         <nav className={shell.nav} aria-label="ניווט ניהול">
           {nav.map(({ to, end, label, icon: Icon }) => (
             <NavLink

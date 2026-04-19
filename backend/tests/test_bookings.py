@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import app.db.models  # noqa: F401 — register models on Base
 from app.core.exceptions.booking import BookingAlreadyExistsError
 from app.domain.bookings.enum import BookingStatus
+from app.domain.bookings.booking_reads_service import BookingReadsService
 from app.domain.bookings.service import BookingService
 
 from tests.helpers.db_factories import make_passenger_request, make_ride, make_user
@@ -161,7 +162,7 @@ async def test_get_driver_summary_embeds_passengers(db_session: AsyncSession):
             current_user_id=passenger.user_id,
         )
 
-    summary = await BookingService.get_driver_summary(db_session, driver.user_id)
+    summary = await BookingReadsService.get_driver_summary(db_session, driver.user_id)
     assert len(summary.rides) >= 1
     match = next((r for r in summary.rides if str(r.ride_id) == str(ride.ride_id)), None)
     assert match is not None
@@ -186,7 +187,7 @@ async def test_get_passenger_summary_includes_driver_when_ride_open(db_session: 
             current_user_id=passenger.user_id,
         )
 
-    summary = await BookingService.get_passenger_summary(db_session, passenger.user_id)
+    summary = await BookingReadsService.get_passenger_summary(db_session, passenger.user_id)
     assert len(summary.bookings) >= 1
     row = summary.bookings[0]
     assert row.driver is not None

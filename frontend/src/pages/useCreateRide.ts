@@ -77,6 +77,18 @@ function followUpReasonToText(
   }
 }
 
+function canAutoPreview(
+  ai: AISearchResult
+): { ok: true; origin: string; dest: string; date: Date } | { ok: false } {
+  const origin = ai.pickup_name?.trim() ?? '';
+  const dest = ai.destination_name?.trim() ?? '';
+  if (!origin || !dest) return { ok: false };
+  if (!ai.departure_time) return { ok: false };
+  const date = new Date(ai.departure_time);
+  if (isNaN(date.getTime()) || date <= new Date()) return { ok: false };
+  return { ok: true, origin, dest, date };
+}
+
 export function useCreateRide() {
   const { t } = useTranslation('rides');
   const { groupId } = useParams<{ groupId?: string }>();
@@ -147,6 +159,59 @@ export function useCreateRide() {
     });
   }, [destinationName]);
 
+  const resetAI = useCallback(() => {
+    setAiQuery('');
+    setAiParsing(false);
+    setAiError('');
+    setAiResult(null);
+    setAiFollowUp(null);
+    setConversationHistory([]);
+  }, []);
+
+  const performPreview = useCallback(
+    async (
+      origin: string,
+      destination: string,
+      date: Date,
+      availableSeats: number,
+    ) => {
+      if (!user?.user_id) {
+        setError('לא זוהה משתמש מחובר. התחבר/י מחדש ונסה/י שוב.');
+        return;
+      }
+
+      const token = claim();
+      setStatus('previewing');
+      setError('');
+      setPreview(null);
+
+      try {
+        const { data } = await previewRideRoutes({
+          driver_id: user.user_id,
+          origin_name: origin.trim(),
+          destination_name: destination.trim(),
+          departure_time: date.toISOString(),
+          available_seats: availableSeats,
+          ...(groupId ? { group_id: groupId } : {}),
+        });
+        if (!isCurrent(token)) return;
+        const routesList = Array.isArray(data.routes)
+          ? data.routes
+          : data.routes
+            ? [data.routes]
+            : [];
+        setPreview({ ...data, routes: routesList });
+        setSelectedRouteIndex(routesList.length === 1 ? 0 : -1);
+      } catch (err) {
+        if (isCurrent(token))
+          setError(getApiErrorMessage(err, apiErr('err_preview_ride')));
+      } finally {
+        if (isCurrent(token)) setStatus('idle');
+      }
+    },
+    [user, groupId, claim, isCurrent]
+  );
+
   const parseWithAI = useCallback(async () => {
     const q = aiQuery.trim();
     if (!q) return;
@@ -174,10 +239,11 @@ export function useCreateRide() {
         }
       }
 
-      if (data.raw_interpretation) {
-        const extracted = extractSeatsFromText(data.raw_interpretation);
-        if (extracted !== null) setSeats(extracted);
-      }
+      const extractedSeats = data.raw_interpretation
+        ? extractSeatsFromText(data.raw_interpretation)
+        : null;
+      if (extractedSeats !== null) setSeats(extractedSeats);
+      const seatsForPreview = extractedSeats ?? seats;
 
       const reason = resolveCreateRideFollowUpReason(data);
       const followUp = followUpReasonToText(reason, data.follow_up_question, t);
@@ -193,7 +259,19 @@ export function useCreateRide() {
         return next.slice(-6);
       });
 
-      if (followUp) setAiQuery('');
+      if (followUp) {
+        setAiQuery('');
+      } else {
+        const check = canAutoPreview(data);
+        if (check.ok) {
+          await performPreview(
+            check.origin,
+            check.dest,
+            check.date,
+            seatsForPreview,
+          );
+        }
+      }
     } catch (err: unknown) {
       if (isAiParseCurrent(token)) {
         setAiError(getApiErrorMessage(err, t('aiCreateParseError')));
@@ -210,17 +288,10 @@ export function useCreateRide() {
     setDestinationName,
     setSelectedDate,
     setSeats,
+    seats,
     t,
+    performPreview,
   ]);
-
-  const resetAI = useCallback(() => {
-    setAiQuery('');
-    setAiParsing(false);
-    setAiError('');
-    setAiResult(null);
-    setAiFollowUp(null);
-    setConversationHistory([]);
-  }, []);
 
   const requestPreview = useCallback(
     async (e: React.FormEvent) => {
@@ -237,32 +308,9 @@ export function useCreateRide() {
         setError('יש לבחור זמן יציאה בעתיד');
         return;
       }
-
-      const token = claim();
-      setStatus('previewing');
-      setError('');
-      setPreview(null);
-
-      try {
-        const { data } = await previewRideRoutes({
-          driver_id: user.user_id,
-          origin_name: originName.trim(),
-          destination_name: destinationName.trim(),
-          departure_time: selectedDate.toISOString(),
-          available_seats: seats,
-          ...(groupId ? { group_id: groupId } : {}),
-        });
-        if (!isCurrent(token)) return;
-        const routesList = Array.isArray(data.routes) ? data.routes : data.routes ? [data.routes] : [];
-        setPreview({ ...data, routes: routesList });
-        setSelectedRouteIndex(routesList.length === 1 ? 0 : -1);
-      } catch (err) {
-        if (isCurrent(token)) setError(getApiErrorMessage(err, apiErr('err_preview_ride')));
-      } finally {
-        if (isCurrent(token)) setStatus('idle');
-      }
+      await performPreview(originName, destinationName, selectedDate, seats);
     },
-    [user, originName, destinationName, selectedDate, seats, groupId, claim, isCurrent]
+    [user, originName, destinationName, selectedDate, seats, performPreview]
   );
 
   const createRide = useCallback(async () => {

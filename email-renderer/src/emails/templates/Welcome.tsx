@@ -25,15 +25,15 @@ const features = [
 export default function Welcome({ user_name, dashboard_url = 'https://linkup.co.il' }: Props) {
   return (
     <EmailLayout
-      preview={`ברוכים הבאים ל-Linkup, ${user_name || ''}!`}
+      preview={`ברוכים הבאים ל-LinkUp, ${user_name || ''}!`}
       headerColor={COLORS.primary}
-      headerTitle="ברוכים הבאים ל-Linkup! 🚗"
+      headerTitle="ברוכים הבאים ל-LinkUp! 🚗"
     >
       <Text style={bodyText}>
         היי <strong>{user_name}</strong>,
       </Text>
       <Text style={mutedText}>
-        אנחנו שמחים שהצטרפת לקהילת Linkup — המקום לתאם נסיעות משותפות ולחסוך ביחד.
+        אנחנו שמחים שהצטרפת לקהילת LinkUp — המקום לתאם נסיעות משותפות ולחסוך ביחד.
       </Text>
       <Section style={{ margin: '20px 0' }}>
         {features.map((f, i) => (

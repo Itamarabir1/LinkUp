@@ -66,7 +66,7 @@ class RideBuilder(BaseContextBuilder):
 
     def _get_default_content(self) -> dict[str, str]:
         return {
-            "subject": "עדכון לגבי נסיעה ב-Linkup",
+            "subject": "עדכון לגבי נסיעה ב-LinkUp",
             "hero_text": "עדכון נסיעה",
             "description": "חלו שינויים בפרטי הנסיעה שלך.",
             "cta_label": "לפרטים נוספים",

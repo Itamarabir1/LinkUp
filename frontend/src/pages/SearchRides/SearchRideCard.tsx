@@ -2,6 +2,7 @@ import type { Ride, DriverInfo } from '../../types/api';
 import { formatDateTimeNoSeconds } from '../../utils/date';
 import { Clock, CheckCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import RouteArrow from '../../components/RouteArrow/RouteArrow';
 import styles from './SearchRides.module.css';
 
 type Props = {
@@ -32,7 +33,7 @@ export function SearchRideCard({
     <div className={styles.card}>
       <div className={styles.cardRoute}>
         <span>{r.origin_name ?? '?'}</span>
-        <span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>→</span>
+        <RouteArrow />
         <span>{r.destination_name ?? '?'}</span>
       </div>
 

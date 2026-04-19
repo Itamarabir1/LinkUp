@@ -1,9 +1,9 @@
 from uuid import UUID
 
-from .base import LinkupError
+from .base import LinkUpError
 
 
-class AdminAccessRequiredError(LinkupError):
+class AdminAccessRequiredError(LinkUpError):
     """Logged-in non-admin user attempted to access `/api/v1/admin/*`."""
 
     status_code = 403
@@ -11,7 +11,7 @@ class AdminAccessRequiredError(LinkupError):
     message = "נדרשות הרשאות מנהל"
 
 
-class OutboxEventNotFoundError(LinkupError):
+class OutboxEventNotFoundError(LinkUpError):
     status_code = 404
     error_code = "ADMIN_OUTBOX_EVENT_NOT_FOUND"
     message = "אירוע Outbox לא נמצא"
@@ -21,7 +21,7 @@ class OutboxEventNotFoundError(LinkupError):
         super().__init__(payload=payload)
 
 
-class OutboxRequeueInvalidStatusError(LinkupError):
+class OutboxRequeueInvalidStatusError(LinkUpError):
     status_code = 400
     error_code = "ADMIN_OUTBOX_REQUEUE_NOT_FAILED"
     message = "ניתן להחזיר לתור רק אירועים במצב FAILED"

@@ -295,3 +295,9 @@ conversations ◄── messages (conversation_id), chat_analysis (conversation_
 | cancel_booking | rides | נעילת נסיעה לפני החזרת סטטוס ל-OPEN ושחרור מושבים — מונע race עם approve |
 
 מימוש: `get_ride_for_update(db, ride_id)` ב-`bookings/crud.py` משתמש ב־`AsyncSession` ומבצע `select(Ride).with_for_update()` כדי לנעול את שורת הנסיעה. ה-service קורא ל-crud זה לפני שינוי booking/ride.
+
+---
+
+## Future / Recommendations (query performance)
+
+No automated EXPLAIN ANALYZE pipeline exists. Manual review recommended on heavy paths (search, matching) using `pg_stat_statements` or Django-style query logging. דפוסי צמצום N+1 מתועדים ב-`ARCHITECTURE.md` (My Bookings / `BookingReadsService`) וב-`docs/ENGINEERING_HIGHLIGHTS.md`.

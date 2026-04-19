@@ -13,7 +13,7 @@ class EmailProvider(BaseNotificationProvider):
     def _render_subject(self, subject: str, context: dict[str, Any]) -> str:
         """Replace subject placeholders (e.g. {passenger_name}) with context values."""
         if not subject or "{" not in subject:
-            return subject or "Update from Linkup"
+            return subject or "Update from LinkUp"
         result = subject
         for key, value in context.items():
             if key and value is not None:
@@ -24,7 +24,7 @@ class EmailProvider(BaseNotificationProvider):
     async def send(self, user: User, template_name: str, context: dict[str, Any]):
         try:
             # Subject may come from context (builder prepared it) — substitute placeholders
-            raw_subject = context.get("subject", "Update from Linkup")
+            raw_subject = context.get("subject", "Update from LinkUp")
             subject = self._render_subject(raw_subject, context)
 
             # 1. Render HTML

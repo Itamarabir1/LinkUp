@@ -1,0 +1,9 @@
+.arrow {
+  display: inline-block;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+:global(html[dir='rtl']) .arrow {
+  transform: scaleX(-1);
+}

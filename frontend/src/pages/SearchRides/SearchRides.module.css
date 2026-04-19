@@ -577,6 +577,29 @@
   line-height: 1.4;
 }
 
+.aiFollowUp {
+  margin-top: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 9px 13px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-family: var(--font-primary);
+  line-height: 1.5;
+  animation: aiSlideIn 0.2s ease-out both;
+}
+
+.aiFollowUpIcon {
+  flex-shrink: 0;
+  color: var(--primary);
+  margin-top: 1px;
+}
+
 /* ── Input row ── */
 .aiInputRow {
   display: flex;

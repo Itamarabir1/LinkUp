@@ -21,14 +21,14 @@ export default function PasswordReset({ user_name, code, token }: Props) {
   const otp = code || token || '------';
   return (
     <EmailLayout
-      preview="קוד לאיפוס הסיסמה שלך ב-Linkup"
+      preview="קוד לאיפוס הסיסמה שלך ב-LinkUp"
       headerColor={COLORS.danger}
       headerTitle="איפוס סיסמה"
     >
       <Text style={bodyText}>
         שלום <strong>{user_name}</strong>,
       </Text>
-      <Text style={mutedText}>קיבלנו בקשה לאיפוס הסיסמה של חשבון Linkup שלך. הזן את הקוד הבא:</Text>
+      <Text style={mutedText}>קיבלנו בקשה לאיפוס הסיסמה של חשבון LinkUp שלך. הזן את הקוד הבא:</Text>
       <EmailOtpBox code={otp} expiryMinutes={10} />
       <Section
         style={{

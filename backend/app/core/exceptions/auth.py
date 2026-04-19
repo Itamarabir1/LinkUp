@@ -1,15 +1,15 @@
 from fastapi import status
 
-from .base import LinkupError
+from .base import LinkUpError
 
 
-class SessionExpiredError(LinkupError):
+class SessionExpiredError(LinkUpError):
     status_code = 401
     error_code = "AUTH_SESSION_EXPIRED"
     message = "הסשן פג תוקף, אנא התחבר שוב"
 
 
-class InvalidAccessTokenError(LinkupError):
+class InvalidAccessTokenError(LinkUpError):
     """JWT invalid, expired, or missing `sub` — mirrors checks in `get_current_user`."""
 
     status_code = 401
@@ -17,25 +17,25 @@ class InvalidAccessTokenError(LinkupError):
     message = "אסימון לא תקף או פג תוקף"
 
 
-class UserInactiveOrMissingError(LinkupError):
+class UserInactiveOrMissingError(LinkUpError):
     status_code = 401
     error_code = "AUTH_USER_INACTIVE_OR_MISSING"
     message = "המשתמש לא נמצא או אינו פעיל"
 
 
-class PermissionDeniedError(LinkupError):
+class PermissionDeniedError(LinkUpError):
     status_code = 403
     error_code = "AUTH_PERMISSION_DENIED"
     message = "אין הרשאה לביצוע הפעולה"
 
 
-class InvalidVerificationCodeError(LinkupError):
+class InvalidVerificationCodeError(LinkUpError):
     status_code = 400
     error_code = "AUTH_INVALID_CODE"
     message = "קוד האימות שגוי או פג תוקף"
 
 
-class InvalidCredentialsError(LinkupError):
+class InvalidCredentialsError(LinkUpError):
     status_code = 401
     error_code = "AUTH_INVALID_CREDENTIALS"
     message = "אימייל או סיסמה שגויים"
@@ -49,7 +49,7 @@ class InvalidCredentialsError(LinkupError):
         )
 
 
-class UserNotVerifiedError(LinkupError):
+class UserNotVerifiedError(LinkUpError):
     status_code = 403
     error_code = "AUTH_USER_NOT_VERIFIED"
     message = "החשבון עדיין לא עבר אימות"
@@ -64,7 +64,7 @@ class UserNotVerifiedError(LinkupError):
         )
 
 
-class InvalidResetCodeError(LinkupError):
+class InvalidResetCodeError(LinkUpError):
     status_code = 400
     error_code = "AUTH_INVALID_RESET_CODE"
     message = "קוד שחזור הסיסמה שגוי או פג תוקף"
@@ -73,7 +73,7 @@ class InvalidResetCodeError(LinkupError):
         super().__init__(message=self.message, payload={"email": email} if email else None)
 
 
-class InvalidRefreshTokenError(LinkupError):
+class InvalidRefreshTokenError(LinkUpError):
     status_code = 401
     error_code = "AUTH_INVALID_REFRESH_TOKEN"
     message = "Refresh Token שגוי או פג תוקף – יש להתחבר מחדש"
@@ -86,7 +86,7 @@ class InvalidRefreshTokenError(LinkupError):
         )
 
 
-class InvalidPasswordError(LinkupError):
+class InvalidPasswordError(LinkUpError):
     status_code = 401
     error_code = "INVALID_PASSWORD"
     message = "הסיסמה הישנה שהוזנה אינה נכונה"
@@ -95,7 +95,7 @@ class InvalidPasswordError(LinkupError):
         super().__init__(message=self.message, status_code=self.status_code)
 
 
-class PasswordTooWeakError(LinkupError):
+class PasswordTooWeakError(LinkUpError):
     def __init__(self, details: str = None):
         description = details or "על הסיסמה להכיל לפחות 8 תווים, אות גדולה, קטנה, מספר ותו מיוחד"
         super().__init__(
@@ -105,7 +105,7 @@ class PasswordTooWeakError(LinkupError):
         )
 
 
-class PasswordsDoNotMatchError(LinkupError):
+class PasswordsDoNotMatchError(LinkUpError):
     def __init__(self):
         super().__init__(
             message="הסיסמה החדשה והאישור אינם זהים",
@@ -114,7 +114,7 @@ class PasswordsDoNotMatchError(LinkupError):
         )
 
 
-class NewPasswordSameAsOldError(LinkupError):
+class NewPasswordSameAsOldError(LinkUpError):
     def __init__(self):
         super().__init__(
             message="הסיסמה החדשה חייבת להיות שונה מהישנה",
@@ -123,7 +123,7 @@ class NewPasswordSameAsOldError(LinkupError):
         )
 
 
-class VerificationCodeExpiredError(LinkupError):
+class VerificationCodeExpiredError(LinkUpError):
     status_code = 400
     error_code = "AUTH_OTP_EXPIRED"
     message = "פג תוקף קוד האימות, אנא בקש קוד חדש"
@@ -136,7 +136,7 @@ class VerificationCodeExpiredError(LinkupError):
         )
 
 
-class GoogleAuthFailed(LinkupError):
+class GoogleAuthFailed(LinkUpError):
     """Failure authenticating with Google — external service, not the user's fault."""
 
     status_code = 502

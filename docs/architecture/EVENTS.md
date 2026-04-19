@@ -53,8 +53,19 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 
 | Event | Exchange | Routing Key | Triggered By | Payload |
 |-------|----------|-------------|--------------|---------|
-| ride.created_for_passengers | ride | ride.created_for_passengers | יצירת נסיעה (לנוסעים מתאימים) | ride_id, driver_id, ... |
+| **ride.created** | ride | **ride.created** | `RideService._persist_ride_and_publish_event` אחרי `INSERT` לנסיעה | `{ "ride_id": "<uuid>" }` בלבד — מופיע ב-Outbox וב-RabbitMQ |
 | ride.cancelled_by_driver | ride | ride.cancelled_by_driver | ביטול נסיעה ע"י נהג | ride_id, ... |
+
+**חשוב — לא לבלבל עם שם האירוע הפנימי למייל:** ההתראה לנוסעים משתמשת במחרוזת האירוע **`ride.created_for_passengers`** רק בתוך `notification_handler.handle_event` (כלומר בשכבת התבניות/Brevo), וזה **לא** routing key שנפרסם מחדש ל-RabbitMQ. אחרי שהצרכן מקבל `ride.created`, הקוד ב-[`notification_tasks.handle_ride_created`](../../backend/app/workers/tasks/notification_tasks.py) טוען את הנסיעה, קורא ל-[`find_passengers_for_ride_notification`](../../backend/app/domain/passengers/crud.py), ולכל `PassengerRequest` מתאים קורא ל-handler עם `event_name=ride.created_for_passengers` ו-`payload` שכולל `ride_id` + `passenger_id`.
+
+#### זרימה מתומצתת (התראת נוסע על נסיעה חדשה)
+
+1. פרסום נסיעה → commit + שורת Outbox **`ride.created`**.
+2. `notification-worker` → Outbox dispatcher מפרסם ל-exchange **`ride`** עם **`routing_key=ride.created`**.
+3. אותו תהליך Worker → consumer על **`notifications_queue`** מקבל `routing_key=ride.created` ומפעיל **`handle_ride_created`**.
+4. **אין יצירת Booking אוטומטית** — רק התראת מייל (וכל ערוץ נוסף שיוגדר בעתיד) לפי ההתאמה הגיאוגרפית.
+
+פירוט סינון (רדיוסים, חלון תאריכים, `group_id`): ראו גם `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §17 ו-[`ARCHITECTURE.md`](../../ARCHITECTURE.md) (פסקת נוסע).
 
 ### Booking
 
@@ -113,6 +124,8 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 | scheduled_tasks_queue | — | — |
 
 תור ראשי עם `x-dead-letter-exchange` → dlq_exchange; הודעות שנכשלו אחרי כל הניסיונות עוברות ל-DLQ. תור retry עם TTL על ההודעה מחזיר אחרי פקיעה לתור הראשי.
+
+**מדיניות איבוד:** Messages that fail after `MAX_RETRIES=3` are routed to the per-queue `.dlq` binding on `dlq_exchange` — **not lost**. `scheduled_tasks_queue` has **no DLQ** by design (failures are logged and the message is acked; the scheduler may emit again on the next cycle — see Scheduled Tasks below).
 
 ---
 

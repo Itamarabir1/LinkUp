@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// WriteAPIError writes the same error JSON shape as Linkup FastAPI (status, error_code, message, trace_id).
+// WriteAPIError writes the same error JSON shape as LinkUp FastAPI (status, error_code, message, trace_id).
 // Uses X-Request-ID from r when present so traces align with callers; otherwise a short random id.
 func WriteAPIError(w http.ResponseWriter, r *http.Request, status int, errorCode, message string) {
 	tid := ""

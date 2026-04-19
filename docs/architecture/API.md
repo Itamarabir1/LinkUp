@@ -12,9 +12,24 @@ Base URL: `http://localhost:8000/api/v1` (בפרודקשן: `API_PUBLIC_URL` א�
 Authorization: Bearer <access_token>
 ```
 
-- **Access Token**: מתקבל מ-`POST /auth/login` או `POST /auth/google-signin` או `POST /auth/refresh`. תוקף: `ACCESS_TOKEN_EXPIRE_MINUTES` (ברירת מחדל 30).
+- **Access Token**: מתקבל מ-`POST /auth/login` או `POST /auth/google-signin` או `POST /auth/refresh`. תוקף: `ACCESS_TOKEN_EXPIRE_MINUTES` (ברירת מחדל 30). כולל **`jti`** (JWT ID) ייחודי; שרת בודק **Redis denylist** (`denylist:{jti}`) לפני שמשתמש מאומת ב-HTTP — אחרי **`POST /auth/logout`** עם אותו Bearer, אותו access נחסם עד `exp` (בנוסף לניקוי refresh ב-DB).
 - **Refresh Token**: נשמר ב-DB; משמש ל-`POST /auth/refresh` לקבלת access חדש. תוקף: `REFRESH_TOKEN_EXPIRE_DAYS` (7).
 - **לוגין מייל+סיסמה:** שגיאת אימות אחידה (**401**, `AUTH_INVALID_CREDENTIALS`) גם כשהאימייל לא רשום וגם כשהסיסמה שגויה — **מניעת username enumeration** (OWASP); אימות מייל (`is_verified`) נבדק רק אחרי אימות סיסמה מוצלח.
+
+### Idempotency-Key (אופציונלי)
+
+עבור **`POST /passenger/passengers/request-ride-from-search`** ניתן לשלוח כותרת **`Idempotency-Key: <uuid>`** (דפוס Stripe):
+
+| מצב | התנהגות |
+|-----|---------|
+| אין כותרת | זרימה רגילה (ללא מניע duplicate ברמת Redis). |
+| מפתח + גוף זהה לבקשה שכבר הושלמה ב-**201** | החזרת אותו גוף JSON ממטמון Redis (TTL ~5 דק׳). |
+| מפתח בשימוש תהליכי (**PROCESSING**) | **409** + **`Retry-After: 1`**. |
+| מפתח קיים עם **fingerprint** שונה (גוף שונה) | **422** — `idempotency_key_mismatch`. |
+
+המפתח ב-Redis כולל את מזהה המשתמש (`idempotency:request_ride:{user_id}:{client_key}`); נשמרת רק תוצאת **הצלחה**; שגיאות עסקיות מסירות נעילה. Redis לא זמין → המערכת ממשיכה (**fail-open**).
+
+**ווב:** במסך חיפוש נוסעים, הוק **`useJoinRide`** ([`useJoinRide.ts`](../../frontend/src/pages/SearchRides/useJoinRide.ts)) מחזיק מפתח יציב ב-**`useRef`** לכל ניסיון “הצטרף לנסיעה” (לא מפתח חדש בכל רינדור), ומעביר אותו ל־**`requestRideFromSearch`**; **`useSearchRides`** משתמש בו לזרימת החיפוש.
 
 ---
 
@@ -51,7 +66,19 @@ Authorization: Bearer <access_token>
 | Method | Path | Auth | תיאור |
 |--------|------|------|--------|
 | GET | / | לא | סטטוס כללי |
-| GET | /api/v1/health | לא | בדיקת API |
+| GET | /api/v1/health | לא | בדיקת תלויות הליבה (DB, Redis, RabbitMQ) + **מצב אינפורמטיבי** של מעגלי **Circuit Breaker** ל-Google Maps |
+
+**`GET /api/v1/health`** מחזיר JSON עם לפחות:
+
+| שדה | משמעות |
+|-----|--------|
+| `database` | `ok` אחרי `SELECT 1`, אחרת `error` |
+| `redis` | `ok` אחרי `PING`, אחרת `error` |
+| `rabbitmq` | `ok` כשהלקוח מחובר לברוקר, אחרת `error` |
+| `status` | **`healthy`** רק אם כל שלושת השדות למעלה הם **`ok`**; אחרת **`unhealthy`** |
+| `circuit_breakers` | אובייקט עם מפתחות **`google_geocoding`**, **`google_directions`**, **`google_distance_matrix`** — ערכים מחרוזתיים: **`closed`** / **`open`** / **`half_open`** (מצב מעגל ה-Google Maps API המתאים בבקאנד). **לא** משפיע על **`status`** — רק ניטור תפעולי. |
+
+קוד התגובה: **200** כש־`status === healthy`, **503** כש־`status === unhealthy` (מוגדר ב־`main.py`). מימוש: **`app/infrastructure/health/health_service.py`**.
 
 ---
 
@@ -62,7 +89,7 @@ Authorization: Bearer <access_token>
 | POST | /register | לא | רישום — body: UserRegister (email, password, full_name, ...). מחזיר UserOut, שומר cookie לאימות מייל. **Rate limited** (Redis, אותו מנגנון כמו login/refresh). |
 | POST | /login | לא | התחברות — body: LoginRequest (email, password). מחזיר LoginResponse (access_token, refresh_token, user). Rate limited. |
 | POST | /refresh | לא | רענון טוקן — body: RefreshRequest (refresh_token). מחזיר RefreshResponse. Rate limited. |
-| POST | /logout | כן | ביטול refresh token (204). |
+| POST | /logout | כן | ניקוי refresh ב-DB + **denylist** ל-access token מה-**`Authorization: Bearer`** (204). בלי Bearer — רק ניקוי refresh. |
 | GET | /verify-email/confirm | לא | אימות מייל מקישור — query: email, code. מפנה לפרונט. |
 | POST | /verify-email | לא | אימות מייל מקוד — body: VerifyEmailRequest (email, code). אימייל יכול מה-cookie. |
 | POST | /resend-verification | לא | body: EmailOnlyRequest. |
@@ -102,7 +129,7 @@ Authorization: Bearer <access_token>
 | GET | /passengers/me | כן | הבקשות שלי כנוסע. query: `request_status` (pending, approved, cancelled, matched, expired, completed, rejected). |
 | POST | /passengers/ | כן | יצירת בקשה קבועה — body: `PassengerRequestCreate` (pickup/destination, `num_passengers`, `search_radius`, `requested_departure_time` אופציונלי, `pickup_lat`/`pickup_lon` זוגיים, **`is_notification_active`** — האם לכלול את הבקשה בהתאמות אימייל/פוש כשנהג יוצר נסיעה מתאימה, **`group_id`** אופציונלי — התאמה רק לנסיעות באותה קבוצה, `is_auto_generated`). מחזיר `PassengerRequestWithMatches` (201) כולל `matching_rides` מיידי. **זהו גם מסלול “שמירת התראה”** אחרי חיפוש: אותם פרמטרי מסלול כמו בחיפוש, בלי תלות ב-`GET search-rides` (החיפוש עצמו **לא** יוצר שורה ב-DB). |
 | GET | /rides/{ride_id}/driver-info | כן | פרטי נהג לנסיעה (מנותב תחת `/api/v1/passenger/rides/...`). |
-| POST | /passengers/request-ride-from-search | כן | body: `RequestRideFromSearch` (`ride_id`, `request_id?`, `num_seats`, כתובות). אם אין `request_id` — יוצר בקשה זמנית לחיפוש; אז `BookingService.request_to_join` + אירועי outbox (התראה לנהג). |
+| POST | /passengers/request-ride-from-search | כן | body: `RequestRideFromSearch` (`ride_id`, `request_id?`, `num_seats`, כתובות). אם אין `request_id` — יוצר בקשה זמנית לחיפוש; אז `BookingService.request_to_join` + אירועי outbox (התראה לנהג). **כותרת אופציונלית `Idempotency-Key`** — מניע כפילות (Redis; fingerprint ב־`ride_join_idempotency.py`); ראו סעיף Idempotency-Key למעלה. |
 | GET | /passengers/search-rides | אופציונלי | חיפוש נסיעות **ללא שמירה** ב-DB. query: `pickup_name`, `destination_name`, `search_radius` (ברירת מחדל 1000 מ׳), `departure_time?`, `limit` (ברירת מחדל 20, עד 50), `after` (cursor), **`group_id?`** — רק אם המשתמש מחובר וחבר בקבוצה (dependency `require_group_member`). **Pagination**: cursor-based — `items`, `next_cursor`, `has_more`. |
 | DELETE | /passengers/{request_id}/cancel | כן | ביטול בקשת נסיעה ושחרור שריונים (204). |
 | GET | /passengers/{request_id}/matches | כן | התאמות עדכניות לבקשה קיימת. |
@@ -118,13 +145,13 @@ Authorization: Bearer <access_token>
 | PATCH | /{booking_id}/approve | לא (query) | query: booking_id, driver_id. אישור הזמנה. |
 | PATCH | /{booking_id}/reject | לא (query) | query: booking_id, driver_id. דחיית הזמנה. |
 | POST | /{booking_id}/cancel | כן | ביטול הזמנה (בעלים). |
-| POST | /{booking_id}/location | כן | **GPS נהג**: body: lat, lng, heading?, speed?. דורש: משתמש=נהג הנסיעה, נסיעה ב-ACTIVE. מפיץ מיקום לנוסעים המאושרים (204). לוגיקה ב־`BookingService.broadcast_driver_location`. |
-| POST | /{booking_id}/passenger-location | כן | **GPS נוסע**: body: lat, lng, heading?, speed?. דורש: משתמש=נוסע הבוקינג. מפיץ מיקום לנהג בערוץ ride_{ride_id}:passenger_locations (204). לוגיקה ב־`BookingService.broadcast_passenger_location`. |
+| POST | /{booking_id}/location | כן | **GPS נהג**: body: lat, lng, heading?, speed?. דורש: משתמש=נהג הנסיעה, נסיעה ב-ACTIVE. מפיץ מיקום לנוסעים המאושרים (204). לוגיקה ב־`BookingLocationService.broadcast_driver_location` (`location_service.py`). |
+| POST | /{booking_id}/passenger-location | כן | **GPS נוסע**: body: lat, lng, heading?, speed?. דורש: משתמש=נוסע הבוקינג. מפיץ מיקום לנהג בערוץ ride_{ride_id}:passenger_locations (204). לוגיקה ב־`BookingLocationService.broadcast_passenger_location` (`location_service.py`). |
 | GET | /my-bookings | לא (query) | query: user_id, status?, page (default 1), limit (default 20, max 50). **Pagination**: page-based. תגובה: items, total, page, limit, has_more. |
-| GET | /driver-summary | כן | כל נסיעות הנהג עם נוסעים (pending/confirmed) בשאילתת DB אחת — `DriverSummaryResponse`. |
-| GET | /passenger-summary | כן | כל הזמנות הנוסע עם פרטי נסיעה ונהג (כשהנסיעה לא cancelled/completed) — `PassengerSummaryResponse`. |
-| GET | /ride/{ride_id}/manifest | לא (query) | query: ride_id, driver_id. מניפסט נסיעה. |
-| GET | /ride/{ride_id}/pending | לא (query) | query: ride_id, driver_id. בקשות ממתינות. |
+| GET | /driver-summary | כן | כל נסיעות הנהג עם נוסעים (pending/confirmed) בשאילתת DB אחת — `DriverSummaryResponse` (`BookingReadsService.get_driver_summary`). |
+| GET | /passenger-summary | כן | כל הזמנות הנוסע עם פרטי נסיעה ונהג (כשהנסיעה לא cancelled/completed) — `PassengerSummaryResponse` (`BookingReadsService.get_passenger_summary`). |
+| GET | /ride/{ride_id}/manifest | לא (query) | query: ride_id, driver_id. מניפסט נסיעה (`BookingReadsService.get_ride_manifest`). |
+| GET | /ride/{ride_id}/pending | לא (query) | query: ride_id, driver_id. בקשות ממתינות (`BookingReadsService.get_pending_requests`). |
 | GET | /{booking_id} | לא | פרטי הזמנה. |
 | WS | /ws/{booking_id}/location | query token=JWT | WebSocket לעדכוני מיקום נהג (רק נוסע הבוקינג). ערוץ Redis: booking_{booking_id}. **שדות:** [REALTIME.md](REALTIME.md) (WebSocket JSON — מיקום). |
 
@@ -137,7 +164,7 @@ Authorization: Bearer <access_token>
 | GET | /me | כן | הפרופיל שלי (UserRead). |
 | PATCH | /me/last-seen | כן | עדכון `last_active_at` (204). |
 | GET | /{user_id}/last-seen | כן | מקור ל-`last_seen` ב-UI צ'אט; נקרא מ-chat-ws ב-`GET /presence/{id}` כשצריך. |
-| GET | /me/notifications | כן | כל ההתראות שלי (כנהג/נוסע). |
+| GET | /me/notifications | כן | כל ההתראות שלי (כנהג/נוסע) — `BookingReadsService.get_notifications_for_user`. |
 | PATCH | /fcm-token | כן | body: `FCMTokenUpdate` — `fcm_token` מחרוזת (רישום) או **`null`** (ניקוי ב-DB, למשל logout). |
 | POST | /me/test-push | כן | בדיקת FCM (דורש `fcm_token` בפרופיל). |
 | GET | /me/avatar/upload-url | כן | query: filename?. מחזיר presigned URL + staging_key. |
@@ -167,7 +194,7 @@ Authorization: Bearer <access_token>
 - `partner_read_up_to_message_id` — מקור האמת החדש ל־read receipts פר הודעה
 
 | GET | /unread-count | כן | `{ "count": number }` — מספר שיחות עם הודעות שלא נקראו. |
-| GET | /conversations/{conversation_id}/calendar.ics | כן | ייצוא ללוח שנה — כרגע `LinkupError` **501** (`CHAT_CALENDAR_NOT_IMPLEMENTED`). |
+| GET | /conversations/{conversation_id}/calendar.ics | כן | ייצוא ללוח שנה — כרגע `LinkUpError` **501** (`CHAT_CALENDAR_NOT_IMPLEMENTED`). |
 
 ---
 

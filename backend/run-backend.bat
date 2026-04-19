@@ -2,7 +2,7 @@
 REM For development only. In production use Docker.
 chcp 65001 >nul
 echo ========================================
-echo   Linkup - הרצת בקאנד (פורט 8000)
+echo   LinkUp - הרצת בקאנד (פורט 8000)
 echo ========================================
 echo.
 
@@ -16,8 +16,8 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8000 ^| findstr LISTENING') 
 )
 echo [2/2] מפעיל את הבקאנד...
 echo.
-echo אם אתה רואה למטה "[Linkup] Backend נטען" - הבקאנד הנכון רץ.
-echo כשתנסה הרשמה באתר, כאן אמורות להופיע שורות [Linkup] >>> בקשה
+echo אם אתה רואה למטה "[LinkUp] Backend נטען" - הבקאנד הנכון רץ.
+echo כשתנסה הרשמה באתר, כאן אמורות להופיע שורות [LinkUp] >>> בקשה
 echo.
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 pause

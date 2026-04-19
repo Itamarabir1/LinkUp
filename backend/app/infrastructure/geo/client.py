@@ -6,6 +6,10 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
+from app.infrastructure.geo.circuit_breaker import (
+    google_directions_cb,
+    google_distance_matrix_cb,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +108,10 @@ class GeoClient:
         Google Distance Matrix: travel time and distance (meters) between two points.
         Returns (duration_sec, distance_m) or None on failure.
         """
+        if not google_distance_matrix_cb.allow_request():
+            logger.warning("CircuitBreaker OPEN: skipping Distance Matrix")
+            return None
+
         origin = f"{start[0]},{start[1]}"
         destination = f"{end[0]},{end[1]}"
         params = {
@@ -116,23 +124,29 @@ class GeoClient:
             try:
                 response = await client.get(GOOGLE_DISTANCE_MATRIX_URL, params=params)
                 if response.status_code != 200:
-                    logger.warning(f"Distance Matrix API error: {response.status_code}")
+                    logger.warning("Distance Matrix API error: %s", response.status_code)
+                    google_distance_matrix_cb.record_failure()
                     return None
                 data: dict[str, Any] = response.json()
                 if data.get("status") != "OK":
-                    logger.warning(f"Distance Matrix status: {data.get('status')}")
+                    logger.warning("Distance Matrix status: %s", data.get("status"))
+                    google_distance_matrix_cb.record_failure()
                     return None
                 rows = data.get("rows", [])
                 if not rows or not rows[0].get("elements"):
+                    google_distance_matrix_cb.record_failure()
                     return None
                 el = rows[0]["elements"][0]
                 if el.get("status") != "OK":
+                    google_distance_matrix_cb.record_failure()
                     return None
                 duration_sec = el.get("duration", {}).get("value", 0)
                 distance_m = el.get("distance", {}).get("value", 0)
+                google_distance_matrix_cb.record_success()
                 return (int(duration_sec), int(distance_m))
             except Exception as e:
-                logger.warning(f"Distance Matrix error: {e}")
+                logger.warning("Distance Matrix error: %s", e)
+                google_distance_matrix_cb.record_failure()
                 return None
 
     async def fetch_raw_routes(
@@ -158,6 +172,10 @@ class GeoClient:
         Up to 3 routes from Google Directions (alternatives=true).
         Output shape matches processor: summary, duration (sec), distance (m), coords.
         """
+        if not google_directions_cb.allow_request():
+            logger.warning("CircuitBreaker OPEN: skipping Google Directions")
+            return []
+
         origin = f"{start[0]},{start[1]}"
         destination = f"{end[0]},{end[1]}"
         params = {
@@ -170,21 +188,22 @@ class GeoClient:
         if departure_time:
             ts = int(departure_time.timestamp())
             now_ts = int(time.time())
-            # Google requires departure_time in the future (~1 min ahead minimum)
             params["departure_time"] = max(ts, now_ts + 60)
         else:
             params["departure_time"] = "now"
+
         async with httpx.AsyncClient(timeout=TIMEOUT_DIRECTIONS) as client:
             try:
                 response = await client.get(GOOGLE_DIRECTIONS_URL, params=params)
                 if response.status_code != 200:
-                    logger.error(f"Google Directions API error: {response.status_code}")
+                    logger.error("Google Directions API error: %s", response.status_code)
+                    google_directions_cb.record_failure()
                     return []
                 data = response.json()
                 if data.get("status") != "OK":
-                    logger.warning(f"Google Directions status: {data.get('status')}")
+                    logger.warning("Google Directions status: %s", data.get("status"))
+                    google_directions_cb.record_failure()
                     return []
-                # alternatives=true returns a list — take up to MAX_ROUTES
                 raw_list = data.get("routes")
                 if not isinstance(raw_list, list):
                     raw_list = [raw_list] if raw_list else []
@@ -192,31 +211,45 @@ class GeoClient:
                 out: list[dict] = []
                 for i, r in enumerate(routes_raw):
                     legs = r.get("legs", [])
-                    duration_sec = sum(leg.get("duration", {}).get("value", 0) for leg in legs)
-                    distance_m = sum(leg.get("distance", {}).get("value", 0) for leg in legs)
+                    duration_sec = sum(
+                        leg.get("duration", {}).get("value", 0) for leg in legs
+                    )
+                    distance_m = sum(
+                        leg.get("distance", {}).get("value", 0) for leg in legs
+                    )
                     poly = r.get("overview_polyline", {}).get("points", "")
                     coords = _decode_polyline(poly) if poly else []
                     summary = r.get("summary") or f"מסלול {i + 1}"
-                    out.append(
-                        {
-                            "summary": summary,
-                            "duration": duration_sec,
-                            "distance": distance_m,
-                            "coords": coords,
-                        },
-                    )
-                # Override duration/distance from Distance Matrix when available
+                    out.append({
+                        "summary": summary,
+                        "duration": duration_sec,
+                        "distance": distance_m,
+                        "coords": coords,
+                    })
+                google_directions_cb.record_success()
+
                 dm_result = await self.fetch_distance_matrix(start, end)
                 if dm_result:
                     duration_dm, distance_dm = dm_result
                     for route in out:
                         route["duration"] = duration_dm
                         route["distance"] = distance_dm
-                    logger.info(f"Distance Matrix: duration={duration_dm}s, distance={distance_dm}m applied to {len(out)} routes")
-                logger.info(f"Google Directions: {len(out)} routes for {origin} -> {destination}")
+                    logger.info(
+                        "Distance Matrix override: %ds, %dm on %d routes",
+                        duration_dm,
+                        distance_dm,
+                        len(out),
+                    )
+                logger.info(
+                    "Google Directions: %d routes for %s → %s",
+                    len(out),
+                    origin,
+                    destination,
+                )
                 return out
             except Exception as e:
-                logger.error(f"Google Directions error: {e}", exc_info=True)
+                logger.error("Google Directions error: %s", e, exc_info=True)
+                google_directions_cb.record_failure()
                 return []
 
 

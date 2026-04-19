@@ -1,4 +1,4 @@
-# איך להריץ את הפרויקט Linkup
+# איך להריץ את הפרויקט LinkUp
 
 צריך **שני חלונות CMD** – אחד לבקאנד ואחד לפרונט.
 
@@ -8,7 +8,7 @@
 
 דוגמה לנתיב (החלף לנתיב אצלך):
 ```
-c:\Users\user\Desktop\Linkup
+c:\Users\user\Desktop\LinkUp
 ```
 בתוכו צריכות להיות לפחות תיקיות: `backend`, `frontend`. ל**צ'אט בזמן אמת**, **התראות in-app** (פיד), **push דרך worker** וכו' — צריך גם תשתית (Postgres, Redis, RabbitMQ), ולרוב **chat-ws** על פורט **8081**; השורה המלאה: **`README.md`** / **`docs/architecture/DEVELOPMENT.md`** עם `docker compose up -d`.
 
@@ -16,7 +16,7 @@ c:\Users\user\Desktop\Linkup
 
 ## שלב 1: הרצת הבקאנד (API)
 
-**חשוב:** אם **Docker רץ** (למשל `docker compose up -d`), **מיכל הבקאנד** של Linkup תופס פורט 8000. אז הבקשות מהאתר מגיעות למיכל (קוד ישן) ולא ל-uvicorn שהרצת ב-CMD – ולכן אין לוגים. **עצור את מיכל הבקאנד:**
+**חשוב:** אם **Docker רץ** (למשל `docker compose up -d`), **מיכל הבקאנד** של LinkUp תופס פורט 8000. אז הבקשות מהאתר מגיעות למיכל (קוד ישן) ולא ל-uvicorn שהרצת ב-CMD – ולכן אין לוגים. **עצור את מיכל הבקאנד:**
 ```cmd
 docker stop linkup_backend
 ```
@@ -27,26 +27,26 @@ docker stop linkup_backend
 1. **לסגור את כל חלונות CMD** שקשורים לפרויקט.
 
 2. **להריץ את הבקאנד דרך הקובץ המוכן** (הוא עוצר תהליך קיים על 8000 ואז מפעיל את הבקאנד):
-   - פתח סייר קבצים → `c:\Users\user\Desktop\Linkup\backend`
+   - פתח סייר קבצים → `c:\Users\user\Desktop\LinkUp\backend`
    - **לחיצה כפולה** על `run-backend.bat`
 
    או מ-CMD:
    ```cmd
-   c:\Users\user\Desktop\Linkup\backend\run-backend.bat
+   c:\Users\user\Desktop\LinkUp\backend\run-backend.bat
    ```
 
 3. **אם אתה מעדיף להריץ ידנית** (בלי הסקריפט):
    - לפתוח CMD
-   - `cd c:\Users\user\Desktop\Linkup\backend`
+   - `cd c:\Users\user\Desktop\LinkUp\backend`
    - `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
 
 4. **לבדוק שהבקאנד עלה:**
    - אמורות להופיע שורות כמו:
      ```
-     [Linkup] Backend נטען (main.py) – CORS + לוגים פעילים
+     [LinkUp] Backend נטען (main.py) – CORS + לוגים פעילים
      INFO:     Uvicorn running on http://0.0.0.0:8000
      ```
-   - אם **לא** מופיע "Linkup Backend נטען" – יש שגיאת הפעלה (למשל חסר Python/uvicorn או שגיאה ב־import). תעתיק את השגיאה המלאה.
+   - אם **לא** מופיע "LinkUp Backend נטען" – יש שגיאת הפעלה (למשל חסר Python/uvicorn או שגיאה ב־import). תעתיק את השגיאה המלאה.
 
 5. **אל תסגור את החלון** – הבקאנד צריך להמשיך לרוץ.
 
@@ -58,7 +58,7 @@ docker stop linkup_backend
 
 2. **לעבור לתיקיית הפרונט:**
    ```cmd
-   cd c:\Users\user\Desktop\Linkup\frontend
+   cd c:\Users\user\Desktop\LinkUp\frontend
    ```
 
 3. **הפעלה (פעם ראשונה – התקנת חבילות):**
@@ -85,8 +85,8 @@ docker stop linkup_backend
 
 | חלון | פקודה | כתובת |
 |------|--------|--------|
-| CMD 1 (בקאנד) | `cd c:\Users\user\Desktop\Linkup\backend` ואז `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000` | API: http://localhost:8000 |
-| CMD 2 (פרונט) | `cd c:\Users\user\Desktop\Linkup\frontend` ואז `npm run dev` | אתר: http://localhost:5173 |
+| CMD 1 (בקאנד) | `cd c:\Users\user\Desktop\LinkUp\backend` ואז `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000` | API: http://localhost:8000 |
+| CMD 2 (פרונט) | `cd c:\Users\user\Desktop\LinkUp\frontend` ואז `npm run dev` | אתר: http://localhost:5173 |
 
 ---
 
@@ -99,7 +99,7 @@ docker stop linkup_backend
 - **שגיאה על חוסר מודול (module)** – מתוך `backend` להריץ:  
   `pip install -r requirements.txt`
 
-- **שגיאה על DB / Redis / RabbitMQ / chat-ws / worker** – להריץ את התשתית (למשל עם Docker) משורש הפרויקט (`Linkup`):  
+- **שגיאה על DB / Redis / RabbitMQ / chat-ws / worker** – להריץ את התשתית (למשל עם Docker) משורש הפרויקט (`LinkUp`):  
   `docker compose up -d` — מרים `db`, `redis`, `rabbitmq`, שירות **`migrate`** (מיגרציה אוטומטית), `chat-ws`, `outbox-worker`, `backend` וכו׳ (ללא **nginx** אלא אם מריצים `docker compose --profile prod up -d`). אם **`migrate`** נכשל — לבדוק `docker compose logs migrate`; **backend** לא יעלה עד שהמיגרציה מצליחה.  
   אפשר גם במפורש: `docker compose up -d db redis rabbitmq chat-ws` אם צריך רק חלק מהשירותים (אז מיגרציה ידנית: `cd backend && alembic upgrade head`).
 
@@ -110,11 +110,11 @@ docker stop linkup_backend
 כשאתה מנסה **הרשמה** באתר, **בחלון CMD של הבקאנד** (החלון הראשון) אמורות להופיע שורות כמו:
 
 ```
-[Linkup] >>> בקשה הגיעה: POST /api/v1/auth/register
-[Linkup] register endpoint – מתחיל register_new_user
+[LinkUp] >>> בקשה הגיעה: POST /api/v1/auth/register
+[LinkUp] register endpoint – מתחיל register_new_user
 ```
 
-אם יש שגיאה 500, תופיע גם שורת `[Linkup] !!! שגיאה 500:` ואחריה פרטי השגיאה.
+אם יש שגיאה 500, תופיע גם שורת `[LinkUp] !!! שגיאה 500:` ואחריה פרטי השגיאה.
 
 ---
 

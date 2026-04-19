@@ -37,7 +37,7 @@ export default function RideReminderDriver({
       <Text style={mutedText}>רצינו להזכיר לך שיש לך נסיעה מתוכננת בעוד חצי שעה:</Text>
       <EmailInfoBox color={COLORS.warning} rows={[{ label: 'מסלול', value: `${origin || ''} → ${destination || ''}` }]} />
       <Text style={mutedText}>
-        טיפ קטן: כדאי להעיר משתתפים בצ׳אט ב-Linkup ולראות אם יש שינויים אחרונים לפני היציאה.
+        טיפ קטן: כדאי להעיר משתתפים בצ׳אט ב-LinkUp ולראות אם יש שינויים אחרונים לפני היציאה.
       </Text>
       <EmailButton href={ride_url} color={COLORS.warning}>
         לניהול הנסיעה והנוסעים

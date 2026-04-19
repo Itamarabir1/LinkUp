@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_current_user
-from app.core.exceptions.base import LinkupError
+from app.core.exceptions.base import LinkUpError
 from app.core.exceptions.chat import ChatRoomNotFound
 from app.db.session import get_db
 from app.domain.chat import crud as chat_crud
@@ -184,7 +184,7 @@ async def export_conversation_calendar(
     # ride = RideSummary(...)
     # ical_bytes = export_rides_to_ical_bytes([ride])
 
-    raise LinkupError(
+    raise LinkUpError(
         message="ייצוא ללוח שנה דורש ניתוח AI - עדיין לא מומש",
         status_code=501,
         error_code="CHAT_CALENDAR_NOT_IMPLEMENTED",

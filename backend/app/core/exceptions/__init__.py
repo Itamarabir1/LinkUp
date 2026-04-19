@@ -1,5 +1,5 @@
 # app/core/exceptions/__init__.py
-"""Central re-exports for domain errors: ``from app.core.exceptions import LinkupError, ...``."""
+"""Central re-exports for domain errors: ``from app.core.exceptions import LinkUpError, ...``."""
 
 # Admin
 from .admin import (
@@ -26,7 +26,7 @@ from .auth import (
     UserNotVerifiedError,
     VerificationCodeExpiredError,
 )
-from .base import LinkupError
+from .base import LinkUpError
 
 # Booking
 from .booking import (
@@ -152,7 +152,7 @@ __all__ = [
     "InvalidRideStatusError",
     "InvalidRouteError",
     "InvalidVerificationCodeError",
-    "LinkupError",
+    "LinkUpError",
     "MessageSendFailed",
     "NewPasswordSameAsOldError",
     "NoSeatsAvailableError",

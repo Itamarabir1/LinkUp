@@ -94,7 +94,7 @@
 |--|--|
 | **החלטה** | [`useErrorHandler`](../../frontend/src/errors/useErrorHandler.ts) מנרמל Axios ופורמט ה-API (`error_code`, `message`, `trace_id`); [`CODE_MESSAGES`](../../frontend/src/errors/useErrorHandler.ts) למיפוי קודים נפוצים לעברית כשאין הודעה מהשרת. |
 | **למה** | התאמה ל-[`docs/ERRORS.md`](../ERRORS.md) — חוויית משתמש אחידה גם כשהשרת מחזיר רק קוד. |
-| **בקצרה לראיון** | "מיישרים קו עם LinkupError בבקאנד — קוד שגיאה, הודעה, ו-fallback לפי error_code." |
+| **בקצרה לראיון** | "מיישרים קו עם LinkUpError בבקאנד — קוד שגיאה, הודעה, ו-fallback לפי error_code." |
 
 ---
 

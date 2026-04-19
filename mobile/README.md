@@ -1,13 +1,13 @@
-# Linkup – אפליקציית React Native (Expo)
+# LinkUp – אפליקציית React Native (Expo)
 
-אפליקציית מובייל לחיבור ל-Backend של Linkup: נהג (הנסיעות שלי, יצירת נסיעה), נוסע (חיפוש, הבקשות שלי), פרופיל ואימות.
+אפליקציית מובייל לחיבור ל-Backend של LinkUp: נהג (הנסיעות שלי, יצירת נסיעה), נוסע (חיפוש, הבקשות שלי), פרופיל ואימות.
 
 ## דרישות
 
 - Node.js 18+
 - npm או yarn
 - Android Studio (לאמולטור אנדרואיד) או מכשיר אנדרואיד
-- Backend Linkup רץ (למשל `http://localhost:8000`)
+- Backend LinkUp רץ (למשל `http://localhost:8000`)
 
 ## התקנה והרצה
 

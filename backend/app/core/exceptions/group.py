@@ -1,9 +1,9 @@
 from uuid import UUID
 
-from .base import LinkupError
+from .base import LinkUpError
 
 
-class GroupNotFoundError(LinkupError):
+class GroupNotFoundError(LinkUpError):
     status_code = 404
     error_code = "GROUP_NOT_FOUND"
     message = "קבוצה לא נמצאה"
@@ -13,25 +13,25 @@ class GroupNotFoundError(LinkupError):
         super().__init__(payload=payload)
 
 
-class GroupNotMemberError(LinkupError):
+class GroupNotMemberError(LinkUpError):
     status_code = 403
     error_code = "GROUP_NOT_MEMBER"
     message = "אינך חבר בקבוצה"
 
 
-class GroupAdminRequiredError(LinkupError):
+class GroupAdminRequiredError(LinkUpError):
     status_code = 403
     error_code = "GROUP_ADMIN_REQUIRED"
     message = "רק אדמין הקבוצה יכול לבצע פעולה זו"
 
 
-class GroupInvalidImageKeyError(LinkupError):
+class GroupInvalidImageKeyError(LinkUpError):
     status_code = 400
     error_code = "GROUP_INVALID_IMAGE_KEY"
     message = "מפתח תמונה לא תקין"
 
 
-class GroupMemberNotFoundError(LinkupError):
+class GroupMemberNotFoundError(LinkUpError):
     status_code = 404
     error_code = "GROUP_MEMBER_NOT_FOUND"
     message = "חבר לא נמצא בקבוצה"
@@ -41,7 +41,7 @@ class GroupMemberNotFoundError(LinkupError):
         super().__init__(payload=payload)
 
 
-class GroupFilterAuthRequiredError(LinkupError):
+class GroupFilterAuthRequiredError(LinkUpError):
     """Search or operation with group_id requires a logged-in user."""
 
     status_code = 401

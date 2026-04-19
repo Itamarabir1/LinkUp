@@ -11,7 +11,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions.base import LinkupError
+from app.core.exceptions.base import LinkUpError
 from app.core.exceptions.booking import (
     BookingNotFoundError,
     ForbiddenRideActionError,
@@ -96,7 +96,7 @@ async def get_or_create_conversation(db: AsyncSession, current_user_id: UUID, ot
     Returns ConversationDetail (for the router).
     """
     if other_user_id == current_user_id:
-        raise LinkupError(
+        raise LinkUpError(
             message="לא ניתן לפתוח שיחה עם עצמך",
             status_code=400,
             error_code="CHAT_INVALID_SELF_CONVERSATION",
@@ -134,7 +134,7 @@ async def get_or_create_conversation_by_booking(db: AsyncSession, booking_id: UU
     other_user_id = driver_id if current_user_id == passenger_id else passenger_id
 
     if other_user_id == current_user_id:
-        raise LinkupError(
+        raise LinkUpError(
             message="לא ניתן לפתוח שיחה עם עצמך",
             status_code=400,
             error_code="CHAT_INVALID_SELF_CONVERSATION",

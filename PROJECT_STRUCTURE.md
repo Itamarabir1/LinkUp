@@ -1,16 +1,16 @@
-# סכמת מבנה הפרויקט – Linkup
+# סכמת מבנה הפרויקט – LinkUp
 
 מסמך זה הוא snapshot תיעודי (לא מקור אמת מחייב לקובץ-לקובץ), ועלול לפגר אחרי שינויים בריפו.  
 למצב עדכני בזמן אמת עדיף להסתמך על העץ בפועל (`git ls-files` / IDE) ועל מסמכי ארכיטקטורה בשורש (`README.md`, `ARCHITECTURE.md`).
 
-**עדכונים אחרונים בתיעוד:** נוספו שירות **`email-renderer/`** (React Email), מסלולי **`frontend/src/i18n/`** (he/en), **`frontend/src/utils/date.ts`**, **`frontend/src/utils/i18nError.ts`**, ואיחוד `font-family` ב־`*.module.css` סביב **`var(--font-primary)`**. עץ התיקיות המפורט למטה עלול עדיין להציג קבצים שהוסרו או הוזזו — השוו לריפו.
+**עדכונים אחרונים בתיעוד:** **פיצול SRP ב־bookings:** קריאות צבירה ב־**`booking_reads_service.py`** (`BookingReadsService`), שידור GPS ב־**`location_service.py`** (`BookingLocationService`), מחזור חיים ב־**`service.py`** (`BookingService`) + ייצוא לאחור; עזרי **Idempotency-Key** ל־join מחיפוש ב־**`ride_join_idempotency.py`**; בפרונט הוק **`useJoinRide.ts`** לצד **`useSearchRides.ts`**. **Circuit Breaker** לקריאות Google Maps (**`backend/app/infrastructure/geo/circuit_breaker.py`**) + **`circuit_breakers`** ב־**`GET /api/v1/health`** — `docs/ENGINEERING_HIGHLIGHTS.md`, `docs/architecture/API.md`, `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §20; **`Idempotency-Key`** — `ARCHITECTURE.md`, `docs/architecture/API.md`, ADR §19, `docs/ENGINEERING_HIGHLIGHTS.md` §7ה; **JWT denylist** — ADR §18; שירות **`email-renderer/`**, **`frontend/src/i18n/`**, **`date.ts`**, **`i18nError.ts`**, פונטים ב־CSS Modules; **`EVENTS.md`** — `ride.created` לעומת `ride.created_for_passengers`; ADR §17. עץ התיקיות המפורט למטה עלול עדיין להציג קבצים שהוסרו או הוזזו — השוו לריפו.
 
 ---
 
-## שורש הפרויקט (Linkup/)
+## שורש הפרויקט (LinkUp/)
 
 ```
-Linkup/
+LinkUp/
 ├── .git/                          # מאגר Git
 ├── .github/
 │   └── workflows/                 # CI/CD
@@ -130,9 +130,13 @@ backend/
 │   │   │   ├── service.py
 │   │   │   └── verification_service.py
 │   │   ├── bookings/
+│   │   │   ├── booking_reads_service.py
 │   │   │   ├── crud.py
 │   │   │   ├── enum.py
+│   │   │   ├── location_service.py
+│   │   │   ├── manifest_mapping.py
 │   │   │   ├── model.py
+│   │   │   ├── router.py
 │   │   │   ├── schema.py
 │   │   │   └── service.py
 │   │   ├── chat/
@@ -228,9 +232,14 @@ backend/
 │   │   │       ├── orchestrator.py
 │   │   │       └── reminder_scheduler.py
 │   │   ├── passengers/
+│   │   │   ├── ai_search_prompts.py
+│   │   │   ├── ai_search_schema.py
+│   │   │   ├── ai_search_service.py
 │   │   │   ├── crud.py
 │   │   │   ├── enum.py
 │   │   │   ├── model.py
+│   │   │   ├── router.py
+│   │   │   ├── ride_join_idempotency.py
 │   │   │   ├── schema.py
 │   │   │   └── service.py
 │   │   ├── rides/
@@ -273,7 +282,10 @@ backend/
 │   │   │   ├── firebase-credentials.json   # local only, in .gitignore
 │   │   │   └── firebase.py
 │   │   ├── geo/
-│   │   │   ├── client.py
+│   │   │   ├── circuit_breaker.py   # Circuit Breaker singletons ל-Google Maps APIs
+│   │   │   ├── client.py            # Directions + Distance Matrix (GeoClient)
+│   │   │   ├── geocode_cache.py
+│   │   │   ├── geocoding.py         # GeocodingService (Google HTTP)
 │   │   │   └── utils.py
 │   │   ├── outbox/
 │   │   │   ├── enum.py

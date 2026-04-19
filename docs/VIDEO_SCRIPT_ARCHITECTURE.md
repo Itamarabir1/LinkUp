@@ -1,4 +1,4 @@
-# תסריט סרטון — ארכיטקטורה (Linkup) · ~6–7 דקות
+# תסריט סרטון — ארכיטקטורה (LinkUp) · ~6–7 דקות
 
 מטרה: להסביר איך המערכת מפורקת לשירותים, איך נתונים ואירועים זורמים, ואיפה נכנס פיצ’ר הנוסע (חיפוש לעומת שמירת התראה). בסוף יש **קטלוג API** — מקור אמת מפורט: [`architecture/API.md`](architecture/API.md).
 
@@ -7,7 +7,7 @@
 ## חלק א׳ — מה רואים על המסך (0:00–1:00)
 
 **תגיד:**  
-“Linkup בנויה משלושה חלקים עיקריים: **בקאנד** ב-Python ו-FastAPI — כל ה-REST, העסקים, ה-DB והאאוטבוקס; **chat-ws** ב-Go — שרת WebSocket לצ’אט והעברת הודעות מ-Redis ללקוחות; ו**פרונט** React עם Vite. הלקוח מדבר ב-HTTP לבקאנד וב-WebSocket ל-chat-ws לפי סוג הפיצ’ר.”
+“LinkUp בנויה משלושה חלקים עיקריים: **בקאנד** ב-Python ו-FastAPI — כל ה-REST, העסקים, ה-DB והאאוטבוקס; **chat-ws** ב-Go — שרת WebSocket לצ’אט והעברת הודעות מ-Redis ללקוחות; ו**פרונט** React עם Vite. הלקוח מדבר ב-HTTP לבקאנד וב-WebSocket ל-chat-ws לפי סוג הפיצ’ר.”
 
 **מומלץ להציג:** דיאגרמה מ־[`README.md`](../../README.md) (mermaid services) או שקופית פשוטה: FE → API, FE → chat-ws, API/worker → Postgres / Redis / RabbitMQ / **email-renderer**.
 
@@ -56,7 +56,7 @@
 
 **החלטה מתועדת:** `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` — **סעיף 17**.
 
-**פרונט:** `frontend/src/pages/SearchRides/` + `useSearchRides` + `saveSearchAlert` ב-`src/api/passengers.ts`; מצב `hasSearched` כדי להציג ‘אין תוצאות’ רק אחרי חיפוש אמיתי.
+**פרונט:** `frontend/src/pages/SearchRides/` — `useSearchRides` + **`useJoinRide`** (הצטרפות מחיפוש + Idempotency-Key) + `saveSearchAlert` ב-`src/api/passengers.ts`; מצב `hasSearched` כדי להציג ‘אין תוצאות’ רק אחרי חיפוש אמיתי.
 
 ---
 

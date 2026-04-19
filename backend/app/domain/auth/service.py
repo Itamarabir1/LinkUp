@@ -27,10 +27,12 @@ from app.core.exceptions.user import (
 from app.core.security import (
     create_access_token,
     create_refresh_token,
+    decode_access_token,
     decode_refresh_token,
     get_password_hash,
     verify_password,
 )
+from app.infrastructure.redis.client import redis_client
 
 # Model import so the IDE resolves methods on new_user
 # Note: validation is usually raised from schemas, not the service — kept here for safety
@@ -110,8 +112,8 @@ class AuthService:
         except Exception as e:
             await db.rollback()
             logger.error("register_new_user failed: %s", e)
-            # Could wrap in LinkupError here if desired
-            # raise LinkupError(
+            # Could wrap in LinkUpError here if desired
+            # raise LinkUpError(
             #     message=f"Registration failed: {str(e)}",
             #     status_code=500
             # )
@@ -397,9 +399,23 @@ class AuthService:
             },
         }
 
-    async def logout(self, db: AsyncSession, user: User) -> None:
-        """Clear the user's refresh token (logout from all devices)."""
+    async def logout(self, db: AsyncSession, user: User, access_token: str | None = None) -> None:
+        """Clear refresh token; optionally denylist current access token jti until exp."""
         await self.crud_user.update_refresh_token(db, user=user, refresh_token=None)
+        if not access_token:
+            return
+        payload = decode_access_token(access_token)
+        if not payload:
+            return
+        jti = payload.get("jti")
+        exp = payload.get("exp")
+        if not jti or exp is None:
+            return
+        now = datetime.now(UTC).timestamp()
+        exp_ts = float(exp.timestamp()) if hasattr(exp, "timestamp") else float(exp)
+        ttl = max(0, int(exp_ts - now))
+        if ttl > 0:
+            await redis_client.add_to_denylist(str(jti), ttl)
 
     async def change_password(self, db: AsyncSession, user_id: UUID, data: ChangePasswordRequest) -> dict:
         """

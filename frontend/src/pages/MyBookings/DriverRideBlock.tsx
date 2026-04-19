@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { canDriverOpenMap, canDriverShare, getSource } from './myBookings.utils';
 import type { DriverBookingItem } from './myBookings.types';
 import DriverBookingPassengerRow from './DriverBookingPassengerRow';
+import RouteArrow from '../../components/RouteArrow/RouteArrow';
 import styles from './MyBookings.module.css';
 
 type MyGroup = { group_id: string; name: string };
@@ -58,7 +59,7 @@ export default function DriverRideBlock({
         <div className={styles.driverBlockLeft}>
           <div className={styles.cardRoute}>
             <span>{ride.origin_name ?? '?'}</span>
-            <span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>→</span>
+            <RouteArrow />
             <span>{ride.destination_name ?? '?'}</span>
           </div>
           <div className={styles.cardMeta}>

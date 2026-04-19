@@ -6,7 +6,7 @@ set -e
 cd "$(dirname "$0")"
 
 echo "========================================"
-echo "  Linkup - Backend (port 8000)"
+echo "  LinkUp - Backend (port 8000)"
 echo "========================================"
 echo ""
 
@@ -25,7 +25,7 @@ fi
 
 echo "[2/2] Starting backend..."
 echo ""
-echo "When you see '[Linkup] Backend loaded' below, the backend is running."
-echo "On signup/login requests you should see [Linkup] >>> request lines here."
+echo "When you see '[LinkUp] Backend loaded' below, the backend is running."
+echo "On signup/login requests you should see [LinkUp] >>> request lines here."
 echo ""
 exec uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

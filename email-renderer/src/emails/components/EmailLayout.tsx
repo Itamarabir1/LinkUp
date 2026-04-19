@@ -33,14 +33,14 @@ export default function EmailLayout({
       <Body style={styles.body}>
         <Container style={styles.container}>
           <Section style={{ ...styles.header, backgroundColor: headerColor }}>
-            <Text style={styles.logoText}>Linkup</Text>
+            <Text style={styles.logoText}>LinkUp</Text>
             <Text style={styles.headerTitle}>{headerTitle}</Text>
           </Section>
 
           <Section style={styles.content}>{children}</Section>
 
           <Section style={styles.footer}>
-            <Text style={styles.footerText}>© 2026 Linkup · נוסעים יחד, חוסכים יחד</Text>
+            <Text style={styles.footerText}>© 2026 LinkUp · נוסעים יחד, חוסכים יחד</Text>
             <Text style={styles.footerLinks}>
               <Link href="https://linkup.co.il/unsubscribe" style={styles.footerLink}>
                 הסר מרשימת תפוצה

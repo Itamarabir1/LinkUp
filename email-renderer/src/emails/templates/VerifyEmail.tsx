@@ -25,14 +25,14 @@ export default function VerifyEmail({ user_name, first_name, token, code }: Prop
 
   return (
     <EmailLayout
-      preview="אמת את כתובת המייל שלך ב-Linkup"
+      preview="אמת את כתובת המייל שלך ב-LinkUp"
       headerColor={COLORS.primary}
       headerTitle="אימות כתובת המייל שלך"
     >
       <Text style={bodyText}>
         שלום <strong>{name}</strong>,
       </Text>
-      <Text style={mutedText}>כמעט סיימנו! כדי להשלים את ההרשמה ל-Linkup, הזן את הקוד הבא:</Text>
+      <Text style={mutedText}>כמעט סיימנו! כדי להשלים את ההרשמה ל-LinkUp, הזן את הקוד הבא:</Text>
       <EmailOtpBox code={otp} expiryMinutes={10} />
       <Text style={{ ...mutedText, textAlign: 'center', fontSize: '13px' }}>
         לא ביקשת? אפשר להתעלם מהודעה זו.

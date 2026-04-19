@@ -17,10 +17,10 @@ import app.infrastructure.firebase_core.firebase
 from app.admin.setup import setup_admin
 from app.api.v1.api_router import api_router
 from app.core.config import settings
-from app.core.exceptions.base import LinkupError
+from app.core.exceptions.base import LinkUpError
 from app.core.exceptions.handlers import (
     integrity_error_handler,
-    linkup_exception_handler,
+    link_up_exception_handler,
     request_validation_exception_handler,
     sqlalchemy_error_handler,
 )
@@ -74,7 +74,7 @@ class EnsureCORSHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app = FastAPI(
-    title="Linkup API",
+    title="LinkUp API",
     version="1.0.0",
     lifespan=lifespan,
     servers=[{"url": "http://127.0.0.1:8000", "description": "Local"}],
@@ -108,7 +108,7 @@ setup_admin(app, engine)
 app.add_exception_handler(RequestValidationError, request_validation_exception_handler)
 app.add_exception_handler(IntegrityError, integrity_error_handler)
 app.add_exception_handler(SQLAlchemyError, sqlalchemy_error_handler)
-app.add_exception_handler(LinkupError, linkup_exception_handler)
+app.add_exception_handler(LinkUpError, link_up_exception_handler)
 
 
 @app.exception_handler(Exception)
@@ -161,4 +161,4 @@ async def api_health(response: Response):
     return health
 
 
-logger.info("Linkup backend started")
+logger.info("LinkUp backend started")

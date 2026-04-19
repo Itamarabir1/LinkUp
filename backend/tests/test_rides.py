@@ -14,7 +14,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.db.models  # noqa: F401
-from app.core.exceptions.base import LinkupError
+from app.core.exceptions.base import LinkUpError
 from app.core.exceptions.ride import InvalidRideStatusError, NoConfirmedBookingsError, RideNotFoundError
 from app.domain.notifications.constants import NotificationEvent
 from app.domain.rides.enum import RideStatus
@@ -54,7 +54,7 @@ async def test_update_ride_empty_payload_raises(db_session: AsyncSession):
     driver = await make_user(db_session, "rUpd0", email_suffix="rides")
     ride = await make_ride(db_session, driver.user_id)
     svc = RideService()
-    with pytest.raises(LinkupError) as exc:
+    with pytest.raises(LinkUpError) as exc:
         await svc.update_ride(db_session, ride.ride_id, driver.user_id, RideUpdate())
     assert exc.value.error_code == "RIDE_UPDATE_EMPTY_FIELDS"
 

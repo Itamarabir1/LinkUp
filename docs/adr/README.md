@@ -1,10 +1,10 @@
 # החלטות ארכיטקטוניות (ADR) — מדריך לראיונות
 
-מסמכים אלה מסכמים **למה** נבנתה Linkup כפי שהיא — לא רק **מה** קיים. מקור אמת טכני נשאר במסמכי הארכיטקטורה והקוד.
+מסמכים אלה מסכמים **למה** נבנתה LinkUp כפי שהיא — לא רק **מה** קיים. מקור אמת טכני נשאר במסמכי הארכיטקטורה והקוד.
 
 ## סדר קריאה מומלץ לפני ראיון
 
-1. [ARCHITECTURE_DECISIONS_BACKEND.md](ARCHITECTURE_DECISIONS_BACKEND.md) — DB, Redis, RabbitMQ, Outbox, **רינדור מיילים ב-Node (§5)**, workers, סקייל, אבטחה, **נוסע: חיפוש מול שמירת התראה (§17)**.
+1. [ARCHITECTURE_DECISIONS_BACKEND.md](ARCHITECTURE_DECISIONS_BACKEND.md) — DB, Redis, RabbitMQ, Outbox, **רינדור מיילים ב-Node (§5)**, workers, סקייל, אבטחה, **JWT `jti` + denylist ב-Redis (§18)**, **Idempotency-Key ל-request-ride-from-search (§19)**, **נוסע: חיפוש מול שמירת התראה (§17)**, **Circuit Breaker ל-Google Maps בבקאנד (§20)**, **PgBouncer מתוכנן (§21)**.
 2. [WEBSOCKETS.md](WEBSOCKETS.md) — **מתי** משתמשים ב-WebSocket, **איזה שרת**, למה לא רק REST/polling.
 3. [FCM_AND_PUSH.md](FCM_AND_PUSH.md) — **למה** push ב-data-only, מחזור חיים טוקן, UX foreground/background.
 4. [ARCHITECTURE_DECISIONS_CHAT_WS.md](ARCHITECTURE_DECISIONS_CHAT_WS.md) — למה Go, גבולות שירות.

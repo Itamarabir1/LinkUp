@@ -1,5 +1,5 @@
 /**
- * Base URL of the Linkup backend API.
+ * Base URL of the LinkUp backend API.
  * Android emulator: use 10.0.2.2 for localhost.
  * Physical device: use your machine IP (e.g. 192.168.1.x).
  */

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions.auth import InvalidAccessTokenError, UserInactiveOrMissingError
 from app.core.security import decode_access_token
 from app.db.session import get_db
+from app.infrastructure.redis.client import redis_client
 from app.domain.users.crud import crud_user
 from app.domain.users.model import User
 
@@ -43,6 +44,11 @@ async def get_current_user(
 
     logger.debug(f"✅ Token decoded successfully, payload: {payload}")
 
+    jti = payload.get("jti")
+    if jti and await redis_client.is_denied(str(jti)):
+        logger.warning("❌ Access token jti is denylisted")
+        raise InvalidAccessTokenError()
+
     user_id = payload.get("sub")
     if not user_id:
         logger.error("❌ Token payload missing 'sub' field")
@@ -68,6 +74,9 @@ async def get_current_user_optional(
     payload = decode_access_token(credentials.credentials)
     if not payload:
         return None
+    jti = payload.get("jti")
+    if jti and await redis_client.is_denied(str(jti)):
+        return None
     user_id = payload.get("sub")
     if not user_id:
         return None
@@ -84,6 +93,8 @@ async def get_current_user_ws(
     WebSocket auth via JWT only (?token=...) — no DB round-trip.
     decode_access_token verifies signature, expiry, and canonical base64.
     Disabled users may still connect until token expiry (trade-off vs DB pool load).
+
+    TODO: JWT denylist is not checked here yet (Redis); WS should align with HTTP auth.
     """
     if not token:
         return None

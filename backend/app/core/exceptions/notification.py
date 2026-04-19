@@ -1,8 +1,8 @@
 # app/core/exceptions/notifications.py
-from .base import LinkupError
+from .base import LinkUpError
 
 
-class NotificationError(LinkupError):
+class NotificationError(LinkUpError):
     """Base class for notification pipeline errors."""
 
     status_code = 500

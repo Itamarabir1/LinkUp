@@ -19,6 +19,7 @@ import { formatMonthYearLong, formatRelativeNotificationTime, formatWeekdayLong 
 import { getApiErrorMessage } from '../utils/apiError';
 import { apiErr } from '../utils/i18nError';
 import { NOTIFICATIONS_REFRESH_EVENT } from '../config/constants';
+import RouteArrow from '../components/RouteArrow/RouteArrow';
 import styles from './Notifications.module.css';
 
 type DisplayType = 'booking_approved' | 'booking_rejected' | 'ride_cancelled' | 'booking_request' | 'booking_cancelled_by_passenger' | 'group_joined' | 'group_member_joined' | 'pending_approval' | 'default';
@@ -206,8 +207,10 @@ export default function Notifications() {
                 const key = getNotificationItemKey(n);
                 const read = isNotificationRead(key);
                 const displayType = getDisplayType(n.type);
-                const routeStr = [n.ride_origin, n.ride_destination].filter(Boolean).join(' ← ') || null;
-                const bodyLine = n.body && routeStr ? `${n.body} · ${routeStr}` : (n.body || routeStr);
+                const origin = n.ride_origin?.trim() || '';
+                const dest = n.ride_destination?.trim() || '';
+                const hasRoute = Boolean(origin || dest);
+                const hasFullRoute = Boolean(origin && dest);
                 return (
                   <button
                     key={key}
@@ -251,7 +254,21 @@ export default function Notifications() {
                       <p className={read ? styles.notifTitle : `${styles.notifTitle} ${styles.notifTitleUnread}`}>
                         {n.title}
                       </p>
-                      {bodyLine && <p className={styles.notifBody}>{bodyLine}</p>}
+                      {(n.body || hasRoute) && (
+                        <p className={styles.notifBody}>
+                          {n.body}
+                          {n.body && hasRoute ? ' · ' : null}
+                          {hasFullRoute ? (
+                            <>
+                              {origin}
+                              <RouteArrow />
+                              {dest}
+                            </>
+                          ) : hasRoute ? (
+                            <>{origin || dest}</>
+                          ) : null}
+                        </p>
+                      )}
                       <p
                         className={
                           read ? styles.notifTime : `${styles.notifTime} ${styles.notifTimeUnread}`

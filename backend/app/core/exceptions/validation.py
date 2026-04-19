@@ -1,9 +1,9 @@
 from fastapi import status
 
-from .base import LinkupError
+from .base import LinkUpError
 
 
-class InvalidEmailError(LinkupError):
+class InvalidEmailError(LinkUpError):
     status_code = 400
     error_code = "VAL_INVALID_EMAIL"
     message = "כתובת האימייל שהוזנה אינה תקינה"
@@ -17,7 +17,7 @@ class InvalidEmailError(LinkupError):
         )
 
 
-class InvalidPhoneError(LinkupError):
+class InvalidPhoneError(LinkUpError):
     status_code = 400
     error_code = "VAL_INVALID_PHONE"
     message = "מספר הטלפון שהוזן אינו תקין"
@@ -31,7 +31,7 @@ class InvalidPhoneError(LinkupError):
         )
 
 
-class PasswordTooWeakError(LinkupError):
+class PasswordTooWeakError(LinkUpError):
     status_code = 400
     error_code = "VAL_PASSWORD_TOO_WEAK"
     message = "הסיסמה חלשה מדי"
@@ -45,7 +45,7 @@ class PasswordTooWeakError(LinkupError):
         )
 
 
-class InvalidFileTypeError(LinkupError):
+class InvalidFileTypeError(LinkUpError):
     status_code = 400
     error_code = "VAL_INVALID_FILE_TYPE"
     message = "סוג הקובץ אינו נתמך. יש להשתמש ב-JPG, PNG או WebP"
@@ -59,7 +59,7 @@ class InvalidFileTypeError(LinkupError):
         )
 
 
-class FileTooLargeError(LinkupError):
+class FileTooLargeError(LinkUpError):
     status_code = 413
     error_code = "VAL_FILE_TOO_LARGE"
     message = "הקובץ גדול מדי עבור השרת"
@@ -73,7 +73,7 @@ class FileTooLargeError(LinkupError):
         )
 
 
-class InvalidLocationError(LinkupError):
+class InvalidLocationError(LinkUpError):
     status_code = 400
     error_code = "INVALID_LOCATION"
     message = "המיקום שהוזן אינו תקין או מחוץ לטווח"
@@ -90,7 +90,7 @@ class InvalidLocationError(LinkupError):
         )
 
 
-class InsufficientSeatsError(LinkupError):
+class InsufficientSeatsError(LinkUpError):
     """
     Example of an additional validation error for later use —
     raised when booking more seats than available on the ride.
@@ -104,7 +104,7 @@ class InsufficientSeatsError(LinkupError):
         )
 
 
-class BadRequestError(LinkupError):
+class BadRequestError(LinkUpError):
     """Generic bad request (e.g. ValueError from a service class)."""
 
     status_code = 400
@@ -114,7 +114,7 @@ class BadRequestError(LinkupError):
         super().__init__(message=message)
 
 
-class SameOriginDestinationError(LinkupError):
+class SameOriginDestinationError(LinkUpError):
     status_code = 400
     error_code = "VAL_SAME_ORIGIN_DESTINATION"
     message = "מוצא ויעד אינם יכולים להיות זהים"

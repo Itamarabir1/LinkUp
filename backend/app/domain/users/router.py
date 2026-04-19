@@ -7,7 +7,7 @@ from app.api.dependencies.auth import get_current_user
 from app.core.exceptions.user import UserNotFoundError
 from app.db.session import get_db
 from app.domain.bookings.schema import NotificationItemResponse
-from app.domain.bookings.service import BookingService
+from app.domain.bookings.booking_reads_service import BookingReadsService
 from app.domain.users.crud import crud_user
 from app.domain.users.model import User
 from app.domain.users.schema import (
@@ -66,7 +66,7 @@ async def get_my_notifications(
     current_user: User = Depends(get_current_user),
 ):
     """All notifications for the user: as driver — join requests; as passenger — approve/reject/pending."""
-    return await BookingService.get_notifications_for_user(db, current_user.user_id)
+    return await BookingReadsService.get_notifications_for_user(db, current_user.user_id)
 
 
 # --- 2. FCM token update (push notifications) ---
@@ -187,7 +187,7 @@ async def update_my_profile(
 #     db: AsyncSession = Depends(get_db),
 #     current_user: User = Depends(get_current_user),
 # ):
-#     # Logic and LinkupError raises live in the service
+#     # Logic and LinkUpError raises live in the service
 #     await user_service.update_user_location(
 #         db,
 #         user_id=current_user.user_id,

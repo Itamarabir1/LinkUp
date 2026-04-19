@@ -28,7 +28,7 @@ export default function ConversationSummary({
   summary_hebrew,
 }: Props) {
   return (
-    <EmailLayout preview="סיכום השיחה שלך ב-Linkup" headerColor={COLORS.primary} headerTitle="סיכום שיחה - Linkup">
+    <EmailLayout preview="סיכום השיחה שלך ב-LinkUp" headerColor={COLORS.primary} headerTitle="סיכום שיחה - LinkUp">
       <Text style={bodyText}>
         שלום <strong>{user_name}</strong>,
       </Text>

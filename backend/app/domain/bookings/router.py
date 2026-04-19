@@ -15,6 +15,8 @@ from app.domain.bookings.schema import (
     PassengerSummaryResponse,
     RideManifestResponse,
 )
+from app.domain.bookings.booking_reads_service import BookingReadsService
+from app.domain.bookings.location_service import BookingLocationService
 from app.domain.bookings.service import BookingService
 from app.domain.geo.schema import (
     DriverLocationReport,
@@ -86,7 +88,7 @@ async def get_user_bookings(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await BookingService.get_user_bookings(db, user_id=current_user.user_id, status=status, page=1, limit=50)
+    result = await BookingReadsService.get_user_bookings(db, user_id=current_user.user_id, status=status, page=1, limit=50)
     return result.items
 
 
@@ -96,7 +98,7 @@ async def get_driver_summary(
     current_user: User = Depends(get_current_user),
 ):
     """Driver rides with embedded passengers — replaces N+1 fetchRideManifest loop."""
-    return await BookingService.get_driver_summary(db, current_user.user_id)
+    return await BookingReadsService.get_driver_summary(db, current_user.user_id)
 
 
 @router.get("/passenger-summary", response_model=PassengerSummaryResponse)
@@ -105,7 +107,7 @@ async def get_passenger_summary(
     current_user: User = Depends(get_current_user),
 ):
     """Passenger bookings with embedded ride + driver — replaces N+1 fetchRideById loop."""
-    return await BookingService.get_passenger_summary(db, current_user.user_id)
+    return await BookingReadsService.get_passenger_summary(db, current_user.user_id)
 
 
 @router.get("/ride/{ride_id}/manifest", response_model=RideManifestResponse)
@@ -114,7 +116,7 @@ async def get_ride_manifest(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await BookingService.get_ride_manifest(db, ride_id, current_user.user_id)
+    return await BookingReadsService.get_ride_manifest(db, ride_id, current_user.user_id)
 
 
 @router.get("/ride/{ride_id}/pending", response_model=list[BookingResponse])
@@ -123,7 +125,7 @@ async def get_pending_requests(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await BookingService.get_pending_requests(db, ride_id, current_user.user_id)
+    return await BookingReadsService.get_pending_requests(db, ride_id, current_user.user_id)
 
 
 @router.get("/{booking_id}", response_model=BookingResponse)
@@ -149,7 +151,7 @@ async def report_driver_location(
     Driver reports location during the ride. Broadcast to confirmed passengers over WebSocket.
     Requires: ride driver, ride in active status.
     """
-    await BookingService.broadcast_driver_location(db, booking_id, current_user.user_id, body)
+    await BookingLocationService.broadcast_driver_location(db, booking_id, current_user.user_id, body)
     return
 
 
@@ -164,7 +166,7 @@ async def report_passenger_location(
     Passenger reports location during the ride. Broadcast to driver on ride_{ride_id}:passenger_locations.
     Requires: the booking’s passenger.
     """
-    await BookingService.broadcast_passenger_location(db, booking_id, current_user.user_id, body)
+    await BookingLocationService.broadcast_passenger_location(db, booking_id, current_user.user_id, body)
     return
 
 

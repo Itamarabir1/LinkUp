@@ -89,7 +89,7 @@ FCM delivery has two connected paths:
 
 - Mappings: [`backend/app/domain/notifications/config/mappings.py`](backend/app/domain/notifications/config/mappings.py)
 - Worker: [`backend/app/workers/main_worker.py`](backend/app/workers/main_worker.py), [`backend/app/workers/tasks/notification_tasks.py`](backend/app/workers/tasks/notification_tasks.py)
-- Orchestration: [`backend/app/domain/notifications/core/handler.py`](backend/app/domain/notifications/core/handler.py), [`manager.py`](backend/app/domain/notifications/manager.py)
+- Orchestration: [`backend/app/domain/notifications/core/handler.py`](backend/app/domain/notifications/core/handler.py) (`NotificationHandler.handle_event` — אורקסטרציה קצרה + שלבי pipeline פרטיים `_resolve_*` / `_dispatch`), [`manager.py`](backend/app/domain/notifications/manager.py)
 
 ### 3.3 FCM client (server: `data` map only)
 

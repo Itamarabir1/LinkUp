@@ -1,11 +1,11 @@
 from uuid import UUID
 
-from .base import LinkupError
+from .base import LinkUpError
 
 # --- Ride Discovery & General Errors ---
 
 
-class RideNotFoundError(LinkupError):
+class RideNotFoundError(LinkUpError):
     status_code = 404
     error_code = "RIDE_NOT_FOUND"
 
@@ -18,7 +18,7 @@ class RideNotFoundError(LinkupError):
         )
 
 
-class InvalidRideStatusError(LinkupError):
+class InvalidRideStatusError(LinkUpError):
     status_code = 400
     error_code = "RIDE_INVALID_STATUS"
 
@@ -34,7 +34,7 @@ class InvalidRideStatusError(LinkupError):
 # --- Logic & Validation Errors ---
 
 
-class InvalidRouteError(LinkupError):
+class InvalidRouteError(LinkUpError):
     status_code = 400
     error_code = "RIDE_INVALID_ROUTE"
     message = "מסלול הנסיעה שסופק אינו תקין או שאינו נתמך"
@@ -52,7 +52,7 @@ class InvalidRouteError(LinkupError):
         super().__init__(message=msg, payload=payload)
 
 
-class InvalidDateTimeError(LinkupError):
+class InvalidDateTimeError(LinkUpError):
     status_code = 400
     error_code = "RIDE_INVALID_DATETIME"
     message = "זמן הנסיעה שנבחר אינו תקין"
@@ -70,7 +70,7 @@ class InvalidDateTimeError(LinkupError):
 # --- Booking Errors ---
 
 
-class NoConfirmedBookingsError(LinkupError):
+class NoConfirmedBookingsError(LinkUpError):
     """Raised when starting a ride without any confirmed booking."""
 
     status_code = 400
@@ -84,7 +84,7 @@ class NoConfirmedBookingsError(LinkupError):
         )
 
 
-class RideFullError(LinkupError):
+class RideFullError(LinkUpError):
     status_code = 400
     error_code = "RIDE_IS_FULL"
     message = "הנסיעה מלאה, לא ניתן להוסיף נוסעים נוספים"
@@ -94,7 +94,7 @@ class RideFullError(LinkupError):
         super().__init__(message=msg, payload={"ride_id": ride_id} if ride_id is not None else None)
 
 
-class SessionExpiredError(LinkupError):
+class SessionExpiredError(LinkUpError):
     """Ride preview session missing or expired in Redis."""
 
     status_code = 410
@@ -106,7 +106,7 @@ class SessionExpiredError(LinkupError):
         super().__init__(message=msg, payload={"session_id": session_id} if session_id else None)
 
 
-class RideAlreadyCancelledError(LinkupError):
+class RideAlreadyCancelledError(LinkUpError):
     status_code = 400
     error_code = "RIDE_ALREADY_CANCELLED"
     message = "הנסיעה כבר בוטלה בעבר"

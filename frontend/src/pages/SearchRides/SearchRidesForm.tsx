@@ -4,7 +4,7 @@ import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { enUS, he } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
-import { MapPin, ArrowUpDown, Calendar, Sparkles, RotateCcw } from 'lucide-react';
+import { MapPin, ArrowUpDown, Calendar, Sparkles, RotateCcw, Bot } from 'lucide-react';
 import LoadingButton from '../../components/LoadingButton';
 import { useLang } from '../../context/LangContext';
 import type { AISearchResult, ConversationTurn } from '../../api/passengers';
@@ -126,21 +126,6 @@ export function SearchRidesForm({
           )}
         </div>
 
-        {conversationHistory.length > 0 && aiResult?.follow_up_question && (
-          <div className={styles.aiHistory}>
-            {conversationHistory.map((turn, i) => (
-              <div
-                key={`${turn.role}-${i}-${turn.content.slice(0, 24)}`}
-                className={
-                  turn.role === 'user' ? styles.aiHistoryUser : styles.aiHistoryAssistant
-                }
-              >
-                {turn.content}
-              </div>
-            ))}
-          </div>
-        )}
-
         <div className={styles.aiInputRow}>
           <textarea
             className={`${styles.aiTextarea}${aiParsing ? ` ${styles.aiTextareaParsing}` : ''}`}
@@ -174,6 +159,13 @@ export function SearchRidesForm({
             )}
           </button>
         </div>
+
+        {aiResult?.follow_up_question && !aiError && (
+          <div className={styles.aiFollowUp} role="status" aria-live="polite">
+            <Bot size={14} strokeWidth={2} className={styles.aiFollowUpIcon} aria-hidden />
+            <span>{aiResult.follow_up_question}</span>
+          </div>
+        )}
 
         {aiError ? <p className={styles.aiErrorMsg}>{aiError}</p> : null}
 

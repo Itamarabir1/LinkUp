@@ -3,6 +3,8 @@ import logging
 import httpx
 
 from app.core.config import settings
+from app.core.exceptions.infrastructure import InfrastructureError
+from app.infrastructure.geo.circuit_breaker import google_geocoding_cb
 
 logger = logging.getLogger(__name__)
 
@@ -35,36 +37,48 @@ class GeocodingService:
             logger.warning("Empty address provided for geocoding")
             return None, None
 
+        if not google_geocoding_cb.allow_request():
+            logger.warning("CircuitBreaker OPEN: skipping geocoding for '%s'", address)
+            return None, None
+
         url = GeocodingService.GOOGLE_MAPS_BASE_URL
         params = {
             "address": address,
             "key": settings.GOOGLE_MAPS_API_KEY,
-            "language": "he",  # עברית
+            "language": "he",
         }
-
         try:
             async with httpx.AsyncClient(timeout=GeocodingService.TIMEOUT) as client:
                 response = await client.get(url, params=params)
-
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("status") == "OK" and data.get("results"):
                         location = data["results"][0]["geometry"]["location"]
                         lat = float(location.get("lat", 0))
                         lng = float(location.get("lng", 0))
-                        logger.info(f"Geocoded '{address}' → ({lat}, {lng})")
+                        logger.info("Geocoded '%s' → (%s, %s)", address, lat, lng)
+                        google_geocoding_cb.record_success()
                         return lat, lng
                     status = data.get("status", "UNKNOWN")
-                    logger.warning(f"Google Maps geocoding failed for '{address}': {status}")
+                    logger.warning(
+                        "Google Maps geocoding failed for '%s': %s", address, status
+                    )
+                    google_geocoding_cb.record_failure()
                     return None, None
-                logger.error(f"Google Maps geocoding API error: {response.status_code} for address: {address}")
+                logger.error(
+                    "Google Maps geocoding API error: %s for '%s'",
+                    response.status_code,
+                    address,
+                )
+                google_geocoding_cb.record_failure()
                 return None, None
-
         except httpx.TimeoutException:
-            logger.error(f"Geocoding timeout for address: {address}")
+            logger.error("Geocoding timeout for address: %s", address)
+            google_geocoding_cb.record_failure()
             return None, None
         except Exception as e:
-            logger.error(f"Geocoding exception for '{address}': {e}", exc_info=True)
+            logger.error("Geocoding exception for '%s': %s", address, e, exc_info=True)
+            google_geocoding_cb.record_failure()
             return None, None
 
     @staticmethod
@@ -81,48 +95,71 @@ class GeocodingService:
             כתובת טקסטואלית או None אם נכשל
         """
         if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
-            logger.warning(f"Invalid coordinates: lat={lat}, lon={lon}")
+            logger.warning("Invalid coordinates: lat=%s, lon=%s", lat, lon)
+            return None
+
+        if not google_geocoding_cb.allow_request():
+            logger.warning(
+                "CircuitBreaker OPEN: skipping reverse geocoding for (%s, %s)", lat, lon
+            )
             return None
 
         url = GeocodingService.GOOGLE_MAPS_BASE_URL
         params = {
             "latlng": f"{lat},{lon}",
             "key": settings.GOOGLE_MAPS_API_KEY,
-            "language": "he",  # עברית
+            "language": "he",
         }
-
         try:
             async with httpx.AsyncClient(timeout=GeocodingService.TIMEOUT) as client:
                 response = await client.get(url, params=params)
-
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("status") == "OK" and data.get("results"):
                         address = data["results"][0].get("formatted_address")
                         if address:
-                            logger.info(f"Reverse geocoded ({lat}, {lon}) → '{address}'")
+                            logger.info(
+                                "Reverse geocoded (%s, %s) → '%s'", lat, lon, address
+                            )
+                            google_geocoding_cb.record_success()
                             return address
-                        logger.warning(f"No formatted_address found for coordinates: ({lat}, {lon})")
+                        logger.warning("No formatted_address for (%s, %s)", lat, lon)
                         return None
                     status = data.get("status", "UNKNOWN")
-                    logger.warning(f"Google Maps reverse geocoding failed for ({lat}, {lon}): {status}")
+                    logger.warning(
+                        "Reverse geocoding failed for (%s, %s): %s", lat, lon, status
+                    )
+                    google_geocoding_cb.record_failure()
                     return None
                 if response.status_code == 429:
-                    # Rate limiting (Too Many Requests)
-                    logger.warning(f"Google Maps rate limit exceeded (429) for ({lat}, {lon})")
-                    from app.core.exceptions.infrastructure import InfrastructureError
-
+                    logger.warning("Google Maps rate limit (429) for (%s, %s)", lat, lon)
+                    google_geocoding_cb.record_failure()
                     raise InfrastructureError(
-                        message="שירות geocoding לא זמין כרגע עקב הגבלת תעבורה. אנא נסה שוב בעוד כמה שניות.",
+                        message="שירות geocoding לא זמין כרגע עקב הגבלת תעבורה.",
                         detail="Google Maps API returned 429 Too Many Requests",
                         error_code="GEO_SERVICE_UNAVAILABLE",
                     )
-                logger.error(f"Reverse geocoding API error: {response.status_code} for ({lat}, {lon}). Response: {response.text[:200]}")
+                logger.error(
+                    "Reverse geocoding API error: %s for (%s, %s)",
+                    response.status_code,
+                    lat,
+                    lon,
+                )
+                google_geocoding_cb.record_failure()
                 return None
-
         except httpx.TimeoutException:
-            logger.error(f"Reverse geocoding timeout for ({lat}, {lon})")
+            logger.error("Reverse geocoding timeout for (%s, %s)", lat, lon)
+            google_geocoding_cb.record_failure()
             return None
+        except InfrastructureError:
+            raise
         except Exception as e:
-            logger.error(f"Reverse geocoding exception for ({lat}, {lon}): {e}", exc_info=True)
+            logger.error(
+                "Reverse geocoding exception for (%s, %s): %s",
+                lat,
+                lon,
+                e,
+                exc_info=True,
+            )
+            google_geocoding_cb.record_failure()
             return None

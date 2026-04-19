@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { STATUS_LABEL } from './myBookings.constants';
 import { canPassengerShare, getSource } from './myBookings.utils';
 import type { PassengerBookingItem } from './myBookings.types';
+import RouteArrow from '../../components/RouteArrow/RouteArrow';
 import styles from './MyBookings.module.css';
 
 type MyGroup = { group_id: string; name: string };
@@ -54,7 +55,7 @@ export default function PassengerBookingCard({
       <div className={styles.bookingCardBody}>
         <div className={styles.cardRoute}>
           <span>{ride.origin_name ?? '?'}</span>
-          <span style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>→</span>
+          <RouteArrow />
           <span>{ride.destination_name ?? '?'}</span>
         </div>
         <div className={styles.cardMeta}>

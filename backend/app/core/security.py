@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
@@ -36,6 +37,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
         {
             "exp": expire,
             "iss": getattr(settings, "JWT_ISSUER", "linkup-api"),
+            "jti": str(uuid.uuid4()),
         },
     )
     return jwt.encode(

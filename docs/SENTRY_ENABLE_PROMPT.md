@@ -1,4 +1,4 @@
-# פרומפט להפעלת Sentry ב-Linkup
+# פרומפט להפעלת Sentry ב-LinkUp
 
 העתק את הבלוק למטה ושלח ל-Cursor (Agent mode) כשאתה מוכן **להפעיל** את Sentry בפועל (לא רק TODO).
 

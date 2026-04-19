@@ -9,7 +9,7 @@ from app.api.dependencies.rate_limit import rate_limit_auth
 from app.api.dependencies.services import get_auth_service
 from app.core.config import settings
 from app.core.exceptions.auth import GoogleAuthFailed
-from app.core.exceptions.base import LinkupError
+from app.core.exceptions.base import LinkUpError
 from app.domain.auth.schema import (
     AuthMessageResponse,
     ChangePasswordRequest,
@@ -42,8 +42,8 @@ async def register(
     auth_svc: AuthService = Depends(get_auth_service),
 ):
     """Register a new user (step one: create unverified account)."""
-    logger.info("[Linkup] register called: email=%s", getattr(user_in, "email", ""))
-    print("[Linkup] register endpoint – starting register_new_user")
+    logger.info("[LinkUp] register called: email=%s", getattr(user_in, "email", ""))
+    print("[LinkUp] register endpoint – starting register_new_user")
     new_user = await auth_svc.register_new_user(db=db, user_in=user_in)
 
     # Stash email in cookie for verification (10 minutes)
@@ -126,12 +126,17 @@ async def refresh_token(
     summary="התנתקות (Logout)",
 )
 async def logout(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     auth_svc: AuthService = Depends(get_auth_service),
 ):
     """Revoke refresh token(s) for the user (logout until next password login)."""
-    await auth_svc.logout(db, user=current_user)
+    auth_header = request.headers.get("Authorization") or ""
+    access_token = None
+    if auth_header.lower().startswith("bearer "):
+        access_token = auth_header[7:].strip()
+    await auth_svc.logout(db, user=current_user, access_token=access_token)
 
 
 def _frontend_base_url() -> str:
@@ -263,7 +268,7 @@ async def google_signin(
             raise GoogleAuthFailed(message="שירות Google לא מוגדר בשרת")
 
         return await auth_svc.authenticate_with_google(db=db, id_token=data.id_token)
-    except LinkupError:
+    except LinkUpError:
         raise
     except Exception as e:
         logger.exception("Error in google_signin endpoint: %s", e)

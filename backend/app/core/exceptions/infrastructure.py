@@ -1,9 +1,9 @@
 from typing import Any
 
-from .base import LinkupError
+from .base import LinkUpError
 
 
-class StorageServiceError(LinkupError):
+class StorageServiceError(LinkUpError):
     """S3 / object storage connectivity failure."""
 
     status_code = 503
@@ -14,7 +14,7 @@ class StorageServiceError(LinkupError):
         super().__init__(payload=payload)
 
 
-class CacheConnectionError(LinkupError):
+class CacheConnectionError(LinkUpError):
     """Redis connectivity failure."""
 
     status_code = 503
@@ -25,7 +25,7 @@ class CacheConnectionError(LinkupError):
         super().__init__(payload=payload)
 
 
-class QueueServiceError(LinkupError):
+class QueueServiceError(LinkUpError):
     """RabbitMQ connectivity failure."""
 
     status_code = 503
@@ -36,7 +36,7 @@ class QueueServiceError(LinkupError):
         super().__init__(payload=payload)
 
 
-class RouteNotFoundError(LinkupError):
+class RouteNotFoundError(LinkUpError):
     """No driving route found between origin and destination."""
 
     status_code = 404
@@ -50,7 +50,7 @@ class RouteNotFoundError(LinkupError):
         )
 
 
-class GeocodingError(LinkupError):
+class GeocodingError(LinkUpError):
     status_code = 422
     error_code = "GEO_ADDRESS_NOT_RESOLVED"
     message = "לא הצלחנו לאתר את הכתובת המבוקשת"
@@ -64,7 +64,7 @@ class GeocodingError(LinkupError):
         )
 
 
-class InfrastructureError(LinkupError):
+class InfrastructureError(LinkUpError):
     """Generic infrastructure failure (cache, DB, network, etc.)."""
 
     status_code = 503
@@ -80,7 +80,7 @@ class InfrastructureError(LinkupError):
         super().__init__(message=message, error_code=error_code or self.error_code, payload=payload)
 
 
-class RateLimitExceeded(LinkupError):
+class RateLimitExceeded(LinkUpError):
     """Too many requests; clients may read retry_after from payload."""
 
     status_code = 429
@@ -91,31 +91,31 @@ class RateLimitExceeded(LinkupError):
         super().__init__(payload={"retry_after": retry_after})
 
 
-class S3UploadFailed(LinkupError):
+class S3UploadFailed(LinkUpError):
     status_code = 502
     error_code = "S3_UPLOAD_FAILED"
     message = "העלאת הקובץ לשירות האחסון נכשלה"
 
 
-class S3DeleteFailed(LinkupError):
+class S3DeleteFailed(LinkUpError):
     status_code = 502
     error_code = "S3_DELETE_FAILED"
     message = "מחיקת הקובץ מהאחסון נכשלה"
 
 
-class RedisUnavailable(LinkupError):
+class RedisUnavailable(LinkUpError):
     status_code = 503
     error_code = "REDIS_UNAVAILABLE"
     message = "שירות הזיכרון (Redis) אינו זמין כרגע"
 
 
-class WorkerTaskFailed(LinkupError):
+class WorkerTaskFailed(LinkUpError):
     status_code = 500
     error_code = "WORKER_TASK_FAILED"
     message = "משימת רקע נכשלה"
 
 
-class ExternalServiceError(LinkupError):
+class ExternalServiceError(LinkUpError):
     """Third-party dependency failed (email, maps, OAuth, etc.)."""
 
     status_code = 502
@@ -123,7 +123,7 @@ class ExternalServiceError(LinkupError):
     message = "שירות חיצוני אינו זמין או החזיר שגיאה"
 
 
-class InternalServerError(LinkupError):
+class InternalServerError(LinkUpError):
     status_code = 500
     error_code = "INTERNAL_ERROR"
     message = "שגיאת שרת פנימית"

@@ -30,7 +30,7 @@ function showForegroundNotification(payload: MessagePayload): void {
   const title =
     fromDataTitle ||
     payload.notification?.title?.trim() ||
-    'Linkup';
+    'LinkUp';
   const body =
     fromDataBody || payload.notification?.body?.trim() || '';
   triggerNotificationToast({ title, body });

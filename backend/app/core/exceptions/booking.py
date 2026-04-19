@@ -3,10 +3,10 @@
 
 from uuid import UUID
 
-from .base import LinkupError
+from .base import LinkUpError
 
 
-class RideNotAvailableError(LinkupError):
+class RideNotAvailableError(LinkUpError):
     """Ride is not open for joins or was not found."""
 
     status_code = 404
@@ -18,7 +18,7 @@ class RideNotAvailableError(LinkupError):
         super().__init__(payload=payload)
 
 
-class BookingAlreadyExistsError(LinkupError):
+class BookingAlreadyExistsError(LinkUpError):
     """Passenger already has a join request for this ride."""
 
     status_code = 400
@@ -34,7 +34,7 @@ class BookingAlreadyExistsError(LinkupError):
         super().__init__(payload=payload or None)
 
 
-class PassengerRequestNotFoundError(LinkupError):
+class PassengerRequestNotFoundError(LinkUpError):
     """Passenger request id does not exist."""
 
     status_code = 404
@@ -46,7 +46,7 @@ class PassengerRequestNotFoundError(LinkupError):
         super().__init__(payload=payload)
 
 
-class BookingNotFoundError(LinkupError):
+class BookingNotFoundError(LinkUpError):
     """Booking id does not exist."""
 
     status_code = 404
@@ -61,7 +61,7 @@ class BookingNotFoundError(LinkupError):
         super().__init__(payload={"booking_id": bid})
 
 
-class NoSeatsAvailableError(LinkupError):
+class NoSeatsAvailableError(LinkUpError):
     """No free seats on the ride (request or approval flow)."""
 
     status_code = 409
@@ -72,7 +72,7 @@ class NoSeatsAvailableError(LinkupError):
         super().__init__(message=message)
 
 
-class ForbiddenRideActionError(LinkupError):
+class ForbiddenRideActionError(LinkUpError):
     """Caller may not perform this action on the ride or booking."""
 
     status_code = 403

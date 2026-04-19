@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import RouteArrow from '../RouteArrow/RouteArrow';
 import styles from './RideCard.module.css';
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
@@ -19,7 +20,8 @@ function getStatusVariant(status: string): keyof typeof STATUS_STYLES {
 }
 
 interface RideCardProps {
-  route: string;
+  originLabel: string;
+  destinationLabel: string;
   /** Ride/request date and time (not entity creation time). */
   time: string;
   /** Optional caption shown above the time, e.g. "Ride time". */
@@ -30,7 +32,8 @@ interface RideCardProps {
 }
 
 export default function RideCard({
-  route,
+  originLabel,
+  destinationLabel,
   time,
   scheduleCaption,
   status,
@@ -58,7 +61,11 @@ export default function RideCard({
           : undefined
       }
     >
-      <div className={styles.route}>{route}</div>
+      <div className={styles.route}>
+        <span>{originLabel}</span>
+        <RouteArrow />
+        <span>{destinationLabel}</span>
+      </div>
 
       {scheduleCaption ? (
         <div className={styles.scheduleBlock}>
