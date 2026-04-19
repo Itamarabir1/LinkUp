@@ -115,9 +115,7 @@ async def get_or_create_conversation(db: AsyncSession, current_user_id: UUID, ot
         partner=partner,
         created_at=conv.created_at,
         partner_last_read_at=await _get_partner_last_read_at(db, conv.conversation_id, current_user_id),
-        partner_read_up_to_message_id=await _get_partner_read_up_to_message_id(
-            db, conv.conversation_id, current_user_id
-        ),
+        partner_read_up_to_message_id=await _get_partner_read_up_to_message_id(db, conv.conversation_id, current_user_id),
     )
 
 
@@ -156,9 +154,7 @@ async def get_or_create_conversation_by_booking(db: AsyncSession, booking_id: UU
         created_at=conv.created_at,
         booking_id=booking.booking_id,
         partner_last_read_at=await _get_partner_last_read_at(db, conv.conversation_id, current_user_id),
-        partner_read_up_to_message_id=await _get_partner_read_up_to_message_id(
-            db, conv.conversation_id, current_user_id
-        ),
+        partner_read_up_to_message_id=await _get_partner_read_up_to_message_id(db, conv.conversation_id, current_user_id),
     )
 
 
@@ -214,9 +210,7 @@ async def get_conversation_detail(db: AsyncSession, conversation_id: UUID, curre
         partner=partner,
         created_at=conv.created_at,
         partner_last_read_at=await _get_partner_last_read_at(db, conv.conversation_id, current_user_id),
-        partner_read_up_to_message_id=await _get_partner_read_up_to_message_id(
-            db, conv.conversation_id, current_user_id
-        ),
+        partner_read_up_to_message_id=await _get_partner_read_up_to_message_id(db, conv.conversation_id, current_user_id),
     )
 
 

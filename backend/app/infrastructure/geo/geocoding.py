@@ -60,9 +60,7 @@ class GeocodingService:
                         google_geocoding_cb.record_success()
                         return lat, lng
                     status = data.get("status", "UNKNOWN")
-                    logger.warning(
-                        "Google Maps geocoding failed for '%s': %s", address, status
-                    )
+                    logger.warning("Google Maps geocoding failed for '%s': %s", address, status)
                     google_geocoding_cb.record_failure()
                     return None, None
                 logger.error(
@@ -99,9 +97,7 @@ class GeocodingService:
             return None
 
         if not google_geocoding_cb.allow_request():
-            logger.warning(
-                "CircuitBreaker OPEN: skipping reverse geocoding for (%s, %s)", lat, lon
-            )
+            logger.warning("CircuitBreaker OPEN: skipping reverse geocoding for (%s, %s)", lat, lon)
             return None
 
         url = GeocodingService.GOOGLE_MAPS_BASE_URL
@@ -118,17 +114,13 @@ class GeocodingService:
                     if data.get("status") == "OK" and data.get("results"):
                         address = data["results"][0].get("formatted_address")
                         if address:
-                            logger.info(
-                                "Reverse geocoded (%s, %s) → '%s'", lat, lon, address
-                            )
+                            logger.info("Reverse geocoded (%s, %s) → '%s'", lat, lon, address)
                             google_geocoding_cb.record_success()
                             return address
                         logger.warning("No formatted_address for (%s, %s)", lat, lon)
                         return None
                     status = data.get("status", "UNKNOWN")
-                    logger.warning(
-                        "Reverse geocoding failed for (%s, %s): %s", lat, lon, status
-                    )
+                    logger.warning("Reverse geocoding failed for (%s, %s): %s", lat, lon, status)
                     google_geocoding_cb.record_failure()
                     return None
                 if response.status_code == 429:

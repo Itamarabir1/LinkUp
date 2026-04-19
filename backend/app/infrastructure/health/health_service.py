@@ -41,11 +41,7 @@ async def check_health() -> dict[str, Any]:
 
     # Core services determine health status (not external APIs)
     core_services = ("database", "redis", "rabbitmq")
-    results["status"] = (
-        "healthy"
-        if all(results.get(s) == "ok" for s in core_services)
-        else "unhealthy"
-    )
+    results["status"] = "healthy" if all(results.get(s) == "ok" for s in core_services) else "unhealthy"
 
     # Circuit Breaker state — informational only, does not affect status
     try:

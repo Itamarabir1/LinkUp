@@ -229,9 +229,7 @@ async def mark_conversation_read(db: AsyncSession, conversation_id: UUID, user_i
     if not participant:
         return
     participant.last_read_at = now
-    if max_message_id is not None and (
-        participant.last_read_message_id is None or max_message_id > participant.last_read_message_id
-    ):
+    if max_message_id is not None and (participant.last_read_message_id is None or max_message_id > participant.last_read_message_id):
         participant.last_read_message_id = max_message_id
     await db.commit()
 

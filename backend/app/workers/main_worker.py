@@ -15,9 +15,7 @@ logger = logging.getLogger("MainWorker")
 
 async def main():
     logger.warning(
-        "main_worker.py is deprecated. "
-        "Use notification_worker, task_worker, or ai_worker. "
-        "Running notification_worker for backward compatibility."
+        "main_worker.py is deprecated. Use notification_worker, task_worker, or ai_worker. Running notification_worker for backward compatibility."
     )
     await notification_main()
 

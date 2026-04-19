@@ -211,21 +211,19 @@ class GeoClient:
                 out: list[dict] = []
                 for i, r in enumerate(routes_raw):
                     legs = r.get("legs", [])
-                    duration_sec = sum(
-                        leg.get("duration", {}).get("value", 0) for leg in legs
-                    )
-                    distance_m = sum(
-                        leg.get("distance", {}).get("value", 0) for leg in legs
-                    )
+                    duration_sec = sum(leg.get("duration", {}).get("value", 0) for leg in legs)
+                    distance_m = sum(leg.get("distance", {}).get("value", 0) for leg in legs)
                     poly = r.get("overview_polyline", {}).get("points", "")
                     coords = _decode_polyline(poly) if poly else []
                     summary = r.get("summary") or f"מסלול {i + 1}"
-                    out.append({
-                        "summary": summary,
-                        "duration": duration_sec,
-                        "distance": distance_m,
-                        "coords": coords,
-                    })
+                    out.append(
+                        {
+                            "summary": summary,
+                            "duration": duration_sec,
+                            "distance": distance_m,
+                            "coords": coords,
+                        }
+                    )
                 google_directions_cb.record_success()
 
                 dm_result = await self.fetch_distance_matrix(start, end)

@@ -8,15 +8,17 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-VALID_MISSING_FIELDS = frozenset({
-    "pickup_name",
-    "destination_name",
-    "departure_time",
-    "departure_time_to",
-    "departure_date",
-    "destination_radius",
-    "search_radius",
-})
+VALID_MISSING_FIELDS = frozenset(
+    {
+        "pickup_name",
+        "destination_name",
+        "departure_time",
+        "departure_time_to",
+        "departure_date",
+        "destination_radius",
+        "search_radius",
+    }
+)
 
 
 class ConversationTurn(BaseModel):

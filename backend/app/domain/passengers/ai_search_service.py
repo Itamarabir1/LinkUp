@@ -149,9 +149,7 @@ def parse_ride_search_query(
     # clamp destination_radius
     if data.get("destination_radius") is not None:
         try:
-            data["destination_radius"] = max(
-                0.1, min(50.0, float(data["destination_radius"]))
-            )
+            data["destination_radius"] = max(0.1, min(50.0, float(data["destination_radius"])))
         except (TypeError, ValueError):
             data["destination_radius"] = None
 

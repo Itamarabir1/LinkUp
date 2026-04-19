@@ -7,6 +7,7 @@ States:
   OPEN      → failing fast (no calls to Google)
   HALF_OPEN → testing recovery (one request allowed)
 """
+
 from __future__ import annotations
 
 import logging
@@ -36,9 +37,7 @@ class CircuitBreaker:
     def allow_request(self) -> bool:
         try:
             if self._state == CircuitState.OPEN:
-                if self._opened_at and (
-                    time.monotonic() - self._opened_at
-                ) >= self.recovery_timeout:
+                if self._opened_at and (time.monotonic() - self._opened_at) >= self.recovery_timeout:
                     logger.info("CircuitBreaker[%s]: OPEN → HALF_OPEN", self.name)
                     self._state = CircuitState.HALF_OPEN
                     return True
@@ -60,9 +59,7 @@ class CircuitBreaker:
     def record_failure(self) -> None:
         try:
             self._failure_count += 1
-            if self._state == CircuitState.HALF_OPEN or (
-                self._failure_count >= self.failure_threshold
-            ):
+            if self._state == CircuitState.HALF_OPEN or (self._failure_count >= self.failure_threshold):
                 logger.warning(
                     "CircuitBreaker[%s]: → OPEN (%d failures)",
                     self.name,
