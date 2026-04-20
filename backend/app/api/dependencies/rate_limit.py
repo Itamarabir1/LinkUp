@@ -2,10 +2,12 @@
 Rate limiting for sensitive endpoints (login, refresh, password-reset) — per IP.
 """
 
-from fastapi import Request
+from fastapi import Depends, Request
 
+from app.api.dependencies.auth import get_current_user
 from app.core.config import settings
 from app.core.exceptions.infrastructure import RateLimitExceeded
+from app.domain.users.model import User
 from app.infrastructure.redis.client import redis_client
 
 
@@ -30,3 +32,25 @@ async def rate_limit_auth(request: Request) -> None:
     allowed = await redis_client.rate_limit_check(key, window_seconds=window, max_count=max_req)
     if not allowed:
         raise RateLimitExceeded(retry_after=window)
+
+
+async def rate_limit_chat(
+    current_user: User = Depends(get_current_user),
+) -> None:
+    """
+    Dependency: limits chat messages per user.
+    Max 30 messages per minute. Fail open if Redis unavailable.
+    """
+    key = f"ratelimit:chat:{current_user.user_id}"
+    try:
+        allowed = await redis_client.rate_limit_check(
+            key,
+            window_seconds=60,
+            max_count=30,
+        )
+        if not allowed:
+            raise RateLimitExceeded(retry_after=60)
+    except RateLimitExceeded:
+        raise
+    except Exception:
+        pass  # fail open

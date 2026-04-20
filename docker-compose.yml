@@ -298,7 +298,7 @@ services:
     networks:
       - linkup_network
 
-  # --- Reverse proxy: expose only port 80 ---
+  # --- Reverse proxy: expose ports 80/443 ---
   nginx:
     profiles: ["prod"]
     image: nginx:1.25-alpine
@@ -306,8 +306,10 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       frontend:
         condition: service_started

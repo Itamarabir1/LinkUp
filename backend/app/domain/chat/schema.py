@@ -2,10 +2,11 @@
 Pydantic schemas for 1:1 chat API (request/response).
 """
 
+import re
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ConversationCreate(BaseModel):
@@ -14,10 +15,23 @@ class ConversationCreate(BaseModel):
     other_user_id: UUID = Field(..., description="Other participant user id")
 
 
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+
 class MessageCreate(BaseModel):
     """Send a message in a conversation."""
 
     body: str = Field(..., min_length=1, max_length=10_000)
+
+    @field_validator("body")
+    @classmethod
+    def reject_html(cls, v: str) -> str:
+        """Reject messages containing HTML tags — chat is plaintext only."""
+        if _HTML_TAG_RE.search(v):
+            raise ValueError(
+                "הודעות צ'אט לא יכולות להכיל HTML. שלח טקסט בלבד."
+            )
+        return v.strip()
 
 
 # --- Responses ---

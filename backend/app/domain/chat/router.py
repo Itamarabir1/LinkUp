@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_current_user
+from app.api.dependencies.rate_limit import rate_limit_chat
 from app.core.exceptions.base import LinkUpError
 from app.core.exceptions.chat import ChatRoomNotFound
 from app.db.session import get_db
@@ -120,8 +121,9 @@ async def post_message(
     data: MessageCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    _: None = Depends(rate_limit_chat),
 ):
-    """Post a message; participants only."""
+    """Post a message; participants only. Rate limited: 30 messages/minute per user."""
     msg = await send_message(
         db,
         conversation_id=conversation_id,

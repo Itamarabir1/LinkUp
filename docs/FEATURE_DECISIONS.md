@@ -1,0 +1,175 @@
+# LinkUp — Feature Decisions (Why / Alternatives / Trade-offs)
+
+מסמך **מקביל** ל-[ENGINEERING_HIGHLIGHTS.md](ENGINEERING_HIGHLIGHTS.md).  
+**HIGHLIGHTS** = "מה בניתי + איפה בקוד". **מסמך זה** = להצגה בראיון: בעיה, החלטה, חלופות, מחיר, משפט פתיחה קצר.
+
+> פירוט ADR מלא: [adr/ARCHITECTURE_DECISIONS_BACKEND.md](adr/ARCHITECTURE_DECISIONS_BACKEND.md) (§1–22) ו־[adr/ARCHITECTURE_DECISIONS_FRONTEND.md](adr/ARCHITECTURE_DECISIONS_FRONTEND.md), [adr/ARCHITECTURE_DECISIONS_CHAT_WS.md](adr/ARCHITECTURE_DECISIONS_CHAT_WS.md).
+
+---
+
+<a id="outbox"></a>
+
+## Outbox + RabbitMQ
+
+| | |
+|--|--|
+| **בעיה** | אחרי `commit` ב-DB רוצים לאירוע חיצוני (מייל, FCM) — `publish` ישיר אחרי commit או אם הברוקר/שרת נופלים = אובדן או כפילות. |
+| **החלטה** | שורה ב-`outbox_events` **באותה טרנזקציה** עם שינוי עסקי; worker מפרסם ל-RabbitMQ (LISTEN/NOTIFY + מנגנון fallback). |
+| **אלטרנטיבות** | (1) Publish ישיר — פשוט אבל fragile. (2) Kafka — כבד יותר לסקייל נוכחי. (3) SQS — vendor lock, דורש מודל mental שונה. |
+| **יתרון** | **at-least-once** + עקביות DB/אירוע; ה-API לא מחכה ל-latency של הברוקר. |
+| **Trade-off** | צריך idempotency בצרכנים; מורכבות תפעול (worker + monitoring). |
+| **Interview pitch (≈30s)** | *"יישמתי outbox: האירוע נשמר בטרנזקציה יחד עם הדאטה, אז אם הפרוסס קורס או Rabbit זמנית למטה — לא מאבדים. Worker מפרסם ל-Rabbit. המחיר הוא at-least-once אז בצרכנים בודקים idempotency."* |
+| **הפניה** | ADR §4, HIGHLIGHTS §6, [architecture/EVENTS.md](architecture/EVENTS.md) |
+
+---
+
+<a id="chat-ws"></a>
+
+## Real-time chat + chat-ws (Go)
+
+| | |
+|--|--|
+| **בעיה** | הודעות 1:1 + typing + presence — צריך הרבה idle connections; לא רוצים לייבל את path ה-DB ב-Python. |
+| **החלטה** | **Go `chat-ws`**: WebSocket, JWT ב-handshake, מנוי ל-**Redis** (`chat:conversation:*`, notification/typing, `user:*:events`), fan-out. Python שומר הודעה + publish ל-Redis. |
+| **אלטרנטיבות** | (1) WebSocket ב-FastAPI בלבד — אפשרי אבל per-connection cost גבוה ב-Python. (2) SaaS (Pusher/Ably) — עלות+vendor. (3) רק long polling — גרוע ל-UX. |
+| **יתרון** | הפרדת "מסע real-time" משכבת REST/DB; גורוטינים זולים per connection. |
+| **Trade-off** | שני runtimes (Python + Go); אותו `SECRET_KEY` ל-WS. |
+| **Interview pitch (≈30s)** | *"צ'אט: FastAPI שומר ב-Postgres ומפרסם ל-Redis, chat-ws ב-Go מנוי ודוחף ללקוח. בחרתי Go כי אלפי חיבורים idle זולים שם ולא שולפים load על SQLAlchemy."* |
+| **הפניה** | [adr/ARCHITECTURE_DECISIONS_CHAT_WS.md](adr/ARCHITECTURE_DECISIONS_CHAT_WS.md), HIGHLIGHTS §4, [architecture/REALTIME.md](architecture/REALTIME.md) |
+
+---
+
+<a id="chat-plaintext"></a>
+
+## Chat: plaintext + דחיית HTML (XSS)
+
+| | |
+|--|--|
+| **בעיה** | הודעות נשמרות ב-`messages.body`; אפשר לייצר **stored** payload (HTML) שישפיע עתידית על render או ייצוא. |
+| **החלטה** | `MessageCreate` (Pydantic) — **דחייה** אם מזוהה תבנית תג HTML (`<...>`); הודעת שגיאה ברורה. מדיניות מוצר: **צ'אט = טקסט בלבד**. |
+| **אלטרנטיבות** | (1) DOMPurify/escape בצד הלקוח בלבד — לא מספיק ל-API אחר. (2) Strip שקט — משנה תוכן בלי שקיפות. |
+| **יתרון** | הכנסה "נקייה" ל-DB; עקבי לכל consumer (UI, אדמין עתידי, ייצוא). |
+| **Trade-off** | טקסט לגיטימי עם `<`/`>` עלול להידחות; זו החלטת product. |
+| **Interview pitch (≈30s)** | *"רינדור הודעה ב-React כבר בטוח כטקסט, אבל חיזקתי בשרת: הודעות שממלאות pattern של תג HTML נדחות, כי זה contract של plain text. זה שכבה נגד stored XSS, לא רק ref reflected."* |
+| **הפניה** | ADR **§22**, [backend/app/domain/chat/schema.py](../backend/app/domain/chat/schema.py) |
+
+---
+
+<a id="chat-rate-limit"></a>
+
+## Chat rate limit (per-user)
+
+| | |
+|--|--|
+| **בעיה** | ספאם הודעות בצ'אט יוצר עומס כתיבה, רעש למשתמש השני וסיכון להתנהגות abuse. |
+| **החלטה** | Dependency ייעודי `rate_limit_chat` בשכבת API: מפתח Redis פר-משתמש `ratelimit:chat:{user_id}`, חלון 60 שניות, מקסימום 30 הודעות לדקה ל-endpoint `POST /chat/conversations/{conversation_id}/messages`. |
+| **אלטרנטיבות** | (1) Rate limit לפי IP בלבד — לא מדויק למשתמשים מאחורי NAT. (2) מנגנון throttling רק בפרונט — קל לעקיפה. (3) Queue עם slow mode — מורכב לדרישה הנוכחית. |
+| **יתרון** | הגבלה הוגנת ברמת משתמש אותנטי, reuse מלא לתשתית `rate_limit_check` הקיימת, ללא שינוי בדומיין הצ'אט. |
+| **Trade-off** | Redis למטה => fail-open לצורך זמינות (הגנה זמנית נחלשת). |
+| **Interview pitch (≈30s)** | *"הוספתי rate limit פר-משתמש לשליחת הודעות בצ'אט, 30 לדקה. זה יושב כ-dependency ב-FastAPI ומשתמש באותה תשתית Redis של auth. בחרתי fail-open כדי לא לשבור זמינות אם Redis נופל."* |
+| **הפניה** | [../backend/app/api/dependencies/rate_limit.py](../backend/app/api/dependencies/rate_limit.py), [../backend/app/domain/chat/router.py](../backend/app/domain/chat/router.py), [../ARCHITECTURE.md](../ARCHITECTURE.md) |
+
+---
+
+<a id="my-bookings"></a>
+
+## My Bookings: aggregated reads (דילוג על N+1)
+
+| | |
+|--|--|
+| **בעיה** | בטאב "הזמנות שלי" מספר קריאות per booking/ride יוצרות N+1 ו-UX איטי. |
+| **החלטה** | Dedicate endpoints: `GET /bookings/driver-summary` ו-`GET /bookings/passenger-summary` + mapping ל-view-model; hooks מבודדים. |
+| **אלטרנטיבות** | (1) GraphQL עם DataLoader. (2) BFF שמרכז. (3) N+1 עם `joinedload` — עדיין הרבה round-trips אם ה-UI שואל "פר booking". |
+| **יתרון** | מעט round-trips, חוזה יציב ל-UI, קל לדגום ב-ראיון. |
+| **Trade-off** | endpoints ייעודיים = יותר שטח API לתחזק. |
+| **Interview pitch (≈30s)** | *"במקום שהפרונט יריץ N קריאות, הוספתי read models מרוכזים לנהג ולנוסע: טאב אחד = קריאה אחת, והמאפר מרכז את DTO→UI."* |
+| **הפניה** | HIGHLIGHTS, `BookingReadsService`, [architecture/DATABASE.md](architecture/DATABASE.md) (אם רלוונטי) |
+
+---
+
+<a id="idempotency"></a>
+
+## Idempotency-Key — `request-ride-from-search`
+
+| | |
+|--|--|
+| **בעיה** | double tap / retry רשת → שתי bookings לאותו ride. |
+| **החלטה** | Header אופציונלי, Redis `SET NX`, fingerprint לגוף, cache רק **201**; 409+Retry-After בזמן processing; **fail-open** בלי Redis. |
+| **אלטרנטיבות** | (1) unique constraint DB בלבד — לא מכסה כל מרוץ. (2) idempotency רק בפרונט — לא אמין. |
+| **יתרון** | אותו דפוס שמסחר אלקטרוני מכיר; לא שיניתי `BookingService.request_to_join` ללוגיקה, רק הכניסה. |
+| **Trade-off** | בלי Redis אין dedup. |
+| **Interview pitch (≈30s)** | *"Stripe-style: `SET NX` + fingerprint, שומרים רק תשובה מוצלחת. בלי Redis — fail-open כי זמינות מול dedup."* |
+| **הפניה** | ADR §19, HIGHLIGHTS §7ה / 0א |
+
+---
+
+<a id="auth-session"></a>
+
+## Auth: JWT + `jti` + denylist (logout)
+
+| | |
+|--|--|
+| **בעיה** | JWT stateless — אחרי logout ה-access עדיין חתום עד `exp`. |
+| **החלטה** | `jti` + `SETEX denylist:{jti}` ב-Redis עד `exp`; HTTP בודק; **fail-open** אם Redis down ב-read. |
+| **אלטרנטיבות** | (1) session server-side (sticky). (2) רשימת ביטול ב-Postgres לכל request — עומס. (3) access קצר מאוד בלי denylist — UX גרוע. |
+| **יתרון** | logout אמיתי על access בלי טבלת sessions גדולה. |
+| **Trade-off** | **WS** עדיין בלי denylist (TODO) — token תקף עד exp אם אין בדיקה. |
+| **Interview pitch (≈30s)** | *"הוספתי jti ל-access ו-Redis denylist ב-logout. Fail-open on read — לא נועלת את כל המשתמשים אם Redis מפסיק. Trade-off: WS אקטיבי עד exp."* |
+| **הפניה** | ADR §18, HIGHLIGHTS §7ד |
+
+---
+
+<a id="circuit-breaker"></a>
+
+## Circuit Breaker — Google Maps (באקאנד)
+
+| | |
+|--|--|
+| **בעיה** | Geocoding/Directions איטי או 429 → storm של requests חוסמים workers. |
+| **החלטה** | In-memory per-process circuit לכל API; OPEN = אין HTTP ל-Google; health מדווח `circuit_breakers` בלי לסמן את השרת unhealthy בגלל Google. |
+| **אלטרנטיבות** | (1) Retry בלי cap — מחמיר. (2) rate limit בלבד. (3) sidecar (Envoy) — overkill. |
+| **יתרון** | fail-fast; מגן על CPU ו-external budget. |
+| **Trade-off** | מעגל **לא** משותף בין instances — reset אחרי deploy. |
+| **Interview pitch (≈30s)** | *"לכל API של Google מעגל נפרד; אחרי סף כשלים נכנסים ל-OPEN — לא קוראים חיצונית, מחזירים שכבה ריקה. Health מציג מצב אבל status הכללי תלוי DB/Redis/Rabbit בלבד."* |
+| **הפניה** | ADR §20, HIGHLIGHTS §0א |
+
+---
+
+<a id="email-renderer"></a>
+
+## Email: React Email / Node `email-renderer`
+
+| | |
+|--|--|
+| **בעיה** | Jinja2 מקומי ב-Python — קשה sharing עם פרונט, preview, קומפוננטות. |
+| **החלטה** | מיקרו-שירות Node: `POST /render` { template, props } → HTML; Outbox/notification שולחים. |
+| **אלטרנטיבות** | (1) MJML static. (2) שליחה דרך SaaS. (3) Jinja2 ב-Python. |
+| **יתרון** | קומפוננטות, SSR כמו React, הפרדת אחריות. |
+| **Trade-off** | hop רשת נוסף, health, סדר on compose. |
+| **Interview pitch (≈30s)** | *"רינדור מייל עבר ל-Node+React Email — אותו mindset כמו SSR, templates ב-TS. ה-Python נשאר לאורקסטרציה ו-Outbox."* |
+| **הפניה** | ADR §5, HIGHLIGHTS (מייל / email-renderer) |
+
+---
+
+<a id="fcm"></a>
+
+## Push: FCM data-only
+
+| | |
+|--|--|
+| **בעיה** | שליטה ב-UX: Toast בחזית, SW ברקע, עקביות בין iOS/Web. |
+| **החלטה** | שרת שולח `data` map בלבד; קליינט מפרש ל-Toast/צליל. |
+| **אלטרנטивות** | (1) `notification` object של FCM — פחות שליטה אחידה. |
+| **יתרון** | שליטה מלאה בטקסט, שפה, A/B, analytics. |
+| **Trade-off** | יותר לוגיקה בקליינט. |
+| **הפניה** | [FCM_SYSTEM_SUMMARY.md](FCM_SYSTEM_SUMMARY.md), [adr/FCM_AND_PUSH.md](adr/FCM_AND_PUSH.md) |
+
+---
+
+## איך זה יושב מול High ו־ADR
+
+- **השתמש ב-FEATURE_DECISIONS** כששואלים: *"למה לא X?"* — עמודת **אלטרנטיבות** + **Trade-off**.
+- **השתמש ב-ENGINEERING_HIGHLIGHTS** לקישור לנתיבי קבצים ומספור סעיפים.
+- **השתמש ב-ADR** כששואלים deep dive (מספור §).
+
+[← חזרה ל-Interview Playbook](INTERVIEW_PLAYBOOK.md)

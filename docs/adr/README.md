@@ -2,6 +2,8 @@
 
 מסמכים אלה מסכמים **למה** נבנתה LinkUp כפי שהיא — לא רק **מה** קיים. מקור אמת טכני נשאר במסמכי הארכיטקטורה והקוד.
 
+**מסלול “סניור” מאוחד (נקודת כניסה + Why/Alternatives לפי פיצ'ר):** [../INTERVIEW_PLAYBOOK.md](../INTERVIEW_PLAYBOOK.md) · [../FEATURE_DECISIONS.md](../FEATURE_DECISIONS.md)
+
 ## סדר קריאה מומלץ לפני ראיון
 
 1. [ARCHITECTURE_DECISIONS_BACKEND.md](ARCHITECTURE_DECISIONS_BACKEND.md) — DB, Redis, RabbitMQ, Outbox, **רינדור מיילים ב-Node (§5)**, workers, סקייל, אבטחה, **JWT `jti` + denylist ב-Redis (§18)**, **Idempotency-Key ל-request-ride-from-search (§19)**, **נוסע: חיפוש מול שמירת התראה (§17)**, **Circuit Breaker ל-Google Maps בבקאנד (§20)**, **PgBouncer מתוכנן (§21)**.

@@ -88,6 +88,7 @@ ai-worker
 - **WebSocket auth (FastAPI)**: `get_current_user_ws` ב-`app/api/dependencies/auth.py` מאמת **רק JWT** (`decode_access_token`: חתימה, `exp`, base64 קנוני) ומחזיר `WsUser` עם `user_id` מה-`sub` — **בלי קריאת DB** בזמן חיבור, כדי לא להעמיס על ה-connection pool תחת עומס. HTTP (`get_current_user`) עדיין טוען `User` מ-DB ובודק `is_active`. **הערה:** denylist מבוסס-HTTP עדיין **לא** נבדק ב-handshake של WebSocket (TODO בקוד) — חיבורי WS עדיין תקפים עד פקיעת JWT.
 - **Cursor-based Pagination**: נסיעות (חיפוש), הודעות צ'אט — `after` / `before` + `limit`, תגובה עם `next_cursor`, `has_more`.
 - **Chat read cursor**: `conversation_participants.last_read_message_id` is the source of truth for read receipts. `mark_conversation_read` advances it monotonically; REST returns `partner_read_up_to_message_id`, and `message_read` WS events carry `read_up_to_message_id` so the UI can mark every outgoing message up to that cursor as read.
+- **Chat plaintext-only input (XSS hardening)**: `MessageCreate.reject_html` in [`backend/app/domain/chat/schema.py`](backend/app/domain/chat/schema.py) rejects bodies containing HTML tags (`<...>`). This blocks stored HTML payloads at API entry and keeps chat content policy as plain text.
 - **Page-based Pagination**: הזמנות שלי — `page`, `limit`, תגובה עם `total`, `has_more`.
 - **Pessimistic Locking**: `approve_booking`, `cancel_booking` — שליפת נסיעה עם `SELECT ... FOR UPDATE` כדי למנוע race. **שגיאות טרנזקציה:** `approve_booking`, `reject_booking`, `cancel_booking` — `rollback` גם על `Exception` לא צפוי אחרי `flush`, עם לוג — עקבי עם `request_to_join`.
 - **Race Condition Protection**: אישור/ביטול הזמנה תחת lock על ה-ride; ביטול מחזיר נסיעה ל-OPEN רק אם לא CANCELLED.
@@ -172,7 +173,7 @@ ai-worker
 - **JWT**: HS256, `SECRET_KEY` חובה בפרודקשן. Access/Refresh expiry מ-config. **Access:** claim **`jti`** + **Redis denylist** לאחר logout — ביטול מיידי של אותו access token (במקביל לניקוי refresh ב-DB).
 - **WebSocket (backend)**: אימות ב-`get_current_user_ws` מבוסס JWT בלבד — אין בדיקת `is_active` בזמן ה-handshake; משתמש מושבת עם טוקן תקף עדיין יכול להתחבר ל-WS עד פקיעת הטוקן (מול מניעת עומס על DB בחיבור).
 - **CORS**: `CORS_ORIGINS` או `FRONTEND_URL`; ב-DEBUG גם localhost regex.
-- **Rate Limiting**: Auth endpoints — חלון שניות + מקסימום בקשות ל-IP (`RATE_LIMIT_AUTH_*`); כולל **`POST /register`** לצד login/refresh וכו’.
+- **Rate Limiting**: Auth endpoints — חלון שניות + מקסימום בקשות ל-IP (`RATE_LIMIT_AUTH_*`); כולל **`POST /register`** לצד login/refresh וכו’. Chat message endpoint (`POST /chat/conversations/{conversation_id}/messages`) מוגבל פר-משתמש ל-30 הודעות לדקה (`ratelimit:chat:{user_id}`), עם fail-open אם Redis לא זמין.
 - **Password hashing**: bcrypt; חישוב/אימות סיסמה רץ ב-**thread pool** (`run_in_executor`) כדי לא לחסום את ה-event loop.
 - **OTP (אימות מייל / איפוס סיסמה)**: קוד אקראי עם **`secrets`**; השוואה עם **`hmac.compare_digest`**; מונה ניסיונות ב-Redis + איפוס בעת הנפקת קוד חדש.
 - **HTTPS**: `FORCE_HTTPS_REDIRECT` מאחורי proxy בפרודקשן.

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import type { RegisterData } from '../context/AuthContext';
 import ErrorBanner from '../components/ErrorBanner';
 import LoadingButton from '../components/LoadingButton';
+import PhoneInput from '../components/PhoneInput/PhoneInput';
 import { getApiErrorMessage } from '../utils/apiError';
 import styles from './Register.module.css';
 
@@ -121,14 +122,11 @@ export default function Register() {
             <label className={styles.fieldLabel} htmlFor="reg-phone">
               {t('phone')}
             </label>
-            <input
+            <PhoneInput
               id="reg-phone"
-              type="tel"
-              placeholder={t('phonePlaceholder')}
               value={form.phone_number}
-              onChange={(e) => setForm((f) => ({ ...f, phone_number: e.target.value }))}
-              className={styles.input}
-              autoComplete="tel"
+              onChange={(e164) => setForm((f) => ({ ...f, phone_number: e164 }))}
+              defaultCountryCode="IL"
             />
           </div>
 

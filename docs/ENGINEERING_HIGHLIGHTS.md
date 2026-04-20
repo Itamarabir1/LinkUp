@@ -7,6 +7,8 @@
 
 **לראיון — מיפוי שורת CV ↔ איפה בקוד:** [`INTERVIEW_TECH_STACK_MAP.md`](INTERVIEW_TECH_STACK_MAP.md).
 
+**לראיון — ניווט לפי נושא + טבלת Why / Alternatives / Trade-offs (מקביל למסמך הזה):** [`INTERVIEW_PLAYBOOK.md`](INTERVIEW_PLAYBOOK.md) · [`FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md).
+
 לפרטים טכניים עמוקים יותר: `../ARCHITECTURE.md`, `ERRORS.md`, `architecture/REALTIME.md`, `architecture/EVENTS.md`, `architecture/DATABASE.md`, `architecture/API.md`, `backend/docs/GOOGLE_OAUTH.md`.
 
 ---
@@ -278,7 +280,7 @@
 | **Async SQLAlchemy 2.0 migration** | זרימות ליבה בדומיינים passengers/bookings/rides עברו ל-`AsyncSession` + `select/execute`; פעולות sync נשמרו רק למקטעים שדורשים locking/transactional guarantees. |
 | **JWT קצר + Refresh ב-DB + `jti` + Redis denylist** | אבטחה; refresh נמחק ב-logout; access הנוכחי נחסם מיידית עד `exp` (TTL על `denylist:{jti}`). |
 | **Idempotency-Key (Redis, `SET NX`)** | `POST …/request-ride-from-search` — מניע duplicate booking; מטמון **201** בלבד; **§7ה**. |
-| **Rate limiting (Redis)** | על **register**, **login / refresh** ונקודות auth נוספות — מונה ב-Redis, חלון זמן + מקסימום בקשות ל-IP — מגביל הרשמה/כניסה אגרסיבית. |
+| **Rate limiting (Redis)** | על **register**, **login / refresh** ונקודות auth נוספות — מונה ב-Redis, חלון זמן + מקסימום בקשות ל-IP — מגביל הרשמה/כניסה אגרסיבית; בצ'אט יש rate limit פר-משתמש על `POST /chat/conversations/{conversation_id}/messages` (30 הודעות/דקה, fail-open אם Redis לא זמין). |
 | **מניעת username enumeration (OWASP)** | לוגין: **אותה** `InvalidCredentialsError` (401) לאימייל שלא קיים ולסיסמה שגויה — לא חושפים אם המשתמש רשום. |
 | **bcrypt ב-thread pool** | `get_password_hash` / `verify_password` — **async** עם `asyncio.get_running_loop().run_in_executor` — לא חוסמים את לולאת ה-ASGI תחת עומס סיסמאות. |
 | **Request ID** | `X-Request-ID` — מעקב בין לוגים לבקשה. |
@@ -367,6 +369,20 @@ ADR: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §18**.
 
 **פרונט:** [`requestRideFromSearch`](../../frontend/src/api/passengers.ts) מקבל מפתח אופציונלי; **[`useJoinRide`](../../frontend/src/pages/SearchRides/useJoinRide.ts)** (נקרא מ־**[`useSearchRides`](../../frontend/src/pages/SearchRides/useSearchRides.ts)**) יוצר **`crypto.randomUUID()`** פעם אחת לכל ניסיון הצטרפות (**`idempotencyKeyRef`**), מעביר ל-API, **מאפס אחרי הצלחה**, ומשאיר את המפתח אחרי שגיאה ל-retry עם אותו מפתח.  
 ADR: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §19**.
+
+---
+
+## 7ו. Chat XSS hardening — plaintext-only messages
+
+כדי למנוע **stored XSS** בשכבת הצ'אט, הוגדרה מדיניות קלט של **טקסט בלבד**:
+
+| רכיב | מה קורה |
+|------|---------|
+| **נקודת כניסה** | `MessageCreate` ב־`backend/app/domain/chat/schema.py` |
+| **החלטת אבטחה** | `reject_html` דוחה הודעות שמכילות תגיות HTML (`<...>`) במקום לנקות אותן בשקט |
+| **למה** | דחייה מפורשת שקופה יותר למשתמש ולמפתחים, ושומרת עקביות בין consumers שונים של תוכן הצ'אט (UI, WS, סיכומים/ייצוא עתידיים) |
+| **מה זה לא** | לא מנגנון sanitization כללי ל-HTML — זו מדיניות מוצרית: צ'אט = plaintext |
+| **בקצרה לראיון** | “בחרנו reject ל-HTML בהודעות צ'אט כדי לחסום payloads בעייתיים מוקדם ולשמור על UX צפוי: טקסט בלבד.” |
 
 ---
 
