@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import styles from './PhoneInput.module.css';
 
 interface Country {
@@ -54,26 +54,29 @@ export default function PhoneInput({
   error,
   defaultCountryCode = 'IL',
 }: PhoneInputProps) {
-  const defaultCountry = COUNTRIES.find((c) => c.code === defaultCountryCode) ?? COUNTRIES[0];
+  const defaultCountry = useMemo(
+    () => COUNTRIES.find((c) => c.code === defaultCountryCode) ?? COUNTRIES[0],
+    [defaultCountryCode],
+  );
+
+  /** When `value` is empty, remember country chosen from dropdown before any digits (controlled parent keeps `value` as ''). */
+  const [pendingCountry, setPendingCountry] = useState<Country | null>(null);
+
+  const { country, localNumber } = useMemo(() => {
+    if (value) {
+      const parsed = parseE164(value);
+      if (parsed) {
+        return { country: parsed.country, localNumber: parsed.local };
+      }
+      return { country: defaultCountry, localNumber: '' };
+    }
+    return { country: pendingCountry ?? defaultCountry, localNumber: '' };
+  }, [value, defaultCountry, pendingCountry]);
+
   const [open, setOpen] = useState(false);
-  const [country, setCountry] = useState<Country>(defaultCountry);
-  const [localNumber, setLocalNumber] = useState('');
   const [search, setSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-
-  // Sync from external value (prefill / reset)
-  useEffect(() => {
-    if (!value) {
-      setLocalNumber('');
-      return;
-    }
-    const parsed = parseE164(value);
-    if (parsed) {
-      setCountry(parsed.country);
-      setLocalNumber(parsed.local);
-    }
-  }, [value]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -110,7 +113,7 @@ export default function PhoneInput({
   };
 
   const selectCountry = (c: Country) => {
-    setCountry(c);
+    setPendingCountry(value ? null : c);
     setOpen(false);
     setSearch('');
     emitValue(c.dial, localNumber);
@@ -118,7 +121,6 @@ export default function PhoneInput({
 
   const handleNumberChange = (raw: string) => {
     const cleaned = raw.replace(/\D/g, '');
-    setLocalNumber(cleaned);
     emitValue(country.dial, cleaned);
   };
 

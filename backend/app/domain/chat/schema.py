@@ -28,9 +28,7 @@ class MessageCreate(BaseModel):
     def reject_html(cls, v: str) -> str:
         """Reject messages containing HTML tags — chat is plaintext only."""
         if _HTML_TAG_RE.search(v):
-            raise ValueError(
-                "הודעות צ'אט לא יכולות להכיל HTML. שלח טקסט בלבד."
-            )
+            raise ValueError("הודעות צ'אט לא יכולות להכיל HTML. שלח טקסט בלבד.")
         return v.strip()
 
 
