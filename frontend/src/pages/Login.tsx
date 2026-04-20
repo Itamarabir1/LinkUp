@@ -81,7 +81,7 @@ export default function Login() {
         </div>
 
         <h1 className={styles.title}>{t('welcomeBack')}</h1>
-        <p className={styles.subtitle}>{t('loginSubtitle')}.</p>
+        <p className={styles.subtitle}>{t('loginSubtitle')}</p>
 
         {verifiedMessage ? (
           <p className={styles.verifiedBanner}>✓ {t('emailVerified')}</p>
