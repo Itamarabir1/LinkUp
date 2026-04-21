@@ -287,6 +287,39 @@ services:
     networks:
       - linkup_network
 
+  # --- Monitoring: Prometheus ---
+  prometheus:
+    profiles: ["monitoring"]
+    image: prom/prometheus:v2.51.0
+    container_name: linkup_prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - linkup_network
+    restart: unless-stopped
+
+  # --- Monitoring: Grafana ---
+  grafana:
+    profiles: ["monitoring"]
+    image: grafana/grafana:10.4.0
+    container_name: linkup_grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3002:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - linkup_network
+    restart: unless-stopped
+
   # --- Frontend: static build (production profile only) ---
   frontend:
     profiles: ["prod"]
@@ -327,3 +360,4 @@ networks:
 volumes:
   postgres_data:
   rabbitmq_data:
+  grafana_data:

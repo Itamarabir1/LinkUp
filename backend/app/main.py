@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -102,6 +103,9 @@ app.add_middleware(SecurityHeadersMiddleware)
 # HTTPS: redirect HTTP → HTTPS when behind a proxy (enable in prod with FORCE_HTTPS_REDIRECT=True)
 if getattr(settings, "FORCE_HTTPS_REDIRECT", False):
     app.add_middleware(HTTPSRedirectMiddleware)
+
+# Metrics — expose /metrics for Prometheus scraping
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 # Admin panel and exception handlers (order: specific → generic)
 setup_admin(app, engine)
