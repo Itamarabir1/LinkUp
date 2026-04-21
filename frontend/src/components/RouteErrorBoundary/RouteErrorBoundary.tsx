@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import styles from './RouteErrorBoundary.module.css';
 
@@ -24,10 +25,7 @@ export default class RouteErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[LinkUp] RouteErrorBoundary caught:', error, info.componentStack);
-    // TODO: Sentry — remove when enabling in production
-    // Route boundary crashes are always critical
-    // import * as Sentry from "@sentry/react";
-    // if (import.meta.env.PROD) { Sentry.captureException(error); }
+    if (import.meta.env.PROD) { Sentry.captureException(error); }
   }
 
   componentDidUpdate(prevProps: Props) {

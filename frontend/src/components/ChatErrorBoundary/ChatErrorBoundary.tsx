@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import styles from './ChatErrorBoundary.module.css';
 
@@ -22,10 +23,7 @@ export default class ChatErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, _info: ErrorInfo) {
     void _info;
     console.error('[LinkUp] ChatErrorBoundary caught:', error);
-    // TODO: Sentry — remove when enabling in production
-    // Chat crashes are critical — capture all
-    // import * as Sentry from "@sentry/react";
-    // if (import.meta.env.PROD) { Sentry.captureException(error); }
+    if (import.meta.env.PROD) { Sentry.captureException(error); }
   }
 
   render() {

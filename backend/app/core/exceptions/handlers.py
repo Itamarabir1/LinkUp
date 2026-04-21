@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+import sentry_sdk
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -49,11 +50,8 @@ async def link_up_exception_handler(request: Request, exc: LinkUpError):
         extra={"request_id": request_id},
     )
 
-    # TODO: Sentry — remove comment when enabling in production
-    # Only 5xx — do not send business 401/404/422 (reduces noise)
-    # import sentry_sdk
-    # if exc.status_code >= 500:
-    #     sentry_sdk.capture_exception(exc)
+    if exc.status_code >= 500:
+        sentry_sdk.capture_exception(exc)
 
     headers = {}
     if request_id:

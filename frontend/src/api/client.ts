@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react';
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { STORAGE_KEYS } from '../config/constants';
 import { API_BASE_URL, API_TIMEOUT_MS } from '../config/env';
@@ -122,12 +123,9 @@ api.interceptors.response.use(
         trace_id: (err.response?.data as { trace_id?: string } | undefined)?.trace_id,
         status: err.response?.status,
       });
-      // TODO: Sentry — remove when enabling in production
-      // Only 5xx — skip business 4xx (less noise)
-      // import * as Sentry from "@sentry/react";
-      // if (import.meta.env.PROD && err.response?.status && err.response.status >= 500) {
-      //   Sentry.captureException(err);
-      // }
+      if (import.meta.env.PROD && err.response?.status && err.response.status >= 500) {
+        Sentry.captureException(err);
+      }
     }
     return Promise.reject(err);
   }

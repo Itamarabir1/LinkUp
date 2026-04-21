@@ -12,7 +12,11 @@ import sys
 from contextvars import ContextVar
 from typing import Any
 
+import sentry_sdk
 import structlog
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from structlog.types import EventDict, WrappedLogger
 
 from app.core.config import settings
@@ -45,28 +49,18 @@ def setup_logging() -> None:
     """
     Configure structlog and stdlib logging; processors apply to app and library logs.
     """
-    # TODO: Sentry — enable when SENTRY_DSN is set in production
-    # import sentry_sdk
-    # from sentry_sdk.integrations.fastapi import FastApiIntegration
-    # from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-    # from sentry_sdk.integrations.redis import RedisIntegration
-    #
-    # if getattr(settings, "SENTRY_DSN", None):
-    #     sentry_sdk.init(
-    #         dsn=settings.SENTRY_DSN,
-    #         integrations=[
-    #             FastApiIntegration(),
-    #             SqlalchemyIntegration(),
-    #             RedisIntegration(),
-    #         ],
-    #         traces_sample_rate=0.1,
-    #         send_default_pii=False,
-    #         environment=getattr(settings, "ENVIRONMENT", "development"),
-    #     )
-    #
-    # TODO: Sentry — also init in:
-    # - app/workers/main_worker.py (separate process)
-    # - chat-ws (sentry-go)
+    if getattr(settings, "SENTRY_DSN", None):
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            integrations=[
+                FastApiIntegration(),
+                SqlalchemyIntegration(),
+                RedisIntegration(),
+            ],
+            traces_sample_rate=0.1,
+            send_default_pii=False,
+            environment=getattr(settings, "ENVIRONMENT", "development"),
+        )
 
     shared_processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
