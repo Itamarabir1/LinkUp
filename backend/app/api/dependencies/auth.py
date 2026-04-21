@@ -93,13 +93,15 @@ async def get_current_user_ws(
     WebSocket auth via JWT only (?token=...) — no DB round-trip.
     decode_access_token verifies signature, expiry, and canonical base64.
     Disabled users may still connect until token expiry (trade-off vs DB pool load).
-
-    TODO: JWT denylist is not checked here yet (Redis); WS should align with HTTP auth.
+    Denied tokens (post-logout denylist) are rejected. Redis failures remain fail-open.
     """
     if not token:
         return None
     payload = decode_access_token(token)
     if not payload:
+        return None
+    jti = payload.get("jti")
+    if jti and await redis_client.is_denied(str(jti)):
         return None
     user_id = payload.get("sub")
     if not user_id:

@@ -5,7 +5,9 @@ Security helpers tests — JWT decode paths (valid, expired, bad signature).
 import pytest
 from datetime import datetime, timedelta, timezone
 from jose import jwt
+from unittest.mock import AsyncMock, patch
 
+from app.api.dependencies.auth import get_current_user_ws
 from app.core.security import (
     decode_access_token,
     decode_refresh_token,
@@ -125,3 +127,31 @@ class TestDecodeRefreshToken:
 
         result = decode_refresh_token(token)
         assert result is None
+
+
+class TestGetCurrentUserWs:
+    """Tests for get_current_user_ws denylist behavior."""
+
+    async def test_valid_token_not_denied_returns_ws_user(self):
+        token = create_access_token(data={"sub": "00000000-0000-0000-0000-000000000123"})
+        with patch(
+            "app.api.dependencies.auth.redis_client.is_denied",
+            new=AsyncMock(return_value=False),
+        ):
+            result = await get_current_user_ws(token=token)
+
+        assert result is not None
+        assert str(result.user_id) == "00000000-0000-0000-0000-000000000123"
+
+    async def test_denied_jti_returns_none(self):
+        token = create_access_token(data={"sub": "00000000-0000-0000-0000-000000000123"})
+        with patch(
+            "app.api.dependencies.auth.redis_client.is_denied",
+            new=AsyncMock(return_value=True),
+        ):
+            result = await get_current_user_ws(token=token)
+
+        assert result is None
+
+    async def test_no_token_returns_none(self):
+        assert await get_current_user_ws(token=None) is None
