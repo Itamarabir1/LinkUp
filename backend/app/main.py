@@ -79,6 +79,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
     servers=[{"url": "http://127.0.0.1:8000", "description": "Local"}],
+    docs_url="/docs" if settings.API_DOCS_ENABLED else None,
+    redoc_url="/redoc" if settings.API_DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if settings.API_DOCS_ENABLED else None,
 )
 
 # Standard CORS (preflight / normal requests)

@@ -17,7 +17,8 @@
 
 - **Google Maps — Circuit Breaker (שלושה מעגלים נפרדים):** מימוש in-memory ב־**`backend/app/infrastructure/geo/circuit_breaker.py`** — singletons **`google_geocoding_cb`**, **`google_directions_cb`**, **`google_distance_matrix_cb`** (מצבים `closed` / `open` / `half_open`; סף כשלונות + timeout התאוששות). **`GeocodingService`** ו־**`GeoClient`** בודקים **`allow_request()`** לפני קריאת HTTP; הצלחה/כשל מעדכנים את המעגל — כשהמעגל **OPEN**, אין קריאות ל-Google (fail-fast: `None` / `[]` לפי הזרימה). **`GET /api/v1/health`** מחזיר אובייקט **`circuit_breakers`** עם שמות המצבים — **אינפורמטיבי בלבד**; **`status`** (`healthy` / `unhealthy`) נקבע רק מ־**database**, **redis**, **rabbitmq** (לא ממצב Google). פירוט: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §20**, **`docs/architecture/API.md`** (Health).
 - **Idempotency-Key ל־`POST …/passengers/request-ride-from-search`:** כותרת אופציונלית; Redis **`SET NX`** + fingerprint (SHA-256) על גוף קנוני; מטמון **רק 201**; **409 + Retry-After** בזמן עיבוד; **422** על `idempotency_key_mismatch`; שגיאת דומיין → מחיקת נעילה; **fail-open** בלי Redis. **בקאנד:** עזרים ב־**`ride_join_idempotency.py`**, ראוטר דק. **פרונט:** **`useJoinRide`** מחזיק **`idempotencyKeyRef`** — מפתח יציב לכל ניסיון הצטרפות (איפוס אחרי הצלחה); נקרא מ־**`useSearchRides`**. פירוט: **§7ה**, **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §19**, `passengers.ts` + **`useJoinRide.ts`** / `useSearchRides.ts`.
-- **JWT access-token revocation (Redis denylist):** כל access כולל **`jti`**; **`POST /auth/logout`** עם Bearer מוסיף `denylist:{jti}` עם TTL עד `exp`; HTTP dependencies בודקים לפני אימות מלא; **fail-open** אם Redis לא זמין; WebSocket עדיין בלי denylist (TODO). פירוט: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §18**, **`ARCHITECTURE.md`** (Key Patterns / Security), **סעיף 7ד** למטה.
+- **JWT access-token revocation (Redis denylist):** כל access כולל **`jti`**; **`POST /auth/logout`** עם Bearer מוסיף `denylist:{jti}` עם TTL עד `exp`; HTTP dependencies וגם `get_current_user_ws` בודקים denylist בזמן handshake; **fail-open** אם Redis לא זמין. פירוט: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §18**, **`ARCHITECTURE.md`** (Key Patterns / Security), **סעיף 7ד** למטה.
+- **Prometheus + Grafana monitoring:** backend חושף `GET /metrics` דרך `prometheus-fastapi-instrumentator`; ב-Compose נוספו שירותי `prometheus` ו-`grafana` תחת profile `monitoring`, עם provisioning מוכן + dashboard בסיסי ל-HTTP (`rate`, `p95`, `5xx`, `in_progress`).
 - **Passenger match emails documented end-to-end:** Outbox publishes **`ride.created`**; `notification_tasks.handle_ride_created` runs `find_passengers_for_ride_notification`; per-match notification uses internal event **`ride.created_for_passengers`** (not a second Rabbit routing key). See §6.4 below and **`architecture/EVENTS.md`** (Ride section).
 - **WebSocket notifications unified via `chat-ws`**: user refresh/domain events are pushed on the existing chat socket (`user:*:events`), reducing concurrent client WebSocket connections.
 - **Outbox dispatch improved**: LISTEN/NOTIFY flow is now primary, with safe fallback behavior to avoid fixed-interval-only polling.
@@ -26,6 +27,7 @@
 - **Redis reconnect resilience**: reconnect retry strategy now uses exponential backoff for long-lived pub/sub channels.
 - **Google Maps resilience**: קריאות Geocoding / Directions / Distance Matrix עם **timeouts** ב־`httpx`; **Circuit Breaker** נפרד לכל API למניעת storm כשספק הרשת/Google לא יציב; ב־reverse geocode — HTTP **429** מזוהה ככשלון במעגל ונזרקת **`InfrastructureError`** (`error_code` **`GEO_SERVICE_UNAVAILABLE`**) — פורמט אחיד ב־**`docs/ERRORS.md`**.
 - **Chat reliability/UX**: missed messages are fetched after reconnect (`after=message_id`), and read receipts now use a DB-level message cursor (`last_read_message_id`) so `✓✓` renders correctly on all outgoing messages up to the partner's read position.
+- **Chat inbox N+1 fix + index hardening**: `list_my_conversations` הריצה `get_last_message` + `has_unread_messages` לכל שיחה בנפרד (~3N קריאות). הוחלפה ב-`get_inbox_aggregates` (`chat/crud.py`) — 3 aggregate queries + מיזוג בזיכרון, **4 קריאות קבועות**. נוסף `__table_args__` ב-`Message` model עם `Index("idx_messages_sender_id", "sender_id")` להתאמה ל-migration 012. פירוט: [FEATURE_DECISIONS.md — Chat inbox N+1](FEATURE_DECISIONS.md#chat-inbox-n1).
 - **Task scheduler safety**: `task-worker` is fixed to a single replica to prevent duplicate scheduled task publishing.
 
 ---
@@ -80,7 +82,7 @@
 |--|--|
 | **בעיה** | אחרי logout ה-access JWT עדיין חתום ותקף עד `exp` אם אין revocation. |
 | **החלטה** | **`jti`** בכל access; logout → **`SETEX denylist:{jti}`** עם TTL = זמן שנותר ל-`exp`; **`get_current_user`** / **`get_current_user_optional`** בודקים לפני המשך. **Fail-open** ב-`is_denied` אם Redis לא זמין. |
-| **Trade-off** | חלון קצר שבו טוקן מבוטל עדיין מתקבל אם Redis למטה; WS עדיין ללא denylist (TODO). Refresh כבר נמחק ב-DB ב-logout — לא צריך denylist נפרד לו. |
+| **Trade-off** | חלון קצר שבו טוקן מבוטל עדיין מתקבל אם Redis למטה (fail-open); Refresh כבר נמחק ב-DB ב-logout — לא צריך denylist נפרד לו. |
 
 ---
 
@@ -278,9 +280,11 @@
 | **DDD** | דומיינים מבודדים (rides, bookings, chat, …) — קל להרחבה וטסטים. |
 | **Pessimistic locking** | אישור/ביטול הזמנה תחת `SELECT FOR UPDATE` — מונע race ו”כפל” לוגיקה תחרותית על אותה נסיעה. |
 | **Async SQLAlchemy 2.0 migration** | זרימות ליבה בדומיינים passengers/bookings/rides עברו ל-`AsyncSession` + `select/execute`; פעולות sync נשמרו רק למקטעים שדורשים locking/transactional guarantees. |
+| **Chat inbox — aggregate query (N+1 fix)** | `get_inbox_aggregates` (`chat/crud.py`) — 3 שאילתות `func.max` מאוגדות לכלל השיחות במקום `get_last_message` + `has_unread_messages` per-row; מ-~3N ל-4 קריאות קבועות ללא תלות בגודל ה-inbox. פירוט: [FEATURE_DECISIONS.md — Chat inbox N+1](FEATURE_DECISIONS.md#chat-inbox-n1). |
 | **JWT קצר + Refresh ב-DB + `jti` + Redis denylist** | אבטחה; refresh נמחק ב-logout; access הנוכחי נחסם מיידית עד `exp` (TTL על `denylist:{jti}`). |
 | **Idempotency-Key (Redis, `SET NX`)** | `POST …/request-ride-from-search` — מניע duplicate booking; מטמון **201** בלבד; **§7ה**. |
 | **Rate limiting (Redis)** | על **register**, **login / refresh** ונקודות auth נוספות — מונה ב-Redis, חלון זמן + מקסימום בקשות ל-IP — מגביל הרשמה/כניסה אגרסיבית; בצ'אט יש rate limit פר-משתמש על `POST /chat/conversations/{conversation_id}/messages` (30 הודעות/דקה, fail-open אם Redis לא זמין). |
+| **API docs hardening** | `/docs`, `/redoc`, `/openapi.json` נשלטים ע"י `API_DOCS_ENABLED`; ברירת מחדל `False` כדי להשבית חשיפת סכימת API בפרודקשן, והפעלה רק בסביבות פנימיות (dev/staging). |
 | **מניעת username enumeration (OWASP)** | לוגין: **אותה** `InvalidCredentialsError` (401) לאימייל שלא קיים ולסיסמה שגויה — לא חושפים אם המשתמש רשום. |
 | **bcrypt ב-thread pool** | `get_password_hash` / `verify_password` — **async** עם `asyncio.get_running_loop().run_in_executor` — לא חוסמים את לולאת ה-ASGI תחת עומס סיסמאות. |
 | **Request ID** | `X-Request-ID` — מעקב בין לוגים לבקשה. |
@@ -345,7 +349,7 @@
 | **Logout** | `AuthService.logout` מקבל את מחרוזת ה-access מ-**`Authorization`**, מפענח, לוקח `jti` + `exp`, **`TTL = max(0, int(exp_ts − now))`**, **`SETEX denylist:{jti}`**. |
 | **בדיקה ב-HTTP** | אחרי `decode_access_token`, אם `jti` ב-denylist → **`InvalidAccessTokenError`** (או `None` ב-**`get_current_user_optional`**). |
 | **Fail-open** | אם Redis נמוך ב-`is_denied` — **לא** חוסמים משתמש (זמינות); אם `add_to_denylist` נכשל — logout עדיין מצליח (refresh נמחק). |
-| **פער ידוע** | **`get_current_user_ws`** עדיין **לא** בודק denylist (TODO בקוד) — התאמה ל-chat-ws/עומס DB היא trade-off נפרד. |
+| **WS handshake** | `get_current_user_ws` מיושר ל-HTTP ובודק denylist לפי `jti`; עדיין **אין** בדיקת `is_active` ב-WS handshake (בחירה להפחתת עומס DB תחת עומס חיבורים). |
 
 **לראיון:** *“stateless JWT + denylist ב-Redis נותן logout אמיתי על access בלי טבלת טוקנים ב-Postgres.”*  
 ADR: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §18**.
@@ -493,7 +497,7 @@ ADR: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §19**.
 | **Presigned PUT ל-S3** | ה-API לא מעביר bytes של תמונות — פחות CPU/זיכרון ו-timeoutים בשרת. |
 | **Cursor pagination** | חיפוש נסיעות וצ’אט בלי offset עמוק — יציב יותר בנתונים גדלים. |
 | **קונטרקט שגיאות אחיד** | `LinkUpError` + `trace_id` — לקוחות ו-Sentry מיושרים; פחות דיבוג “בעלם”. |
-| **ניטור עתידי + שאילתות** | **כיום:** `GET /api/v1/health`, structlog, `X-Request-ID` — [`ARCHITECTURE.md`](../ARCHITECTURE.md). **עתיד:** Prometheus `/metrics` + Grafana — לא ממומש. **שאילתות:** אין pipeline אוטומטי ל-EXPLAIN ANALYZE; סקירה ידנית מומלצת על נתיבים כבדים (חיפוש, התאמות) עם `pg_stat_statements` או query logging בסגנון Django — Future ב-`ARCHITECTURE.md`. |
+| **Sentry + Prometheus/Grafana (פעיל)** | **Sentry:** `sentry_sdk.init()` ב-`setup_logging()` כש-`SENTRY_DSN` מוגדר — FastAPI/SQLAlchemy/Redis integrations, `traces_sample_rate=0.1`; `capture_exception` ל-5xx בלבד (מניעת רעש). פרונט: `Sentry.init()` ב-`main.tsx` + `captureException` ב-axios interceptor (5xx), `ChatErrorBoundary`, `RouteErrorBoundary`. **Prometheus/Grafana:** backend חושף `/metrics`; compose profile `monitoring` מרים `prometheus`+`grafana` עם provisioning + dashboard בסיסי. DSN ב-`.env` בלבד, לא ב-git. **שאילתות:** אין pipeline אוטומטי ל-EXPLAIN ANALYZE; סקירה ידנית מומלצת על נתיבים כבדים עם `pg_stat_statements`. |
 
 ### אימות טלפון (ישראל / בינלאומי)
 

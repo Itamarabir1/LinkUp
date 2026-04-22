@@ -85,7 +85,7 @@ ai-worker
 - **Domain-Driven Design**: כל דומיין (users, rides, bookings, passengers, chat, groups, **admin**, auth, …) — model, schema, crud, service; ראוטרים תחת `backend/app/domain/*/router.py` ונרשמים ב־[`api/v1/api_router.py`](backend/app/api/v1/api_router.py). **רישום מודלי SQLAlchemy:** `import app.db.models` נטען מוקדם כדי לרשום את מודלי הדומיינים שנדרשים לטעינת API/relationships. הוא לא אמור להיתפס כרשימה ממצה של כל מודל אפשרי בריפו (למשל מודלים תשתיתיים כמו outbox). ב־[`alembic/env.py`](backend/alembic/env.py) אותו ייבוא לפני `target_metadata` ל־autogenerate. ב־Ruff: `per-file-ignores` ל־F401 על קבצי registry (`api_router.py`, `app/db/models.py`, `alembic/env.py`, `main_worker.py`) — ראו [`backend/pyproject.toml`](backend/pyproject.toml).
 - **Dependency Injection (FastAPI Depends)**: `RideService` ו-`AuthService` נוצרים דרך factories ב-`backend/app/api/dependencies/services.py`, והראוטרים מזריקים אותם עם `Depends(get_ride_service)` / `Depends(get_auth_service)` (במקום singletons גלובליים).
 - **JWT Auth**: Access Token (קצר, כולל **`jti`** ייחודי לכל הנפקה) + Refresh Token (ארוך, נשמר ב-DB). **`POST /auth/logout`** (עם Bearer) מנקה refresh ומוסיף את ה-access הנוכחי ל-**Redis denylist** עד פקיעת ה-`exp` (`SETEX denylist:{jti}`); `get_current_user` / `get_current_user_optional` בודקים denylist אחרי פענוח (Redis **fail-open** ב-`is_denied` — אם Redis נופל, לא חוסמים את כל המשתמשים). יצירת טוקן: `create_access_token` ב-`app/core/security.py`; denylist: **`app/infrastructure/redis/client.py`**, logout: **`app/domain/auth/service.py`**, תלות HTTP: **`app/api/dependencies/auth.py`**. אותו SECRET_KEY בין backend ל-chat-ws לאימות WebSocket.
-- **WebSocket auth (FastAPI)**: `get_current_user_ws` ב-`app/api/dependencies/auth.py` מאמת **רק JWT** (`decode_access_token`: חתימה, `exp`, base64 קנוני) ומחזיר `WsUser` עם `user_id` מה-`sub` — **בלי קריאת DB** בזמן חיבור, כדי לא להעמיס על ה-connection pool תחת עומס. HTTP (`get_current_user`) עדיין טוען `User` מ-DB ובודק `is_active`. **הערה:** denylist מבוסס-HTTP עדיין **לא** נבדק ב-handshake של WebSocket (TODO בקוד) — חיבורי WS עדיין תקפים עד פקיעת JWT.
+- **WebSocket auth (FastAPI)**: `get_current_user_ws` ב-`app/api/dependencies/auth.py` מאמת **JWT** (`decode_access_token`: חתימה, `exp`, base64 קנוני), בודק `jti` מול Redis denylist (`is_denied`, fail-open), ומחזיר `WsUser` עם `user_id` מה-`sub` — **בלי קריאת DB** בזמן חיבור, כדי לא להעמיס על ה-connection pool תחת עומס. HTTP (`get_current_user`) עדיין טוען `User` מ-DB ובודק גם `is_active`.
 - **Cursor-based Pagination**: נסיעות (חיפוש), הודעות צ'אט — `after` / `before` + `limit`, תגובה עם `next_cursor`, `has_more`.
 - **Chat read cursor**: `conversation_participants.last_read_message_id` is the source of truth for read receipts. `mark_conversation_read` advances it monotonically; REST returns `partner_read_up_to_message_id`, and `message_read` WS events carry `read_up_to_message_id` so the UI can mark every outgoing message up to that cursor as read.
 - **Chat plaintext-only input (XSS hardening)**: `MessageCreate.reject_html` in [`backend/app/domain/chat/schema.py`](backend/app/domain/chat/schema.py) rejects bodies containing HTML tags (`<...>`). This blocks stored HTML payloads at API entry and keeps chat content policy as plain text.
@@ -96,6 +96,7 @@ ai-worker
   - **Bookings** async-only (ללא `db.run_sync`) ומשתמשים ב־`select(...).with_for_update()` לנעילות שורה.
   - **Workers / notifications:** `find_passengers_for_ride_notification`, טעינת הזמנות ב־`handle_ride_cancelled_by_driver` ([`notification_tasks.py`](backend/app/workers/tasks/notification_tasks.py)) וכו' — **async** (`await db.execute(select(...))`). אין `Session.run_sync` בקוד האפליקציה; `run_sync` נשאר רק ב־Alembic (`env.py`) לצורך מיגרציות.
   - **ביטול נסיעה — התראות:** רק הזמנות במצב **PENDING** או **CONFIRMED** מקבלות `ride.cancelled_by_driver` (לא הזמנות שכבר **CANCELLED**).
+- **Chat inbox read path (anti N+1):** `list_my_conversations` משתמש ב-`get_inbox_aggregates` כדי להביא `last_message` + `has_unread` בבאצ' קבוע, ללא await DB פר-שיחה.
 - **תזכורות**: אין עוד `reminder_sent` על `rides`/`bookings` ב-ORM או ב-API ציבורי (מיגרציה **008**); תזמון בשכבת `scheduled_notifications` + `ReminderScheduler` + notification handler; סימון נשלח ב-`sent_at`.
 - **תחזוקת סטטוסים (maintenance)**: `MaintenanceCRUD` מחזיר `PendingUserEvent` עם RETURNING; אחרי `commit` מוצלח, `MaintenanceService` מפרסם `publish_user_event` (מוגן ב-`USER_EVENTS_ENABLED` ב-config).
 - **שגיאות API מרוכזות**: תת־מחלקות של `LinkUpError` לפי דומיין ב־`app/core/exceptions/`; ב־`main.py` handlers גלובליים ל־Pydantic (`RequestValidationError` → 422), `IntegrityError` / `SQLAlchemyError`, ו־`LinkUpError`. פורמט JSON, Sentry, פרונט ו-chat-ws: [`docs/ERRORS.md`](docs/ERRORS.md).
@@ -145,9 +146,10 @@ ai-worker
 
 - **ASGI server (Docker Compose)**: `backend/entrypoint.sh` מריץ `uvicorn` עם `--workers` לפי **`UVICORN_WORKERS`** ב-`backend/.env` (ברירת מחדל **1** אם חסר; ראו `.env.example`: **4**). **מיגרציות** רצות בשירות נפרד **`migrate`** לפני עליית ה-backend. **Healthcheck** על המיכל: `GET /api/v1/health`. **פיתוח לוקאלי** (ללא Docker): בדרך כלל `uvicorn ... --reload` — תהליך יחיד; מיגרציה ידנית (`alembic upgrade head`) לפני הרצה.
 - **Connection Pool** (`backend/app/db/session.py`): `pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle` מ-**config** (`DB_POOL_*` ב-`.env`; ברירות מחדל ב-`Settings`), `pool_pre_ping=True`.
-- **Indexes**: ראה `docs/DATABASE.md` — כולל 11 ה-indexes מ-migration 004 (rides, bookings, group_members, passenger_requests).
+- **Indexes**: ראה `docs/DATABASE.md` — כולל אינדקסי בסיס ממיגרציה 004 ועוד אינדקסים משלימים מקריאות production חמות (כולל `idx_bookings_request_id`, `idx_messages_sender_id`).
 - **Caching**: Redis לפי צורך — TTL וכו' לפי סוג (למשל OTP, broadcast channels).
 - **My Bookings — קריאות מאוגדות**: `GET /bookings/driver-summary` ו־`GET /bookings/passenger-summary` ממומשים ב־**`BookingReadsService`** ([`booking_reads_service.py`](backend/app/domain/bookings/booking_reads_service.py)) — שאילתת DB אחת לכל מסך (ראו `bookings/crud.py`: `joinedload` + `with_loader_criteria` על הזמנות pending/confirmed לנהג), במקום סדרת קריאות per-ride. בפרונט יש שכבת mapping ייעודית (`frontend/src/pages/MyBookings/myBookings.mappers.ts`) שממירה DTOs ל-view-model של UI — פירוט ב־`docs/architecture/DATABASE.md` ו־`docs/architecture/API.md`.
+- **Chat inbox — קריאות מאוגדות (N+1 fix)**: `list_my_conversations` ([`chat/service.py`](backend/app/domain/chat/service.py)) הריצה `get_last_message` + `has_unread_messages` לכל שיחה בנפרד (~3N DB round-trips). הוחלפה ב-**`get_inbox_aggregates`** ([`chat/crud.py`](backend/app/domain/chat/crud.py)): שלוש `func.max` aggregate queries על כלל השיחות ומיזוג בזיכרון — **4 קריאות קבועות** ללא תלות בגודל ה-inbox.
 
 ---
 
@@ -164,14 +166,16 @@ ai-worker
 
 ### Health endpoint וניטור
 - **Current:** `GET /api/v1/health` (DB, Redis, RabbitMQ + `circuit_breakers` אינפורמטיבי) + **structlog** + **`X-Request-ID`** (ראו לעיל).
-- **Future:** Prometheus **`/metrics`** + Grafana dashboard — **not yet implemented**.
+- **Sentry (פעיל):** `sentry_sdk.init()` ב-[`app/core/logging.py`](backend/app/core/logging.py) (`setup_logging`) — מופעל כש-`SENTRY_DSN` מוגדר בסביבה; integrations: `FastApiIntegration`, `SqlalchemyIntegration`, `RedisIntegration`; `traces_sample_rate=0.1`. `capture_exception` על 5xx בלבד ב-[`handlers.py`](backend/app/core/exceptions/handlers.py) (מניעת רעש מ-4xx עסקיים). פרונט: `Sentry.init()` ב-`main.tsx` (guard: `PROD + VITE_SENTRY_DSN`); `captureException` ב-axios interceptor (5xx), `ChatErrorBoundary`, `RouteErrorBoundary`.
+- **Prometheus + Grafana (פעיל, profile `monitoring`):** backend חושף `GET /metrics` דרך `prometheus-fastapi-instrumentator` (`Instrumentator().instrument(app).expose(...)` ב-`main.py`); ב-Compose נוספו שירותי `prometheus` ו-`grafana` תחת `profiles: ["monitoring"]`, עם קונפיגים ב-`monitoring/prometheus.yml` ו-`monitoring/grafana/provisioning/**`.
 
 ---
 
 ## Security
 
 - **JWT**: HS256, `SECRET_KEY` חובה בפרודקשן. Access/Refresh expiry מ-config. **Access:** claim **`jti`** + **Redis denylist** לאחר logout — ביטול מיידי של אותו access token (במקביל לניקוי refresh ב-DB).
-- **WebSocket (backend)**: אימות ב-`get_current_user_ws` מבוסס JWT בלבד — אין בדיקת `is_active` בזמן ה-handshake; משתמש מושבת עם טוקן תקף עדיין יכול להתחבר ל-WS עד פקיעת הטוקן (מול מניעת עומס על DB בחיבור).
+- **API docs exposure**: Swagger/ReDoc/OpenAPI נשלטים דרך `API_DOCS_ENABLED` ב-`Settings`; ברירת מחדל `False` כך שבפרודקשן `/docs`, `/redoc`, `/openapi.json` כבויים אלא אם הודלקו במפורש (למשל staging פנימי).
+- **WebSocket (backend)**: אימות ב-`get_current_user_ws` מבוסס JWT בלבד — אין בדיקת `is_active` בזמן ה-handshake (בחירה מודעת לצמצום עומס DB בזמן חיבור). עם זאת, בדיקת **Redis denylist (`denylist:{jti}`)** נוספה ומיושרת ל-HTTP auth: token שבוטל ב-logout נחסם גם ב-WS handshake (עם fail-open אם Redis לא זמין).
 - **CORS**: `CORS_ORIGINS` או `FRONTEND_URL`; ב-DEBUG גם localhost regex.
 - **Rate Limiting**: Auth endpoints — חלון שניות + מקסימום בקשות ל-IP (`RATE_LIMIT_AUTH_*`); כולל **`POST /register`** לצד login/refresh וכו’. Chat message endpoint (`POST /chat/conversations/{conversation_id}/messages`) מוגבל פר-משתמש ל-30 הודעות לדקה (`ratelimit:chat:{user_id}`), עם fail-open אם Redis לא זמין.
 - **Password hashing**: bcrypt; חישוב/אימות סיסמה רץ ב-**thread pool** (`run_in_executor`) כדי לא לחסום את ה-event loop.

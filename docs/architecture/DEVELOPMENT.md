@@ -68,6 +68,7 @@
 | API_PUBLIC_URL | — | כתובת ה-API בציבור |
 | CORS_ORIGINS | — | רשימה מופרדת בפסיקים; אם ריק — משתמש ב-FRONTEND_URL |
 | DEBUG | — | true/false |
+| API_DOCS_ENABLED | — | false כברירת מחדל; true רק ב-dev/staging כדי לחשוף `/docs`/`/redoc`/`/openapi.json` |
 | BREVO_API_KEY | למיילים | Brevo (Sendinblue) |
 | BREVO_SENDER_EMAIL | — | |
 | BREVO_SENDER_NAME | — | |

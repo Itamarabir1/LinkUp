@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "LinkUp"
     APP_NAME: str = "linkup-backend"
     DEBUG: bool = Field(False)
+    API_DOCS_ENABLED: bool = Field(False, description="Enable Swagger/OpenAPI docs. Set True only in dev/staging.")
     ENVIRONMENT: str = Field(
         "development",
         description="Environment name (Sentry, logs): development / staging / production",
