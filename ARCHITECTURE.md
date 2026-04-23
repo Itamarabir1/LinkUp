@@ -16,7 +16,7 @@
 | chat-ws | chat-ws/ | Go | 8081 | WebSocket server for real-time chat (JWT, Redis Pub/Sub) |
 | db | Docker | PostgreSQL 15 + PostGIS | 5432 | Primary data store |
 | pgbouncer | Docker | PgBouncer 1.24 | 6432 (internal) | Transaction pooler between app/workers and PostgreSQL |
-| redis | Docker | Redis Stack 7.2 | 6379 | Single Redis server - DB 0: backend + task/notification infra; DB 1: chat-ws + AI completion + user events |
+| redis-primary / redis-replica / redis-sentinel | Docker | Redis 7.2 + Sentinel | 6379, 26379 (internal) | Redis HA topology (master, replica, sentinel failover); DB 0: backend infra, DB 1: chat/events |
 | rabbitmq | Docker | RabbitMQ 3 + Management | 5672, 15672 | Message broker (events, tasks) |
 
 ---
@@ -27,10 +27,10 @@
 |-----------|------------|---------|---------|
 | Database | PostgreSQL + PostGIS | 15-3.3 | טבלאות, גיאומטריה, חיפוש מרחבי |
 | DB Pooler | PgBouncer | 1.24.1 | pooling פנימי (transaction mode), בלימת connection storms, הפחתת עומס זיכרון/CPU ב-Postgres |
-| Cache / Pub-Sub | Redis | 7.2.0-v10 | DB 0: ride per-ride + **rides:list**, cache, OTP, **JWT denylist** (`denylist:{jti}`), **idempotency keys** (`idempotency:request_ride:{user_id}:{key}`); DB 1: chat + **`user:{id}:events`** (דרך `redis_chat_pubsub`), completion, presence |
+| Cache / Pub-Sub | Redis + Sentinel | 7.2.0-v10 / 7.2-alpine | DB 0: ride per-ride + **rides:list**, cache, OTP, **JWT denylist** (`denylist:{jti}`), **idempotency keys** (`idempotency:request_ride:{user_id}:{key}`); DB 1: chat + **`user:{id}:events`** (דרך `redis_chat_pubsub`), completion, presence; client connection path via Sentinel failover |
 | Message Broker | RabbitMQ | 3-management | אירועים (Outbox), תורי משימות (notifications, avatar, scheduled) |
 | Email rendering | Node.js + Express + React Email | Node 20 | microservice called by backend/worker to render transactional email HTML |
-| Runtime | Docker Compose | — | Dev: db, redis, rabbitmq, **migrate** (once), backend (**8000** host), `notification-worker`, `task-worker`, `ai-worker`, chat-ws; local prod: static frontend + nginx (80) with `--profile prod` |
+| Runtime | Docker Compose | — | Dev: db, pgbouncer, redis-primary/replica/sentinel, rabbitmq, **migrate** (once), backend (**8000** host), `notification-worker`, `task-worker`, `ai-worker`, chat-ws; local prod: static frontend + nginx (80) with `--profile prod` |
 | CDN (אופציונלי) | **Amazon CloudFront** | — | דומיין ציבורי מול אותו bucket S3; מופעל כש־**`CLOUDFRONT_DOMAIN`** מוגדר — URLs יציבים לתמונות (אווטאר/קבוצות); ללא דומיין — presigned GET ישירות ל-S3 |
 
 ---

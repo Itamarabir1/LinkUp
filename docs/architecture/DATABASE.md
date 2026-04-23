@@ -38,6 +38,12 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 
 קבצי קונפיג: `infrastructure/pgbouncer/pgbouncer.ini`, `infrastructure/pgbouncer/userlist.txt` (template בלבד; סודות מוזרקים סביבתית).
 
+### Redis topology (HA)
+
+- Compose runtime: `redis-primary` (master), `redis-replica` (replication), `redis-sentinel` (failover detection).
+- Python clients (`RedisClient`, `RedisChatPubSub`, `RedisBroadcast`) משתמשים ב-`redis.asyncio.Sentinel` כש-`REDIS_SENTINEL_HOST` מוגדר; אחרת fallback ל-`REDIS_URL`.
+- DB split נשאר: **DB 0** ל-cache/rate-limit/denylist/idempotency, **DB 1** לצ'אט/pubsub.
+
 ---
 
 ## Tables

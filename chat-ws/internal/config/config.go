@@ -8,12 +8,14 @@ import (
 
 // Config holds env-based configuration. Same SECRET_KEY and REDIS_URL as Python backend.
 type Config struct {
-	Port            int      // WS server port (default 8081)
-	RedisURL        string   // e.g. redis://localhost:6379/0
-	SecretKey       string   // JWT secret (same as Python SECRET_KEY)
-	JWTAlg          string   // HS256
-	BackendURL      string   // e.g. http://localhost:8000
-	AllowedOrigins  []string // from ALLOWED_ORIGINS (comma-separated); empty = allow any origin (dev)
+	Port              int      // WS server port (default 8081)
+	RedisURL          string   // e.g. redis://localhost:6379/0
+	RedisMasterName   string   // sentinel master name (default mymaster)
+	RedisSentinelAddr string   // sentinel host:port (default redis-sentinel:26379)
+	SecretKey         string   // JWT secret (same as Python SECRET_KEY)
+	JWTAlg            string   // HS256
+	BackendURL        string   // e.g. http://localhost:8000
+	AllowedOrigins    []string // from ALLOWED_ORIGINS (comma-separated); empty = allow any origin (dev)
 }
 
 func LoadConfig() Config {
@@ -27,6 +29,14 @@ func LoadConfig() Config {
 	// Default DB=1 — matches backend REDIS_CHAT_DB (chat + chat-ws share logical DB)
 	if redisURL == "" {
 		redisURL = "redis://localhost:6379/1"
+	}
+	redisMasterName := os.Getenv("REDIS_MASTER_NAME")
+	if redisMasterName == "" {
+		redisMasterName = "mymaster"
+	}
+	redisSentinelAddr := os.Getenv("REDIS_SENTINEL_ADDR")
+	if redisSentinelAddr == "" {
+		redisSentinelAddr = "redis-sentinel:26379"
 	}
 	secret := os.Getenv("SECRET_KEY")
 	if secret == "" {
@@ -49,11 +59,13 @@ func LoadConfig() Config {
 		}
 	}
 	return Config{
-		Port:           port,
-		RedisURL:       redisURL,
-		SecretKey:      secret,
-		JWTAlg:         alg,
-		BackendURL:     backendURL,
-		AllowedOrigins: allowedOrigins,
+		Port:              port,
+		RedisURL:          redisURL,
+		RedisMasterName:   redisMasterName,
+		RedisSentinelAddr: redisSentinelAddr,
+		SecretKey:         secret,
+		JWTAlg:            alg,
+		BackendURL:        backendURL,
+		AllowedOrigins:    allowedOrigins,
 	}
 }

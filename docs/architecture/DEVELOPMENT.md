@@ -6,7 +6,7 @@
 
 ## Prerequisites
 
-- **Docker** ו-Docker Compose (להרצת db, **pgbouncer**, redis, rabbitmq, backend, notification-worker, task-worker, ai-worker, chat-ws).
+- **Docker** ו-Docker Compose (להרצת db, **pgbouncer**, `redis-primary`/`redis-replica`/`redis-sentinel`, rabbitmq, backend, notification-worker, task-worker, ai-worker, chat-ws).
 - **Python** 3.11+ (להרצת backend/worker לוקאלית בלי Docker).
 - **Node** (אם מריצים פרונט — לא מפורט כאן).
 - **Go** 1.x (אם בונים chat-ws ידנית).
@@ -53,11 +53,14 @@
 | DB pooling runtime path | — | runtime services דרך `pgbouncer`; migrations ישירות ל-`db` |
 | DATABASE_URL | אופציונלי | override מלא (למשל פרודקשן / K8s / CI); נטען ל־`DATABASE_URL_RAW` ב־Settings דרך **`validation_alias`** (גם **`DATABASE_URL_RAW`** תקף כשם env) |
 | REDIS_URL | אופציונלי | override מלא ל-Redis; נטען ל־`REDIS_URL_RAW` (גם **`REDIS_URL_RAW`** תקף) |
-| REDIS_HOST | — | localhost / redis |
+| REDIS_HOST | — | localhost / redis (alias ל-master ב-Compose) |
 | REDIS_PORT | — | 6379 |
 | REDIS_DB | — | 0 |
 | REDIS_PASSWORD | — | אם Redis דורש סיסמה |
 | REDIS_CHAT_DB | — | 1 (לצ'אט) |
+| REDIS_SENTINEL_HOST | — | redis-sentinel (מפעיל נתיב Sentinel במקום URL רגיל) |
+| REDIS_SENTINEL_PORT | — | 26379 |
+| REDIS_MASTER_NAME | — | mymaster |
 | RABBITMQ_HOST | — | localhost / rabbitmq |
 | RABBITMQ_USER | כן | |
 | RABBITMQ_PASSWORD | כן | |

@@ -39,12 +39,12 @@ services:
     networks:
       - linkup_network
 
-  # --- Cache & Pub/Sub: Redis ---
+  # --- Cache & Pub/Sub: Redis HA (Primary + Replica + Sentinel) ---
   # DB 0 -> backend + compatibility outbox-worker
   # DB 1 -> chat-ws pub/sub + chat completion listener
-  redis:
-    image: redis/redis-stack:7.2.0-v10 # pinned version, not latest
-    container_name: linkup_redis
+  redis-primary:
+    image: redis/redis-stack:7.2.0-v10
+    container_name: linkup_redis_primary
     restart: unless-stopped
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
     ports:
@@ -54,6 +54,59 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      linkup_network:
+        aliases:
+          - redis
+
+  redis-replica:
+    image: redis:7.2-alpine
+    container_name: linkup_redis_replica
+    restart: unless-stopped
+    command:
+      [
+        "redis-server",
+        "--replicaof",
+        "redis-primary",
+        "6379",
+        "--masterauth",
+        "${REDIS_PASSWORD}",
+        "--requirepass",
+        "${REDIS_PASSWORD}",
+      ]
+    depends_on:
+      redis-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - linkup_network
+
+  redis-sentinel:
+    image: redis:7.2-alpine
+    container_name: linkup_redis_sentinel
+    restart: unless-stopped
+    command:
+      [
+        "sh",
+        "-c",
+        "sed 's|\\${REDIS_PASSWORD}|'\"$REDIS_PASSWORD\"'|g' /etc/redis/sentinel.conf > /tmp/sentinel.conf && redis-server /tmp/sentinel.conf --sentinel",
+      ]
+    volumes:
+      - ./infrastructure/redis/sentinel.conf:/etc/redis/sentinel.conf:ro
+    depends_on:
+      redis-primary:
+        condition: service_healthy
+      redis-replica:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "sentinel", "masters"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - linkup_network
 
@@ -126,6 +179,7 @@ services:
     environment:
       - POSTGRES_HOST=pgbouncer
       - REDIS_HOST=redis
+      - REDIS_SENTINEL_HOST=redis-sentinel
       - REDIS_DB=0
       - REDIS_CHAT_DB=1
       - RABBITMQ_HOST=rabbitmq
@@ -140,7 +194,9 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      redis:
+      redis-primary:
+        condition: service_healthy
+      redis-sentinel:
         condition: service_healthy
       email-renderer:
         condition: service_healthy
@@ -160,6 +216,7 @@ services:
     environment:
       - POSTGRES_HOST=pgbouncer
       - REDIS_HOST=redis
+      - REDIS_SENTINEL_HOST=redis-sentinel
       - REDIS_DB=0
       - REDIS_CHAT_DB=1
       - RABBITMQ_HOST=rabbitmq
@@ -174,7 +231,9 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      redis:
+      redis-primary:
+        condition: service_healthy
+      redis-sentinel:
         condition: service_healthy
     networks:
       - linkup_network
@@ -192,6 +251,7 @@ services:
     environment:
       - POSTGRES_HOST=pgbouncer
       - REDIS_HOST=redis
+      - REDIS_SENTINEL_HOST=redis-sentinel
       - REDIS_DB=0
       - REDIS_CHAT_DB=1
       - DB_POOL_SIZE=3
@@ -203,7 +263,9 @@ services:
         condition: service_healthy
       pgbouncer:
         condition: service_healthy
-      redis:
+      redis-primary:
+        condition: service_healthy
+      redis-sentinel:
         condition: service_healthy
     networks:
       - linkup_network
@@ -222,6 +284,7 @@ services:
     environment:
       - POSTGRES_HOST=pgbouncer
       - REDIS_HOST=redis
+      - REDIS_SENTINEL_HOST=redis-sentinel
       - REDIS_DB=0
       - REDIS_CHAT_DB=1
       - RABBITMQ_HOST=rabbitmq
@@ -232,7 +295,9 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      redis:
+      redis-primary:
+        condition: service_healthy
+      redis-sentinel:
         condition: service_healthy
       email-renderer:
         condition: service_healthy
@@ -252,6 +317,7 @@ services:
     environment:
       - POSTGRES_HOST=pgbouncer
       - REDIS_HOST=redis
+      - REDIS_SENTINEL_HOST=redis-sentinel
       - REDIS_DB=0 # explicit: DB 0 for backend
       - REDIS_CHAT_DB=1 # same DB as chat-ws for chat/user pubsub
       - RABBITMQ_HOST=rabbitmq
@@ -265,7 +331,9 @@ services:
         condition: service_healthy
       pgbouncer:
         condition: service_healthy
-      redis:
+      redis-primary:
+        condition: service_healthy
+      redis-sentinel:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -302,8 +370,12 @@ services:
     environment:
       - PORT=8081
       - BACKEND_URL=http://backend:8000
+      - REDIS_MASTER_NAME=mymaster
+      - REDIS_SENTINEL_ADDR=redis-sentinel:26379
     depends_on:
-      redis:
+      redis-primary:
+        condition: service_healthy
+      redis-sentinel:
         condition: service_healthy
     networks:
       - linkup_network

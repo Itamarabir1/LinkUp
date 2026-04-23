@@ -7,9 +7,11 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 
 	redisv9 "github.com/redis/go-redis/v9"
@@ -26,15 +28,23 @@ func main() {
 		log.Fatal("SECRET_KEY (or JWT_SECRET) is required")
 	}
 
-	opt, err := redisv9.ParseURL(cfg.RedisURL)
+	redisPassword, redisDB, err := parseRedisURL(cfg.RedisURL)
 	if err != nil {
-		log.Fatalf("redis parse URL: %v", err)
+		log.Fatalf("redis URL parsing failed: %v", err)
 	}
-	redisClient := redisv9.NewClient(opt)
+	newFailover := func() *redisv9.Client {
+		return redisv9.NewFailoverClient(&redisv9.FailoverOptions{
+			MasterName:    cfg.RedisMasterName,
+			SentinelAddrs: []string{cfg.RedisSentinelAddr},
+			Password:      redisPassword,
+			DB:            redisDB,
+		})
+	}
+	redisClient := newFailover()
 	defer redisClient.Close()
-	redisOfflineSub := redisv9.NewClient(opt)
+	redisOfflineSub := newFailover()
 	defer redisOfflineSub.Close()
-	redisOnlineSub := redisv9.NewClient(opt)
+	redisOnlineSub := newFailover()
 	defer redisOnlineSub.Close()
 
 	h := hub.NewHub(redisClient)
@@ -62,4 +72,27 @@ func main() {
 	<-quit
 	slog.Info("shutting down", "component", "server")
 	cancel()
+}
+
+func parseRedisURL(raw string) (string, int, error) {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", 0, err
+	}
+	password := ""
+	if parsed.User != nil {
+		if pwd, ok := parsed.User.Password(); ok {
+			password = pwd
+		}
+	}
+	db := 0
+	path := strings.TrimPrefix(parsed.Path, "/")
+	if path != "" {
+		v, convErr := strconv.Atoi(path)
+		if convErr != nil {
+			return "", 0, convErr
+		}
+		db = v
+	}
+	return password, db, nil
 }

@@ -161,8 +161,8 @@
 | **החלטה** | `jti` + `SETEX denylist:{jti}` ב-Redis עד `exp`; HTTP בודק; **fail-open** אם Redis down ב-read. |
 | **אלטרנטיבות** | (1) session server-side (sticky). (2) רשימת ביטול ב-Postgres לכל request — עומס. (3) access קצר מאוד בלי denylist — UX גרוע. |
 | **יתרון** | logout אמיתי על access בלי טבלת sessions גדולה. |
-| **Trade-off** | **WS** עדיין בלי denylist (TODO) — token תקף עד exp אם אין בדיקה. |
-| **Interview pitch (≈30s)** | *"הוספתי jti ל-access ו-Redis denylist ב-logout. Fail-open on read — לא נועלת את כל המשתמשים אם Redis מפסיק. Trade-off: WS אקטיבי עד exp."* |
+| **Trade-off** | בדיקות denylist בכל handshake מוסיפות תלות Redis במסלול WS auth; נבחר fail-open לשמירת זמינות אם Redis למטה. |
+| **Interview pitch (≈30s)** | *"הוספתי jti ל-access ו-Redis denylist ב-logout גם ל-HTTP וגם ל-WS handshake. אם Redis נופל, בחרתי fail-open כדי לא ליפול גלובלית בזמינות."* |
 | **הפניה** | ADR §18, HIGHLIGHTS §7ד |
 
 ---
@@ -238,3 +238,20 @@
 | **Trade-off** | עוד רכיב תפעולי לנטר (health/config/auth), וצריך משמעת סביב סודות `userlist` + smoke checks בפריסה. |
 | **Interview pitch (≈30s)** | *"במקום שכל service יפציץ את Postgres בחיבורים, הוספתי PgBouncer כ-layer פנימי. השארתי migrations direct ל-db, כיביתי statement cache ב-asyncpg, והקטנתי pools אפליקטיביים — זה בדיוק ההבדל בין 'להוסיף container' לבין rollout יציב ברמת production."* |
 | **הפניה** | `docker-compose.yml`, `backend/app/db/session.py`, `infrastructure/pgbouncer/pgbouncer.ini`, `scripts/ops/pgbouncer-smoke.sh` |
+
+---
+
+<a id="redis-sentinel"></a>
+
+## Redis Sentinel HA (EC2 + Docker Compose)
+
+| | |
+|--|--|
+| **בעיה** | Redis single-node הוא SPOF: נפילה/ריסטארט בזמן אמת שוברת cache, denylist, idempotency, ו-pub/sub לצ'אט עד התאוששות ידנית. |
+| **החלטה** | לעבור לטופולוגיית `redis-primary` + `redis-replica` + `redis-sentinel`, עם clients Sentinel-aware ב-Python (`redis.asyncio.Sentinel`) וב-Go (`go-redis` failover). |
+| **אלטרנטיבות** | (1) ElastiCache/Managed Redis — עדיף בפרודקשן מנוהל אבל לא תמיד זמין מיד תקציבית. (2) Redis Cluster — מורכב יותר מהצורך הנוכחי (שימוש כ-key/value + pub/sub). (3) להישאר single-node עם restart policy — לא פותר failover אמיתי. |
+| **מה סניור עושה (לא טריוויאלי)** | (1) שומר `REDIS_HOST=redis` כ-alias ל-master כדי לא לשבור קונפיג קיים. (2) מוסיף fallback ל-URL רגיל ללוקאל/dev. (3) מחליף `broadcaster` ב-adapter פנימי ששומר API זהה לראוטרים (`event.message`). (4) ב-`subscribe()` מבצע cleanup שקט על `WebSocketDisconnect` בלי לדלוף pubsub handles. |
+| **יתרון** | זמינות גבוהה יותר ל-real-time ו-state infra בלי שינוי בדומיין העסקי; failover שקוף יחסית לאפליקציה. |
+| **Trade-off** | יותר מורכבות תפעולית (3 שירותי Redis, smoke checks, observability), ו-footprint גדול יותר על EC2 קטן. |
+| **Interview pitch (≈30s)** | *"העברתי את Redis מ-single instance ל-Sentinel HA. השארתי alias `redis` כדי לא לשבור env קיים, הוספתי Sentinel-aware clients ב-Python וב-Go, והחלפתי broadcaster ב-adapter פנימי עם אותו חוזה לראוטרים. התוצאה: failover תפעולי בלי לגעת ב-domain logic."* |
+| **הפניה** | `docker-compose.yml`, `infrastructure/redis/sentinel.conf`, `backend/app/infrastructure/redis/{client.py,chat_pubsub.py,broadcast.py}`, `chat-ws/cmd/server/main.go`, `scripts/ops/redis-sentinel-smoke.sh` |

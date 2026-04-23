@@ -30,7 +30,6 @@ dependencies = [
     # --- Messaging & Infrastructure ---
     "aio-pika>=9.4.0",
     "redis>=5.0.0",
-    "broadcaster>=0.2.0",
     # --- File Handling ---
     "python-multipart>=0.0.9",
     "Pillow>=10.4.0",

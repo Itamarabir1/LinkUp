@@ -108,6 +108,7 @@ flowchart LR
 - ✅ **Task worker safety:** `task-worker` is pinned to one replica to avoid duplicate scheduled task publishing.
 - ✅ **Per-worker DB connection caps:** explicit `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` per worker keeps total DB usage below Postgres defaults.
 - ✅ **PgBouncer (transaction pooling, internal-only):** backend + workers connect via `pgbouncer` service (no public port), `migrate` stays direct to `db`, and asyncpg statement cache is disabled at engine connect for compatibility.
+- ✅ **Redis Sentinel HA:** compose now runs `redis-primary` + `redis-replica` + `redis-sentinel`; Python Redis clients use `redis.asyncio.Sentinel` (with URL fallback), and `chat-ws` connects via `go-redis` failover client.
 - ✅ **Redis reconnect hardening:** reconnect loop uses retry with exponential backoff for resilient long-lived pub/sub connections.
 - ✅ **Geocode retry hardening:** Google geocoding flow includes bounded retries via `tenacity` for transient failures/timeouts.
 - ✅ **Notification worker (async):** [`notification_tasks.py`](backend/app/workers/tasks/notification_tasks.py) uses `await db.execute(select(...))` for ride-cancel fan-out (no `run_sync` in app code paths); **`ride.cancelled_by_driver`** notifies only bookings still **PENDING** or **CONFIRMED** (not already cancelled by the passenger).
@@ -235,7 +236,7 @@ docker compose ps            # סטטוס (backend: healthy / ממתין)
 
 - **Go for chat-ws (not Python).** WebSocket servers benefit from low per-connection overhead and high concurrency. Go’s goroutines and small footprint fit many idle connections; the service does no DB or business logic—only subscribe to Redis and push to clients. Keeping it in Go avoids pulling the full Python stack into the real-time path.
 
-- **Redis DB separation (DB=0 vs DB=1).** Backend uses Redis for cache, rate limiting, and outbox-related state on DB=0. Chat traffic (pub/sub for messages and completion events) uses DB=1 so that chat-ws and the backend’s chat-completion listener can share the same Redis instance without key or namespace clashes and without backend cache evictions affecting chat.
+- **Redis HA + DB separation.** Runtime Redis is deployed as Sentinel topology (`redis-primary` + `redis-replica` + `redis-sentinel`). Logical DB split still applies: DB=0 for cache/rate-limit/idempotency/denylist and DB=1 for chat/pub-sub, so failover improves availability without changing domain contracts.
 
 - **Redis completion listener + `ai-worker` for AI chat summary (not a separate service).** The AI flow is “on conversation end, analyze and persist.” The backend publishes a completion event to Redis DB=1; the `ai-worker` subscribes and runs `handle_conversation_completion`. This keeps deployment surface small while preserving async execution.
 
