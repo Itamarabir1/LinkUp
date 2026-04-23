@@ -19,7 +19,7 @@
 ### System design / Backend / Staff
 
 1. [../ARCHITECTURE.md](../ARCHITECTURE.md) — שירותים, Redis DB0/DB1, Outbox, תבניות.
-2. [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) — Outbox, Idempotency, JWT denylist, Circuit Breaker, chat plaintext + chat rate limit.
+2. [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) — Outbox, Idempotency, JWT denylist, Circuit Breaker, Sentry, Prometheus/Grafana, chat plaintext + chat rate limit + [chat inbox N+1 fix](FEATURE_DECISIONS.md#chat-inbox-n1).
 3. [adr/ARCHITECTURE_DECISIONS_BACKEND.md](adr/ARCHITECTURE_DECISIONS_BACKEND.md) — §1–22.
 
 ### Real-time / WebSocket

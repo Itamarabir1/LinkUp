@@ -88,16 +88,112 @@ async def list_conversations_for_user(db: AsyncSession, user_id: UUID) -> list[C
     return list(result.scalars().unique().all())
 
 
+async def get_inbox_aggregates(
+    db: AsyncSession,
+    user_id: UUID,
+    conversation_ids: list[UUID],
+) -> dict[UUID, dict]:
+    """
+    Single aggregated query batch for inbox:
+    For each conversation_id — last_message_at, last_message_body, has_unread.
+    Replaces per-row get_last_message + has_unread_messages (N+1).
+
+    Latest message: max(message_id) per conversation (monotonic BIGSERIAL — aligns with
+    get_last_message in normal operation). Unread: same as has_unread_messages
+    (max(created_at) from other party vs last_read_at).
+    """
+    if not conversation_ids:
+        return {}
+
+    uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+
+    # Latest message per conversation (same as get_last_message: chronological order via BIGSERIAL)
+    last_msg_subq = (
+        select(
+            Message.conversation_id,
+            func.max(Message.message_id).label("last_message_id"),
+        )
+        .where(Message.conversation_id.in_(conversation_ids))
+        .group_by(Message.conversation_id)
+        .subquery()
+    )
+
+    last_msg_result = await db.execute(
+        select(
+            Message.conversation_id,
+            Message.body,
+            Message.created_at,
+        ).join(
+            last_msg_subq,
+            (Message.conversation_id == last_msg_subq.c.conversation_id)
+            & (Message.message_id == last_msg_subq.c.last_message_id),
+        ),
+    )
+    last_messages = {
+        row.conversation_id: {"body": row.body, "created_at": row.created_at}
+        for row in last_msg_result.all()
+    }
+
+    # Last incoming message from the other party (for unread — matches has_unread_messages)
+    last_other_subq = (
+        select(
+            Message.conversation_id,
+            func.max(Message.created_at).label("last_other_at"),
+        )
+        .where(
+            Message.conversation_id.in_(conversation_ids),
+            Message.sender_id != uid,
+        )
+        .group_by(Message.conversation_id)
+        .subquery()
+    )
+
+    participants_result = await db.execute(
+        select(
+            ConversationParticipant.conversation_id,
+            ConversationParticipant.last_read_at,
+        ).where(
+            ConversationParticipant.conversation_id.in_(conversation_ids),
+            ConversationParticipant.user_id == uid,
+        ),
+    )
+    last_read = {row.conversation_id: row.last_read_at for row in participants_result.all()}
+
+    unread_result = await db.execute(
+        select(
+            last_other_subq.c.conversation_id,
+            last_other_subq.c.last_other_at,
+        ),
+    )
+    unread_map: dict[UUID, bool] = {}
+    for row in unread_result.all():
+        user_last_read = last_read.get(row.conversation_id)
+        if user_last_read is None:
+            unread_map[row.conversation_id] = True
+        else:
+            unread_map[row.conversation_id] = row.last_other_at > user_last_read
+
+    result: dict[UUID, dict] = {}
+    for cid in conversation_ids:
+        last = last_messages.get(cid)
+        result[cid] = {
+            "last_message_at": last["created_at"] if last else None,
+            "last_message_body": last["body"] if last else None,
+            "has_unread": unread_map.get(cid, False),
+        }
+    return result
+
+
 async def get_conversations_with_timeout(
     db: AsyncSession,
-    timeout_hours: int = 24,
+    timeout_hours: int = 2,
 ) -> list[Conversation]:
     """
     Conversations with no AI analysis yet whose last message is older than timeout_hours.
 
     Args:
         db: AsyncSession
-        timeout_hours: hours without a new message (default 24)
+        timeout_hours: hours without a new message (default 2)
 
     Returns:
         Conversations that should be analyzed

@@ -71,6 +71,54 @@
 
 ---
 
+<a id="sentry"></a>
+
+## Sentry — error monitoring (production)
+
+| | |
+|--|--|
+| **בעיה** | שגיאות production אינן גלויות בזמן אמת — אי אפשר לאתר רגרסיות חדשות בלי לחפש ידנית בלוגים. |
+| **החלטה** | Sentry SDK — backend: `sentry_sdk.init()` בתוך `setup_logging()` כש-`SENTRY_DSN` מוגדר (FastAPI/SQLAlchemy/Redis integrations, `traces_sample_rate=0.1`); `capture_exception` ל-5xx בלבד ב-`link_up_exception_handler`. Frontend: `Sentry.init()` ב-`main.tsx` (guard: `PROD + VITE_SENTRY_DSN`); `captureException` ב-axios interceptor (5xx), `ChatErrorBoundary`, `RouteErrorBoundary`. |
+| **אלטרנטיבות** | (1) Rollbar / Datadog — אותו עיקרון, עלות גבוהה יותר. (2) Prometheus + Grafana — מדדים בלבד, אין stack traces. (3) לוגים בלבד — קשה לאתר רגרסיות בזמן אמת. |
+| **יתרון** | stack traces מלאים עם `trace_id`; DSN לא נכנס ל-git (`.env` בלבד); fail-safe — אם Sentry down, השרת ממשיך. |
+| **Trade-off** | capture ל-5xx בלבד מפחית רעש אבל עלול להחמיץ שגיאות לוגיקה שנבלעות או 4xx חריגים שתרצה לנטר בהמשך. |
+| **Interview pitch (≈30s)** | *"הפעלתי Sentry: backend init ב-`logging.py` עם guard על `SENTRY_DSN`, capture רק ל-5xx כדי להפחית רעש. פרונט: init ב-`main.tsx` + שני error boundaries. DSN ב-`.env` בלבד — לא עולה ל-git."* |
+| **הפניה** | [`../backend/app/core/logging.py`](../backend/app/core/logging.py), [`../backend/app/core/exceptions/handlers.py`](../backend/app/core/exceptions/handlers.py), [`../frontend/src/main.tsx`](../frontend/src/main.tsx) |
+
+---
+
+<a id="prometheus-grafana"></a>
+
+## Prometheus + Grafana monitoring
+
+| | |
+|--|--|
+| **בעיה** | `health` ולוגים עוזרים ל-diagnosis, אבל חסרים time-series metrics (RPS, latency, 5xx trend) ו-dashboard תפעולי רציף. |
+| **החלטה** | `prometheus-fastapi-instrumentator` בבקאנד: חשיפת `/metrics` מ-`main.py`. ב-Compose נוספו שירותי `prometheus` ו-`grafana` תחת profile ייעודי `monitoring`, עם provisioning מוכן (`datasource + dashboard provider`) ו-dashboard בסיסי (`HTTP Requests/sec`, `p95`, `5xx`, `in-progress`). |
+| **אלטרנטיבות** | (1) Datadog/NewRelic SaaS — מהיר יותר להתחלה אבל יקר יותר לסקייל וריבוי סביבות. (2) OpenTelemetry full stack — גמיש מאוד אך מורכב לשלב ראשון. (3) להישאר עם health+logs בלבד — פחות ראות מגמות. |
+| **יתרון** | Visibility מיידי על ביצועי API, קל להרחיב ל-Redis/RabbitMQ/DB metrics בהמשך; profile `monitoring` שומר את סביבת dev קלה כשלא צריך observability stack. |
+| **Trade-off** | Dashboard ראשוני ממוקד HTTP בלבד; queries תלויות naming של metrics מה-instrumentator ועלולות לדרוש התאמות לפי גרסה. |
+| **Interview pitch (≈30s)** | *"הוספתי Prometheus ו-Grafana עם profile ייעודי ב-compose, וחשפתי `/metrics` בבקאנד. זה נותן baseline של RPS, p95, error rate ו-in-flight requests בלי להעמיס על סביבת פיתוח כשלא צריך."* |
+| **הפניה** | [`../backend/app/main.py`](../backend/app/main.py), [`../docker-compose.yml`](../docker-compose.yml), [`../monitoring/prometheus.yml`](../monitoring/prometheus.yml), [`../monitoring/grafana/dashboards/linkup.json`](../monitoring/grafana/dashboards/linkup.json) |
+
+---
+
+<a id="chat-inbox-n1"></a>
+
+## Chat inbox: batched aggregate (N+1 fix)
+
+| | |
+|--|--|
+| **בעיה** | `list_my_conversations` קראה ל-`get_last_message` + `has_unread_messages` **לכל שיחה בנפרד** → 2N+ DB round-trips כשלמשתמש יש N שיחות. |
+| **החלטה** | פונקציה חדשה `get_inbox_aggregates` ב-`chat/crud.py`: שלוש שאילתות מאוגדות (last message per conversation, last incoming per conversation, last_read_at per participant) + מיזוג בזיכרון. `list_my_conversations` קוראת לה פעם **אחת** ומייצרת את כל ה-`ConversationListItem`. |
+| **אלטרנטיבות** | (1) `joinedload` ב-ORM — לא מספיק: לא מחשב `has_unread` ב-SQL. (2) GraphQL + DataLoader — overkill לממשק REST הנוכחי. (3) view materialised ב-Postgres — מורכבות תפעולית גבוהה, stale data. |
+| **יתרון** | מ-~3N קריאות ל-**4 קריאות קבועות** ללא תלות בגודל ה-inbox; `get_last_message` + `has_unread_messages` המקוריות נשמרות לשימושים אחרים (DRY). |
+| **Trade-off** | שאילתות ה-aggregate ארוכות יותר (subquery + join); אם inbox ריק — early return מיידי. |
+| **Interview pitch (≈30s)** | *"ה-inbox הריץ get_last_message + has_unread לכל שיחה — N+1 קלאסי. החלפתי בפונקציה אחת שמריצה שלוש aggregate queries ומאחדת בזיכרון. מ-3N ל-4 קריאות קבועות, והפונקציות המקוריות נשמרות כי בשימוש במקומות אחרים."* |
+| **הפניה** | [`../backend/app/domain/chat/crud.py`](../backend/app/domain/chat/crud.py) (`get_inbox_aggregates`), [`../backend/app/domain/chat/service.py`](../backend/app/domain/chat/service.py) (`list_my_conversations`) |
+
+---
+
 <a id="my-bookings"></a>
 
 ## My Bookings: aggregated reads (דילוג על N+1)

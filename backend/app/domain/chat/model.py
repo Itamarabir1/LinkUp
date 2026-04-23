@@ -12,6 +12,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Text,
     UniqueConstraint,
     func,
@@ -67,6 +68,8 @@ class Message(Base):
     sender_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     body = Column(Text, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (Index("idx_messages_sender_id", "sender_id"),)
 
     conversation = relationship("Conversation", back_populates="messages")
     sender = relationship("User", foreign_keys=[sender_id])

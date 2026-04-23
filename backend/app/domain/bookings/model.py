@@ -138,6 +138,7 @@ class Booking(Base):
         UniqueConstraint("ride_id", "passenger_id", name="unique_passenger_per_ride"),
         Index("idx_bookings_ride", "ride_id"),
         Index("idx_bookings_passenger", "passenger_id"),
+        Index("idx_bookings_request_id", "request_id"),
     )
 
     def __repr__(self):

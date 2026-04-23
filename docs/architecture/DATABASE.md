@@ -226,6 +226,7 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 | conversations | user_id_2 | idx_conversations_user_2 | חיפוש שיחות לפי משתמש |
 | messages | conversation_id | idx_messages_conversation | הודעות לפי שיחה |
 | messages | conversation_id, created_at | idx_messages_created | מיון הודעות בזמן |
+| messages | sender_id | idx_messages_sender_id | סינון הודעות לפי שולח (migration 012; ORM `__table_args__` עודכן) |
 | chat_analysis | conversation_id | idx_chat_analysis_conversation | חיפוש ניתוח לפי שיחה |
 | users | last_location | idx_users_location (GIST) | חיפוש מרחבי |
 | rides | origin_geom | idx_rides_origin_geom (GIST) | חיפוש מרחבי |
@@ -300,4 +301,8 @@ conversations ◄── messages (conversation_id), chat_analysis (conversation_
 
 ## Future / Recommendations (query performance)
 
-No automated EXPLAIN ANALYZE pipeline exists. Manual review recommended on heavy paths (search, matching) using `pg_stat_statements` or Django-style query logging. דפוסי צמצום N+1 מתועדים ב-`ARCHITECTURE.md` (My Bookings / `BookingReadsService`) וב-`docs/ENGINEERING_HIGHLIGHTS.md`.
+No automated EXPLAIN ANALYZE pipeline exists. Manual review recommended on heavy paths (search, matching) using `pg_stat_statements` or Django-style query logging. דפוסי צמצום N+1 מתועדים ב-`ARCHITECTURE.md`:
+- **My Bookings** / `BookingReadsService` — `joinedload` + aggregate per screen.
+- **Chat inbox** / `get_inbox_aggregates` ([`backend/app/domain/chat/crud.py`](../../backend/app/domain/chat/crud.py)) — 3 `func.max` aggregate queries לכלל השיחות, מ-~3N ל-4 קריאות קבועות.
+
+פירוט: `docs/ENGINEERING_HIGHLIGHTS.md`, [`docs/FEATURE_DECISIONS.md#chat-inbox-n1`](../FEATURE_DECISIONS.md#chat-inbox-n1).

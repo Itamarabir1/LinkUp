@@ -18,10 +18,8 @@ from app.core.exceptions.booking import (
 )
 from app.core.exceptions.chat import (
     ChatRoomNotFound,
-    MessageSendFailed,
     UnauthorizedChatAccess,
 )
-from app.core.exceptions.infrastructure import RedisUnavailable
 from app.core.exceptions.ride import RideNotFoundError
 from app.core.exceptions.user import UserNotFoundError
 from app.domain.bookings.enum import BookingStatus
@@ -171,8 +169,15 @@ def _partner_from_conversation(conv, current_user_id: UUID) -> ConversationPartn
 async def list_my_conversations(db: AsyncSession, current_user_id: UUID) -> list[ConversationListItem]:
     """
     Lists the user’s conversations with partner details and last message.
+    Uses a single aggregated DB batch — no N+1 per conversation.
     """
     convs = await chat_crud.list_conversations_for_user(db, current_user_id)
+    if not convs:
+        return []
+
+    conversation_ids = [conv.conversation_id for conv in convs]
+    aggregates = await chat_crud.get_inbox_aggregates(db, current_user_id, conversation_ids)
+
     out = []
     for conv in convs:
         partner_user = conv.user_2 if conv.user_id_1 == current_user_id else conv.user_1
@@ -181,17 +186,15 @@ async def list_my_conversations(db: AsyncSession, current_user_id: UUID) -> list
             full_name=partner_user.full_name,
             avatar_url=storage_service.build_avatar_url(partner_user.avatar_key, "150x150.webp"),
         )
-        last = await chat_crud.get_last_message(db, conv.conversation_id)
-        has_unread = False
-        if last:
-            has_unread = await chat_crud.has_unread_messages(db, conversation_id=conv.conversation_id, user_id=current_user_id)
+        agg = aggregates.get(conv.conversation_id, {})
+        body = agg.get("last_message_body")
         out.append(
             ConversationListItem(
                 conversation_id=conv.conversation_id,
                 partner=partner,
-                last_message_at=last.created_at if last else None,
-                last_message_preview=(last.body[:80] + "…") if last and len(last.body) > 80 else (last.body if last else None),
-                has_unread=has_unread,
+                last_message_at=agg.get("last_message_at"),
+                last_message_preview=(body[:80] + "…") if body and len(body) > 80 else body,
+                has_unread=agg.get("has_unread", False),
             ),
         )
     return out
@@ -222,13 +225,7 @@ async def send_message(
 ) -> MessageResponse:
     """
     Sends a message: persist in DB + publish to Redis (Go WS server listens).
-    If the body is a conversation-end message — publishes to Redis DB=1; worker runs AI analysis.
     """
-    from app.domain.chat.completion.detector import is_conversation_completion_message
-    from app.infrastructure.redis.chat_completion_publish import (
-        publish_chat_completion_event,
-    )
-
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, sender_id)
     if not conv:
         raise ChatRoomNotFound()
@@ -253,16 +250,6 @@ async def send_message(
         )
     except Exception as e:
         logger.warning("Publish unread_count failed: %s", e, exc_info=True)
-
-    # If this is a conversation-end message — publish to Redis DB=1; worker runs AI analysis
-    if is_conversation_completion_message(body):
-        try:
-            await publish_chat_completion_event(conversation_id, sender_id)
-        except RedisUnavailable:
-            raise
-        except Exception as e:
-            logger.error("Error publishing chat completion event: %s", e, exc_info=True)
-            raise MessageSendFailed() from e
 
     return MessageResponse(
         message_id=msg.message_id,

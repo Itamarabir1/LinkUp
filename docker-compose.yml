@@ -126,8 +126,6 @@ services:
     networks:
       - linkup_network
     restart: unless-stopped
-    volumes:
-      - ./backend/app/infrastructure/firebase_core/firebase-credentials.json:/app/infrastructure/firebase_core/firebase-credentials.json:ro
 
   # --- Task Worker (avatar + scheduled tasks) ---
   task-worker:
@@ -216,8 +214,6 @@ services:
     networks:
       - linkup_network
     restart: unless-stopped
-    volumes:
-      - ./backend/app/infrastructure/firebase_core/firebase-credentials.json:/app/infrastructure/firebase_core/firebase-credentials.json:ro
 
   # --- Backend: FastAPI ---
   backend:
@@ -258,8 +254,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
-    volumes:
-      - ./backend/app/infrastructure/firebase_core/firebase-credentials.json:/app/infrastructure/firebase_core/firebase-credentials.json:ro
     ports:
       - "8000:8000" # dev: local Vite proxies to localhost:8000
     networks:

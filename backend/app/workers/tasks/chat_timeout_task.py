@@ -1,5 +1,5 @@
 """
-Scheduled job: conversations idle 24h without new messages → completion flow.
+Scheduled job: conversations idle 2h without new messages → completion flow.
 """
 
 import logging
@@ -18,7 +18,7 @@ async def execute_chat_timeout_job():
     async with SessionLocal() as db:
         try:
             # Conversations past idle timeout
-            conversations = await chat_crud.get_conversations_with_timeout(db, timeout_hours=24)
+            conversations = await chat_crud.get_conversations_with_timeout(db, timeout_hours=2)
 
             if not conversations:
                 logger.info("No conversations with timeout found")
