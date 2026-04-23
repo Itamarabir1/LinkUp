@@ -18,7 +18,7 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 
 | Exchange | Type | Purpose |
 |----------|------|---------|
-| user | (default) | אירועי משתמש והתראות — רישום, אימות מייל, איפוס סיסמה, צ'אט |
+| user | (default) | אירועי משתמש והתראות — רישום, אימות מייל, איפוס סיסמה, צ'אט, billing |
 | ride | — | אירועי נסיעה — יצירה, ביטול |
 | booking | — | אירועי הזמנות — בקשת הצטרפות, אישור, דחייה |
 | tasks | — | משימות כבדות — העלאת/הסרת אווטאר (S3) |
@@ -48,6 +48,12 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 | user.registered | user | user.registered | רישום מוצלח | user_id, email, ... |
 | user.avatar_upload | tasks | user.avatar_upload | confirm_avatar_upload | user_id, staging_key |
 | user.avatar_remove | tasks | user.avatar_remove | remove_avatar | user_id |
+
+### Billing
+
+| Event | Exchange | Routing Key | Triggered By | Payload |
+|-------|----------|-------------|--------------|---------|
+| billing.* | user | billing.<name> | Billing service / future billing outbox events | payment_id, user_id, status, provider ids |
 
 ### Ride
 

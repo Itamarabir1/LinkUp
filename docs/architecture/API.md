@@ -157,7 +157,16 @@ Authorization: Bearer <access_token>
 
 ---
 
-### Users (`/api/v1/users`)
+### Billing (`/api/v1/billing`)
+
+| Method | Path | Auth | תיאור |
+|--------|------|------|--------|
+| POST | /checkout | כן | יצירת Stripe Checkout Session לשדרוג פרימיום. מחזיר `checkout_url` + `session_id`. |
+| GET | /status | כן | סטטוס חיוב למשתמש המחובר (`is_premium`, `premium_since`). |
+| GET | /payments | כן | היסטוריית תשלומים של המשתמש המחובר. |
+| POST | /webhook | לא | Stripe webhook endpoint. אימות חתימה חובה דרך `Stripe-Signature`. |
+
+---
 
 | Method | Path | Auth | תיאור |
 |--------|------|------|--------|

@@ -61,6 +61,11 @@
 | CHAT_ROOM_NOT_FOUND | 404 | backend | צ׳אט |
 | CHAT_UNAUTHORIZED_ACCESS | 403 | backend | צ׳אט |
 | CHAT_MESSAGE_SEND_FAILED | 500 | backend | צ׳אט |
+| PAYMENT_NOT_FOUND | 404 | backend | Billing — תשלום לא נמצא |
+| PAYMENT_ALREADY_EXISTS | 409 | backend | Billing — ניסיון יצירה כפול (אידמפוטנטיות/ייחודיות) |
+| STRIPE_WEBHOOK_ERROR | 400 | backend | Billing — webhook לא תקין (חתימה/מטען) |
+| CHECKOUT_SESSION_ERROR | 502 | backend | Billing — כשל ביצירת Checkout Session מול Stripe |
+| USER_ALREADY_PREMIUM | 400 | backend | Billing — משתמש כבר מסומן כ־premium |
 | NOTIFICATION_* | לפי המחלקה | backend | התראות |
 | GROUP_* / **INVITE_CODE_GENERATION_FAILED** | לפי המחלקה | backend | קבוצות (`GROUP_NOT_FOUND`, `GROUP_FULL`, …; יצירת קבוצה — כשל ייחוד `invite_code` אחרי retries) |
 | **ADMIN_ACCESS_REQUIRED** | 403 | backend | גישה ל-**`/api/v1/admin/*`** בלי `user.is_admin` — **`AdminAccessRequiredError`** ב-`app/api/dependencies/admin.py` |

@@ -124,6 +124,23 @@ class CRUDUser:
         await db.refresh(user)
         return user
 
+    async def mark_as_premium(self, db: AsyncSession, *, user: User) -> User:
+        """Mark user as premium after successful payment."""
+        user.is_premium = True
+        user.premium_since = datetime.now(UTC)
+        db.add(user)
+        await db.flush()
+        await db.refresh(user)
+        return user
+
+    async def update_stripe_customer_id(self, db: AsyncSession, *, user: User, stripe_customer_id: str) -> User:
+        """Save Stripe customer ID on first payment."""
+        user.stripe_customer_id = stripe_customer_id
+        db.add(user)
+        await db.flush()
+        await db.refresh(user)
+        return user
+
     async def update_last_active(self, db: AsyncSession, *, user_id: UUID | str) -> bool:
         """Bump last_active_at (chat, etc.); does not touch last_login."""
         user = await self.get_by_id(db, user_id)

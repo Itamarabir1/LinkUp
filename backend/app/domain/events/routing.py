@@ -33,6 +33,7 @@ from typing import Any
 # event_name prefix → exchange
 _EXCHANGE_BY_PREFIX: dict[str, str] = {
     "auth.": "user",
+    "billing.": "user",
     "user.": "user",
     "ride.": "ride",
     "booking.": "booking",

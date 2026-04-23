@@ -5,6 +5,7 @@ from fastapi import APIRouter
 
 from app.domain.admin.router import router as admin_router
 from app.domain.auth.router import router as auth_router
+from app.domain.billing.router import router as billing_router
 from app.domain.bookings.router import router as bookings_router
 from app.domain.chat.router import router as chat_router
 from app.domain.geo.router import router as geo_router
@@ -26,6 +27,7 @@ api_router.include_router(passenger_rides_router, prefix="/passenger", tags=["Pa
 api_router.include_router(bookings_router, prefix="/bookings", tags=["Bookings"])
 api_router.include_router(user_router, prefix="/users", tags=["Users"])
 api_router.include_router(auth_router, prefix="/auth", tags=["Auth"])
+api_router.include_router(billing_router, prefix="/billing", tags=["Billing"])
 api_router.include_router(geo_router, prefix="/geo", tags=["Geo"])
 api_router.include_router(chat_router, prefix="/chat", tags=["Chat"])
 api_router.include_router(admin_router, prefix="/admin", tags=["Admin"])

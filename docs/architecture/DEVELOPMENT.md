@@ -72,6 +72,9 @@
 | BREVO_API_KEY | למיילים | Brevo (Sendinblue) |
 | BREVO_SENDER_EMAIL | — | |
 | BREVO_SENDER_NAME | — | |
+| STRIPE_SECRET_KEY | לחיובים | Stripe Secret Key (`sk_*` / `rk_*`) |
+| STRIPE_PUBLISHABLE_KEY | אופציונלי בבקאנד | מפתח publishable; לרוב נצרך בפרונט כ-`VITE_STRIPE_PUBLISHABLE_KEY` |
+| STRIPE_WEBHOOK_SECRET | לחתימת webhook | Stripe Webhook Signing Secret (`whsec_*`) |
 | GOOGLE_MAPS_API_KEY | לגיאו/מפות | |
 | GOOGLE_CLIENT_ID | ל-Google Sign-In | |
 | GOOGLE_CLIENT_SECRET | אופציונלי | |

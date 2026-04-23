@@ -46,6 +46,10 @@ class User(Base):
     last_active_at = Column(DateTime(timezone=True), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    # Billing
+    stripe_customer_id = Column(String(255), nullable=True, index=True)
+    is_premium = Column(Boolean, default=False, server_default="false", nullable=False)
+    premium_since = Column(DateTime(timezone=True), nullable=True)
 
     # --- Relationships (The "Glue" of the System) ---
 
@@ -77,6 +81,12 @@ class User(Base):
     owned_groups = relationship("Group", back_populates="admin")
     # 5. Group memberships
     group_memberships = relationship("GroupMember", back_populates="user")
+    payments = relationship(
+        "Payment",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     def __repr__(self):
         return f"<User(user_id={self.user_id}, full_name='{self.full_name}', phone='{self.phone_number}')>"

@@ -225,6 +225,10 @@ class Settings(BaseSettings):
     FIREBASE_SERVICE_ACCOUNT_PATH: str = Field("", description="Path to Firebase JSON (optional for local dev)")
     FIREBASE_CREDENTIALS_JSON: str | None = Field(None, description="Firebase credentials as JSON string (production)")
 
+    # --- Stripe ---
+    STRIPE_SECRET_KEY: str = Field("", description="Stripe secret key (sk_test_... or sk_live_...)")
+    STRIPE_WEBHOOK_SECRET: str = Field("", description="Stripe webhook signing secret (whsec_...)")
+
     # --- Logging ---
     LOG_LEVEL: str = Field("INFO", description="Log level: DEBUG, INFO, WARNING, ERROR")
     LOG_FORMAT: str = Field(

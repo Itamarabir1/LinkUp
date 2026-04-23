@@ -62,6 +62,7 @@ dependencies = [
     "ruff==0.15.5",
     "structlog>=25.5.0",
     "prometheus-fastapi-instrumentator>=6.1.0",
+    "stripe>=15.0.1",
 ]
 
 [tool.setuptools.packages.find]

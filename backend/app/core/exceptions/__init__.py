@@ -37,6 +37,14 @@ from .booking import (
     PassengerRequestNotFoundError,
     RideNotAvailableError,
 )
+# Billing
+from .billing import (
+    CheckoutSessionError,
+    PaymentAlreadyExistsError,
+    PaymentNotFoundError,
+    StripeWebhookError,
+    UserAlreadyPremiumError,
+)
 
 # Chat
 from .chat import ChatRoomNotFound, MessageSendFailed, UnauthorizedChatAccess
@@ -120,6 +128,7 @@ __all__ = [
     "BadRequestError",
     "BookingAlreadyExistsError",
     "BookingNotFoundError",
+    "CheckoutSessionError",
     "CacheConnectionError",
     "ChatRoomNotFound",
     "ContextBuilderError",
@@ -159,6 +168,8 @@ __all__ = [
     "NotificationError",
     "OutboxEventNotFoundError",
     "OutboxRequeueInvalidStatusError",
+    "PaymentAlreadyExistsError",
+    "PaymentNotFoundError",
     "PassengerRequestNotFoundError",
     "PasswordSameAsOldError",
     "PasswordTooWeakError",
@@ -180,7 +191,9 @@ __all__ = [
     "SameOriginDestinationError",
     "SessionExpiredError",
     "StorageServiceError",
+    "StripeWebhookError",
     "UnauthorizedChatAccess",
+    "UserAlreadyPremiumError",
     "UserInactiveOrMissingError",
     "UserNotFoundError",
     "UserNotVerifiedError",

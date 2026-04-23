@@ -49,6 +49,26 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | last_location | GEOGRAPHY(POINT) | PostGIS |
 | last_login | TIMESTAMPTZ | התחברות אחרונה |
 | last_active_at | TIMESTAMPTZ | פעילות אחרונה (צ'אט / PATCH last-seen מ-chat-ws); אינדקס; מיגרציה **007** |
+| stripe_customer_id | VARCHAR(255) | מזהה לקוח ב-Stripe; אינדקס; מיגרציה **013** |
+| is_premium | BOOLEAN DEFAULT FALSE | cache של סטטוס חיוב; מקור אמת בטבלת `payments`; אינדקס; מיגרציה **013** |
+| premium_since | TIMESTAMPTZ | תאריך מעבר לפרימיום; מיגרציה **013** |
+| created_at | TIMESTAMPTZ | |
+| updated_at | TIMESTAMPTZ | |
+
+### payments
+
+טבלת חיובים — מקור אמת לתשלומי Stripe.
+
+| שדה | טיפוס | הערות |
+|-----|--------|--------|
+| payment_id | UUID PK | |
+| user_id | UUID FK users NOT NULL | index (`idx_payments_user_id`) |
+| stripe_payment_intent_id | VARCHAR(255) UNIQUE | מזהה תשלום סופי ב-Stripe |
+| stripe_session_id | VARCHAR(255) UNIQUE | מזהה Checkout Session |
+| stripe_event_id | VARCHAR(255) UNIQUE | idempotency ברמת webhook event |
+| amount | NUMERIC(10,2) NOT NULL | סכום בפורמט דצימלי |
+| currency | VARCHAR(10) NOT NULL DEFAULT `ils` | מנורמל lowercase |
+| status | `payment_status_enum` NOT NULL DEFAULT `pending` | pending/succeeded/failed/canceled; index (`idx_payments_status`) |
 | created_at | TIMESTAMPTZ | |
 | updated_at | TIMESTAMPTZ | |
 
@@ -263,6 +283,8 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 | 006_chat_participants | טבלת `conversation_participants` (למשל `last_read_at` למשתמש בשיחה) | — |
 | 007_last_active_at (קובץ `007_add_last_active_at.py`) | `users.last_active_at` — פעילות/צ'אט / last-seen | מזהה רוויזיה בקוד: `revision = "007_last_active_at"`; **008** מצביע אליו ב־`down_revision` |
 | 008_scheduled_notifications | טבלת `scheduled_notifications` + partial index; הסרת `reminder_sent` מ-rides ו-bookings | — |
+| 012_add_missing_indexes | אינדקסים משלימים: `bookings.request_id`, `messages.sender_id` | 2026-04-21 |
+| 013_add_billing | טבלת `payments`, enum `payment_status_enum`, ושדות חיוב ב-`users` (`stripe_customer_id`, `is_premium`, `premium_since`) | 2026-04-23 |
 
 הרצה: מתוך `backend/` — `alembic upgrade head`. downgrade: `alembic downgrade -1`.
 

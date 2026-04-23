@@ -4,6 +4,7 @@ Routers import from here via Depends.
 """
 
 from app.domain.auth.service import AuthService
+from app.domain.billing.service import BillingService
 from app.domain.rides.repository import ride_cache_repo
 from app.domain.rides.service import RideService
 
@@ -16,3 +17,8 @@ def get_ride_service() -> RideService:
 def get_auth_service() -> AuthService:
     """Factory for AuthService."""
     return AuthService()
+
+
+def get_billing_service() -> BillingService:
+    """Factory for BillingService."""
+    return BillingService()
