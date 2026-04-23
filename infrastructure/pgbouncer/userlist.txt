@@ -1,0 +1,2 @@
+"pgbouncer_admin" "replace_with_admin_password"
+"replace_with_postgres_user" "replace_with_postgres_password"

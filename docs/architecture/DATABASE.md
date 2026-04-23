@@ -14,7 +14,8 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 
 ## Connection Pool
 
-מקור: `backend/app/db/session.py` — ערכים מ-`app.core.config.settings` (ניתן לעקוף ב-`.env`).
+מקור: `backend/app/db/session.py` — ערכים מ-`app.core.config.settings` (ניתן לעקוף ב-`.env`).  
+ב-runtime, השירותים מתחברים ל-Postgres דרך `pgbouncer` (transaction pooling); מיגרציות (`migrate`) נשארות direct ל-`db`.
 
 | Parameter | Env / default | הערות |
 |-----------|----------------|--------|
@@ -23,6 +24,19 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | pool_timeout | `DB_POOL_TIMEOUT` (default 30s) | המתנה לחיבור פנוי מהמאגר |
 | pool_recycle | `DB_POOL_RECYCLE` (default 1800s) | מחזור חיבורים (למניעת חיבורים “מתים” אצל שרת ה-DB) |
 | pool_pre_ping | True (קוד) | בודק חיבור לפני שימוש (מונע חיבורים מתים) |
+| connect_args.statement_cache_size | 0 (קוד) | תאימות asyncpg עם PgBouncer במצב transaction pooling |
+
+### PgBouncer (runtime layer)
+
+| Parameter | Value | הערות |
+|-----------|-------|--------|
+| pool_mode | transaction | ברירת מחדל מומלצת ל-API workloads |
+| max_client_conn | 400 | קיבולת חיבורי לקוח ל-pooler |
+| default_pool_size | 20 | חיבורים פיזיים עיקריים ל-Postgres לכל DB/user |
+| reserve_pool_size | 5 | headroom בזמן burst |
+| server_idle_timeout | 30 | שחרור חיבורים לא פעילים |
+
+קבצי קונפיג: `infrastructure/pgbouncer/pgbouncer.ini`, `infrastructure/pgbouncer/userlist.txt` (template בלבד; סודות מוזרקים סביבתית).
 
 ---
 

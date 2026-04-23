@@ -63,6 +63,9 @@ jobs:
       - name: Run migrations
         run: uv run alembic upgrade head
 
+      - name: Verify migration head
+        run: bash ../scripts/ops/check-migration-head.sh
+
       - name: Run tests
         run: uv run pytest tests/ -v --tb=short
 

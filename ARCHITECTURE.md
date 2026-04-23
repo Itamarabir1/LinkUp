@@ -15,6 +15,7 @@
 | email-renderer | email-renderer/ | Node.js / Express / React Email | 3001 | Renders email HTML from template name + props (`POST /render`) |
 | chat-ws | chat-ws/ | Go | 8081 | WebSocket server for real-time chat (JWT, Redis Pub/Sub) |
 | db | Docker | PostgreSQL 15 + PostGIS | 5432 | Primary data store |
+| pgbouncer | Docker | PgBouncer 1.24 | 6432 (internal) | Transaction pooler between app/workers and PostgreSQL |
 | redis | Docker | Redis Stack 7.2 | 6379 | Single Redis server - DB 0: backend + task/notification infra; DB 1: chat-ws + AI completion + user events |
 | rabbitmq | Docker | RabbitMQ 3 + Management | 5672, 15672 | Message broker (events, tasks) |
 
@@ -25,6 +26,7 @@
 | Component | Technology | Version | Purpose |
 |-----------|------------|---------|---------|
 | Database | PostgreSQL + PostGIS | 15-3.3 | טבלאות, גיאומטריה, חיפוש מרחבי |
+| DB Pooler | PgBouncer | 1.24.1 | pooling פנימי (transaction mode), בלימת connection storms, הפחתת עומס זיכרון/CPU ב-Postgres |
 | Cache / Pub-Sub | Redis | 7.2.0-v10 | DB 0: ride per-ride + **rides:list**, cache, OTP, **JWT denylist** (`denylist:{jti}`), **idempotency keys** (`idempotency:request_ride:{user_id}:{key}`); DB 1: chat + **`user:{id}:events`** (דרך `redis_chat_pubsub`), completion, presence |
 | Message Broker | RabbitMQ | 3-management | אירועים (Outbox), תורי משימות (notifications, avatar, scheduled) |
 | Email rendering | Node.js + Express + React Email | Node 20 | microservice called by backend/worker to render transactional email HTML |
@@ -42,7 +44,8 @@ Clients (Web/Mobile)
     │
     ├── HTTP REST (מקומי / ישיר) ► backend:8000 (FastAPI)
     │                                    │
-    │                                    ├── PostgreSQL (asyncpg)
+    │                                    ├── PgBouncer (transaction pool)
+    │                                    ├── PostgreSQL (asyncpg via PgBouncer)
     │                                    ├── Redis DB 0 (broadcast, cache)
     │                                    ├── Redis DB 1 PUB (chat messages, user:*:events, chat:completion)
     │                                    └── Outbox table ──► notification-worker
@@ -85,6 +88,7 @@ ai-worker
 - **Outbox Pattern**: אירועים נכתבים ל-`outbox_events` ב-DB **באותה טרנזקציה** עם השינוי העסקי; ה-worker (`notification-worker`) מפרסם ל-RabbitMQ (LISTEN/NOTIFY + fallback polling). מבטיח **at-least-once** ולא מאבד אירועים אם RabbitMQ זמנית למטה. **דוגמאות routing keys / אירועים:** `ride.created`, `ride.cancelled_by_driver`, `booking.passenger_join_request`, `booking.approved_by_driver`, `booking.rejected_by_driver`, `auth.email_verification`, `auth.password_reset_code`, `user.registered` (מקור אמת מלא: [`docs/architecture/EVENTS.md`](docs/architecture/EVENTS.md)). קוד: [`app/infrastructure/outbox/`](backend/app/infrastructure/outbox/), [`app/domain/events/outbox.py`](backend/app/domain/events/outbox.py).
 - **Domain-Driven Design**: כל דומיין (users, rides, bookings, passengers, chat, groups, **admin**, auth, …) — model, schema, crud, service; ראוטרים תחת `backend/app/domain/*/router.py` ונרשמים ב־[`api/v1/api_router.py`](backend/app/api/v1/api_router.py). **רישום מודלי SQLAlchemy:** `import app.db.models` נטען מוקדם כדי לרשום את מודלי הדומיינים שנדרשים לטעינת API/relationships. הוא לא אמור להיתפס כרשימה ממצה של כל מודל אפשרי בריפו (למשל מודלים תשתיתיים כמו outbox). ב־[`alembic/env.py`](backend/alembic/env.py) אותו ייבוא לפני `target_metadata` ל־autogenerate. ב־Ruff: `per-file-ignores` ל־F401 על קבצי registry (`api_router.py`, `app/db/models.py`, `alembic/env.py`, `main_worker.py`) — ראו [`backend/pyproject.toml`](backend/pyproject.toml).
 - **Dependency Injection (FastAPI Depends)**: `RideService`, `AuthService`, ו-`BillingService` נוצרים דרך factories ב-`backend/app/api/dependencies/services.py`, והראוטרים מזריקים אותם עם `Depends(...)` (במקום singletons גלובליים).
+- **PgBouncer integration (senior-grade details):** `backend` + workers מתחברים ל-`pgbouncer` (לא ישירות ל-`db`), אבל שירות `migrate` נשאר direct ל-`db` כדי להימנע מבעיות DDL תחת transaction pooling. ב-`session.py` נוסף `connect_args={"statement_cache_size": 0}` עבור תאימות asyncpg + PgBouncer.
 - **Billing idempotency + integrity guards**: webhook של Stripe קשיח ל-replay באמצעות `stripe_event_id` (event-level) ו-`stripe_payment_intent_id` (payment-level), סטטוסים דרך `payment_status_enum` (pending/succeeded/failed/canceled), וסכומי Stripe נשמרים ב-`Decimal` עקבי (לא float).
 - **JWT Auth**: Access Token (קצר, כולל **`jti`** ייחודי לכל הנפקה) + Refresh Token (ארוך, נשמר ב-DB). **`POST /auth/logout`** (עם Bearer) מנקה refresh ומוסיף את ה-access הנוכחי ל-**Redis denylist** עד פקיעת ה-`exp` (`SETEX denylist:{jti}`); `get_current_user` / `get_current_user_optional` בודקים denylist אחרי פענוח (Redis **fail-open** ב-`is_denied` — אם Redis נופל, לא חוסמים את כל המשתמשים). יצירת טוקן: `create_access_token` ב-`app/core/security.py`; denylist: **`app/infrastructure/redis/client.py`**, logout: **`app/domain/auth/service.py`**, תלות HTTP: **`app/api/dependencies/auth.py`**. אותו SECRET_KEY בין backend ל-chat-ws לאימות WebSocket.
 - **WebSocket auth (FastAPI)**: `get_current_user_ws` ב-`app/api/dependencies/auth.py` מאמת **JWT** (`decode_access_token`: חתימה, `exp`, base64 קנוני), בודק `jti` מול Redis denylist (`is_denied`, fail-open), ומחזיר `WsUser` עם `user_id` מה-`sub` — **בלי קריאת DB** בזמן חיבור, כדי לא להעמיס על ה-connection pool תחת עומס. HTTP (`get_current_user`) עדיין טוען `User` מ-DB ובודק גם `is_active`.
@@ -148,6 +152,7 @@ ai-worker
 
 - **ASGI server (Docker Compose)**: `backend/entrypoint.sh` מריץ `uvicorn` עם `--workers` לפי **`UVICORN_WORKERS`** ב-`backend/.env` (ברירת מחדל **1** אם חסר; ראו `.env.example`: **4**). **מיגרציות** רצות בשירות נפרד **`migrate`** לפני עליית ה-backend. **Healthcheck** על המיכל: `GET /api/v1/health`. **פיתוח לוקאלי** (ללא Docker): בדרך כלל `uvicorn ... --reload` — תהליך יחיד; מיגרציה ידנית (`alembic upgrade head`) לפני הרצה.
 - **Connection Pool** (`backend/app/db/session.py`): `pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle` מ-**config** (`DB_POOL_*` ב-`.env`; ברירות מחדל ב-`Settings`), `pool_pre_ping=True`.
+- **Layered pooling (SQLAlchemy + PgBouncer):** אפליקציה שומרת pool קטן פר שירות (`DB_POOL_SIZE` נמוך), ו-PgBouncer מבצע multiplexing. זה מונע anti-pattern של אלפי חיבורים ישירים ל-Postgres תחת scale/redeploy.
 - **Indexes**: ראה `docs/DATABASE.md` — כולל אינדקסי בסיס ממיגרציה 004 ועוד אינדקסים משלימים מקריאות production חמות (כולל `idx_bookings_request_id`, `idx_messages_sender_id`).
 - **Caching**: Redis לפי צורך — TTL וכו' לפי סוג (למשל OTP, broadcast channels).
 - **My Bookings — קריאות מאוגדות**: `GET /bookings/driver-summary` ו־`GET /bookings/passenger-summary` ממומשים ב־**`BookingReadsService`** ([`booking_reads_service.py`](backend/app/domain/bookings/booking_reads_service.py)) — שאילתת DB אחת לכל מסך (ראו `bookings/crud.py`: `joinedload` + `with_loader_criteria` על הזמנות pending/confirmed לנהג), במקום סדרת קריאות per-ride. בפרונט יש שכבת mapping ייעודית (`frontend/src/pages/MyBookings/myBookings.mappers.ts`) שממירה DTOs ל-view-model של UI — פירוט ב־`docs/architecture/DATABASE.md` ו־`docs/architecture/API.md`.
@@ -203,5 +208,5 @@ ai-worker
 
 - **Kafka**: הוחלף ב-RabbitMQ לפשטות בסקלה הנוכחית.
 - **Horizontal scaling**: מתוכנן — backend stateless; DB/Redis/RabbitMQ מרכזיים.
-- **PgBouncer (מתוכנן, לא ממומש):** pooler בין האפליקציה ל-PostgreSQL — רלוונטי בעיקר כשעולים ל-**10+ מופעי API** / פריסה serverless-ית, כדי לרכז אלפי חיבורי לקוח לפחות חיבורי DB פיזיים. **מצב נוכחי:** SQLAlchemy async pool (`DB_POOL_*`) + `UVICORN_WORKERS` (למשל 4 workers × pool) — Postgres סביר עד מאות חיבורים לפי tuning; אין PgBouncer ב-Compose או ב-K8s כרגע.
+- **PgBouncer (ממומש ב-Compose):** pooler פנימי בשכבת Docker network, ללא חשיפה חיצונית. בשלב הבא (סקייל מתקדם): לשקול managed Postgres + pooler מנוהל ו/או הפרדת read traffic.
 - **N+1 / בדיקת שאילתות (המלצה):** No automated EXPLAIN ANALYZE pipeline exists. Manual review recommended on heavy paths (search, matching) using `pg_stat_statements` or Django-style query logging.

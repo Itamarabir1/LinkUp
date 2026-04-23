@@ -1,21 +1,20 @@
-"""Add billing: payments table + premium columns on users.
+"""Reconcile billing schema after partial migration states.
 
-Revision ID: 013_add_billing
-Revises: 012_add_missing_indexes
+Revision ID: 014_fix_billing_partial_state
+Revises: 013_add_billing
 Create Date: 2026-04-23
 """
 
-import sqlalchemy as sa
 from alembic import op
 
-revision = "013_add_billing"
-down_revision = "012_add_missing_indexes"
+revision = "014_fix_billing_partial_state"
+down_revision = "013_add_billing"
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
-    # Idempotent enum creation (safe for partial states)
+    # 1) Ensure enum exists (idempotent, safe on duplicate)
     op.execute(
         """
         DO $$
@@ -28,14 +27,14 @@ def upgrade() -> None:
         """
     )
 
-    # 1. Add billing columns to users
+    # 2) Ensure users billing columns + indexes exist
     op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(255);")
     op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_premium BOOLEAN NOT NULL DEFAULT false;")
     op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_since TIMESTAMPTZ;")
     op.execute("CREATE INDEX IF NOT EXISTS idx_users_stripe_customer_id ON users (stripe_customer_id);")
     op.execute("CREATE INDEX IF NOT EXISTS idx_users_is_premium ON users (is_premium);")
 
-    # 2. Create payments table
+    # 3) Ensure payments table exists
     op.execute(
         """
         CREATE TABLE IF NOT EXISTS payments (
@@ -52,17 +51,22 @@ def upgrade() -> None:
         );
         """
     )
+
+    # 4) Reconcile existing partial payments table (if columns/types were drifted)
+    op.execute("ALTER TABLE payments ADD COLUMN IF NOT EXISTS stripe_payment_intent_id VARCHAR(255);")
+    op.execute("ALTER TABLE payments ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(255);")
+    op.execute("ALTER TABLE payments ADD COLUMN IF NOT EXISTS stripe_event_id VARCHAR(255);")
+    op.execute("ALTER TABLE payments ADD COLUMN IF NOT EXISTS currency VARCHAR(10) NOT NULL DEFAULT 'ils';")
+    op.execute("ALTER TABLE payments ADD COLUMN IF NOT EXISTS status payment_status_enum;")
+    op.execute("ALTER TABLE payments ALTER COLUMN status SET DEFAULT 'pending';")
+    op.execute("ALTER TABLE payments ALTER COLUMN status SET NOT NULL;")
+
+    # 5) Ensure indexes exist
     op.execute("CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments (user_id);")
     op.execute("CREATE INDEX IF NOT EXISTS idx_payments_status ON payments (status);")
 
 
 def downgrade() -> None:
-    op.drop_index("idx_payments_status", table_name="payments")
-    op.drop_index("idx_payments_user_id", table_name="payments")
-    op.drop_table("payments")
-    op.drop_index("idx_users_is_premium", table_name="users")
-    op.drop_index("idx_users_stripe_customer_id", table_name="users")
-    op.drop_column("users", "premium_since")
-    op.drop_column("users", "is_premium")
-    op.drop_column("users", "stripe_customer_id")
-    sa.Enum(name="payment_status_enum").drop(op.get_bind(), checkfirst=True)
+    # Forward-only reconciliation migration: intentionally no destructive downgrade.
+    pass
+

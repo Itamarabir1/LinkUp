@@ -6,7 +6,7 @@
 
 ## Prerequisites
 
-- **Docker** ו-Docker Compose (להרצת db, redis, rabbitmq, backend, notification-worker, task-worker, ai-worker, chat-ws).
+- **Docker** ו-Docker Compose (להרצת db, **pgbouncer**, redis, rabbitmq, backend, notification-worker, task-worker, ai-worker, chat-ws).
 - **Python** 3.11+ (להרצת backend/worker לוקאלית בלי Docker).
 - **Node** (אם מריצים פרונט — לא מפורט כאן).
 - **Go** 1.x (אם בונים chat-ws ידנית).
@@ -21,7 +21,7 @@
    - `chat-ws/.env` — העתק מ־`chat-ws/.env.example` (כולל `REDIS_URL`, `JWT_SECRET` זהה ל־`SECRET_KEY` בבקאנד).
 
 2. **הרצה עם Docker**
-  - `docker-compose.yml`: ל־`db`, `redis`, `rabbitmq`, **`migrate`**, `notification-worker`, `task-worker`, `ai-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **`migrate`** מריץ `alembic upgrade head` פעם אחת ויוצא (`restart: "no"`); **backend** וה־workers תלויים ב־`service_completed_successfully:migrate`. **backend** עם **`8000:8000`** ל־host, **healthcheck** על `/api/v1/health` (גוף התשובה כולל גם **`circuit_breakers`** למעגלי Google Maps — מידע תפעולי; **`status`** נקבע רק מ־DB/Redis/RabbitMQ — ראו **`docs/architecture/API.md`**). **`frontend`** ו־**`nginx`** מוגדרים באותו קובץ עם `profiles: ["prod"]` — עולים רק עם `docker compose --profile prod`; **nginx** תלוי ב־**backend** ב־`service_healthy`.
+  - `docker-compose.yml`: ל־`db`, **`pgbouncer`**, `redis`, `rabbitmq`, **`migrate`**, `notification-worker`, `task-worker`, `ai-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **`migrate`** מריץ `alembic upgrade head` פעם אחת ויוצא (`restart: "no"`) ונשאר direct ל-`db`; **backend** וה־workers תלויים ב־`service_completed_successfully:migrate` וגם ב־`pgbouncer:service_healthy`. **backend** עם **`8000:8000`** ל־host, **healthcheck** על `/api/v1/health` (גוף התשובה כולל גם **`circuit_breakers`** למעגלי Google Maps — מידע תפעולי; **`status`** נקבע רק מ־DB/Redis/RabbitMQ — ראו **`docs/architecture/API.md`**). **`frontend`** ו־**`nginx`** מוגדרים באותו קובץ עם `profiles: ["prod"]` — עולים רק עם `docker compose --profile prod`; **nginx** תלוי ב־**backend** ב־`service_healthy`.
   - **פיתוח:** `docker compose up -d` → תשתית + **migrate** + 3 workers + backend (**8000**) + chat-ws (**8081**). פרונט: **`npm run dev`** בתיקיית `frontend`, לא קונטיינר.
    - **WebSocket בפיתוח:** צ'אט — `ws://localhost:8081/ws` (chat-ws); נסיעות / מיקום / **פיד התראות in-app** — `ws://localhost:8000/api/v1/...` (backend). מרוכז ב־[`frontend/src/config/env.ts`](../../frontend/src/config/env.ts).
    - **סטאק מלא מאחורי Nginx (פורט 80):** `docker compose --profile prod up -d --build`.
@@ -50,6 +50,7 @@
 | DB_MAX_OVERFLOW | — | חיבורים נוספים תחת עומס (ברירת מחדל 10) |
 | DB_POOL_TIMEOUT | — | שניות המתנה לחיבור מהמאגר (ברירת מחדל 30) |
 | DB_POOL_RECYCLE | — | מחזור חיבורים בשניות (ברירת מחדל 1800) |
+| DB pooling runtime path | — | runtime services דרך `pgbouncer`; migrations ישירות ל-`db` |
 | DATABASE_URL | אופציונלי | override מלא (למשל פרודקשן / K8s / CI); נטען ל־`DATABASE_URL_RAW` ב־Settings דרך **`validation_alias`** (גם **`DATABASE_URL_RAW`** תקף כשם env) |
 | REDIS_URL | אופציונלי | override מלא ל-Redis; נטען ל־`REDIS_URL_RAW` (גם **`REDIS_URL_RAW`** תקף) |
 | REDIS_HOST | — | localhost / redis |
@@ -169,6 +170,26 @@ alembic revision --autogenerate -m "description"
 
 ---
 
+## How To Recover From Partial Migration State
+
+אם `alembic upgrade head` נכשל באמצע (למשל enum כבר קיים / עמודות חסרות), עובדים לפי סדר קבוע:
+
+1. **בדיקת מצב נוכחי**
+   - מתוך `backend/`: `alembic current`
+   - ודא מה הרוויזיה בפועל מול `alembic heads`
+2. **הרצת forward-only repair**
+   - יש להריץ שוב `alembic upgrade head` (כולל migration תיקון forward-only, לא משכתבים migration ישן בסביבה משותפת)
+3. **אימות סופי**
+   - הרץ `bash ../scripts/ops/check-migration-head.sh` מתוך `backend/`
+   - אם הסקריפט לא מחזיר `(head)` — לא ממשיכים להריץ טסטים/דיפלוי
+4. **רק אם זו סביבת טסטים חד-פעמית**
+   - אפשר לאפס DB ולבנות מחדש (`docker compose down -v` + `docker compose up -d db ...` + migrate)
+   - בפרודקשן/סטייג׳ינג לא עושים reset, רק forward migrations
+
+עקרון סניורי: **No history rewrite on shared environments** — מתקנים עם migration חדש בלבד (forward-only), כדי לשמור עקביות בין מפתחים, CI ופרודקשן.
+
+---
+
 ## Project Structure
 
 ```
@@ -213,6 +234,8 @@ LinkUp/
 - **למה RabbitMQ ולא Kafka**: פשטות בסקלה הנוכחית, ניהול קל, Outbox pattern מספיק עם תור אחד/כמה תורים.
 - **למה PostgreSQL ולא MongoDB**: טרנזקציות, שלמות referential, PostGIS לגיאו, התאמה ל-ORM (SQLAlchemy).
 - **Cursor-based vs Page-based Pagination**: נסיעות והודעות — זרימה אינסופית ויציבות עם cursor; הזמנות — מספור עמודים ו-total לממשק "הזמנות שלי".
+- **למה PgBouncer עכשיו**: connection storms ב-EC2 קטן קורים לפני שנגמר CPU; pooler פנימי נותן שיפור מהיר בלי שינוי קוד דומיין.
+- **מה לא טריוויאלי (senior)**: `migrate` נשאר direct ל-`db`, `statement_cache_size=0` ל-asyncpg, ו-PgBouncer נשאר internal-only בלי פתיחת פורט ציבורי.
 
 ---
 

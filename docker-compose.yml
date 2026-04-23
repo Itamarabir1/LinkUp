@@ -20,6 +20,25 @@ services:
     networks:
       - linkup_network
 
+  # --- Connection Pooler: PgBouncer (internal only) ---
+  pgbouncer:
+    image: pgbouncer/pgbouncer:1.24.1
+    container_name: linkup_pgbouncer
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./infrastructure/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./infrastructure/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - linkup_network
+
   # --- Cache & Pub/Sub: Redis ---
   # DB 0 -> backend + compatibility outbox-worker
   # DB 1 -> chat-ws pub/sub + chat completion listener
@@ -105,7 +124,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - POSTGRES_HOST=db
+      - POSTGRES_HOST=pgbouncer
       - REDIS_HOST=redis
       - REDIS_DB=0
       - REDIS_CHAT_DB=1
@@ -116,6 +135,8 @@ services:
       migrate:
         condition: service_completed_successfully
       db:
+        condition: service_healthy
+      pgbouncer:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -137,17 +158,19 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - POSTGRES_HOST=db
+      - POSTGRES_HOST=pgbouncer
       - REDIS_HOST=redis
       - REDIS_DB=0
       - REDIS_CHAT_DB=1
       - RABBITMQ_HOST=rabbitmq
-      - DB_POOL_SIZE=2
+      - DB_POOL_SIZE=3
       - DB_MAX_OVERFLOW=3
     depends_on:
       migrate:
         condition: service_completed_successfully
       db:
+        condition: service_healthy
+      pgbouncer:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -167,16 +190,18 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - POSTGRES_HOST=db
+      - POSTGRES_HOST=pgbouncer
       - REDIS_HOST=redis
       - REDIS_DB=0
       - REDIS_CHAT_DB=1
-      - DB_POOL_SIZE=2
+      - DB_POOL_SIZE=3
       - DB_MAX_OVERFLOW=3
     depends_on:
       migrate:
         condition: service_completed_successfully
       db:
+        condition: service_healthy
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -195,7 +220,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - POSTGRES_HOST=db
+      - POSTGRES_HOST=pgbouncer
       - REDIS_HOST=redis
       - REDIS_DB=0
       - REDIS_CHAT_DB=1
@@ -225,7 +250,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - POSTGRES_HOST=db
+      - POSTGRES_HOST=pgbouncer
       - REDIS_HOST=redis
       - REDIS_DB=0 # explicit: DB 0 for backend
       - REDIS_CHAT_DB=1 # same DB as chat-ws for chat/user pubsub
@@ -237,6 +262,8 @@ services:
       migrate:
         condition: service_completed_successfully
       db:
+        condition: service_healthy
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy
