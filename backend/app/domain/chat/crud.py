@@ -125,14 +125,10 @@ async def get_inbox_aggregates(
             Message.created_at,
         ).join(
             last_msg_subq,
-            (Message.conversation_id == last_msg_subq.c.conversation_id)
-            & (Message.message_id == last_msg_subq.c.last_message_id),
+            (Message.conversation_id == last_msg_subq.c.conversation_id) & (Message.message_id == last_msg_subq.c.last_message_id),
         ),
     )
-    last_messages = {
-        row.conversation_id: {"body": row.body, "created_at": row.created_at}
-        for row in last_msg_result.all()
-    }
+    last_messages = {row.conversation_id: {"body": row.body, "created_at": row.created_at} for row in last_msg_result.all()}
 
     # Last incoming message from the other party (for unread — matches has_unread_messages)
     last_other_subq = (

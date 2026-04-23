@@ -74,9 +74,7 @@ class CRUDBilling:
 
     async def get_user_payments(self, db: AsyncSession, user_id: UUID) -> list[Payment]:
         result = await db.execute(
-            select(Payment)
-            .where(Payment.user_id == user_id)
-            .order_by(Payment.created_at.desc()),
+            select(Payment).where(Payment.user_id == user_id).order_by(Payment.created_at.desc()),
         )
         return list(result.scalars().all())
 
