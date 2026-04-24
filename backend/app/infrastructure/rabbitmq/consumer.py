@@ -16,6 +16,7 @@ from app.infrastructure.rabbitmq.topology import get_queue_spec
 
 logger = logging.getLogger(__name__)
 
+# Dedicated exchanges used by broker-native retry and DLQ routing.
 DLQ_EXCHANGE = "dlq_exchange"
 RETRY_EXCHANGE = "retry_exchange"
 
