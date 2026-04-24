@@ -19,8 +19,9 @@
 ### System design / Backend / Staff
 
 1. [../ARCHITECTURE.md](../ARCHITECTURE.md) — שירותים, Redis DB0/DB1, Outbox, תבניות.
-2. [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) — Outbox, Idempotency, JWT denylist, Circuit Breaker, Sentry, Prometheus/Grafana, **PgBouncer**, **Redis Sentinel HA** + chat plaintext + chat rate limit + [chat inbox N+1 fix](FEATURE_DECISIONS.md#chat-inbox-n1).
+2. [FEATURE_DECISIONS.md](FEATURE_DECISIONS.md) — Outbox, Idempotency, JWT denylist, Circuit Breaker, Sentry, Prometheus/Grafana, **PgBouncer**, **Redis Sentinel HA**, **Single-EC2 CD rolling deploy** + chat plaintext + chat rate limit + [chat inbox N+1 fix](FEATURE_DECISIONS.md#chat-inbox-n1).
 3. [adr/ARCHITECTURE_DECISIONS_BACKEND.md](adr/ARCHITECTURE_DECISIONS_BACKEND.md) — §1–22.
+4. אם שואלים על message reliability depth: [FEATURE_DECISIONS.md — RabbitMQ reliability refactor](FEATURE_DECISIONS.md#rabbitmq-pr1-pr2) + [architecture/EVENTS.md](architecture/EVENTS.md) (Connection Topology / Retry / DLQ).
 
 ### Real-time / WebSocket
 
@@ -46,7 +47,7 @@
 1. [ENGINEERING_HIGHLIGHTS.md](ENGINEERING_HIGHLIGHTS.md) — סעיפי CI/CD, health, DLQ
 2. [architecture/EVENTS.md](architecture/EVENTS.md) — retry, DLQ, scheduled
 3. Root [../README.md](../README.md) — GitHub Actions / GHCR
-4. [FEATURE_DECISIONS.md#pgbouncer](FEATURE_DECISIONS.md#pgbouncer) + [FEATURE_DECISIONS.md#redis-sentinel](FEATURE_DECISIONS.md#redis-sentinel) — rollout considerations ב-EC2 (connection pooling + Redis HA failover)
+4. [FEATURE_DECISIONS.md#pgbouncer](FEATURE_DECISIONS.md#pgbouncer) + [FEATURE_DECISIONS.md#redis-sentinel](FEATURE_DECISIONS.md#redis-sentinel) + [FEATURE_DECISIONS.md#single-ec2-cd](FEATURE_DECISIONS.md#single-ec2-cd) — rollout considerations ב-EC2 (pooling + Redis HA + automated CD/rollback)
 
 ---
 

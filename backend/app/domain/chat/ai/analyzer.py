@@ -11,6 +11,7 @@ from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponen
 from app.domain.chat.ai.client import get_groq_client
 from app.domain.chat.ai.prompts import SYSTEM_PROMPT, USER_PROMPT
 from app.domain.chat.ai.schema import RideSummary
+from app.infrastructure.metrics import ai_chat_summaries_failed_total, ai_chat_summaries_total
 
 logger = logging.getLogger(__name__)
 
@@ -83,14 +84,18 @@ def analyze_conversation(chat_text: str, temperature: float = 0.2) -> RideSummar
 
         # Validate against Pydantic schema
         ride_summary = RideSummary(**response_json)
+        ai_chat_summaries_total.inc()
         return ride_summary
 
     except json.JSONDecodeError as e:
         logger.error(f"JSON decode error in AI analysis: {e}")
+        ai_chat_summaries_failed_total.inc()
         return None
     except (APIError, ConnectionError, TimeoutError) as e:
         logger.error(f"API error in AI analysis: {e}")
+        ai_chat_summaries_failed_total.inc()
         return None
     except Exception as e:
         logger.error(f"Unexpected error in AI analysis: {e}", exc_info=True)
+        ai_chat_summaries_failed_total.inc()
         return None

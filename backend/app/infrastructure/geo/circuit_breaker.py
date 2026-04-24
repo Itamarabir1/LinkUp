@@ -15,6 +15,8 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 
+from app.infrastructure.metrics import geo_circuit_breaker_state
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,6 +42,7 @@ class CircuitBreaker:
                 if self._opened_at and (time.monotonic() - self._opened_at) >= self.recovery_timeout:
                     logger.info("CircuitBreaker[%s]: OPEN → HALF_OPEN", self.name)
                     self._state = CircuitState.HALF_OPEN
+                    geo_circuit_breaker_state.labels(name=self.name).set(1)
                     return True
                 return False
             return True
@@ -51,6 +54,7 @@ class CircuitBreaker:
             if self._state != CircuitState.CLOSED:
                 logger.info("CircuitBreaker[%s]: → CLOSED", self.name)
             self._state = CircuitState.CLOSED
+            geo_circuit_breaker_state.labels(name=self.name).set(0)
             self._failure_count = 0
             self._opened_at = None
         except Exception:
@@ -66,6 +70,7 @@ class CircuitBreaker:
                     self._failure_count,
                 )
                 self._state = CircuitState.OPEN
+                geo_circuit_breaker_state.labels(name=self.name).set(2)
                 self._opened_at = time.monotonic()
         except Exception:
             pass

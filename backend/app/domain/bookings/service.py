@@ -23,6 +23,12 @@ from app.domain.events.outbox import publish_to_outbox
 from app.domain.notifications.constants import NotificationEvent
 from app.domain.passengers.model import PassengerRequest
 from app.domain.rides.enum import RideStatus
+from app.infrastructure.metrics import (
+    bookings_approved_total,
+    bookings_cancelled_total,
+    bookings_created_total,
+    bookings_rejected_total,
+)
 from app.infrastructure.redis.publisher import publish_user_event
 
 logger = logging.getLogger(__name__)
@@ -75,6 +81,7 @@ class BookingService:
                 new_booking.booking_id,
             )
             await db.commit()
+            bookings_created_total.inc()
             await publish_user_event(
                 ride.driver_id,
                 "booking.passenger_join_request",
@@ -153,6 +160,7 @@ class BookingService:
                 [DispatchTarget.RABBITMQ.value],
             )
             await db.commit()
+            bookings_approved_total.inc()
             await publish_user_event(
                 booking.passenger_id,
                 "booking.approved_by_driver",
@@ -191,6 +199,7 @@ class BookingService:
                 [DispatchTarget.RABBITMQ.value],
             )
             await db.commit()
+            bookings_rejected_total.inc()
             await publish_user_event(
                 booking.passenger_id,
                 "booking.rejected_by_driver",
@@ -223,6 +232,7 @@ class BookingService:
             await crud_booking.execute_booking_cancellation(db, booking)
             await db.flush()
             await db.commit()
+            bookings_cancelled_total.inc()
             return await crud_booking.get_booking_by_id_async(db, booking_id)
         except (BookingNotFoundError, ForbiddenRideActionError, RideNotAvailableError):
             await db.rollback()

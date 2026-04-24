@@ -11,8 +11,9 @@ from app.domain.events.routing import (
     SCHEDULED_EXCHANGES,
     SCHEDULED_TASKS_QUEUE,
 )
-from app.infrastructure.rabbitmq.client import rabbit_client
+from app.infrastructure.rabbitmq.client import worker_rabbit_client
 from app.infrastructure.rabbitmq.consumer import RabbitMQConsumer
+from app.infrastructure.rabbitmq.supervisor import run_supervised
 from app.infrastructure.redis.broadcast import broadcast
 from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 from app.infrastructure.redis.client import redis_client
@@ -21,6 +22,7 @@ from app.workers.tasks.scheduled_tasks import (
     handle_scheduled_task,
     run_scheduled_tasks_publisher,
 )
+from prometheus_client import start_http_server
 
 setup_logging()
 logger = logging.getLogger("TaskWorker")
@@ -46,8 +48,10 @@ async def main():
     broadcast_ok = False
     chat_pubsub_ok = False
     redis_client_ok = False
+    worker_rmq_ok = False
     try:
-        await rabbit_client.connect()
+        await worker_rabbit_client.connect()
+        worker_rmq_ok = True
         try:
             await broadcast.connect()
             broadcast_ok = True
@@ -65,22 +69,41 @@ async def main():
             logger.warning("Redis cache client unavailable: %s", e)
 
         avatar_upload_consumer = RabbitMQConsumer(
-            rabbit_client,
+            worker_rabbit_client,
             queue_name="avatar_upload_queue",
             exchange_names=AVATAR_UPLOAD_EXCHANGES,
         )
         scheduled_tasks_consumer = RabbitMQConsumer(
-            rabbit_client,
+            worker_rabbit_client,
             queue_name=SCHEDULED_TASKS_QUEUE,
             exchange_names=SCHEDULED_EXCHANGES,
         )
 
         tasks = [
-            asyncio.create_task(avatar_upload_consumer.consume(callback=handle_avatar_upload_event)),
-            asyncio.create_task(scheduled_tasks_consumer.consume(callback=handle_scheduled_task)),
-            asyncio.create_task(run_scheduled_tasks_publisher()),
+            asyncio.create_task(
+                run_supervised(
+                    "avatar-upload-consumer",
+                    lambda: avatar_upload_consumer.consume(callback=handle_avatar_upload_event, stop_event=stop_event),
+                    stop_event,
+                )
+            ),
+            asyncio.create_task(
+                run_supervised(
+                    "scheduled-tasks-consumer",
+                    lambda: scheduled_tasks_consumer.consume(callback=handle_scheduled_task, stop_event=stop_event),
+                    stop_event,
+                )
+            ),
+            asyncio.create_task(
+                run_supervised(
+                    "scheduled-tasks-publisher",
+                    lambda: run_scheduled_tasks_publisher(worker_rabbit_client),
+                    stop_event,
+                )
+            ),
         ]
         logger.info("Task worker tasks running: %s", len(tasks))
+        start_http_server(9092)
         await stop_event.wait()
 
     except (KeyboardInterrupt, SystemExit):
@@ -90,11 +113,12 @@ async def main():
         logger.error("Critical task worker error: %s", e, exc_info=True)
     finally:
         logger.info("Shutting down task worker...")
+        stop_event.set()
         for task in tasks:
             if not task.done():
                 task.cancel()
         if tasks:
-            await asyncio.wait(tasks, timeout=5)
+            await asyncio.wait(tasks, timeout=30)
 
         if broadcast_ok:
             try:
@@ -111,7 +135,8 @@ async def main():
                 await redis_client.close()
             except Exception as e:
                 logger.warning("redis_client.close failed: %s", e)
-        await rabbit_client.close()
+        if worker_rmq_ok:
+            await worker_rabbit_client.close()
         logger.info("Task worker shutdown complete.")
 
 

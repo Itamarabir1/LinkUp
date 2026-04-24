@@ -7,13 +7,13 @@ cd "$ROOT_DIR"
 echo "== Redis Sentinel smoke test =="
 
 docker compose exec -T redis-sentinel redis-cli -p 26379 sentinel get-master-addr-by-name mymaster >/tmp/sentinel-master.out
-if ! rg -q "redis-primary|6379" /tmp/sentinel-master.out; then
+if ! grep -q "172.20.0.10\|6379" /tmp/sentinel-master.out; then
   echo "❌ Sentinel does not report redis-primary:6379 as master"
   exit 1
 fi
 
 docker compose exec -T redis-sentinel redis-cli -p 26379 sentinel ckquorum mymaster >/tmp/sentinel-quorum.out
-if ! rg -q "OK" /tmp/sentinel-quorum.out; then
+if ! grep -q "OK" /tmp/sentinel-quorum.out; then
   echo "❌ Sentinel quorum check failed"
   exit 1
 fi

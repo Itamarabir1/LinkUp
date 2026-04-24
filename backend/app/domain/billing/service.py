@@ -19,6 +19,12 @@ from app.domain.billing.model import Payment, PaymentStatus
 from app.domain.billing.schema import CheckoutResponse, PaymentStatusResponse
 from app.domain.users.crud import crud_user
 from app.domain.users.model import User
+from app.infrastructure.metrics import (
+    payments_initiated_total,
+    payments_succeeded_total,
+    stripe_webhook_errors_total,
+    stripe_webhook_received_total,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +100,7 @@ class BillingService:
                 status=PaymentStatus.PENDING,
             )
             await db.commit()
+            payments_initiated_total.inc()
 
             logger.info(
                 "Checkout session created for user=%s session=%s",
@@ -135,8 +142,10 @@ class BillingService:
                 stripe_signature,
                 settings.STRIPE_WEBHOOK_SECRET,
             )
+            stripe_webhook_received_total.labels(event_type=event.get("type", "unknown")).inc()
         except stripe.SignatureVerificationError as e:
             logger.warning("Stripe webhook signature verification failed: %s", e)
+            stripe_webhook_errors_total.inc()
             raise StripeWebhookError() from e
         except Exception as e:
             logger.warning("Stripe webhook invalid payload/signature: %s", e)
@@ -216,6 +225,7 @@ class BillingService:
                 await crud_user.mark_as_premium(db, user=user)
 
             await db.commit()
+            payments_succeeded_total.inc()
             logger.info("User %s upgraded to premium", user_id)
 
         except IntegrityError as e:

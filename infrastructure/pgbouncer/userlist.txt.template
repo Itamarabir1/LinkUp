@@ -1,0 +1,2 @@
+"${POSTGRES_USER}" "${POSTGRES_PASSWORD}"
+"pgbouncer_admin" "${PGBOUNCER_ADMIN_PASSWORD}"

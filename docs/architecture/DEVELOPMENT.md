@@ -22,6 +22,7 @@
 
 2. **הרצה עם Docker**
   - `docker-compose.yml`: ל־`db`, **`pgbouncer`**, `redis`, `rabbitmq`, **`migrate`**, `notification-worker`, `task-worker`, `ai-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **`migrate`** מריץ `alembic upgrade head` פעם אחת ויוצא (`restart: "no"`) ונשאר direct ל-`db`; **backend** וה־workers תלויים ב־`service_completed_successfully:migrate` וגם ב־`pgbouncer:service_healthy`. **backend** עם **`8000:8000`** ל־host, **healthcheck** על `/api/v1/health` (גוף התשובה כולל גם **`circuit_breakers`** למעגלי Google Maps — מידע תפעולי; **`status`** נקבע רק מ־DB/Redis/RabbitMQ — ראו **`docs/architecture/API.md`**). **`frontend`** ו־**`nginx`** מוגדרים באותו קובץ עם `profiles: ["prod"]` — עולים רק עם `docker compose --profile prod`; **nginx** תלוי ב־**backend** ב־`service_healthy`.
+  - **PgBouncer image:** נבנה מקומית מ-`infrastructure/pgbouncer/Dockerfile` (ולא image ציבורי), כדי להבטיח שקובץ `pgbouncer.ini` הממופה ב-volume נשאר מקור אמת.
   - **פיתוח:** `docker compose up -d` → תשתית + **migrate** + 3 workers + backend (**8000**) + chat-ws (**8081**). פרונט: **`npm run dev`** בתיקיית `frontend`, לא קונטיינר.
    - **WebSocket בפיתוח:** צ'אט — `ws://localhost:8081/ws` (chat-ws); נסיעות / מיקום / **פיד התראות in-app** — `ws://localhost:8000/api/v1/...` (backend). מרוכז ב־[`frontend/src/config/env.ts`](../../frontend/src/config/env.ts).
    - **סטאק מלא מאחורי Nginx (פורט 80):** `docker compose --profile prod up -d --build`.
@@ -58,6 +59,7 @@
 | REDIS_DB | — | 0 |
 | REDIS_PASSWORD | — | אם Redis דורש סיסמה |
 | REDIS_CHAT_DB | — | 1 (לצ'אט) |
+| BACKEND_IMAGE | — | override ל-image של backend בפריסה (למשל `ghcr.io/<owner>/linkup/backend:<sha>`) |
 | REDIS_SENTINEL_HOST | — | redis-sentinel (מפעיל נתיב Sentinel במקום URL רגיל) |
 | REDIS_SENTINEL_PORT | — | 26379 |
 | REDIS_MASTER_NAME | — | mymaster |
@@ -235,10 +237,42 @@ LinkUp/
 
 - **למה FastAPI ולא Django**: ביצועים אסינכרוניים, OpenAPI מובנה, התאמה ל-WebSocket ו-worker באותו שפה.
 - **למה RabbitMQ ולא Kafka**: פשטות בסקלה הנוכחית, ניהול קל, Outbox pattern מספיק עם תור אחד/כמה תורים.
+- **למה broker-native retry (DLX/TTL) במקום republish ידני**: פחות race conditions ו-state בקוד worker; ה-broker מנהל delay/requeue, וה-worker מתמקד ב-ack/nack.
 - **למה PostgreSQL ולא MongoDB**: טרנזקציות, שלמות referential, PostGIS לגיאו, התאמה ל-ORM (SQLAlchemy).
 - **Cursor-based vs Page-based Pagination**: נסיעות והודעות — זרימה אינסופית ויציבות עם cursor; הזמנות — מספור עמודים ו-total לממשק "הזמנות שלי".
 - **למה PgBouncer עכשיו**: connection storms ב-EC2 קטן קורים לפני שנגמר CPU; pooler פנימי נותן שיפור מהיר בלי שינוי קוד דומיין.
 - **מה לא טריוויאלי (senior)**: `migrate` נשאר direct ל-`db`, `statement_cache_size=0` ל-asyncpg, ו-PgBouncer נשאר internal-only בלי פתיחת פורט ציבורי.
+- **Secrets ל-PgBouncer בפריסה**: `userlist.txt` לא נשמר ב-git; ה-CI deploy מייצר אותו מ-`userlist.txt.template` עם `envsubst`, מקשיח הרשאות (`chmod 600`), עושה build+up ל-`pgbouncer`, ממתין ל-health, ורק אז עושה rollout ל-backend.
+
+---
+
+## SLOs & Error Budgets (Ops baseline)
+
+מטרת הסעיף: להפוך metrics ל-reliability contract תפעולי.
+
+### 1) SLIs (מה מודדים)
+- **Availability (API):** אחוז בקשות HTTP מוצלחות (2xx/3xx) מכלל הבקשות.
+- **Latency (API):** `p95` ו-`p99` לנתיבים קריטיים.
+- **Async reliability:** יחס הצלחה ב-Outbox/RabbitMQ (`processed` מול `failed`) + מגמות retries/DLQ.
+
+### 2) SLO targets התחלתיים (מומלץ)
+- **API availability:** 99.9% לחודש.
+- **Latency:** `p95 < 400ms`, `p99 < 900ms`.
+- **Async success ratio:** >= 99.5% לרכיבי outbox + worker pipelines.
+
+### 3) Error budget policy
+- אם יותר מ-50% מה-budget החודשי נצרך לפני אמצע החודש:
+  - מקפיאים rollout של פיצ'רים לא קריטיים.
+  - פותחים Reliability Sprint ממוקד ב-SLI שנפגע.
+  - משחררים רק תיקוני יציבות/באגים עד חזרה למסלול.
+
+### 4) Metric sources במערכת
+- **Backend metrics endpoint:** `backend:8000/metrics`
+- **Worker metrics endpoints:**
+  - `notification-worker:9091/metrics`
+  - `task-worker:9092/metrics`
+  - `ai-worker:9093/metrics`
+- Prometheus scrape מוגדר ב-`monitoring/prometheus.yml`.
 
 ---
 
@@ -248,3 +282,16 @@ LinkUp/
 - **Async end-to-end (API + workers):** **Bookings** וזרימות ליבה async-only; workers (למשל `app/workers/tasks/notification_tasks.py`) משתמשים ב־`await db.execute(select(...))` — אין `Session.run_sync` בקוד האפליקציה. `run_sync` נשאר רק ב־Alembic (`alembic/env.py`) עבור מיגרציות.
 - **Geocode cache (24h):** כתובות שחוזרות על עצמן נשמרות ב-Redis ל-24 שעות כדי לחסוך קריאות **Google Geocoding** ולשפר latency.
 - **Admin API + מסך אדמין:** `GET/PATCH … /api/v1/admin/*` דרך `get_current_admin_user`; ממשק React ב־`frontend/src/features/admin/` (`/admin`, lazy). פירוט: **`ADMIN_DASHBOARD.md`** בשורש ה-repo.
+- **RabbitMQ reliability refactor (PR1+PR2):** נוספו `run_supervised` + `ConsumerSupervisor` עם draining states ו-`max_retries`; ה-messaging path פוצל ל-clients לפי תפקיד (`rabbit_client`/`outbox_rabbit_client`/`worker_rabbit_client`) עם channel isolation ל-consumers. Queue config מרוכז ב-`backend/app/infrastructure/rabbitmq/topology.py` (`QueueSpec`).
+- **RabbitMQ PR3/PR4/PR5:** retry עבר ל-broker-native DLX/TTL + `x-death`; נוסף `run_dlq_monitor` לניטור עומק DLQ; ונוסף כלי תפעולי `scripts/ops/rabbitmq-dlq-replay.py` ל-replay מבוקר מתורי DLQ.
+
+---
+
+## RabbitMQ DLQ Replay Tool
+
+- קובץ: `scripts/ops/rabbitmq-dlq-replay.py`
+- שימוש:
+  - dry-run: `python scripts/ops/rabbitmq-dlq-replay.py --dry-run`
+  - replay ברירת מחדל ל-queues retry-enabled: `python scripts/ops/rabbitmq-dlq-replay.py --limit 100`
+  - replay לתור ספציפי: `python scripts/ops/rabbitmq-dlq-replay.py --queue notifications_queue --limit 50`
+- הכלי מחזיר הודעות מ-`<queue>.dlq` חזרה לתור הראשי `<queue>` ומדפיס דוח JSON עם `replayed/errors/remaining`.

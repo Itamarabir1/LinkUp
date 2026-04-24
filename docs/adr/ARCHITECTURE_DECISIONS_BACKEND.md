@@ -230,15 +230,15 @@
 
 ---
 
-## 21. PgBouncer — מתוכנן (לא ממומש בפרויקט)
+## 21. PgBouncer — ממומש (Compose runtime)
 
 | | |
 |--|--|
-| **הקשר** | כשמספר מופעי API גדל (למשל **10+**) או פריסה serverless-ית, כל מופע פותח חיבורי SQLAlchemy ל-PostgreSQL — סכום מהיר של חיבורים פיזיים. |
-| **החלטה (עתידית)** | להציב **PgBouncer** (או pooler דומה) בין האפליקציה ל-DB, לרכז אלפי חיבורי לקוח לפחות חיבורים לשרת Postgres. |
-| **מצב נוכחי** | **אין** PgBouncer ב-Compose או ב-K8s בקוד הבסיס; **SQLAlchemy async pool** (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, …) + מספר workers (`UVICORN_WORKERS`) — Postgres נוח בטווח של **מאות** חיבורים עם tuning. |
-| **למה לא עכשיו** | עלות תפעול ומורכבות; לסקלה הנוכחית ה-pool המקומי מספיק. |
-| **בקצרה לראיון** | “כשאעלה לריבוי מופעים אגרסיבי, אוסיף PgBouncer; היום ה-pool של SQLAlchemy ומגבלות worker מכסים.” |
+| **הקשר** | עומסי burst/redeploy עם כמה services (backend + workers) יוצרים fan-out של חיבורים ל-Postgres. ב-EC2 בינוני זה מייצר לחץ מוקדם על memory/connection slots. |
+| **החלטה** | להפעיל PgBouncer כ-layer פנימי ב-Compose במצב `transaction`, ולהעביר runtime services ל-`POSTGRES_HOST=pgbouncer` בעוד `migrate` נשאר direct ל-`db`. |
+| **מימוש חשוב (ops)** | בגלל entrypoint overrides ב-images ציבוריים, ה-service משתמש ב-custom image (`infrastructure/pgbouncer/Dockerfile`) כדי לשמור שליטה מלאה על `pgbouncer.ini`. קובץ `userlist.txt` לא נשמר ב-git; נוצר בזמן deploy מ-`userlist.txt.template` עם `envsubst` + `chmod 600`. |
+| **Trade-off** | עוד רכיב תפעולי ב-runtime (health/build/deploy ordering), אבל יציבות טובה יותר תחת עומס ו-rollout. |
+| **בקצרה לראיון** | “לא הסתפקתי בלהוסיף PgBouncer — בניתי image מבוקר כדי למנוע entrypoint overrides, והקשחתי secrets flow כך ש-userlist אמיתי נוצר רק בזמן deploy.” |
 
 ---
 

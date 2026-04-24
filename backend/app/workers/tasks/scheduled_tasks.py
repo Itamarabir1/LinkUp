@@ -16,7 +16,6 @@ from app.domain.events.routing import (
     ROUTING_KEY_REMINDERS,
     SCHEDULED_EXCHANGE,
 )
-from app.infrastructure.rabbitmq.client import rabbit_client
 from app.workers.tasks.chat_timeout_task import execute_chat_timeout_job
 from app.workers.tasks.fuel_price_task import FUEL_SCAN_INTERVAL, execute_fuel_scan_job
 from app.workers.tasks.maintenance_task import execute_maintenance_job
@@ -31,7 +30,7 @@ INTERVAL_CHAT_TIMEOUT = 3600
 CHECK_INTERVAL = 60  # wake every minute
 
 
-async def run_scheduled_tasks_publisher():
+async def run_scheduled_tasks_publisher(rabbitmq_client):
     """
     Publisher: sends to the "scheduled" exchange every N seconds.
     Does not run business logic — only publishes; the consumer runs jobs.
@@ -43,7 +42,7 @@ async def run_scheduled_tasks_publisher():
         try:
             now = time.monotonic()
             if now - last_chat_timeout >= INTERVAL_CHAT_TIMEOUT:
-                await rabbit_client.publish(
+                await rabbitmq_client.publish(
                     {"trigger": "chat_timeout"},
                     ROUTING_KEY_CHAT_TIMEOUT,
                     SCHEDULED_EXCHANGE,
@@ -51,7 +50,7 @@ async def run_scheduled_tasks_publisher():
                 last_chat_timeout = now
                 logger.debug("📤 Published scheduled.chat_timeout")
             if now - last_reminders >= INTERVAL_REMINDERS:
-                await rabbit_client.publish(
+                await rabbitmq_client.publish(
                     {"trigger": "reminders"},
                     ROUTING_KEY_REMINDERS,
                     SCHEDULED_EXCHANGE,
@@ -59,7 +58,7 @@ async def run_scheduled_tasks_publisher():
                 last_reminders = now
                 logger.debug("📤 Published scheduled.reminders")
             if now - last_maintenance >= INTERVAL_MAINTENANCE:
-                await rabbit_client.publish(
+                await rabbitmq_client.publish(
                     {"trigger": "maintenance"},
                     ROUTING_KEY_MAINTENANCE,
                     SCHEDULED_EXCHANGE,
@@ -67,7 +66,7 @@ async def run_scheduled_tasks_publisher():
                 last_maintenance = now
                 logger.debug("📤 Published scheduled.maintenance")
             if now - last_fuel >= FUEL_SCAN_INTERVAL:
-                await rabbit_client.publish(
+                await rabbitmq_client.publish(
                     {"trigger": "fuel_scan"},
                     ROUTING_KEY_FUEL_SCAN,
                     SCHEDULED_EXCHANGE,

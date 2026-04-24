@@ -10,6 +10,7 @@ from uuid import UUID
 from app.core.exceptions.infrastructure import WorkerTaskFailed
 from app.db.session import SessionLocal
 from app.domain.users.crud import crud_user
+from app.infrastructure.metrics import s3_uploads_failed_total, s3_uploads_total
 from app.infrastructure.s3.client import s3_client
 from app.infrastructure.s3.image_processor import process_and_save_avatar
 from app.infrastructure.s3.service import storage_service
@@ -135,6 +136,7 @@ async def _handle_avatar_upload(data: dict[str, Any]) -> None:
                 new_prefix,
                 old_avatar_key,
             )
+            s3_uploads_total.labels(type="avatar").inc()
 
         except Exception as e:
             await db.rollback()
@@ -149,6 +151,7 @@ async def _handle_avatar_upload(data: dict[str, Any]) -> None:
             except Exception:
                 await db.rollback()
             logger.exception("Avatar upload processing failed: user_id=%s", user_id)
+            s3_uploads_failed_total.labels(type="avatar").inc()
             raise WorkerTaskFailed() from e
 
     await _delete_previous_avatar_prefix_best_effort(old_avatar_key, new_prefix or "")

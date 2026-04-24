@@ -13,6 +13,7 @@ import logging
 
 from app.core.constants import GEOCODE_CACHE_TTL
 from app.infrastructure.geo.geocoding import GeocodingService
+from app.infrastructure.metrics import geo_cache_hits_total, geo_cache_misses_total
 from app.infrastructure.redis.client import redis_client
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ async def get_cached_coords(address: str) -> tuple[float, float] | None:
         if cached:
             data = cached if isinstance(cached, dict) else json.loads(cached)
             logger.debug(f"Geocode cache hit: '{address}'")
+            geo_cache_hits_total.inc()
             return float(data["lat"]), float(data["lon"])
     except Exception as e:
         logger.warning(f"Geocode cache read failed (fail open): {e}")
@@ -71,6 +73,7 @@ async def get_coordinates(address: str) -> tuple[float, float] | None:
     cached = await get_cached_coords(address)
     if cached:
         return cached
+    geo_cache_misses_total.inc()
 
     lat, lon = await GeocodingService.get_coordinates_from_address(address)
     if lat is None or lon is None:

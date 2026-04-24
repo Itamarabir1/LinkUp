@@ -36,7 +36,7 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | reserve_pool_size | 5 | headroom בזמן burst |
 | server_idle_timeout | 30 | שחרור חיבורים לא פעילים |
 
-קבצי קונפיג: `infrastructure/pgbouncer/pgbouncer.ini`, `infrastructure/pgbouncer/userlist.txt` (template בלבד; סודות מוזרקים סביבתית).
+קבצי קונפיג: `infrastructure/pgbouncer/pgbouncer.ini`, `infrastructure/pgbouncer/userlist.txt.template` (הקובץ `userlist.txt` נוצר בזמן deploy עם `envsubst`; לא נשמר ב-git).
 
 ### Redis topology (HA)
 

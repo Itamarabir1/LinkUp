@@ -11,9 +11,11 @@ logger = logging.getLogger(__name__)
 
 
 class RabbitMQClient:
-    def __init__(self):
+    def __init__(self, role: str):
+        self.role = role
         self._connection: aio_pika.abc.AbstractConnection | None = None
-        self._channel: aio_pika.abc.AbstractChannel | None = None
+        self._publish_channel: aio_pika.abc.AbstractChannel | None = None
+        self._consumer_channels: dict[str, aio_pika.abc.AbstractChannel] = {}
         self._exchanges: dict[str, aio_pika.abc.AbstractExchange] = {}
         self._lock = asyncio.Lock()
 
@@ -23,24 +25,41 @@ class RabbitMQClient:
             if self._connection is None or self._connection.is_closed:
                 try:
                     self._connection = await aio_pika.connect_robust(settings.RABBITMQ_URL, timeout=10)
-                    self._channel = await self._connection.channel()
-                    logger.info("✅ RabbitMQ Client connected")
+                    self._publish_channel = await self._connection.channel()
+                    logger.info("✅ RabbitMQ Client connected role=%s", self.role)
                 except Exception as e:
                     logger.exception("RabbitMQ connect failed: %s", e)
                     raise QueueServiceError() from e
 
-    async def get_channel(self) -> aio_pika.abc.AbstractChannel:
-        if not self._channel or self._channel.is_closed:
+    async def get_publish_channel(self) -> aio_pika.abc.AbstractChannel:
+        if not self._publish_channel or self._publish_channel.is_closed:
+            self._exchanges.clear()
+            if not self._connection or self._connection.is_closed:
+                await self.connect()
+            else:
+                self._publish_channel = await self._connection.channel()
+                logger.info("🔁 RabbitMQ publish channel recreated role=%s", self.role)
+        return self._publish_channel
+
+    async def get_consumer_channel(self, consumer_name: str) -> aio_pika.abc.AbstractChannel:
+        if not self._connection or self._connection.is_closed:
             await self.connect()
-        return self._channel
+        channel = self._consumer_channels.get(consumer_name)
+        if channel and not channel.is_closed:
+            return channel
+        channel = await self._connection.channel()
+        self._consumer_channels[consumer_name] = channel
+        return channel
 
     async def publish(self, message: dict, routing_key: str, exchange_name: str = ""):
         try:
-            channel = await self.get_channel()
+            channel = await self.get_publish_channel()
 
             if exchange_name:
                 if exchange_name not in self._exchanges:
-                    self._exchanges[exchange_name] = await channel.declare_exchange(exchange_name, aio_pika.ExchangeType.TOPIC, durable=True)
+                    self._exchanges[exchange_name] = await channel.declare_exchange(
+                        exchange_name, aio_pika.ExchangeType.TOPIC, durable=True
+                    )
                 target = self._exchanges[exchange_name]
             else:
                 target = channel.default_exchange
@@ -66,7 +85,10 @@ class RabbitMQClient:
         async with self._lock:
             if self._connection and not self._connection.is_closed:
                 await self._connection.close()
-                logger.info("🛑 RabbitMQ Connection closed")
+                self._publish_channel = None
+                self._consumer_channels.clear()
+                self._exchanges.clear()
+                logger.info("🛑 RabbitMQ Connection closed role=%s", self.role)
 
     def is_connected(self) -> bool:
         """For health checks (no await)."""
@@ -79,4 +101,6 @@ class RabbitMQClient:
             return False
 
 
-rabbit_client = RabbitMQClient()
+rabbit_client = RabbitMQClient(role="api")
+worker_rabbit_client = RabbitMQClient(role="worker")
+outbox_rabbit_client = RabbitMQClient(role="outbox")

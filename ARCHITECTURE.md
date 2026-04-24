@@ -15,7 +15,7 @@
 | email-renderer | email-renderer/ | Node.js / Express / React Email | 3001 | Renders email HTML from template name + props (`POST /render`) |
 | chat-ws | chat-ws/ | Go | 8081 | WebSocket server for real-time chat (JWT, Redis Pub/Sub) |
 | db | Docker | PostgreSQL 15 + PostGIS | 5432 | Primary data store |
-| pgbouncer | Docker | PgBouncer 1.24 | 6432 (internal) | Transaction pooler between app/workers and PostgreSQL |
+| pgbouncer | Docker (custom build) | Alpine 3.22 + PgBouncer | 6432 (internal) | Transaction pooler between app/workers and PostgreSQL, with explicit local Dockerfile to prevent image entrypoint config overrides |
 | redis-primary / redis-replica / redis-sentinel | Docker | Redis 7.2 + Sentinel | 6379, 26379 (internal) | Redis HA topology (master, replica, sentinel failover); DB 0: backend infra, DB 1: chat/events |
 | rabbitmq | Docker | RabbitMQ 3 + Management | 5672, 15672 | Message broker (events, tasks) |
 
@@ -26,11 +26,12 @@
 | Component | Technology | Version | Purpose |
 |-----------|------------|---------|---------|
 | Database | PostgreSQL + PostGIS | 15-3.3 | טבלאות, גיאומטריה, חיפוש מרחבי |
-| DB Pooler | PgBouncer | 1.24.1 | pooling פנימי (transaction mode), בלימת connection storms, הפחתת עומס זיכרון/CPU ב-Postgres |
+| DB Pooler | PgBouncer (custom image) | Alpine 3.22 + pgbouncer + postgresql-client | pooling פנימי (transaction mode), בלימת connection storms, הפחתת עומס זיכרון/CPU ב-Postgres |
 | Cache / Pub-Sub | Redis + Sentinel | 7.2.0-v10 / 7.2-alpine | DB 0: ride per-ride + **rides:list**, cache, OTP, **JWT denylist** (`denylist:{jti}`), **idempotency keys** (`idempotency:request_ride:{user_id}:{key}`); DB 1: chat + **`user:{id}:events`** (דרך `redis_chat_pubsub`), completion, presence; client connection path via Sentinel failover |
 | Message Broker | RabbitMQ | 3-management | אירועים (Outbox), תורי משימות (notifications, avatar, scheduled) |
 | Email rendering | Node.js + Express + React Email | Node 20 | microservice called by backend/worker to render transactional email HTML |
 | Runtime | Docker Compose | — | Dev: db, pgbouncer, redis-primary/replica/sentinel, rabbitmq, **migrate** (once), backend (**8000** host), `notification-worker`, `task-worker`, `ai-worker`, chat-ws; local prod: static frontend + nginx (80) with `--profile prod` |
+| Delivery | GitHub Actions + GHCR + SSH | — | Build/test/push on CI, then single-EC2 rolling backend deploy (`docker compose up -d --no-deps backend`) with health-gated rollback |
 | CDN (אופציונלי) | **Amazon CloudFront** | — | דומיין ציבורי מול אותו bucket S3; מופעל כש־**`CLOUDFRONT_DOMAIN`** מוגדר — URLs יציבים לתמונות (אווטאר/קבוצות); ללא דומיין — presigned GET ישירות ל-S3 |
 
 ---
@@ -86,9 +87,13 @@ ai-worker
 ## Key Patterns
 
 - **Outbox Pattern**: אירועים נכתבים ל-`outbox_events` ב-DB **באותה טרנזקציה** עם השינוי העסקי; ה-worker (`notification-worker`) מפרסם ל-RabbitMQ (LISTEN/NOTIFY + fallback polling). מבטיח **at-least-once** ולא מאבד אירועים אם RabbitMQ זמנית למטה. **דוגמאות routing keys / אירועים:** `ride.created`, `ride.cancelled_by_driver`, `booking.passenger_join_request`, `booking.approved_by_driver`, `booking.rejected_by_driver`, `auth.email_verification`, `auth.password_reset_code`, `user.registered` (מקור אמת מלא: [`docs/architecture/EVENTS.md`](docs/architecture/EVENTS.md)). קוד: [`app/infrastructure/outbox/`](backend/app/infrastructure/outbox/), [`app/domain/events/outbox.py`](backend/app/domain/events/outbox.py).
+- **RabbitMQ channel isolation + role separation**: שלושה clients ייעודיים — `rabbit_client` (API publish), `outbox_rabbit_client` (Outbox publish), `worker_rabbit_client` (consumers + scheduler). ב-worker path יש חיבור משותף עם channels מבודדים לכל consumer. התנהגות התורים מרוכזת ב-`QueueSpec` תחת `backend/app/infrastructure/rabbitmq/topology.py`.
+- **RabbitMQ pure broker retry (PR3)**: retry מנוהל ע"י הברוקר עם `retry_exchange` + תור `<queue>.retry` שמוגדר עם `x-message-ttl`, וחזרה אוטומטית לתור הראשי דרך DLX. worker עושה `nack(requeue=False)` בלבד לכשלון transient, וסופר ניסיונות לפי `x-death` (queue-scoped) במקום `x-retry-count` ידני.
+- **RabbitMQ DLQ operability (PR4/PR5)**: `notification-worker` מריץ ניטור עומק DLQ מחזורי (`run_dlq_monitor`) עם thresholds ל-warning/critical, ונוסף כלי replay אופרטיבי `scripts/ops/rabbitmq-dlq-replay.py` להחזרת הודעות `.dlq` לתור הראשי באופן מבוקר.
 - **Domain-Driven Design**: כל דומיין (users, rides, bookings, passengers, chat, groups, **admin**, auth, …) — model, schema, crud, service; ראוטרים תחת `backend/app/domain/*/router.py` ונרשמים ב־[`api/v1/api_router.py`](backend/app/api/v1/api_router.py). **רישום מודלי SQLAlchemy:** `import app.db.models` נטען מוקדם כדי לרשום את מודלי הדומיינים שנדרשים לטעינת API/relationships. הוא לא אמור להיתפס כרשימה ממצה של כל מודל אפשרי בריפו (למשל מודלים תשתיתיים כמו outbox). ב־[`alembic/env.py`](backend/alembic/env.py) אותו ייבוא לפני `target_metadata` ל־autogenerate. ב־Ruff: `per-file-ignores` ל־F401 על קבצי registry (`api_router.py`, `app/db/models.py`, `alembic/env.py`, `main_worker.py`) — ראו [`backend/pyproject.toml`](backend/pyproject.toml).
 - **Dependency Injection (FastAPI Depends)**: `RideService`, `AuthService`, ו-`BillingService` נוצרים דרך factories ב-`backend/app/api/dependencies/services.py`, והראוטרים מזריקים אותם עם `Depends(...)` (במקום singletons גלובליים).
-- **PgBouncer integration (senior-grade details):** `backend` + workers מתחברים ל-`pgbouncer` (לא ישירות ל-`db`), אבל שירות `migrate` נשאר direct ל-`db` כדי להימנע מבעיות DDL תחת transaction pooling. ב-`session.py` נוסף `connect_args={"statement_cache_size": 0}` עבור תאימות asyncpg + PgBouncer.
+- **PgBouncer integration (senior-grade details):** `backend` + workers מתחברים ל-`pgbouncer` (לא ישירות ל-`db`), אבל שירות `migrate` נשאר direct ל-`db` כדי להימנע מבעיות DDL תחת transaction pooling. ב-`session.py` נוסף `connect_args={"statement_cache_size": 0}` עבור תאימות asyncpg + PgBouncer. קובץ `userlist.txt` לא נשמר ב-git: הוא נוצר ב-deploy מ-`userlist.txt.template` עם `envsubst`, ואז `pgbouncer` נבנה/מורם לפני rollout ל-backend.
+- **Single-EC2 rolling CD (low-downtime, cost-aware):** deploy backend מתבצע מה-CI ב-SSH עם image tag immutable (`sha`), החלפה דרך `docker compose up -d --no-deps backend`, health gate על `/api/v1/health`, ו-rollback אוטומטי לתג קודם אם ה-health נכשל. זה שומר על אוטומציה אמינה בלי ALB/שרת נוסף.
 - **Billing idempotency + integrity guards**: webhook של Stripe קשיח ל-replay באמצעות `stripe_event_id` (event-level) ו-`stripe_payment_intent_id` (payment-level), סטטוסים דרך `payment_status_enum` (pending/succeeded/failed/canceled), וסכומי Stripe נשמרים ב-`Decimal` עקבי (לא float).
 - **JWT Auth**: Access Token (קצר, כולל **`jti`** ייחודי לכל הנפקה) + Refresh Token (ארוך, נשמר ב-DB). **`POST /auth/logout`** (עם Bearer) מנקה refresh ומוסיף את ה-access הנוכחי ל-**Redis denylist** עד פקיעת ה-`exp` (`SETEX denylist:{jti}`); `get_current_user` / `get_current_user_optional` בודקים denylist אחרי פענוח (Redis **fail-open** ב-`is_denied` — אם Redis נופל, לא חוסמים את כל המשתמשים). יצירת טוקן: `create_access_token` ב-`app/core/security.py`; denylist: **`app/infrastructure/redis/client.py`**, logout: **`app/domain/auth/service.py`**, תלות HTTP: **`app/api/dependencies/auth.py`**. אותו SECRET_KEY בין backend ל-chat-ws לאימות WebSocket.
 - **WebSocket auth (FastAPI)**: `get_current_user_ws` ב-`app/api/dependencies/auth.py` מאמת **JWT** (`decode_access_token`: חתימה, `exp`, base64 קנוני), בודק `jti` מול Redis denylist (`is_denied`, fail-open), ומחזיר `WsUser` עם `user_id` מה-`sub` — **בלי קריאת DB** בזמן חיבור, כדי לא להעמיס על ה-connection pool תחת עומס. HTTP (`get_current_user`) עדיין טוען `User` מ-DB ובודק גם `is_active`.
@@ -175,6 +180,16 @@ ai-worker
 - **Current:** `GET /api/v1/health` (DB, Redis, RabbitMQ + `circuit_breakers` אינפורמטיבי) + **structlog** + **`X-Request-ID`** (ראו לעיל).
 - **Sentry (פעיל):** `sentry_sdk.init()` ב-[`app/core/logging.py`](backend/app/core/logging.py) (`setup_logging`) — מופעל כש-`SENTRY_DSN` מוגדר בסביבה; integrations: `FastApiIntegration`, `SqlalchemyIntegration`, `RedisIntegration`; `traces_sample_rate=0.1`. `capture_exception` על 5xx בלבד ב-[`handlers.py`](backend/app/core/exceptions/handlers.py) (מניעת רעש מ-4xx עסקיים). פרונט: `Sentry.init()` ב-`main.tsx` (guard: `PROD + VITE_SENTRY_DSN`); `captureException` ב-axios interceptor (5xx), `ChatErrorBoundary`, `RouteErrorBoundary`.
 - **Prometheus + Grafana (פעיל, profile `monitoring`):** backend חושף `GET /metrics` דרך `prometheus-fastapi-instrumentator` (`Instrumentator().instrument(app).expose(...)` ב-`main.py`); ב-Compose נוספו שירותי `prometheus` ו-`grafana` תחת `profiles: ["monitoring"]`, עם קונפיגים ב-`monitoring/prometheus.yml` ו-`monitoring/grafana/provisioning/**`.
+- **Worker metrics endpoints:** כל worker חושף Prometheus HTTP server ייעודי (`notification-worker:9091`, `task-worker:9092`, `ai-worker:9093`) עבור RabbitMQ/Outbox/Geo/S3/AI domain metrics.
+
+### SLOs & Error Budgets
+- **SLI inputs:** HTTP availability/latency מה-backend metrics + reliability counters מה-workers (RabbitMQ retries/failures, outbox failures, AI failures, billing webhook errors).
+- **Initial SLO targets (recommended):**
+  - API availability: **99.9%** חודשי.
+  - API latency: **p95 < 400ms**, **p99 < 900ms** לנתיבי read/write מרכזיים.
+  - Async pipeline success: **>= 99.5%** ליחס `processed / (processed + failed)` ב-Outbox ורכיבי RabbitMQ.
+- **Error budget policy:** כשנצרך יותר מ-50% מה-budget באמצע חלון המדידה (חודש), עוברים ל-mode של יציבות: פחות rollout changes, יותר טיפול ברגרסיות, ו-hardening לנתיבים שפוגעים ב-SLI.
+- **Why this matters:** במקום “רק לראות גרפים”, המדדים הופכים להסכם תפעולי בין פיתוח לפרודקשן לגבי מתי ממשיכים לפתח פיצ'רים ומתי עוצרים לשיפור אמינות.
 
 ---
 
@@ -195,6 +210,7 @@ ai-worker
 ## בדיקות, עומס ואיכות
 
 - **Backend:** `pytest` תחת `backend/tests/` (auth, JWT, וכו’); ב-CI שירות Postgres, משתנה סביבה **`DATABASE_URL` ברמת ה-job** (אותו ערך ל־**Alembic** ול־**pytest** דרך `Settings` + `conftest`), ובסדר ריצה: **Ruff check** → **Ruff format --check** → **`alembic upgrade head`** → **pytest** (`backend-ci.yml`).
+- **Backend deploy (main):** לאחר הצלחת ה-pipeline ב-`main`, workflow מריץ deploy over SSH ל-EC2: pull ל-image החדש (`sha`), rollout של backend, health retries, ו-rollback לתג קודם על כשל.
 - **Config / env:** ב־`app/core/config.py`, `DATABASE_URL` ו־`REDIS_URL` מהסביבה נטענים לשדות `*_RAW` באמצעות **`validation_alias=AliasChoices(...)`** (pydantic-settings) — לא `json_schema_extra`; כך Alembic (`settings.DATABASE_URL`) והאפליקציה רואים את אותו override כמו ב-CI.
 - **Broadcast רשימת נסיעות:** שם ערוץ Redis **`rides:list`** מרוכז ב־`app/infrastructure/redis/keys.py` (`RIDES_LIST_CHANNEL`); שירות הנסיעות מפרסם עדכוני רשימה דרך `broadcast.publish` (תשתית). אירועי נסיעה per-ride ואירועי משתמש per-user יוצאים דרך **`app/infrastructure/redis/publisher.py`**.
 - **Frontend:** Vitest (`npm run test` מתוך `frontend/`) — `utils`, `context`, רכיבים, MessageThread; ב-CI — ESLint + build (כולל `tsc`).

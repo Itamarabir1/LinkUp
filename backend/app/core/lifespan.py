@@ -58,11 +58,11 @@ async def lifespan(app: FastAPI):
     logger.info("🛑 [Lifespan] Shutting down: Cleaning up infrastructure...")
 
     try:
-        await rabbit_client.close()
         if redis_ok:
-            await redis_client.close()
-            await redis_chat_pubsub.close()
             await broadcast.disconnect()
+            await redis_chat_pubsub.close()
+            await redis_client.close()
+        await rabbit_client.close()
         logger.info("👋 [Lifespan] All infrastructure connections closed safely")
     except Exception as e:
         logger.error(f"⚠️ [Lifespan] Error during shutdown cleanup: {e}")

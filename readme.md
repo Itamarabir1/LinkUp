@@ -89,7 +89,7 @@ flowchart LR
 | **Mobile**    | React Native, Expo, TypeScript |
 | **Infrastructure** | Docker, Docker Compose, Kubernetes (manifests in repo) |
 | **Cloud / CI** | GitHub Actions, GHCR (GitHub Container Registry), Docker |
-| **Scaling & reliability** | Request ID (X-Request-ID), structured JSON logging (**python-json-logger** v3+); unified **`LinkupError`** JSON responses — **[docs/ERRORS.md](docs/ERRORS.md)**; RabbitMQ retry (exponential backoff) + DLQ; pessimistic locking (booking approve/cancel); **configurable SQLAlchemy async pool** (`DB_POOL_*` in `.env`), DB indexes |
+| **Scaling & reliability** | Request ID (X-Request-ID), structured JSON logging (**python-json-logger** v3+); unified **`LinkupError`** JSON responses — **[docs/ERRORS.md](docs/ERRORS.md)**; RabbitMQ broker-native retry (DLX/TTL + `x-death`) + DLQ; pessimistic locking (booking approve/cancel); **configurable SQLAlchemy async pool** (`DB_POOL_*` in `.env`), DB indexes |
 
 ---
 
@@ -107,7 +107,9 @@ flowchart LR
 - ✅ **Worker split + autoscaling:** legacy monolith worker was split into `notification-worker`, `task-worker`, `ai-worker`; each has dedicated K8s deployment/HPA.
 - ✅ **Task worker safety:** `task-worker` is pinned to one replica to avoid duplicate scheduled task publishing.
 - ✅ **Per-worker DB connection caps:** explicit `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` per worker keeps total DB usage below Postgres defaults.
-- ✅ **PgBouncer (transaction pooling, internal-only):** backend + workers connect via `pgbouncer` service (no public port), `migrate` stays direct to `db`, and asyncpg statement cache is disabled at engine connect for compatibility.
+- ✅ **PgBouncer (transaction pooling, internal-only):** backend + workers connect via `pgbouncer` service (no public port), `migrate` stays direct to `db`, asyncpg statement cache is disabled at engine connect for compatibility, and PgBouncer runtime now uses a custom image (`infrastructure/pgbouncer/Dockerfile`) so mounted config is not overridden by third-party entrypoints.
+- ✅ **RabbitMQ client/channel topology:** `rabbit_client` (API publish), `outbox_rabbit_client` (Outbox publish), ו-`worker_rabbit_client` (worker consume/scheduler) מופרדים; ה-consumers משתמשים בחיבור worker משותף עם channel מבודד לכל queue. הגדרות התורים מרוכזות ב-`backend/app/infrastructure/rabbitmq/topology.py`.
+- ✅ **RabbitMQ operability tooling:** `notification-worker` כולל `run_dlq_monitor` (warning/critical thresholds ל-DLQ depth) ונוסף כלי replay אופרטיבי `scripts/ops/rabbitmq-dlq-replay.py` להחזרת הודעות מ-`.dlq` לתור הראשי בצורה מבוקרת.
 - ✅ **Redis Sentinel HA:** compose now runs `redis-primary` + `redis-replica` + `redis-sentinel`; Python Redis clients use `redis.asyncio.Sentinel` (with URL fallback), and `chat-ws` connects via `go-redis` failover client.
 - ✅ **Redis reconnect hardening:** reconnect loop uses retry with exponential backoff for resilient long-lived pub/sub connections.
 - ✅ **Geocode retry hardening:** Google geocoding flow includes bounded retries via `tenacity` for transient failures/timeouts.
@@ -223,10 +225,13 @@ docker compose ps            # סטטוס (backend: healthy / ממתין)
 - **Structured logging:** JSON in production (python-json-logger); level and format via env (LOG_LEVEL, LOG_FORMAT).
 - **Sentry error monitoring:** `sentry_sdk.init()` active in backend (`setup_logging()`) when `SENTRY_DSN` is set — FastAPI/SQLAlchemy/Redis integrations, `traces_sample_rate=0.1`; `capture_exception` on 5xx only (reduces noise). Frontend: `Sentry.init()` in `main.tsx` + `captureException` in axios interceptor (5xx), `ChatErrorBoundary`, `RouteErrorBoundary`. DSN kept in `.env` only — never committed.
 - **Prometheus + Grafana (monitoring profile):** backend exposes `/metrics` via `prometheus-fastapi-instrumentator`; docker-compose includes `prometheus` and `grafana` services under `--profile monitoring` with ready provisioning (`monitoring/prometheus.yml`, `monitoring/grafana/provisioning/*`) and a starter dashboard (`monitoring/grafana/dashboards/linkup.json`).
-- **RabbitMQ retry & DLQ:** notifications and avatar queues use exponential backoff (e.g. 5s → 30s → 5min); after max retries, messages go to Dead Letter Queues. See `docs/architecture/EVENTS.md`.
+- **SLOs & Error Budgets (new):** Prometheus now scrapes backend + worker metrics (`notification-worker:9091`, `task-worker:9092`, `ai-worker:9093`) to support service-level objectives (availability/latency) and error-budget based release decisions.
+- **RabbitMQ retry & DLQ:** notifications and avatar queues use broker-native retry via `retry_exchange` + `<queue>.retry` TTL queue + `x-death` counting (no manual republish loop in workers). After max retries, messages are routed to per-queue `.dlq`. See `docs/architecture/EVENTS.md`.
+- **DLQ replay ops:** `python scripts/ops/rabbitmq-dlq-replay.py --dry-run` להצגת עומק, או `python scripts/ops/rabbitmq-dlq-replay.py --queue notifications_queue --limit 50` ל-replay מבוקר.
 - **Pessimistic locking:** booking approve/cancel use `SELECT ... FOR UPDATE` on the ride to avoid race conditions.
 - **Connection pooling:** async SQLAlchemy pool — `pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle`, `pool_pre_ping` מ-`settings` / `.env` (`DB_POOL_*`); indexes on rides/bookings/group_members/passenger_requests/chat message access (including `bookings.request_id`, `messages.sender_id`) — see `docs/architecture/DATABASE.md`.
 - **DB pooling architecture (senior pattern):** two-layer pooling — small SQLAlchemy pool per service + central PgBouncer transaction pool. This reduces Postgres backend process pressure during spikes/redeploys and keeps migrations isolated (direct `db` path only).
+- **PgBouncer secrets flow (deploy-safe):** `infrastructure/pgbouncer/userlist.txt.template` is committed, while real `userlist.txt` is generated during EC2 deploy via `envsubst` and locked with `chmod 600` (not committed to git).
 - **Auth hardening:** bcrypt hashing/verify רץ ב-**thread pool** (`asyncio.run_in_executor`) כדי לא לחסום את event loop; **rate limit** על `/register` ועל login/refresh (Redis), ובצ'אט על `POST /chat/conversations/{conversation_id}/messages` פר-משתמש (30 הודעות/דקה, fail-open אם Redis לא זמין); OTP: `secrets`, `hmac.compare_digest`, מונה ניסיונות + איפוס בקוד חדש; **מניעת username enumeration בלוגין** (אותה תגובת שגיאה לאימייל לא קיים ולסיסמה שגויה — OWASP) — ראו `docs/ENGINEERING_HIGHLIGHTS.md` ו-`ARCHITECTURE.md` (Security).
 - **Load testing (optional, Grafana k6):** scripts are organized under [`backend/k6/scripts/`](backend/k6/scripts/) (auth, rides core flows, users, groups, chat, geo, ws). Legacy wrappers remain at [`backend/load_test.js`](backend/load_test.js) and [`backend/load_test_rides.js`](backend/load_test_rides.js). דורש הכנת `backend/.env` (זמנית `DEBUG=True`, `RATE_LIMIT_AUTH_MAX_REQUESTS` גבוה) ו־**`docker compose up -d --force-recreate backend`**. פירוט: [`backend/README.md`](backend/README.md) ו־[`docs/ENGINEERING_HIGHLIGHTS.md`](docs/ENGINEERING_HIGHLIGHTS.md) (סעיף 12).
 
@@ -237,6 +242,8 @@ docker compose ps            # סטטוס (backend: healthy / ממתין)
 - **Go for chat-ws (not Python).** WebSocket servers benefit from low per-connection overhead and high concurrency. Go’s goroutines and small footprint fit many idle connections; the service does no DB or business logic—only subscribe to Redis and push to clients. Keeping it in Go avoids pulling the full Python stack into the real-time path.
 
 - **Redis HA + DB separation.** Runtime Redis is deployed as Sentinel topology (`redis-primary` + `redis-replica` + `redis-sentinel`). Logical DB split still applies: DB=0 for cache/rate-limit/idempotency/denylist and DB=1 for chat/pub-sub, so failover improves availability without changing domain contracts.
+
+- **Single-EC2 rolling CD (senior pragmatic).** Instead of full blue/green infra, backend deploy runs as a low-downtime rolling replace on the same host: immutable GHCR tag (`sha`) is deployed via GitHub Actions SSH job, post-deploy health is verified on `/api/v1/health`, and rollback to previous tag is automatic on failure. This keeps ops robust on `t3.medium` without extra AWS cost.
 
 - **Redis completion listener + `ai-worker` for AI chat summary (not a separate service).** The AI flow is “on conversation end, analyze and persist.” The backend publishes a completion event to Redis DB=1; the `ai-worker` subscribes and runs `handle_conversation_completion`. This keeps deployment surface small while preserving async execution.
 
@@ -251,7 +258,7 @@ push to `main` or `develop` (only when relevant files change).
 
 | Service   | Workflow | Steps |
 |-----------|----------|-------|
-| backend   | `backend-ci.yml`  | lint (Ruff), format check, migrations (`alembic upgrade head`), tests (pytest), Docker build → push to GHCR |
+| backend   | `backend-ci.yml`  | lint (Ruff), format check, migrations (`alembic upgrade head`), tests (pytest), Docker build → push to GHCR (`latest` + `sha`), deploy to EC2 over SSH (`appleboy/ssh-action`), health gate, auto rollback |
 | chat-ws   | `chat-ws-ci.yml`  | build, vet, Docker build → push to GHCR |
 | frontend  | `frontend-ci.yml` | ESLint, build (`tsc -b` + Vite), Docker build → push to GHCR |
 

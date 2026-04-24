@@ -26,6 +26,8 @@ if [[ -z "${PGB_ADMIN_PASSWORD:-}" ]]; then
 fi
 docker compose exec -T pgbouncer sh -lc \
   "PGPASSWORD=$PGB_ADMIN_PASSWORD psql -h 127.0.0.1 -p 6432 -U pgbouncer_admin pgbouncer -c 'SHOW POOLS;'"
+docker compose exec -T pgbouncer sh -lc \
+  "PGPASSWORD=$PGB_ADMIN_PASSWORD psql -h 127.0.0.1 -p 6432 -U pgbouncer_admin pgbouncer -c 'SHOW SERVERS;'"
 
 echo "[smoke] backend health endpoint"
 curl -fsS "http://localhost:8000/api/v1/health" >/dev/null

@@ -36,6 +36,7 @@ from app.domain.rides.schema import (
 from app.infrastructure.redis.broadcast import broadcast
 from app.infrastructure.redis.keys import RIDES_LIST_CHANNEL
 from app.infrastructure.redis.publisher import publish_ride_event
+from app.infrastructure.metrics import rides_cancelled_total, rides_completed_total, rides_created_total
 
 logger = structlog.get_logger(__name__)
 
@@ -134,6 +135,7 @@ class RideService:
             await self._persist_ride_and_publish_event(db, new_ride)
             response = self._build_ride_response(new_ride, cached_data, ride_in)
             await self._after_ride_created(response, new_ride, ride_in.session_id)
+            rides_created_total.inc()
             return response
         except Exception as e:
             await db.rollback()
@@ -268,6 +270,7 @@ class RideService:
                 raise InvalidRideStatusError(ride.status.value, action="end_ride")
             updated = await crud_ride.update_status(db, ride_id, RideStatus.COMPLETED)
             await db.commit()
+            rides_completed_total.inc()
             await db.refresh(updated)
         except Exception:
             await db.rollback()
@@ -300,6 +303,7 @@ class RideService:
                 [DispatchTarget.RABBITMQ.value],
             )
             await db.commit()
+            rides_cancelled_total.labels(by="driver").inc()
         except Exception:
             await db.rollback()
             raise

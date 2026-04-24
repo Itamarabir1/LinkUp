@@ -51,6 +51,7 @@ from app.domain.users.schema import UserCreate
 from app.infrastructure.outbox.model import OutboxEvent
 from app.infrastructure.outbox.repository import OutboxRepository
 from app.infrastructure.rabbitmq.client import rabbit_client
+from app.infrastructure.metrics import auth_failures_total, auth_logins_total, auth_registrations_total
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,7 @@ class AuthService:
         try:
             await db.commit()
             await db.refresh(new_user)
+            auth_registrations_total.labels(provider="email").inc()
             return new_user
         except Exception as e:
             await db.rollback()
@@ -212,12 +214,14 @@ class AuthService:
 
         # 2. User + password check (uniform response to prevent enumeration)
         if not user or not await verify_password(password, user.hashed_password):
+            auth_failures_total.labels(reason="invalid_credentials").inc()
             raise InvalidCredentialsError()
 
         # 3. Email verification status
         if not user.is_verified:
             # Raise with email in payload for the client
             logger.warning(f"Login blocked: User {email} is not verified yet.")
+            auth_failures_total.labels(reason="not_verified").inc()
             raise UserNotVerifiedError(email=user.email)
 
         # 4. Issue access (short) + refresh (long) tokens
@@ -228,6 +232,7 @@ class AuthService:
         await self.crud_user.update_refresh_token(db, user=user, refresh_token=refresh_token)
 
         logger.info("User %s logged in successfully.", email)
+        auth_logins_total.labels(provider="email").inc()
 
         return {
             "access_token": access_token,
@@ -314,6 +319,7 @@ class AuthService:
             await db.refresh(user)
 
             logger.info(f"Auto-signup via Google: {email}")
+            auth_registrations_total.labels(provider="google").inc()
 
             # user.registered outbox event
             await self.outbox_repo.save_event(
@@ -351,6 +357,7 @@ class AuthService:
         await db.commit()
 
         logger.info(f"User {email} authenticated via Google successfully.")
+        auth_logins_total.labels(provider="google").inc()
 
         return {
             "access_token": access_token,

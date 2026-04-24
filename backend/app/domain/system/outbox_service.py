@@ -5,6 +5,7 @@ from app.domain.events.enum import DispatchTarget
 from app.domain.events.routing import get_routing_metadata
 from app.domain.events.schema import Event
 from app.infrastructure.events.dispatcher.base import EventDispatcher
+from app.infrastructure.metrics import outbox_events_failed_total, outbox_events_processed_total
 from app.infrastructure.outbox.repository import OutboxRepository
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ class OutboxService:
             )
             await asyncio.wait_for(self.dispatcher.dispatch(event_dto), timeout=5.0)
             await self.repo.mark_as_processed(db, db_event.id)
+            outbox_events_processed_total.labels(event_name=db_event.event_name).inc()
             await db.commit()
             logger.info(
                 "[NOTIF] Outbox: processed event_id=%s event_name=%s",
@@ -40,5 +42,6 @@ class OutboxService:
         except Exception as e:
             await db.rollback()
             await self.repo.increment_retries(db, db_event.id, error_msg=str(e))
+            outbox_events_failed_total.labels(event_name=db_event.event_name).inc()
             await db.commit()
             raise e

@@ -12,12 +12,15 @@ from app.core.logging import setup_logging
 from app.domain.events.routing import NOTIFICATION_EXCHANGES
 from app.infrastructure.events.dispatcher.factory import DispatcherFactory
 from app.infrastructure.events.publishers.rabbitmq import RabbitMQPublisher
-from app.infrastructure.rabbitmq.client import rabbit_client
+from app.infrastructure.rabbitmq.client import outbox_rabbit_client, worker_rabbit_client
 from app.infrastructure.rabbitmq.consumer import RabbitMQConsumer
+from app.infrastructure.rabbitmq.dlq_monitor import run_dlq_monitor
+from app.infrastructure.rabbitmq.supervisor import run_supervised
 from app.infrastructure.redis.broadcast import broadcast
 from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 from app.workers.outbox_worker import run_outbox_worker
 from app.workers.tasks.notification_tasks import handle_notification_event
+from prometheus_client import start_http_server
 
 setup_logging()
 logger = logging.getLogger("NotificationWorker")
@@ -42,8 +45,13 @@ async def main():
 
     broadcast_ok = False
     chat_pubsub_ok = False
+    worker_rmq_ok = False
+    outbox_rmq_ok = False
     try:
-        await rabbit_client.connect()
+        await worker_rabbit_client.connect()
+        worker_rmq_ok = True
+        await outbox_rabbit_client.connect()
+        outbox_rmq_ok = True
         try:
             await broadcast.connect()
             broadcast_ok = True
@@ -56,21 +64,41 @@ async def main():
         except Exception as e:
             logger.warning("Redis chat pubsub unavailable: %s", e)
 
-        rmq_publisher = RabbitMQPublisher(rabbit_client=rabbit_client)
+        rmq_publisher = RabbitMQPublisher(rabbit_client=outbox_rabbit_client)
         dispatcher = DispatcherFactory.create_standard_dispatcher(publishers=[rmq_publisher])
 
         notifications_consumer = RabbitMQConsumer(
-            rabbit_client,
+            worker_rabbit_client,
             queue_name="notifications_queue",
             exchange_names=NOTIFICATION_EXCHANGES,
         )
 
         tasks = [
-            asyncio.create_task(notifications_consumer.consume(callback=handle_notification_event)),
-            asyncio.create_task(run_outbox_worker(dispatcher=dispatcher)),
+            asyncio.create_task(
+                run_supervised(
+                    "notifications-consumer",
+                    lambda: notifications_consumer.consume(callback=handle_notification_event, stop_event=stop_event),
+                    stop_event,
+                )
+            ),
+            asyncio.create_task(
+                run_supervised(
+                    "outbox-worker",
+                    lambda: run_outbox_worker(dispatcher=dispatcher),
+                    stop_event,
+                )
+            ),
+            asyncio.create_task(
+                run_supervised(
+                    "dlq-monitor",
+                    lambda: run_dlq_monitor(worker_rabbit_client, stop_event),
+                    stop_event,
+                )
+            ),
         ]
 
         logger.info("Notification worker tasks running: %s", len(tasks))
+        start_http_server(9091)
         await stop_event.wait()
 
     except (KeyboardInterrupt, SystemExit):
@@ -80,11 +108,12 @@ async def main():
         logger.error("Critical notification worker error: %s", e, exc_info=True)
     finally:
         logger.info("Shutting down notification worker...")
+        stop_event.set()
         for task in tasks:
             if not task.done():
                 task.cancel()
         if tasks:
-            await asyncio.wait(tasks, timeout=5)
+            await asyncio.wait(tasks, timeout=30)
 
         if broadcast_ok:
             try:
@@ -96,7 +125,10 @@ async def main():
                 await redis_chat_pubsub.close()
             except Exception as e:
                 logger.warning("redis_chat_pubsub.close failed: %s", e)
-        await rabbit_client.close()
+        if outbox_rmq_ok:
+            await outbox_rabbit_client.close()
+        if worker_rmq_ok:
+            await worker_rabbit_client.close()
         logger.info("Notification worker shutdown complete.")
 
 

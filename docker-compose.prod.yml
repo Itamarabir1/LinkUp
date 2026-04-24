@@ -1,0 +1,4 @@
+services:
+  chat-ws:
+    environment:
+      - ALLOWED_ORIGINS=https://linkup.itamarabir.com

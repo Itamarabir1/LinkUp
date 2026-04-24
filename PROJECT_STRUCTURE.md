@@ -229,7 +229,6 @@ backend/
 │   │   │   │   └── websocket_provider.py
 │   │   │   └── services/
 │   │   │       ├── notification_streamer.py
-│   │   │       ├── orchestrator.py
 │   │   │       └── reminder_scheduler.py
 │   │   ├── passengers/
 │   │   │   ├── ai_search_prompts.py
@@ -293,7 +292,9 @@ backend/
 │   │   │   └── repository.py
 │   │   ├── rabbitmq/
 │   │   │   ├── client.py
-│   │   │   └── consumer.py
+│   │   │   ├── consumer.py
+│   │   │   ├── supervisor.py
+│   │   │   └── topology.py
 │   │   ├── redis/
 │   │   │   ├── __init__.py
 │   │   │   ├── broadcast.py

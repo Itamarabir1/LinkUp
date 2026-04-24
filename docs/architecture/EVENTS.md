@@ -102,9 +102,18 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 
 | Worker | Tasks | תיאור |
 |--------|-------|--------|
-| notification-worker | `run_outbox_worker`, `notifications_consumer.consume(handle_notification_event)` | עיבוד outbox והתראות (מייל/פוש/refresh UI). |
+| notification-worker | `run_outbox_worker`, `notifications_consumer.consume(handle_notification_event)`, `run_dlq_monitor` | עיבוד outbox והתראות (מייל/פוש/refresh UI) + ניטור עומק DLQ. |
 | task-worker | `avatar_upload_consumer.consume(handle_avatar_upload_event)`, `scheduled_tasks_consumer.consume(handle_scheduled_task)`, `run_scheduled_tasks_publisher` | משימות כבדות + scheduler. |
 | ai-worker | `run_chat_completion_redis_listener` | מאזין ל-Redis DB 1 (`chat:completion:*`) ומריץ ניתוח AI. |
+
+---
+
+## RabbitMQ Connection Topology
+
+- `rabbit_client` (API publish path): חיבור ייעודי לפרסומים מה-API.
+- `outbox_rabbit_client` (Outbox publish path): חיבור ייעודי לפרסום `notification-worker` מתוך ה-Outbox.
+- `worker_rabbit_client` (Worker consume/publish path): חיבור משותף ל-consumers ול-scheduled publisher, עם channels מבודדים לכל consumer.
+- הגדרת queue behavior מרוכזת ב-`backend/app/infrastructure/rabbitmq/topology.py` דרך `QueueSpec`.
 
 ---
 
@@ -112,10 +121,10 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 
 - **תורים עם retry:** notifications_queue, avatar_upload_queue.
 - **מקסימום ניסיונות:** 3.
-- **עיכובים (Exponential Backoff):** 5s → 30s → 5min.
-- **אחרי 3 כישלונות:** ההודעה נשלחת ל-Dead Letter Queue (DLQ).
+- **עיכוב retry:** broker-native TTL queue (ברירת מחדל 30s).
+- **אחרי 3 כישלונות:** ההודעה מועברת ל-Dead Letter Queue (DLQ).
 
-מימוש: `backend/app/infrastructure/rabbitmq/consumer.py` — `_handle_with_retry`, קבועים `RETRY_DELAYS_SEC`, `MAX_RETRIES`, `RETRYABLE_QUEUES`.
+מימוש: `backend/app/infrastructure/rabbitmq/consumer.py` — `_handle_with_retry`; retry path מתבסס על `nack(requeue=False)` ל-`retry_exchange` + `x-message-ttl` על `<queue>.retry`, וספירה לפי `x-death` של התור הראשי. קביעת retryability/delay/retry-cap דרך `QueueSpec` ב-`backend/app/infrastructure/rabbitmq/topology.py`.
 
 - **Outbox:** retry_count ו-last_error ב-outbox_events; ה-worker מפרסם ל-RabbitMQ לפי מדיניות.
 
@@ -129,9 +138,30 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 | avatar_upload_queue | avatar_upload_queue.retry | avatar_upload_queue.dlq |
 | scheduled_tasks_queue | — | — |
 
-תור ראשי עם `x-dead-letter-exchange` → dlq_exchange; הודעות שנכשלו אחרי כל הניסיונות עוברות ל-DLQ. תור retry עם TTL על ההודעה מחזיר אחרי פקיעה לתור הראשי.
+תור ראשי עם `x-dead-letter-exchange` → `retry_exchange`; תור `<queue>.retry` עם `x-message-ttl` מחזיר אחרי פקיעה לתור הראשי; אחרי מיצוי נסיונות ההודעה נשלחת ל-`<queue>.dlq`.
 
-**מדיניות איבוד:** Messages that fail after `MAX_RETRIES=3` are routed to the per-queue `.dlq` binding on `dlq_exchange` — **not lost**. `scheduled_tasks_queue` has **no DLQ** by design (failures are logged and the message is acked; the scheduler may emit again on the next cycle — see Scheduled Tasks below).
+**מדיניות איבוד:** Messages that fail after `max_retries=3` (מוגדר ב-`QueueSpec`) נשלחות ל-`.dlq` הייעודי — **לא אובדות**. `scheduled_tasks_queue` נשאר **ללא DLQ** by design (failures are logged and acked; the scheduler emits again on next cycle).
+
+---
+
+## DLQ Monitoring
+
+- `notification-worker` מריץ `run_dlq_monitor` (כל 60s) ובודק עומק תורי DLQ של תורים retry-enabled.
+- thresholds מובנים:
+  - warning: `>=10`
+  - critical: `>=50`
+- אין side effects על messages; זה ניטור לוגי בלבד לצורך תפעול/התראות.
+
+---
+
+## DLQ Replay Tooling
+
+- כלי תפעולי: `scripts/ops/rabbitmq-dlq-replay.py`
+- replay מבוקר מתורי DLQ לתורים הראשיים (`<queue>.dlq` -> `<queue>`), עם:
+  - בחירת תור (`--queue`)
+  - הגבלת כמות (`--limit`)
+  - מצב תצוגה בלבד (`--dry-run`)
+- הפלט הוא דוח JSON תפעולי עם כמות replay/שגיאות/יתרה.
 
 ---
 

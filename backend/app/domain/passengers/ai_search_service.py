@@ -17,6 +17,7 @@ from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponen
 from app.domain.chat.ai.client import get_groq_client
 from app.domain.passengers.ai_search_prompts import build_few_shot, build_system_prompt
 from app.domain.passengers.ai_search_schema import AISearchResult, ConversationTurn
+from app.infrastructure.metrics import ai_search_failed_total, ai_search_requests_total
 
 logger = logging.getLogger(__name__)
 
@@ -130,9 +131,11 @@ def parse_ride_search_query(
         data = json.loads(raw)
     except (json.JSONDecodeError, ValueError, APIError, OSError) as e:
         logger.warning("ai_parse_search: parse or API failed: %s", e)
+        ai_search_failed_total.inc()
         return _fallback_parse_error("לא הצלחנו לנתח את הטקסט. נסה ניסוח אחר או מלא ידנית.")
     except Exception as e:
         logger.warning("ai_parse_search: unexpected error: %s", e, exc_info=True)
+        ai_search_failed_total.inc()
         return _fallback_parse_error("אירעה שגיאה. נסה שוב או מלא את הטופס ידנית.")
 
     if not isinstance(data, dict):
@@ -157,7 +160,10 @@ def parse_ride_search_query(
         data["search_radius"] = _clamp_radius(data["search_radius"])
 
     try:
-        return AISearchResult(**data)
+        result = AISearchResult(**data)
+        ai_search_requests_total.inc()
+        return result
     except Exception as e:
         logger.warning("ai_parse_search: validation failed: %s", e)
+        ai_search_failed_total.inc()
         return _fallback_parse_error("לא הצלחנו לאמת את התוצאה. נסה שוב או מלא ידנית.")

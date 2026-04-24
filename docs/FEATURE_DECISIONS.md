@@ -23,6 +23,22 @@
 
 ---
 
+<a id="rabbitmq-pr1-pr2"></a>
+
+## RabbitMQ reliability refactor (PR1 + PR2)
+
+| | |
+|--|--|
+| **בעיה** | consumer loop בודד + channel משותף לכל flows יצרו סיכון ל-crash loops שקטים ול-backpressure בין consume/publish. |
+| **החלטה** | PR1: supervision עם draining states ו-`max_retries` ל-loopים ארוכי חיים. PR2: הפרדת clients לפי תפקיד (`rabbit_client`, `outbox_rabbit_client`, `worker_rabbit_client`) + channel isolation לכל queue + `QueueSpec` מרכזי לטופולוגיה. |
+| **אלטרנטיבות** | (1) להשאיר singleton channel ולתקן נקודתית חריגות. (2) חיבור נפרד לכל worker/task — אמין אבל כבד מדי ל-`t3.medium`. |
+| **יתרון** | בידוד עומסים בין publish/consume, recovery יותר צפוי, ויכולת לנהל policy ברמת queue ממקור אמת אחד. |
+| **Trade-off** | יותר שכבת infra וקונפיגורציה; דורש משמעת תיעוד כדי לשמור sync בין topology לקוד worker. |
+| **Interview pitch (≈30s)** | *"ב-PR1 הוספתי supervision ודראינינג כדי למנוע task death שקט. ב-PR2 פיצלתי נתיבי RabbitMQ לפי תפקידים והעברתי queue policies ל-QueueSpec מרכזי. כך צמצמתי coupling בין consumers ו-publishers בלי להוסיף תשתית ענן חדשה."* |
+| **הפניה** | `backend/app/infrastructure/rabbitmq/{client.py,consumer.py,supervisor.py,topology.py}`, `architecture/EVENTS.md`, `ENGINEERING_HIGHLIGHTS.md` |
+
+---
+
 <a id="chat-ws"></a>
 
 ## Real-time chat + chat-ws (Go)
@@ -100,6 +116,22 @@
 | **Trade-off** | Dashboard ראשוני ממוקד HTTP בלבד; queries תלויות naming של metrics מה-instrumentator ועלולות לדרוש התאמות לפי גרסה. |
 | **Interview pitch (≈30s)** | *"הוספתי Prometheus ו-Grafana עם profile ייעודי ב-compose, וחשפתי `/metrics` בבקאנד. זה נותן baseline של RPS, p95, error rate ו-in-flight requests בלי להעמיס על סביבת פיתוח כשלא צריך."* |
 | **הפניה** | [`../backend/app/main.py`](../backend/app/main.py), [`../docker-compose.yml`](../docker-compose.yml), [`../monitoring/prometheus.yml`](../monitoring/prometheus.yml), [`../monitoring/grafana/dashboards/linkup.json`](../monitoring/grafana/dashboards/linkup.json) |
+
+---
+
+<a id="slos-error-budgets"></a>
+
+## SLOs & Error Budgets
+
+| | |
+|--|--|
+| **בעיה** | dashboards ולוגים נותנים observability, אבל בלי יעדי שירות רשמיים קשה להחליט מתי המערכת “מספיק יציבה” ומתי לעצור rollout בגלל אמינות. |
+| **החלטה** | להגדיר SLO framework מעל metrics הקיימים: backend latency/availability + worker reliability counters (RabbitMQ/Outbox/AI/Billing). המדיניות מתורגמת ל-error budget חודשי שמנווט החלטות delivery. |
+| **אלטרנטיבות** | (1) לפעול לפי alerts בלבד. (2) להסתמך על “health=ok” בלי SLA/SLO. (3) SRE פורמלי כבד מדי מוקדם מדי. |
+| **יתרון** | יישור בין product למהנדסים: ברור מתי ממשיכים לפיצ'רים ומתי משקיעים באמינות; התראות הופכות לפעולה מדידה ולא “תחושת בטן”. |
+| **Trade-off** | דורש תחזוקה של dashboards/alerts ושיפור מתמיד של SLI definitions כדי להימנע מ-targets לא ריאליים. |
+| **Interview pitch (≈30s)** | *"אחרי שהטמענו metrics בבקאנד ובעובדים, הוספנו שכבת SLOs: availability + p95/p99 + async success ratio עם error budget חודשי. זה נותן governance לפרודקשן — לא רק לראות גרפים אלא גם להחליט מתי לעצור rollout ולתקן אמינות."* |
+| **הפניה** | [`../backend/app/infrastructure/metrics.py`](../backend/app/infrastructure/metrics.py), [`../backend/app/workers/notification_worker.py`](../backend/app/workers/notification_worker.py), [`../backend/app/workers/task_worker.py`](../backend/app/workers/task_worker.py), [`../backend/app/workers/ai_worker.py`](../backend/app/workers/ai_worker.py), [`../monitoring/prometheus.yml`](../monitoring/prometheus.yml) |
 
 ---
 
@@ -233,11 +265,11 @@
 | **בעיה** | כמה services (backend + workers) עם pools נפרדים יוצרים fan-out לחיבורי Postgres תחת עומס/redeploy. ב-EC2 בינוני זה פוגע בזיכרון/latency לפני CPU saturation. |
 | **החלטה** | להוסיף `pgbouncer` כ-service פנימי ב-Compose (transaction mode), ולהעביר runtime services ל-`POSTGRES_HOST=pgbouncer`. |
 | **אלטרנטיבות** | (1) להגדיל רק `max_connections` ב-Postgres — מטפל סימפטום ולא שורש. (2) בלי pooler, רק להקטין `DB_POOL_*` — עוזר חלקית. (3) RDS Proxy/managed pooler — עדיף בענן מנוהל אבל לא quickest win ב-EC2 קיים. |
-| **מה סניור עושה (לא טריוויאלי)** | (1) `migrate` נשאר direct ל-`db` ולא דרך pooler. (2) asyncpg statement cache מנוטרל (`statement_cache_size=0`) לתאימות transaction pooling. (3) PgBouncer internal-only בלי פתיחת `6432` לציבור. (4) right-size ל-SQLAlchemy pools כדי להימנע מ-double-pooling אגרסיבי. |
+| **מה סניור עושה (לא טריוויאלי)** | (1) `migrate` נשאר direct ל-`db` ולא דרך pooler. (2) asyncpg statement cache מנוטרל (`statement_cache_size=0`) לתאימות transaction pooling. (3) PgBouncer internal-only בלי פתיחת `6432` לציבור. (4) right-size ל-SQLAlchemy pools כדי להימנע מ-double-pooling אגרסיבי. (5) אם images ציבוריים דורסים config דרך entrypoint — עוברים ל-custom image מבוקר במקום workaround שביר. (6) `userlist.txt` אמיתי לא נכנס ל-git: יוצרים בזמן deploy מ-template עם `envsubst` ו-`chmod 600`. |
 | **יתרון** | connection storms נבלמים מוקדם, יותר יציבות בזמן deploys, ו-headroom להמשך scaling בלי שינוי לוגיקה דומיינית. |
 | **Trade-off** | עוד רכיב תפעולי לנטר (health/config/auth), וצריך משמעת סביב סודות `userlist` + smoke checks בפריסה. |
 | **Interview pitch (≈30s)** | *"במקום שכל service יפציץ את Postgres בחיבורים, הוספתי PgBouncer כ-layer פנימי. השארתי migrations direct ל-db, כיביתי statement cache ב-asyncpg, והקטנתי pools אפליקטיביים — זה בדיוק ההבדל בין 'להוסיף container' לבין rollout יציב ברמת production."* |
-| **הפניה** | `docker-compose.yml`, `backend/app/db/session.py`, `infrastructure/pgbouncer/pgbouncer.ini`, `scripts/ops/pgbouncer-smoke.sh` |
+| **הפניה** | `docker-compose.yml`, `backend/app/db/session.py`, `infrastructure/pgbouncer/{Dockerfile,pgbouncer.ini,userlist.txt.template}`, `.github/workflows/backend-ci.yml`, `scripts/ops/pgbouncer-smoke.sh` |
 
 ---
 
@@ -255,3 +287,20 @@
 | **Trade-off** | יותר מורכבות תפעולית (3 שירותי Redis, smoke checks, observability), ו-footprint גדול יותר על EC2 קטן. |
 | **Interview pitch (≈30s)** | *"העברתי את Redis מ-single instance ל-Sentinel HA. השארתי alias `redis` כדי לא לשבור env קיים, הוספתי Sentinel-aware clients ב-Python וב-Go, והחלפתי broadcaster ב-adapter פנימי עם אותו חוזה לראוטרים. התוצאה: failover תפעולי בלי לגעת ב-domain logic."* |
 | **הפניה** | `docker-compose.yml`, `infrastructure/redis/sentinel.conf`, `backend/app/infrastructure/redis/{client.py,chat_pubsub.py,broadcast.py}`, `chat-ws/cmd/server/main.go`, `scripts/ops/redis-sentinel-smoke.sh` |
+
+---
+
+<a id="single-ec2-cd"></a>
+
+## Single-EC2 CD rolling deploy (no ALB)
+
+| | |
+|--|--|
+| **בעיה** | Deploy ידני ב-SSH יוצר אי-עקביות וסיכון לטעות אנוש; Blue/Green מלא מכפיל משאבים ויקר מדי ל-`t3.medium`. |
+| **החלטה** | ליישם CD פרגמטי ב-GitHub Actions: build+push (`latest` + `sha`) ואז deploy ל-EC2 ב-SSH, rollout ל-backend יחיד עם `docker compose up -d --no-deps backend`, health gate, ו-rollback אוטומטי לתג קודם. |
+| **אלטרנטיבות** | (1) ALB + target groups + שני סטאקים — הכי נקי תיאורטית אבל תוספת עלות/מורכבות. (2) Blue/Green מקומי עם שני compose projects — כמעט פי 2 footprint בזמן rollout. (3) להישאר manual deploy — פשוט אך לא אמין לאורך זמן. |
+| **מה סניור עושה (לא טריוויאלי)** | (1) משתמש ב-immutable `sha` ל-deterministic rollback. (2) שומר `previous tag` בצד השרת ולא מסתמך על `latest`. (3) deploy נחשב נכשל אם health לא עולה בזמן מוגדר. (4) מוסיף `stop_grace_period` ו-tuning בסיסי ב-nginx כדי לצמצם impact בזמן החלפה. |
+| **יתרון** | תהליך פריסה אוטומטי, עקבי ומהיר, שמתאים לתקציב קטן ולשרת יחיד בלי לבנות פלטפורמה כבדה. |
+| **Trade-off** | זה low-downtime ולא zero-downtime מוחלט, כי backend רץ כרגע בעותק יחיד בזמן ההחלפה. |
+| **Interview pitch (≈30s)** | *"בחרתי CD פרגמטי לשרת יחיד: SHA-tag deploy + health gate + auto rollback. זה נותן אמינות תפעולית גבוהה בלי לשלם על ALB/תשתית כפולה, ומתאים לשלב הסקייל הנוכחי."* |
+| **הפניה** | `.github/workflows/backend-ci.yml`, `docker-compose.yml`, `nginx/nginx.conf`, `docs/architecture/DEVELOPMENT.md` |

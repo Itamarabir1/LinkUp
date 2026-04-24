@@ -5,10 +5,16 @@ on:
     branches: [main, develop]
     paths:
       - 'backend/**'
+      - 'infrastructure/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/backend-ci.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'backend/**'
+      - 'infrastructure/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/backend-ci.yml'
 
 defaults:
   run:
@@ -66,6 +72,9 @@ jobs:
       - name: Verify migration head
         run: bash ../scripts/ops/check-migration-head.sh
 
+      - name: Run RabbitMQ reliability tests
+        run: uv run pytest tests/infrastructure/test_rabbitmq_reliability.py -v --tb=short
+
       - name: Run tests
         run: uv run pytest tests/ -v --tb=short
 
@@ -89,4 +98,102 @@ jobs:
           context: ./backend
           target: production
           push: true
-          tags: ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/backend:latest
+          tags: |
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/backend:latest
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/backend:${{ github.sha }}
+
+  deploy-ec2:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Deploy backend on EC2 (rolling single-instance)
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_OWNER: ${{ github.repository_owner }}
+          IMAGE_TAG: ${{ github.sha }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          PGBOUNCER_ADMIN_PASSWORD: ${{ secrets.PGBOUNCER_ADMIN_PASSWORD }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script_stop: true
+          envs: GHCR_USER,GHCR_TOKEN,IMAGE_OWNER,IMAGE_TAG,POSTGRES_USER,POSTGRES_PASSWORD,PGBOUNCER_ADMIN_PASSWORD
+          script: |
+            set -euo pipefail
+
+            DEPLOY_DIR="${DEPLOY_DIR:-$HOME/LinkUp}"
+            STATE_DIR="$DEPLOY_DIR/.deploy_state"
+            PREV_TAG_FILE="$STATE_DIR/backend_prev_tag"
+            mkdir -p "$STATE_DIR"
+
+            cd "$DEPLOY_DIR"
+            cp backend/.env.production backend/.env
+            cp chat-ws/.env.production chat-ws/.env
+            OWNER_LOWER="$(echo "$IMAGE_OWNER" | tr '[:upper:]' '[:lower:]')"
+            NEW_IMAGE="ghcr.io/$OWNER_LOWER/linkup/backend:$IMAGE_TAG"
+            PREV_TAG="latest"
+            if [ -f "$PREV_TAG_FILE" ]; then
+              PREV_TAG="$(cat "$PREV_TAG_FILE")"
+            fi
+            PREV_IMAGE="ghcr.io/$OWNER_LOWER/linkup/backend:$PREV_TAG"
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            docker pull "$NEW_IMAGE"
+            docker pull "$PREV_IMAGE" || true
+
+            command -v envsubst >/dev/null 2>&1 || { echo "ERROR: envsubst missing. Run: sudo apt-get install -y gettext"; exit 1; }
+            envsubst < "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt.template" > "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
+            chmod 600 "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
+
+            docker compose build pgbouncer
+            docker compose up -d --no-deps pgbouncer
+
+            for i in $(seq 1 30); do
+              status="$(docker inspect -f '{{.State.Health.Status}}' linkup_pgbouncer 2>/dev/null || echo unknown)"
+              if [ "$status" = "healthy" ]; then break; fi
+              sleep 2
+            done
+            if [ "$status" != "healthy" ]; then
+              echo "pgbouncer failed to become healthy"
+              exit 1
+            fi
+
+            BACKEND_IMAGE="$NEW_IMAGE" docker compose up -d --no-deps backend
+
+            health_ok=0
+            for i in $(seq 1 30); do
+              if curl -fsS "http://127.0.0.1:8000/api/v1/health" >/dev/null; then
+                health_ok=1
+                break
+              fi
+              sleep 2
+            done
+
+            if [ "$health_ok" -eq 1 ]; then
+              echo "$IMAGE_TAG" > "$PREV_TAG_FILE"
+              echo "✅ Deploy succeeded with image $NEW_IMAGE"
+              exit 0
+            fi
+
+            echo "❌ Health check failed, rolling back to $PREV_IMAGE"
+            BACKEND_IMAGE="$PREV_IMAGE" docker compose up -d --no-deps backend
+
+            for i in $(seq 1 30); do
+              if curl -fsS "http://127.0.0.1:8000/api/v1/health" >/dev/null; then
+                echo "✅ Rollback succeeded"
+                exit 1
+              fi
+              sleep 2
+            done
+
+            echo "❌ Rollback failed - manual intervention required"
+            exit 1

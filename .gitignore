@@ -111,6 +111,8 @@ lerna-debug.log*
 
 # --- Docker (legacy local override — לא בשימוש; frontend/nginx ב-docker-compose.yml) ---
 docker-compose.override.yml
+prod_config.txt
+infrastructure/pgbouncer/userlist.txt
 
 # --- Database dumps & local data ---
 *.sql.backup
