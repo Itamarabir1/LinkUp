@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 DLQ_EXCHANGE = "dlq_exchange"
 RETRY_EXCHANGE = "retry_exchange"
 
+
 class ConsumerState(str, Enum):
     RUNNING = "running"
     DRAINING = "draining"

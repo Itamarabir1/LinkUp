@@ -57,9 +57,7 @@ class RabbitMQClient:
 
             if exchange_name:
                 if exchange_name not in self._exchanges:
-                    self._exchanges[exchange_name] = await channel.declare_exchange(
-                        exchange_name, aio_pika.ExchangeType.TOPIC, durable=True
-                    )
+                    self._exchanges[exchange_name] = await channel.declare_exchange(exchange_name, aio_pika.ExchangeType.TOPIC, durable=True)
                 target = self._exchanges[exchange_name]
             else:
                 target = channel.default_exchange
