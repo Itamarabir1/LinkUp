@@ -8,6 +8,7 @@ from typing import Any
 
 import aio_pika
 from app.infrastructure.metrics import (
+    rabbitmq_consumer_iterator_restarts_total,
     rabbitmq_messages_consumed_total,
     rabbitmq_messages_failed_total,
     rabbitmq_messages_retried_total,
@@ -181,38 +182,69 @@ class RabbitMQConsumer:
     async def consume(
         self,
         callback: Callable[[dict[str, Any], str], Awaitable[None]],
-        stop_event: Any | None = None,
+        stop_event: asyncio.Event | None = None,
     ):
-        """Owns only the listen loop and forwarding messages to the callback."""
+        """
+        Self-healing consume loop. Owns iterator recreation on channel/iterator close
+        and bounded backoff on _setup() failures. Returns to supervisor only when
+        stop_event is set or an unrecoverable programming error occurs.
+        """
         self._callback = callback
-        queue = await self._setup()
-        supervisor = ConsumerSupervisor(consumer_name=self.queue_name)
-        logger.info(f"✅ Consumer ready on '{self.queue_name}'")
+        backoff_seconds = 1.0
+        MAX_BACKOFF_SECONDS = 30.0
 
+        while not (stop_event and stop_event.is_set()):
+            supervisor = ConsumerSupervisor(consumer_name=self.queue_name)
+            try:
+                queue = await self._setup()
+                backoff_seconds = 1.0
+                logger.info("✅ Consumer ready on '%s'", self.queue_name)
+
+                async with queue.iterator() as queue_iter:
+                    while not (stop_event and stop_event.is_set()):
+                        try:
+                            message = await asyncio.wait_for(queue_iter.__anext__(), timeout=1)
+                        except asyncio.TimeoutError:
+                            continue
+                        except StopAsyncIteration:
+                            rabbitmq_consumer_iterator_restarts_total.labels(queue=self.queue_name).inc()
+                            logger.warning("Iterator closed for '%s', will recreate", self.queue_name)
+                            break
+
+                        if not supervisor.accepting_deliveries:
+                            await message.nack(requeue=False)
+                            continue
+                        task = asyncio.create_task(self._process_message(message))
+                        supervisor.track_task(task)
+
+                supervisor.start_draining()
+                await supervisor.drain()
+
+            except asyncio.CancelledError:
+                supervisor.start_draining()
+                await supervisor.drain()
+                raise
+            except Exception as e:
+                logger.error(
+                    "Consumer recoverable error on '%s': %s", self.queue_name, e, exc_info=True
+                )
+                supervisor.start_draining()
+                await supervisor.drain()
+
+                if stop_event and stop_event.is_set():
+                    return
+                await self._sleep_or_stop(backoff_seconds, stop_event)
+                backoff_seconds = min(MAX_BACKOFF_SECONDS, backoff_seconds * 2)
+
+    async def _sleep_or_stop(self, seconds: float, stop_event: asyncio.Event | None) -> None:
+        """Sleep, but wake up immediately if stop_event fires."""
+        if stop_event is None:
+            await asyncio.sleep(seconds)
+            return
         try:
-            async with queue.iterator() as queue_iter:
-                while True:
-                    if stop_event and stop_event.is_set():
-                        supervisor.start_draining()
-                        break
-                    try:
-                        message = await asyncio.wait_for(queue_iter.__anext__(), timeout=1)
-                    except asyncio.TimeoutError:
-                        continue
-                    except StopAsyncIteration:
-                        break
-
-                    if not supervisor.accepting_deliveries:
-                        await message.nack(requeue=False)
-                        continue
-                    task = asyncio.create_task(self._process_message(message))
-                    supervisor.track_task(task)
-            supervisor.start_draining()
-            await supervisor.drain()
-        except Exception:
-            supervisor.start_draining()
-            await supervisor.drain()
-            raise
+            await asyncio.wait_for(stop_event.wait(), timeout=seconds)
+        except asyncio.TimeoutError:
+            return
 
     async def _handle_with_retry(
         self,

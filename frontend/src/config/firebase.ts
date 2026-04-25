@@ -1,25 +1,17 @@
 /**
- * Firebase (Web) — אתחול ו-FCM.
- * מפתחות: מקור אמת ב-.env (VITE_FIREBASE_*) — אין ברירות מחדל בקוד.
+ * Firebase (Web) — initialization + FCM.
+ * Config source: APP_CONFIG.firebase (window.__APP_CONFIG__ at runtime, .env at dev).
  */
 import { initializeApp } from 'firebase/app';
 import { getAnalytics } from 'firebase/analytics';
 import { getMessaging } from 'firebase/messaging';
 
-const env = import.meta.env;
+import { APP_CONFIG } from './runtime';
 
 /** VAPID key for FCM Web Push (getToken), from Firebase Console > Cloud Messaging > Web. */
-export const FIREBASE_VAPID_KEY = env.VITE_FIREBASE_VAPID_KEY as string;
+export const FIREBASE_VAPID_KEY = APP_CONFIG.firebase.vapidKey;
 
-const firebaseConfig = {
-  apiKey: env.VITE_FIREBASE_API_KEY,
-  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: env.VITE_FIREBASE_APP_ID,
-  measurementId: env.VITE_FIREBASE_MEASUREMENT_ID,
-};
+const { vapidKey: _vapidKey, ...firebaseConfig } = APP_CONFIG.firebase;
 
 const app = initializeApp(firebaseConfig);
 

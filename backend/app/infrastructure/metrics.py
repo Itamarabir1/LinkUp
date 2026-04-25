@@ -33,6 +33,11 @@ rabbitmq_consumer_restarts_total = Counter(
     "Number of times supervisor restarted a consumer",
     ["worker"],
 )
+rabbitmq_consumer_iterator_restarts_total = Counter(
+    "rabbitmq_consumer_iterator_restarts_total",
+    "Number of times consumer recreated its queue iterator after channel/iterator close",
+    ["queue"],
+)
 
 # =============================================================================
 # Outbox

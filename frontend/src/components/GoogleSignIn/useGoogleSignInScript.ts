@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { APP_CONFIG } from '../../config/runtime';
 import './googleIdentity';
 
 /**
@@ -13,7 +14,7 @@ export function useGoogleSignInScript(
   const initializedRef = useRef(false);
 
   useEffect(() => {
-    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const googleClientId = APP_CONFIG.google.clientId;
     if (!googleClientId) {
       console.error('VITE_GOOGLE_CLIENT_ID not set in environment variables');
       onError?.('Google Client ID לא מוגדר. אנא הגדר VITE_GOOGLE_CLIENT_ID ב-.env');

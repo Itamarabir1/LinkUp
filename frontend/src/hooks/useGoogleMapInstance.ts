@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { APP_CONFIG } from '../config/runtime';
 import { loadGoogleMaps } from '../lib/loadGoogleMaps';
 
 const DEFAULT_CENTER = { lat: 32.0853, lng: 34.7818 };
@@ -46,7 +47,7 @@ export function useGoogleMapInstance(
     const mapOptions = {
       center: DEFAULT_CENTER,
       zoom: 10,
-      mapId: import.meta.env.VITE_GOOGLE_MAPS_MAP_ID ?? 'linkup_map',
+      mapId: APP_CONFIG.googleMaps.mapId,
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: true,

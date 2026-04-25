@@ -1,6 +1,8 @@
+import { APP_CONFIG } from './runtime';
+
 export const API_BASE_URL = '/api/v1';
-export const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-export const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS) || 30000;
+export const GOOGLE_MAPS_API_KEY = APP_CONFIG.googleMaps.apiKey;
+export const API_TIMEOUT_MS = APP_CONFIG.api.timeoutMs;
 
 export function getChatWebSocketUrl(token: string): string {
   if (import.meta.env.DEV) {

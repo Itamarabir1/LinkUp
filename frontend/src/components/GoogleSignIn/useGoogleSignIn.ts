@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ERROR_MESSAGES } from '../../config/constants';
+import { APP_CONFIG } from '../../config/runtime';
 import { useAuth } from '../../context/AuthContext';
 import { getApiErrorMessage } from '../../utils/apiError';
 import i18n from '../../i18n';
@@ -49,7 +50,7 @@ export function useGoogleSignIn({ onError, disabled }: UseGoogleSignInOptions) {
   useEffect(() => {
     if (!scriptLoaded || !initialized || !buttonRef.current || disabled) return;
 
-    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const googleClientId = APP_CONFIG.google.clientId;
     if (!googleClientId) return;
 
     try {
