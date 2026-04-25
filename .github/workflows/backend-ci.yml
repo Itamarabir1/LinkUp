@@ -194,7 +194,7 @@ jobs:
 
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
-            docker image prune -af --filter "until=24h"
+            docker image prune -af
 
             docker pull "$NEW_IMAGE"
             docker pull "$PREV_IMAGE"                                || true
