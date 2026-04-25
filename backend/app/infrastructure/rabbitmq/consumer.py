@@ -225,9 +225,7 @@ class RabbitMQConsumer:
                 await supervisor.drain()
                 raise
             except Exception as e:
-                logger.error(
-                    "Consumer recoverable error on '%s': %s", self.queue_name, e, exc_info=True
-                )
+                logger.error("Consumer recoverable error on '%s': %s", self.queue_name, e, exc_info=True)
                 supervisor.start_draining()
                 await supervisor.drain()
 

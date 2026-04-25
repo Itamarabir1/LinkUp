@@ -11,6 +11,7 @@ import { APP_CONFIG } from './runtime';
 /** VAPID key for FCM Web Push (getToken), from Firebase Console > Cloud Messaging > Web. */
 export const FIREBASE_VAPID_KEY = APP_CONFIG.firebase.vapidKey;
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { vapidKey: _vapidKey, ...firebaseConfig } = APP_CONFIG.firebase;
 
 const app = initializeApp(firebaseConfig);
