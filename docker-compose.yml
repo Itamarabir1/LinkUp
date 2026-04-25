@@ -20,6 +20,7 @@ services:
 
   # --- Connection Pooler: PgBouncer (internal only) ---
   pgbouncer:
+    image: ${PGBOUNCER_IMAGE:-ghcr.io/itamarabir1/linkup/pgbouncer:latest}
     build:
       context: ./infrastructure/pgbouncer
       dockerfile: Dockerfile
@@ -131,6 +132,7 @@ services:
 
   # --- Email Renderer: React Email (Node) ---
   email-renderer:
+    image: ${EMAIL_RENDERER_IMAGE:-ghcr.io/itamarabir1/linkup-email-renderer:latest}
     build:
       context: ./email-renderer
       target: production
@@ -150,6 +152,7 @@ services:
 
   # --- DB migration: runs once before backend/workers ---
   migrate:
+    image: ${MIGRATE_IMAGE:-ghcr.io/itamarabir1/linkup/migrate:latest}
     build:
       context: ./backend
       target: migrate
@@ -167,6 +170,7 @@ services:
 
   # --- Notification Worker (notifications consumer + outbox dispatcher) ---
   notification-worker:
+    image: ${WORKER_IMAGE:-ghcr.io/itamarabir1/linkup/worker:latest}
     build:
       context: ./backend
       target: worker
@@ -205,6 +209,7 @@ services:
 
   # --- Task Worker (avatar + scheduled tasks) ---
   task-worker:
+    image: ${WORKER_IMAGE:-ghcr.io/itamarabir1/linkup/worker:latest}
     build:
       context: ./backend
       target: worker
@@ -241,6 +246,7 @@ services:
 
   # --- AI Worker (chat completion listener) ---
   ai-worker:
+    image: ${WORKER_IMAGE:-ghcr.io/itamarabir1/linkup/worker:latest}
     build:
       context: ./backend
       target: worker
@@ -275,6 +281,7 @@ services:
   # --- Temporary compatibility alias (opt-in profile) ---
   outbox-worker:
     profiles: ["compat"]
+    image: ${WORKER_IMAGE:-ghcr.io/itamarabir1/linkup/worker:latest}
     build:
       context: ./backend
       target: worker
@@ -362,6 +369,7 @@ services:
   # --- WebSocket: Chat (Go) ---
   # JWT_SECRET must match backend/.env
   chat-ws:
+    image: ${CHAT_WS_IMAGE:-ghcr.io/itamarabir1/linkup/chat-ws:latest}
     build:
       context: ./chat-ws
       dockerfile: Dockerfile
@@ -418,6 +426,7 @@ services:
   # --- Frontend: static build (production profile only) ---
   frontend:
     profiles: ["prod"]
+    image: ${FRONTEND_IMAGE:-ghcr.io/itamarabir1/linkup/frontend:latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile

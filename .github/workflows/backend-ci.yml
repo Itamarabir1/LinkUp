@@ -102,6 +102,38 @@ jobs:
             ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/backend:latest
             ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/backend:${{ github.sha }}
 
+      - name: Build and push worker image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          target: worker
+          push: true
+          tags: |
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/worker:latest
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/worker:${{ github.sha }}
+
+      - name: Build and push migrate image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          target: migrate
+          push: true
+          tags: |
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/migrate:latest
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/migrate:${{ github.sha }}
+
+      - name: Build and push pgbouncer image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./infrastructure/pgbouncer
+          push: true
+          tags: |
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/pgbouncer:latest
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/pgbouncer:${{ github.sha }}
+
   deploy-ec2:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -133,73 +165,102 @@ jobs:
             mkdir -p "$STATE_DIR"
 
             cd "$DEPLOY_DIR"
+            git pull origin main
+
             cp backend/.env.production backend/.env
             cp chat-ws/.env.production chat-ws/.env
-            docker compose down
-            OWNER_LOWER="$(echo "$IMAGE_OWNER" | tr '[:upper:]' '[:lower:]')"
-            NEW_IMAGE="ghcr.io/$OWNER_LOWER/linkup/backend:$IMAGE_TAG"
-            PREV_TAG="latest"
-            if [ -f "$PREV_TAG_FILE" ]; then
-              PREV_TAG="$(cat "$PREV_TAG_FILE")"
-            fi
-            PREV_IMAGE="ghcr.io/$OWNER_LOWER/linkup/backend:$PREV_TAG"
 
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-            docker pull "$NEW_IMAGE"
-            docker pull "$PREV_IMAGE" || true
-
-            POSTGRES_USER="$(grep -E '^POSTGRES_USER=' "$DEPLOY_DIR/backend/.env" | head -1 | cut -d= -f2-)"
-            POSTGRES_PASSWORD="$(grep -E '^POSTGRES_PASSWORD=' "$DEPLOY_DIR/backend/.env" | head -1 | cut -d= -f2-)"
+            POSTGRES_USER="$(grep -E '^POSTGRES_USER=' backend/.env | head -1 | cut -d= -f2-)"
+            POSTGRES_PASSWORD="$(grep -E '^POSTGRES_PASSWORD=' backend/.env | head -1 | cut -d= -f2-)"
             export POSTGRES_USER POSTGRES_PASSWORD
 
-            [ -n "${POSTGRES_USER:-}" ]            || { echo "ERROR: POSTGRES_USER missing in backend/.env"; exit 1; }
-            [ -n "${POSTGRES_PASSWORD:-}" ]        || { echo "ERROR: POSTGRES_PASSWORD missing in backend/.env"; exit 1; }
-            [ -n "${PGBOUNCER_ADMIN_PASSWORD:-}" ] || { echo "ERROR: PGBOUNCER_ADMIN_PASSWORD missing (GitHub Secret)"; exit 1; }
+            [ -n "${POSTGRES_USER:-}" ]            || { echo "ERROR: POSTGRES_USER missing";          exit 1; }
+            [ -n "${POSTGRES_PASSWORD:-}" ]        || { echo "ERROR: POSTGRES_PASSWORD missing";      exit 1; }
+            [ -n "${PGBOUNCER_ADMIN_PASSWORD:-}" ] || { echo "ERROR: PGBOUNCER_ADMIN_PASSWORD missing"; exit 1; }
 
-            command -v envsubst >/dev/null 2>&1 || { echo "ERROR: envsubst missing. Run: sudo apt-get install -y gettext"; exit 1; }
-            envsubst < "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt.template" > "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
+            command -v envsubst >/dev/null 2>&1 || { echo "ERROR: envsubst missing"; exit 1; }
+            envsubst < "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt.template" \
+                   > "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
             chmod 644 "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
 
-            docker compose build pgbouncer
+            OWNER_LOWER="$(echo "$IMAGE_OWNER" | tr '[:upper:]' '[:lower:]')"
+            GHCR_BASE="ghcr.io/$OWNER_LOWER/linkup"
+            NEW_IMAGE="$GHCR_BASE/backend:$IMAGE_TAG"
+            PREV_TAG="latest"
+            [ -f "$PREV_TAG_FILE" ] && PREV_TAG="$(cat "$PREV_TAG_FILE")"
+            PREV_IMAGE="$GHCR_BASE/backend:$PREV_TAG"
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+            docker image prune -f
+
+            docker pull "$NEW_IMAGE"
+            docker pull "$PREV_IMAGE"                                || true
+            docker pull "$GHCR_BASE/pgbouncer:latest"
+            docker pull "$GHCR_BASE/worker:latest"
+            docker pull "$GHCR_BASE/migrate:latest"
+            docker pull "$GHCR_BASE/chat-ws:latest"                  || true
+            docker pull "$GHCR_BASE/frontend:latest"                 || true
+            docker pull "ghcr.io/$OWNER_LOWER/linkup-email-renderer:latest" || true
+
+            export PGBOUNCER_IMAGE="$GHCR_BASE/pgbouncer:latest"
+            export WORKER_IMAGE="$GHCR_BASE/worker:latest"
+            export MIGRATE_IMAGE="$GHCR_BASE/migrate:latest"
+            export CHAT_WS_IMAGE="$GHCR_BASE/chat-ws:latest"
+            export FRONTEND_IMAGE="$GHCR_BASE/frontend:latest"
+            export EMAIL_RENDERER_IMAGE="ghcr.io/$OWNER_LOWER/linkup-email-renderer:latest"
+
+            docker compose --profile prod up -d \
+              db redis-primary redis-replica redis-sentinel rabbitmq
+
+            for i in $(seq 1 30); do
+              status="$(docker inspect -f '{{.State.Health.Status}}' linkup_db 2>/dev/null || echo unknown)"
+              [ "$status" = "healthy" ] && break
+              sleep 2
+            done
+            [ "$status" = "healthy" ] || { echo "ERROR: db not healthy"; exit 1; }
+
             docker compose up -d --no-deps pgbouncer
 
             for i in $(seq 1 30); do
               status="$(docker inspect -f '{{.State.Health.Status}}' linkup_pgbouncer 2>/dev/null || echo unknown)"
-              if [ "$status" = "healthy" ]; then break; fi
+              [ "$status" = "healthy" ] && break
               sleep 2
             done
-            if [ "$status" != "healthy" ]; then
-              echo "pgbouncer failed to become healthy"
-              exit 1
-            fi
+            [ "$status" = "healthy" ] || { echo "ERROR: pgbouncer not healthy"; exit 1; }
+
+            docker compose run --rm migrate
+
+            docker compose up -d --no-deps email-renderer
+            docker compose up -d --no-deps notification-worker task-worker ai-worker
+            docker compose up -d --no-deps chat-ws
+            docker compose --profile prod up -d --no-deps frontend nginx
 
             BACKEND_IMAGE="$NEW_IMAGE" docker compose up -d --no-deps backend
 
             health_ok=0
             for i in $(seq 1 30); do
               if curl -fsS "http://127.0.0.1:8000/api/v1/health" >/dev/null; then
-                health_ok=1
-                break
+                health_ok=1; break
               fi
               sleep 2
             done
 
             if [ "$health_ok" -eq 1 ]; then
               echo "$IMAGE_TAG" > "$PREV_TAG_FILE"
-              echo "✅ Deploy succeeded with image $NEW_IMAGE"
+              echo "Deploy succeeded: $NEW_IMAGE"
               exit 0
             fi
 
-            echo "❌ Health check failed, rolling back to $PREV_IMAGE"
+            echo "Health check failed, rolling back to $PREV_IMAGE"
             BACKEND_IMAGE="$PREV_IMAGE" docker compose up -d --no-deps backend
 
             for i in $(seq 1 30); do
               if curl -fsS "http://127.0.0.1:8000/api/v1/health" >/dev/null; then
-                echo "✅ Rollback succeeded"
-                exit 1
+                echo "Rollback succeeded"; exit 1
               fi
               sleep 2
             done
 
-            echo "❌ Rollback failed - manual intervention required"
+            echo "Rollback failed - manual intervention required"
             exit 1
