@@ -117,16 +117,13 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IMAGE_OWNER: ${{ github.repository_owner }}
           IMAGE_TAG: ${{ github.sha }}
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           PGBOUNCER_ADMIN_PASSWORD: ${{ secrets.PGBOUNCER_ADMIN_PASSWORD }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
-          script_stop: true
-          envs: GHCR_USER,GHCR_TOKEN,IMAGE_OWNER,IMAGE_TAG,POSTGRES_USER,POSTGRES_PASSWORD,PGBOUNCER_ADMIN_PASSWORD
+          envs: GHCR_USER,GHCR_TOKEN,IMAGE_OWNER,IMAGE_TAG,PGBOUNCER_ADMIN_PASSWORD
           script: |
             set -euo pipefail
 
@@ -149,6 +146,14 @@ jobs:
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             docker pull "$NEW_IMAGE"
             docker pull "$PREV_IMAGE" || true
+
+            POSTGRES_USER="$(grep -E '^POSTGRES_USER=' "$DEPLOY_DIR/backend/.env" | head -1 | cut -d= -f2-)"
+            POSTGRES_PASSWORD="$(grep -E '^POSTGRES_PASSWORD=' "$DEPLOY_DIR/backend/.env" | head -1 | cut -d= -f2-)"
+            export POSTGRES_USER POSTGRES_PASSWORD
+
+            [ -n "${POSTGRES_USER:-}" ]            || { echo "ERROR: POSTGRES_USER missing in backend/.env"; exit 1; }
+            [ -n "${POSTGRES_PASSWORD:-}" ]        || { echo "ERROR: POSTGRES_PASSWORD missing in backend/.env"; exit 1; }
+            [ -n "${PGBOUNCER_ADMIN_PASSWORD:-}" ] || { echo "ERROR: PGBOUNCER_ADMIN_PASSWORD missing (GitHub Secret)"; exit 1; }
 
             command -v envsubst >/dev/null 2>&1 || { echo "ERROR: envsubst missing. Run: sudo apt-get install -y gettext"; exit 1; }
             envsubst < "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt.template" > "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
