@@ -157,7 +157,7 @@ jobs:
 
             command -v envsubst >/dev/null 2>&1 || { echo "ERROR: envsubst missing. Run: sudo apt-get install -y gettext"; exit 1; }
             envsubst < "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt.template" > "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
-            chmod 600 "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
+            chmod 644 "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
 
             docker compose build pgbouncer
             docker compose up -d --no-deps pgbouncer
