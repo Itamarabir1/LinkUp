@@ -210,24 +210,10 @@ jobs:
             export FRONTEND_IMAGE="$GHCR_BASE/frontend:latest"
             export EMAIL_RENDERER_IMAGE="ghcr.io/$OWNER_LOWER/linkup-email-renderer:latest"
 
-            docker compose --profile prod up -d \
+            docker compose --profile prod up -d --wait --wait-timeout 120 \
               db redis-primary redis-replica redis-sentinel rabbitmq
 
-            for i in $(seq 1 30); do
-              status="$(docker inspect -f '{{.State.Health.Status}}' linkup_db 2>/dev/null || echo unknown)"
-              [ "$status" = "healthy" ] && break
-              sleep 2
-            done
-            [ "$status" = "healthy" ] || { echo "ERROR: db not healthy"; exit 1; }
-
-            docker compose up -d --no-deps pgbouncer
-
-            for i in $(seq 1 30); do
-              status="$(docker inspect -f '{{.State.Health.Status}}' linkup_pgbouncer 2>/dev/null || echo unknown)"
-              [ "$status" = "healthy" ] && break
-              sleep 2
-            done
-            [ "$status" = "healthy" ] || { echo "ERROR: pgbouncer not healthy"; exit 1; }
+            docker compose up -d --wait --wait-timeout 60 --no-deps pgbouncer
 
             docker compose run --rm migrate
 
