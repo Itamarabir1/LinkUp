@@ -2,6 +2,8 @@
 
 A full-stack ride-sharing application where drivers post rides, passengers search and book, and real-time chat with AI-powered conversation summaries keeps everyone in sync.
 
+Production: **[https://linkup.itamarabir.com](https://linkup.itamarabir.com)**
+
 ---
 
 ## What Linkup Does
@@ -17,6 +19,7 @@ Single doc for **stack, scale patterns, real-time chat (disconnect / last-seen d
 **Interview prep (navigation + per-feature why / alternatives):** **[docs/INTERVIEW_PLAYBOOK.md](docs/INTERVIEW_PLAYBOOK.md)**, **[docs/FEATURE_DECISIONS.md](docs/FEATURE_DECISIONS.md)**. ADR deep dives: **[docs/adr/README.md](docs/adr/README.md)**.
 פרונט — רשימת ריפקטור מפורטת: **[frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md](frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md)**.  
 **FCM (Web push — `data` map מהשרת; SW + Toast ב־`App.tsx` + צליל; רישום אחרי login ב־`AuthContext`, ניקוי טוקן ב-logout):** **[docs/FCM_SYSTEM_SUMMARY.md](docs/FCM_SYSTEM_SUMMARY.md)**.  
+**Deployment / production runbook:** **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.  
 **מסך אדמין פנימי (React, `/admin`, lazy routes, סטטיסטיקות + משתמשים + נסיעות/קבוצות + Outbox + חיפוש):** **[ADMIN_DASHBOARD.md](ADMIN_DASHBOARD.md)**.  
 **שגיאות API אחידות (`error_code`, `trace_id`, `LinkupError`):** **[docs/ERRORS.md](docs/ERRORS.md)** — בקאנד handlers מרוכזים; בפרונט `utils/apiError.ts` + `ChatErrorBoundary`; ב-chat-ws לוגים עם `slog` ותגובות JSON ל-HTTP.
 
