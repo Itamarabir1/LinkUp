@@ -170,6 +170,8 @@ jobs:
             cp backend/.env.production backend/.env
             cp chat-ws/.env.production chat-ws/.env
 
+            COMPOSE="docker compose --env-file backend/.env"
+
             POSTGRES_USER="$(grep -E '^POSTGRES_USER=' backend/.env | head -1 | cut -d= -f2-)"
             POSTGRES_PASSWORD="$(grep -E '^POSTGRES_PASSWORD=' backend/.env | head -1 | cut -d= -f2-)"
             export POSTGRES_USER POSTGRES_PASSWORD
@@ -210,19 +212,19 @@ jobs:
             export FRONTEND_IMAGE="$GHCR_BASE/frontend:latest"
             export EMAIL_RENDERER_IMAGE="ghcr.io/$OWNER_LOWER/linkup-email-renderer:latest"
 
-            docker compose --profile prod up -d --wait --wait-timeout 120 \
+            $COMPOSE --profile prod up -d --wait --wait-timeout 120 \
               db redis-primary redis-replica redis-sentinel rabbitmq
 
-            docker compose up -d --wait --wait-timeout 60 --no-deps pgbouncer
+            $COMPOSE up -d --wait --wait-timeout 60 --no-deps pgbouncer
 
-            docker compose run --rm migrate
+            $COMPOSE run --rm migrate
 
-            docker compose up -d --no-deps email-renderer
-            docker compose up -d --no-deps notification-worker task-worker ai-worker
-            docker compose up -d --no-deps chat-ws
-            docker compose --profile prod up -d --no-deps frontend nginx
+            $COMPOSE up -d --no-deps email-renderer
+            $COMPOSE up -d --no-deps notification-worker task-worker ai-worker
+            $COMPOSE up -d --no-deps chat-ws
+            $COMPOSE --profile prod up -d --no-deps frontend nginx
 
-            BACKEND_IMAGE="$NEW_IMAGE" docker compose up -d --no-deps backend
+            BACKEND_IMAGE="$NEW_IMAGE" $COMPOSE up -d --no-deps backend
 
             health_ok=0
             for i in $(seq 1 30); do
@@ -239,7 +241,7 @@ jobs:
             fi
 
             echo "Health check failed, rolling back to $PREV_IMAGE"
-            BACKEND_IMAGE="$PREV_IMAGE" docker compose up -d --no-deps backend
+            BACKEND_IMAGE="$PREV_IMAGE" $COMPOSE up -d --no-deps backend
 
             for i in $(seq 1 30); do
               if curl -fsS "http://127.0.0.1:8000/api/v1/health" >/dev/null; then
