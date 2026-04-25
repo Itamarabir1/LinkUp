@@ -135,6 +135,7 @@ jobs:
             cd "$DEPLOY_DIR"
             cp backend/.env.production backend/.env
             cp chat-ws/.env.production chat-ws/.env
+            docker compose down
             OWNER_LOWER="$(echo "$IMAGE_OWNER" | tr '[:upper:]' '[:lower:]')"
             NEW_IMAGE="ghcr.io/$OWNER_LOWER/linkup/backend:$IMAGE_TAG"
             PREV_TAG="latest"
