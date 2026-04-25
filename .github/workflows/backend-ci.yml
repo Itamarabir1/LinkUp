@@ -174,6 +174,10 @@ jobs:
             # Public values only (Firebase Web, Stripe publishable, Sentry DSN, Map ID).
             cp backend/.env.production backend/.env
             cp chat-ws/.env.production chat-ws/.env
+            # Ensure JWT_SECRET in chat-ws matches SECRET_KEY in backend (single source of truth)
+            BACKEND_SECRET="$(grep -E '^SECRET_KEY=' backend/.env | head -1 | cut -d= -f2-)"
+            sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$BACKEND_SECRET|" chat-ws/.env
+            [ -n "$BACKEND_SECRET" ] || { echo "ERROR: SECRET_KEY missing in backend/.env"; exit 1; }
             cp frontend/.env.production frontend/.env
 
             [ -f backend/.env ]  || { echo "ERROR: backend/.env missing on EC2";  exit 1; }
