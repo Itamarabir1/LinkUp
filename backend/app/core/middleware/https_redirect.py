@@ -13,6 +13,10 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# loopback hosts share the container's trust boundary - bypass HTTPS redirect
+# (Docker healthcheck, docker exec debug, internal monitoring scripts)
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1"})
+
 
 class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
     """
@@ -22,6 +26,10 @@ class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         if not getattr(settings, "FORCE_HTTPS_REDIRECT", False):
+            return await call_next(request)
+
+        client_host = request.client.host if request.client else ""
+        if client_host in LOOPBACK_HOSTS:
             return await call_next(request)
 
         proto = request.headers.get("x-forwarded-proto", "").strip().lower() or request.url.scheme
