@@ -224,31 +224,17 @@ jobs:
             $COMPOSE up -d --no-deps chat-ws
             $COMPOSE --profile prod up -d --no-deps frontend nginx
 
-            BACKEND_IMAGE="$NEW_IMAGE" $COMPOSE up -d --no-deps backend
-
-            health_ok=0
-            for i in $(seq 1 30); do
-              if curl -fsS "http://127.0.0.1:8000/api/v1/health" >/dev/null; then
-                health_ok=1; break
-              fi
-              sleep 2
-            done
-
-            if [ "$health_ok" -eq 1 ]; then
+            if BACKEND_IMAGE="$NEW_IMAGE" $COMPOSE up -d --no-deps --wait --wait-timeout 90 backend; then
               echo "$IMAGE_TAG" > "$PREV_TAG_FILE"
               echo "Deploy succeeded: $NEW_IMAGE"
               exit 0
             fi
 
             echo "Health check failed, rolling back to $PREV_IMAGE"
-            BACKEND_IMAGE="$PREV_IMAGE" $COMPOSE up -d --no-deps backend
-
-            for i in $(seq 1 30); do
-              if curl -fsS "http://127.0.0.1:8000/api/v1/health" >/dev/null; then
-                echo "Rollback succeeded"; exit 1
-              fi
-              sleep 2
-            done
+            if BACKEND_IMAGE="$PREV_IMAGE" $COMPOSE up -d --no-deps --wait --wait-timeout 90 backend; then
+              echo "Rollback succeeded"
+              exit 1
+            fi
 
             echo "Rollback failed - manual intervention required"
             exit 1
