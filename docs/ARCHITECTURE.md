@@ -22,7 +22,7 @@ This file is the canonical architecture entry point for Linkup.
 ## Operations docs
 
 - [`docs/operations/RUNBOOK.md`](operations/RUNBOOK.md) — incident handling for common production failures
-- [`docs/operations/MONITORING.md`](operations/MONITORING.md) — Prometheus/Grafana and SLO baseline
+- [`docs/operations/MONITORING.md`](operations/MONITORING.md) — Prometheus/Grafana, SLO baseline, and probe exposure policy (`/livez` public, `/readyz` internal-only)
 
 ## ADRs
 

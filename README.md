@@ -28,6 +28,7 @@ Deferred/next-step architecture decisions (including cache stampede Phase 2 earl
 - Redis Sentinel HA + PgBouncer runtime pooling + direct migrate path.
 - Automated JWT secret sync between backend and chat-ws during deploy.
 - OAuth popup compatibility headers in nginx (`COOP` / `COEP`).
+- Nginx probe routing hardening: exact-match `/livez` and loopback-only `/readyz` to prevent frontend fallback and readiness information exposure.
 
 **Interview prep (navigation + per-feature why / alternatives):** **[docs/internal/INTERVIEW_PLAYBOOK.md](docs/internal/INTERVIEW_PLAYBOOK.md)**, **[docs/FEATURE_DECISIONS.md](docs/FEATURE_DECISIONS.md)**. ADR deep dives: **[docs/adr/README.md](docs/adr/README.md)**.
 פרונט — רשימת ריפקטור מפורטת: **[frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md](frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md)**.  
