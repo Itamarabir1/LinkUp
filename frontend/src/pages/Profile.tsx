@@ -156,16 +156,15 @@ export default function Profile() {
               ) : null}
             </div>
 
-            {!billingLoading &&
-              (billing?.is_premium ? (
-                <PremiumBanner mode="badge" premiumSince={billing.premium_since} />
-              ) : (
-                <PremiumBanner
-                  mode="upgrade"
-                  loading={checkout.isPending}
-                  onUpgrade={() => checkout.mutate()}
-                />
-              ))}
+            {billing?.is_premium ? (
+              <PremiumBanner mode="badge" premiumSince={billing.premium_since} />
+            ) : (
+              <PremiumBanner
+                mode="upgrade"
+                loading={checkout.isPending || billingLoading}
+                onUpgrade={() => checkout.mutate()}
+              />
+            )}
           </>
         )}
 

@@ -1,133 +1,56 @@
-import { useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { useEffect, useState, type MutableRefObject } from 'react';
 import { APP_CONFIG } from '../../config/runtime';
-import './googleIdentity';
+import { ensureGisInitialized, setGisCredentialHandler } from './gisLoader';
 
 /**
+ * Thin React adapter over the GIS module-level singleton ([gisLoader.ts](./gisLoader.ts)).
+ *
+ * - Subscribes the active credential handler to the singleton.
+ * - Awaits the (idempotent) script-load + init.
+ * - Surfaces a clean error to the caller's `onError` if init fails (origin
+ *   not allowlisted, network blocked, etc.) with actionable next steps.
+ *
+ * The cleanup intentionally does NOT reset the singleton: GIS is initialized
+ * once per page load, full stop. This is what makes the hook StrictMode-safe.
  */
 export function useGoogleSignInScript(
   onError: ((msg: string) => void) | undefined,
   credentialRef: MutableRefObject<((response: { credential: string }) => Promise<void>) | null>
 ): { scriptLoaded: boolean; initialized: boolean } {
-  const [scriptLoaded, setScriptLoaded] = useState(false);
-  const [initialized, setInitialized] = useState(false);
-  const initializedRef = useRef(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const googleClientId = APP_CONFIG.google.clientId;
-    if (!googleClientId) {
-      console.error('VITE_GOOGLE_CLIENT_ID not set in environment variables');
+    let cancelled = false;
+    const clientId = APP_CONFIG.google.clientId;
+    if (!clientId) {
       onError?.('Google Client ID לא מוגדר. אנא הגדר VITE_GOOGLE_CLIENT_ID ב-.env');
       return;
     }
-
-    if (initialized || scriptLoaded) return;
-
-    const initializeGoogleSignIn = () => {
-      if (!window.google?.accounts?.id) {
-        console.error('[GoogleSignIn] Google Identity Services API not available');
-        return false;
-      }
-
-      if (initializedRef.current) {
-        return true;
-      }
-
-      const currentOrigin = window.location.origin;
-
-      try {
-        window.google.accounts.id.initialize({
-          client_id: googleClientId,
-          callback: async (response: { credential: string }) => {
-            await credentialRef.current?.(response);
-          },
-          auto_select: false,
-          cancel_on_tap_outside: true,
-          itp_support: true,
-        });
-        initializedRef.current = true;
-        setInitialized(true);
-        return true;
-      } catch (err) {
-        console.error('[GoogleSignIn] ❌ Failed to initialize Google Identity Services:', err);
+    setGisCredentialHandler((response) => {
+      void credentialRef.current?.(response);
+    });
+    ensureGisInitialized(clientId)
+      .then(() => {
+        if (!cancelled) setReady(true);
+      })
+      .catch((err: unknown) => {
+        const origin = window.location.origin;
         const msg = err instanceof Error ? err.message : String(err);
-        const isOriginError = /origin|not allowed|403|client id/i.test(msg);
-        if (isOriginError && onError) {
-          onError(
-            `ה-origin לא מורשה ב-Google. Origin: ${currentOrigin}. Client ID: ${googleClientId}. הוסף בדיוק את ה-origin הזה ב-Google Cloud Console → Credentials → ה-Client ID → Authorized JavaScript origins.`
+        const isOriginErr = /origin|not allowed|403|client id|failed to load/i.test(msg);
+        if (isOriginErr) {
+          onError?.(
+            `טעינת Google Sign-In נכשלה. Origin: ${origin}. Client ID: ${clientId.slice(0, 12)}…\n` +
+              `ודא: (1) ה-origin הזה מופיע ב-Google Cloud Console → Credentials → Authorized JavaScript origins ` +
+              `עבור ה-Client ID הזה, (2) אין רווחים/scheme שונה ב-Console, (3) אם הוספת לאחרונה — חכה 10 דקות לרענון cache.`
           );
-        }
-        if (err instanceof Error) {
-          console.error('[GoogleSignIn] Error message:', err.message);
-          console.error('[GoogleSignIn] Error stack:', err.stack);
-        }
-        return false;
-      }
-    };
-
-    const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
-    if (existingScript && window.google?.accounts?.id) {
-      initializeGoogleSignIn();
-      setScriptLoaded(true);
-      return () => {
-        setInitialized(false);
-        setScriptLoaded(false);
-        initializedRef.current = false;
-      };
-    }
-    if (existingScript) {
-      let checkCount = 0;
-      const maxChecks = 50;
-      const checkInterval = setInterval(() => {
-        checkCount++;
-        if (window.google?.accounts?.id) {
-          clearInterval(checkInterval);
-          initializeGoogleSignIn();
-          setScriptLoaded(true);
-        } else if (checkCount >= maxChecks) {
-          clearInterval(checkInterval);
-          console.error('Google Identity Services failed to load after timeout');
-          onError?.('Google Sign-In לא נטען. אנא רענן את הדף.');
-        }
-      }, 100);
-      return () => {
-        clearInterval(checkInterval);
-        setInitialized(false);
-        setScriptLoaded(false);
-        initializedRef.current = false;
-      };
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      setTimeout(() => {
-        if (window.google?.accounts?.id) {
-          initializeGoogleSignIn();
-          setScriptLoaded(true);
         } else {
-          console.error('Google Identity Services API not available after script load');
-          onError?.('Google Sign-In לא זמין. אנא רענן את הדף.');
+          onError?.(`Google Sign-In נכשל: ${msg}`);
         }
-      }, 100);
-    };
-    script.onerror = () => {
-      console.error('Failed to load Google Identity Services script (may be 403 - origin not allowed)');
-      const origin = window.location.origin;
-      onError?.(
-        `טעינת Google Sign-In נכשלה. Origin: ${origin}. Client ID: ${googleClientId}. בדוק שה-origin מורשה עבור ה-Client ID הזה ב-Google Cloud Console → Credentials → Authorized JavaScript origins.`
-      );
-    };
-    document.head.appendChild(script);
-
+      });
     return () => {
-      setInitialized(false);
-      setScriptLoaded(false);
-      initializedRef.current = false;
+      cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once; state managed inside
   }, [onError, credentialRef]);
 
-  return { scriptLoaded, initialized };
+  return { scriptLoaded: ready, initialized: ready };
 }

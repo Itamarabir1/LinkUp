@@ -9,6 +9,18 @@ import { getAnalyticsSafe } from './config/firebase';
 getAnalyticsSafe();
 
 if (import.meta.env.DEV) {
+  const cid = APP_CONFIG.google.clientId;
+  if (!cid) {
+    console.warn('[GSI] VITE_GOOGLE_CLIENT_ID is empty — Google Sign-In will not work');
+  } else {
+    console.info(
+      `[GSI pre-flight] clientId=${cid.slice(0, 12)}… origin=${window.location.origin}\n` +
+        `If you see 403 from accounts.google.com/gsi/button: verify this exact origin is in the Google Console allowlist for this clientId, and wait 10min after Console changes.`
+    );
+  }
+}
+
+if (import.meta.env.DEV) {
   import('@axe-core/react').then(({ default: axe }) => {
     import('react').then(({ default: React }) => {
       import('react-dom').then(({ default: ReactDOM }) => {

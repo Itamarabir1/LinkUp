@@ -22,6 +22,7 @@ import { getApiErrorMessage } from '../utils/apiError';
 import { apiErr } from '../utils/i18nError';
 import { NOTIFICATIONS_REFRESH_EVENT } from '../config/constants';
 import RouteArrow from '../components/RouteArrow/RouteArrow';
+import { usePageTitle } from '../hooks/usePageTitle';
 import styles from './Notifications.module.css';
 
 type DisplayType = 'booking_approved' | 'booking_rejected' | 'ride_cancelled' | 'booking_request' | 'booking_cancelled_by_passenger' | 'group_joined' | 'group_member_joined' | 'pending_approval' | 'default';
@@ -37,7 +38,9 @@ function getDisplayType(type: string): DisplayType {
 
 export default function Notifications() {
   const navigate = useNavigate();
-  const { t } = useTranslation('common');
+  const { t } = useTranslation(['common', 'nav']);
+  const pageTitle = t('nav:notifications');
+  usePageTitle(pageTitle);
   const { user } = useAuth();
   const {
     markNotificationRead,
@@ -175,6 +178,7 @@ export default function Notifications() {
 
   return (
     <div className={styles.page}>
+      <h1 className="sr-only">{pageTitle}</h1>
       {error && <p className={styles.pageError}>{error}</p>}
 
       {list.length === 0 ? (

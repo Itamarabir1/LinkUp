@@ -198,6 +198,42 @@
 
 ---
 
+## 18. Route-level a11y semantics + GIS module-level singleton
+
+| | |
+|--|--|
+| **הקשר** | שני anti-patterns חיו ביחד: (1) `h1` גנרי ("LinkUp") ברמת route shell יצר כפילות heading + headings לא אינפורמטיביים; loading states (`Suspense fallback`, `ProtectedRoute` while authenticating) רנדרו `<div>` חשוף בלי landmark/h1, מה שגרם ל-axe לדווח שלוש אזהרות (`landmark-one-main`, `page-has-heading-one`, `region`) בכל מעבר route. (2) Google Identity Services נוהל בתוך React `useEffect` עם cleanup שאיפס `initializedRef` — זה גרם ל-`google.accounts.id.initialize()` להיקרא פעמיים תחת StrictMode dev double-mount, וכל race condition סביב origin/clientId היה מוכפל ב-console. |
+| **החלטה** | (1) **a11y**: להסיר `h1` גנרי מ-shells (`PublicPageShell` + `Layout`); כל route מקבל `h1` ייעודי (ויזואלי או `.sr-only`) ו-[`usePageTitle`](../../frontend/src/hooks/usePageTitle.ts) פר-עמוד; [`PageLoading`](../../frontend/src/components/PageLoading/PageLoading.tsx) הוא דף a11y מלא בעצמו (`<main aria-busy aria-live>` + `<h1 sr-only>` + i18n `common:loading`); `ProtectedRoute` משתמש ב-`<PageLoading />` ולא ב-`<div>` חשוף. (2) **GSI**: ה-script-load ו-`initialize()` הורמו למודול singleton ב-[`gisLoader.ts`](../../frontend/src/components/GoogleSignIn/gisLoader.ts) (`loadScriptOnce`, `ensureGisInitialized`, `setGisCredentialHandler`). [`useGoogleSignInScript`](../../frontend/src/components/GoogleSignIn/useGoogleSignInScript.ts) הפך ל-React adapter דק שמסתפק ב-subscribe ל-singleton; cleanup לא מאפס דבר. נוסף DEV-only pre-flight log ב-[`main.tsx`](../../frontend/src/main.tsx) שמדפיס clientId+origin אפקטיביים והוראות diagnose ל-403. ההחלטה על split client-id לפי סביבה (`VITE_GOOGLE_CLIENT_ID`) נשמרה. |
+| **למה** | a11y: כל פריים שהמשתמש רואה הוא דף שלם — גם בזמן loading. axe מפסיק לדווח. GSI: GIS היא מערכת ברמת ה-document (script tag, `window.google`, init יחיד), אז הניהול שלה צריך להיות module-scoped ולא בתוך React effect שכל מציאות בורחת ממנו. singleton idempotent מבטל double-init תחת StrictMode וגם תחת re-render של parent עם `onError` לא ממומוז. ה-pre-flight diagnostic מוציא את 403 מקטגוריית "מסתורי" — המפתח רואה מיד את ה-clientId/origin האפקטיביים ומה לבדוק ב-Console. |
+| **Trade-off** | a11y: כל route חדש חייב heading ייעודי + `usePageTitle`; ללא guardrails (eslint/a11y CI) regression יכול לחזור. GSI: ה-singleton הוא state גלובלי במודול — אם בעתיד יהיה צורך ברב-clientId באותו דף (לא מתוכנן), הוא ידרוש extension. |
+| **בקצרה לראיון** | "loading states הם דפים בפני עצמם — `<main aria-busy>` + sr-only h1; ו-GSI עברה למודול singleton idempotent ש-StrictMode-safe by design — pre-flight log חושף 403 origin mismatch מיד במקום אחרי debugging ארוך." |
+
+---
+
+## 19. Admin data-layer rebuild to domain RQ hooks (remove `useAdminFetch`)
+
+| | |
+|--|--|
+| **הקשר** | שכבת admin נשענה על helper כללי (`useAdminFetch`) שהקשה על ownership ברור ל-cache/mutations בכל entity. |
+| **החלטה** | להחליף ל-hooks ייעודיים לפי דומיין תחת `features/admin/queries` ו-`features/admin/mutations` (`Users`, `Rides`, `Groups`, `Outbox`, `Health`, `Stats`), ולבטל שימוש ב-`useAdminFetch` בקוד admin. |
+| **למה** | key ownership ברור, invalidation ממוקד, ויכולת להרחיב דומיין admin בלי side-effects רוחביים. |
+| **Trade-off** | יותר קבצים ודפוס boilerplate בין entities, אבל עם גבולות תחזוקה טובים יותר. |
+| **בקצרה לראיון** | "ב-admin עברנו מ-helper כללי ל-hooks פר-entity; זה שיפר ownership של cache ומנע coupling בין מסכים." |
+
+---
+
+## 20. Client-side throttle + bundle-budget guardrails
+
+| | |
+|--|--|
+| **הקשר** | פעולות UI מקבילות יכלו לייצר bursts ל-client network layer, ובמקביל נדרש פיקוח טוב יותר על גידול bundle לאורך שדרוגי frontend. |
+| **החלטה** | להוסיף token-bucket throttle ב-`src/api/throttle.ts` ולחבר אותו כאינטרספטור ראשון ב-`src/api/client.ts`; בנוסף להטמיע guardrails של bundle budget (`rollup-plugin-visualizer`, `size-limit`, ו-`manualChunks` ב-`vite.config.ts`). |
+| **למה** | throttle ממתן spikes מצד הדפדפן ומשפר יציבות perceived-latency; bundle guardrails הופכים גדילה לא מבוקרת לנראית ומדידה ב-PR/CI. |
+| **Trade-off** | throttle אגרסיבי מדי יכול להאט פעולות לגיטימיות; חלוקת chunks דורשת תחזוקה תקופתית כדי לא ליצור fragmentation לא יעיל. |
+| **בקצרה לראיון** | "שילבנו token-bucket בצד הלקוח כדי למתן bursts, ובמקביל קבענו תקציב bundle מדיד עם visualizer ו-size-limit." |
+
+---
+
 ## קישורים
 
 - [README.md](README.md) (מפת ADR)  

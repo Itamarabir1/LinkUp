@@ -51,14 +51,16 @@ const AdminGroups = lazy(() => import('./features/admin/pages/AdminGroups'));
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
-  if (isLoading) {
-    return <div className={styles.pageLoading}>טוען...</div>;
-  }
+  if (isLoading) return <PageLoading />;
   if (!isAuthenticated) {
     const from = encodeURIComponent(location.pathname + location.search);
     return <Navigate to={`/login?from=${from}`} replace />;
   }
   return <>{children}</>;
+}
+
+function PublicPageShell({ children }: { children: React.ReactNode }) {
+  return <main>{children}</main>;
 }
 
 function AppRoutes() {
@@ -67,9 +69,30 @@ function AppRoutes() {
     <RouteErrorBoundary resetKey={location.pathname}>
       <Suspense fallback={<PageLoading />}>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route
+            path="/login"
+            element={(
+              <PublicPageShell>
+                <Login />
+              </PublicPageShell>
+            )}
+          />
+          <Route
+            path="/register"
+            element={(
+              <PublicPageShell>
+                <Register />
+              </PublicPageShell>
+            )}
+          />
+          <Route
+            path="/verify-email"
+            element={(
+              <PublicPageShell>
+                <VerifyEmail />
+              </PublicPageShell>
+            )}
+          />
 
           <Route
             path="/admin"
@@ -147,7 +170,12 @@ export default function App() {
             </AuthProvider>
           </LangProvider>
         </ThemeProvider>
-        {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+        {import.meta.env.DEV && (
+          <ReactQueryDevtools
+            initialIsOpen={false}
+            buttonPosition="bottom-right"
+          />
+        )}
       </QueryClientProvider>
     </BrowserRouter>
   );

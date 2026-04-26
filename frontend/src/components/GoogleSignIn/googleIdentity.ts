@@ -15,7 +15,7 @@ declare global {
           }) => void;
           renderButton: (
             element: HTMLElement,
-            config: { theme?: string; size?: string; text?: string; width?: number }
+            config: { theme?: string; size?: string; text?: string; width?: number; locale?: string }
           ) => void;
           prompt: (
             callback?: (notification: {

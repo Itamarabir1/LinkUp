@@ -18,11 +18,14 @@ import { getRideSourceLabel, getRideStatusLabel } from '../utils/rideDisplay';
 import HistorySection from '../components/HistorySection/HistorySection';
 import { useUserEvent } from '../hooks/useUserEvent';
 import { useRideWebSocket } from '../hooks/useRideWebSocket';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { LIVE_STATUSES } from '../constants/rideStatuses';
 import styles from './MyRides.module.css';
 
 export default function MyRides() {
-  const { t } = useTranslation(['rides', 'common']);
+  const { t } = useTranslation(['rides', 'common', 'nav']);
+  const pageTitle = t('nav:myRides');
+  usePageTitle(pageTitle);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { myGroups, activeChipId, setActiveChipId } = useGroup();
@@ -134,6 +137,7 @@ export default function MyRides() {
 
   return (
     <div className={styles.page}>
+      <h1 className="sr-only">{pageTitle}</h1>
       <Chips items={chipItems} activeId={activeChipId} onChange={setActiveChipId} />
 
       {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}

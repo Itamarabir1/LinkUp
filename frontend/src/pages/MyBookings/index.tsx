@@ -6,14 +6,18 @@ import { useTranslation } from 'react-i18next';
 import DriverBookingsTab from './DriverBookingsTab';
 import PassengerBookingsTab from './PassengerBookingsTab';
 import { useMyBookings } from './useMyBookings';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import styles from './MyBookings.module.css';
 
 export default function MyBookings() {
-  const { t } = useTranslation(['bookings', 'common']);
+  const { t } = useTranslation(['bookings', 'common', 'nav']);
+  const pageTitle = t('nav:myBookings');
+  usePageTitle(pageTitle);
   const vm = useMyBookings();
 
   return (
     <div className={styles.page}>
+      <h1 className="sr-only">{pageTitle}</h1>
       <div className={styles.tabWrap}>
         <div role="tablist" className={styles.tabPills}>
           <button

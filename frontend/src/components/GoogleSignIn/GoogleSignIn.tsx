@@ -1,4 +1,5 @@
 import { useGoogleSignIn } from './useGoogleSignIn';
+import { useTranslation } from 'react-i18next';
 import styles from './GoogleSignIn.module.css';
 
 export interface GoogleSignInProps {
@@ -7,12 +8,13 @@ export interface GoogleSignInProps {
 }
 
 export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
+  const { t } = useTranslation('auth');
   const { buttonRef, scriptLoaded, loading } = useGoogleSignIn({ onError, disabled });
 
   if (!scriptLoaded) {
     return (
       <div ref={buttonRef} className={styles.placeholder}>
-        {loading ? 'מתחבר...' : 'טוען Google Sign-In...'}
+        {loading ? t('loggingIn') : t('continueWithGoogle')}
       </div>
     );
   }

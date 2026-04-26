@@ -97,6 +97,22 @@
 | RATE_LIMIT_AUTH_MAX_REQUESTS | — | 10 |
 | FORCE_HTTPS_REDIRECT | — | false (true מאחורי proxy) |
 | DOCKER_MODE | — | true ב-Docker |
+
+### Google Sign-In local (403 origin not allowed)
+
+If Chrome console shows:
+
+- `The given origin is not allowed for the given client ID`
+
+configure the OAuth client in Google Cloud Console:
+
+1. Go to **APIs & Services -> Credentials**.
+2. Open the relevant **OAuth 2.0 Client ID**.
+3. Add `http://localhost:5173` under **Authorized JavaScript origins**.
+4. Add `http://localhost:5173` under **Authorized redirect URIs**.
+5. Save and wait a few minutes for propagation.
+
+Recommended senior setup: use a dedicated local OAuth client ID and wire it via `VITE_GOOGLE_CLIENT_ID` per environment (local/staging/prod) to avoid cross-environment coupling.
 | LOG_LEVEL | — | DEBUG / INFO / WARNING / ERROR (default: INFO) |
 | LOG_FORMAT | — | text בפיתוח, json בפרודקשן |
 

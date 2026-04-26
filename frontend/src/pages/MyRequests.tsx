@@ -12,11 +12,14 @@ import ErrorBanner from '../components/ErrorBanner';
 import { formatDateTimeNoSeconds } from '../utils/date';
 import { getRideSourceLabel, getRequestStatusLabel } from '../utils/rideDisplay';
 import HistorySection from '../components/HistorySection/HistorySection';
+import { usePageTitle } from '../hooks/usePageTitle';
 import styles from './MyRequests.module.css';
 
 export default function MyRequests() {
   const navigate = useNavigate();
-  const { t } = useTranslation(['rides', 'common']);
+  const { t } = useTranslation(['rides', 'common', 'nav']);
+  const pageTitle = t('nav:myRequests');
+  usePageTitle(pageTitle);
   const { myGroups, activeChipId, setActiveChipId } = useGroup();
 
   const {
@@ -56,6 +59,7 @@ export default function MyRequests() {
 
   return (
     <div className={styles.page}>
+      <h1 className="sr-only">{pageTitle}</h1>
       <Chips items={chipItems} activeId={activeChipId} onChange={setActiveChipId} />
 
       {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}

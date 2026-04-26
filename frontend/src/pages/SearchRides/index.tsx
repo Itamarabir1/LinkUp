@@ -4,10 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { useSearchRides } from './useSearchRides';
 import { SearchRidesForm } from './SearchRidesForm';
 import { SearchRideCard } from './SearchRideCard';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import styles from './SearchRides.module.css';
 
 export default function SearchRides() {
-  const { t } = useTranslation('rides');
+  const { t } = useTranslation(['rides', 'nav']);
+  const pageTitle = t('nav:searchRide');
+  usePageTitle(pageTitle);
   const { user } = useAuth();
   const { myGroups } = useGroup();
   const s = useSearchRides();
@@ -18,6 +21,7 @@ export default function SearchRides() {
 
   return (
     <div className={styles.page}>
+      <h1 className="sr-only">{pageTitle}</h1>
       {activeGroupName && (
         <div className={styles.groupBanner}>
           {t('groupContext', { name: activeGroupName })}

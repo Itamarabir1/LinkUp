@@ -1,11 +1,3 @@
-.pageLoading {
-  padding: 3rem;
-  text-align: center;
-  color: var(--text-secondary);
-  font-size: 1rem;
-  background: var(--bg-page);
-}
-
 /* Theme + language: single stack so they never overlap (was both fixed bottom-start). */
 .floatingControls {
   position: fixed;

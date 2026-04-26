@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useGroup } from '../context/GroupContext';
 import ErrorBanner from '../components/ErrorBanner';
 import { useAuth } from '../context/AuthContext';
+import { usePageTitle } from '../hooks/usePageTitle';
 import styles from './Groups.module.css';
 
 const AVATAR_COLORS = [
@@ -20,7 +21,9 @@ function getAvatarStyle(index: number) {
 }
 
 export default function Groups() {
-  const { t } = useTranslation(['groups', 'common']);
+  const { t } = useTranslation(['groups', 'common', 'nav']);
+  const pageTitle = t('nav:groups');
+  usePageTitle(pageTitle);
   const navigate = useNavigate();
   const { user } = useAuth();
   const { myGroups, isLoadingGroups, groupsError } = useGroup();
@@ -39,6 +42,7 @@ export default function Groups() {
     <div className={styles.page}>
       {groupsError ? <ErrorBanner message={groupsError} /> : null}
       <header className={styles.pageHeader}>
+        <h1 className="sr-only">{pageTitle}</h1>
         <button
           type="button"
           className={styles.btnPrimary}

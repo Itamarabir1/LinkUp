@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
@@ -8,10 +9,14 @@ import { formatConversationTime } from '../utils/date';
 import ErrorBanner from '../components/ErrorBanner';
 import { getApiErrorMessage } from '../utils/apiError';
 import { apiErr } from '../utils/i18nError';
+import { usePageTitle } from '../hooks/usePageTitle';
 import MessageThread from './MessageThread';
 import styles from './Messages.module.css';
 
 export default function Messages() {
+  const { t } = useTranslation('nav');
+  const pageTitle = t('messages');
+  usePageTitle(pageTitle);
   const { user } = useAuth();
   const { openChat, panelConversationId, unreadMessages } = useChat();
   const {
@@ -38,6 +43,7 @@ export default function Messages() {
 
   return (
     <div className={styles.container}>
+      <h1 className="sr-only">{pageTitle}</h1>
       <aside className={styles.sidebar}>
         <header className={styles.sidebarHeader}>
           {unreadMessages > 0 && (
