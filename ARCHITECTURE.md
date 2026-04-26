@@ -5,9 +5,9 @@ This root file intentionally stays short.
 For the canonical architecture documentation, use:
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system-wide architecture entry point
-- [`docs/FUTURE_WORK.md`](docs/FUTURE_WORK.md) — deferred architecture decisions and rollout timing
+- [`docs/FUTURE_WORK.md`](docs/FUTURE_WORK.md) — deferred architecture decisions and rollout timing (כולל S.4 OCC ו-E.5/E.6 frontend forms scope)
 - [`docs/FEATURE_DECISIONS.md`](docs/FEATURE_DECISIONS.md) — rationale/trade-offs, including Token Bucket + Sliding Window rate limiting
-- [`docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md`](docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md) — frontend decisions including TanStack React Query (Stage 3a/3b), GroupContext/MyRides migration, and auth forms with react-hook-form + zod
+- [`docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md`](docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md) — frontend decisions including TanStack React Query (Stage 3a/3b), GroupContext/MyRides migration, auth forms with react-hook-form + zod, S.7 hybrid i18n/asset-hardening, and Web Vitals D (Sentry RUM)
 - [`docs/architecture/API.md`](docs/architecture/API.md)
 - [`docs/architecture/DATABASE.md`](docs/architecture/DATABASE.md)
 - [`docs/architecture/EVENTS.md`](docs/architecture/EVENTS.md)

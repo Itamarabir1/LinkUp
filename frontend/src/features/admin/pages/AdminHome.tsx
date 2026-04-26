@@ -4,9 +4,8 @@ import {
   CartesianGrid, Cell, Line, LineChart,
   Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { fetchAdminStats, type AdminStatsResponse } from '../api/stats';
-import { fetchAdminHealth } from '../api/health';
-import { useAdminFetch } from '../hooks/useAdminFetch';
+import { useAdminStats } from '../queries/useAdminStats';
+import { useAdminHealth } from '../queries/useAdminHealth';
 import { useAdminTheme } from '../hooks/useAdminTheme';
 import {
   RIDE_STATUS_COLORS, RIDE_STATUS_LABELS,
@@ -30,8 +29,8 @@ function pieLabel(props: { name?: string; percent?: number }) {
 }
 
 function HealthStrip() {
-  const { status, data } = useAdminFetch(fetchAdminHealth);
-  if (status !== 'ready' || !data) return null;
+  const { data, isLoading } = useAdminHealth();
+  if (isLoading || !data) return null;
   const pills = [
     { label: 'DB', ok: data.database === 'ok' },
     { label: 'Redis', ok: data.redis === 'ok' },
@@ -53,7 +52,8 @@ function HealthStrip() {
 }
 
 export default function AdminHome() {
-  const { status, data } = useAdminFetch<AdminStatsResponse>(fetchAdminStats);
+  const { data, isLoading, isError } = useAdminStats();
+  const status = isLoading ? 'loading' : isError ? 'error' : 'ready';
   const { chart } = useAdminTheme();
 
   const tooltipStyle = {

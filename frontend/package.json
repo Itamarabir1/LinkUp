@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "size": "size-limit",
+    "analyze": "vite build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -23,6 +25,7 @@
     "firebase": "^11.10.0",
     "i18next": "^26.0.4",
     "i18next-browser-languagedetector": "^8.2.1",
+    "i18next-http-backend": "^3.0.6",
     "i18next-icu": "^2.4.3",
     "lucide-react": "^0.468.0",
     "react": "^19.2.0",
@@ -32,10 +35,39 @@
     "react-i18next": "^17.0.3",
     "react-router-dom": "^7.13.0",
     "recharts": "^3.8.1",
+    "web-vitals": "^5.2.0",
     "zod": "^4.3.6"
   },
+  "size-limit": [
+    {
+      "path": "dist/assets/react-vendor-*.js",
+      "limit": "200 KB"
+    },
+    {
+      "path": "dist/assets/query-*.js",
+      "limit": "60 KB"
+    },
+    {
+      "path": "dist/assets/firebase-*.js",
+      "limit": "200 KB"
+    },
+    {
+      "path": "dist/assets/sentry-*.js",
+      "limit": "100 KB"
+    },
+    {
+      "path": "dist/assets/i18n-*.js",
+      "limit": "80 KB"
+    },
+    {
+      "path": "dist/assets/charts-*.js",
+      "limit": "100 KB"
+    }
+  ],
   "devDependencies": {
+    "@axe-core/react": "^4.11.2",
     "@eslint/js": "^9.39.1",
+    "@size-limit/preset-app": "^12.1.0",
     "@tanstack/eslint-plugin-query": "^5.100.5",
     "@testing-library/react": "^16.3.2",
     "@types/i18next": "^12.1.0",
@@ -44,10 +76,13 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "eslint": "^9.39.1",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
     "jsdom": "^29.0.2",
+    "rollup-plugin-visualizer": "^7.0.1",
+    "size-limit": "^12.1.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
     "vite": "^7.3.1",

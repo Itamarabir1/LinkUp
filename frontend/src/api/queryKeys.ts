@@ -41,7 +41,7 @@ export const qk = {
     stats: () => ['admin', 'stats'] as const,
     users: (filters?: Record<string, unknown>) => ['admin', 'users', filters] as const,
     rides: (filters?: Record<string, unknown>) => ['admin', 'rides', filters] as const,
-    groups: () => ['admin', 'groups'] as const,
+    groups: (filters?: Record<string, unknown>) => ['admin', 'groups', filters] as const,
     outbox: (filters?: Record<string, unknown>) => ['admin', 'outbox', filters] as const,
     health: () => ['admin', 'health'] as const,
   },

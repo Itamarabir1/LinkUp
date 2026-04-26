@@ -1,77 +1,39 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import ConfirmModal from '../../../components/ConfirmModal/ConfirmModal';
-import { triggerNotificationToast } from '../../../components/NotificationToast/notificationToast.utils';
 import {
-  fetchAdminOutbox,
-  fetchAdminOutboxById,
-  postAdminOutboxRequeue,
-  type AdminOutboxDetail,
-  type AdminOutboxRow,
-} from '../api/outbox';
-import { useAdminFetch } from '../hooks/useAdminFetch';
+  useAdminOutbox,
+  useAdminOutboxDetail,
+} from '../queries/useAdminOutbox';
+import { useRequeueOutbox } from '../mutations/useAdminOutboxMutations';
 import page from '../styles/AdminPage.module.css';
-
-type DetailState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'ready'; item: AdminOutboxDetail }
-  | { status: 'error' };
 
 export default function AdminOutbox() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<DetailState>({ status: 'idle' });
   const [requeueId, setRequeueId] = useState<string | null>(null);
-  const [requeueLoading, setRequeueLoading] = useState(false);
+  const requeue = useRequeueOutbox();
 
   const params = useMemo(() => ({ limit: 100, status: statusFilter || undefined }), [statusFilter]);
+  const { data: listData, isLoading, isError } = useAdminOutbox(params);
   const {
-    status: listStatus,
-    data: listData,
-    reload: loadList,
-  } = useAdminFetch<AdminOutboxRow[]>(() => fetchAdminOutbox(params));
-
-  useEffect(() => {
-    let mounted = true;
-    if (!selectedId) {
-      setDetail({ status: 'idle' });
-      return () => {
-        mounted = false;
-      };
-    }
-    setDetail({ status: 'loading' });
-    (async () => {
-      try {
-        const { data } = await fetchAdminOutboxById(selectedId);
-        if (!mounted) return;
-        setDetail({ status: 'ready', item: data });
-      } catch {
-        if (!mounted) return;
-        setDetail({ status: 'error' });
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [selectedId]);
+    data: detailItem,
+    isLoading: detailLoading,
+    isError: detailError,
+  } = useAdminOutboxDetail(selectedId);
+  const listStatus: 'loading' | 'error' | 'ready' = isLoading ? 'loading' : isError ? 'error' : 'ready';
 
   async function confirmRequeue() {
     if (!requeueId) return;
-    setRequeueLoading(true);
     try {
-      await postAdminOutboxRequeue(requeueId);
-      triggerNotificationToast({ title: 'בוצע', body: 'האירוע הוחזר לתור.' });
+      await requeue.mutateAsync(requeueId);
       setRequeueId(null);
       if (selectedId === requeueId) setSelectedId(null);
-      loadList();
     } catch {
-      triggerNotificationToast({ title: 'שגיאה', body: 'לא ניתן להחזיר לתור.' });
-    } finally {
-      setRequeueLoading(false);
+      // toast handled in mutation hook
     }
   }
 
-  const canRequeueDetail = detail.status === 'ready' && detail.item.status === 'FAILED';
+  const canRequeueDetail = detailItem?.status === 'FAILED';
 
   return (
     <div>
@@ -138,23 +100,23 @@ export default function AdminOutbox() {
           </div>
           <div>
             <h3 className={page.subheading}>פרטים</h3>
-            {detail.status === 'idle' && <p className={page.muted}>בחר שורה מהטבלה.</p>}
-            {detail.status === 'loading' && <p className={page.muted}>טוען…</p>}
-            {detail.status === 'error' && <p className={page.error}>שגיאה בטעינת פרטים.</p>}
-            {detail.status === 'ready' && (
+            {!selectedId && <p className={page.muted}>בחר שורה מהטבלה.</p>}
+            {selectedId && detailLoading && <p className={page.muted}>טוען…</p>}
+            {selectedId && detailError && <p className={page.error}>שגיאה בטעינת פרטים.</p>}
+            {!!detailItem && (
               <>
                 {canRequeueDetail && (
                   <div className={page.toolbar}>
                     <button
                       type="button"
                       className={page.btnSmPrimary}
-                      onClick={() => setRequeueId(detail.item.id)}
+                      onClick={() => setRequeueId(detailItem.id)}
                     >
                       החזר לתור (requeue)
                     </button>
                   </div>
                 )}
-                <pre className={page.preJson}>{JSON.stringify(detail.item, null, 2)}</pre>
+                <pre className={page.preJson}>{JSON.stringify(detailItem, null, 2)}</pre>
               </>
             )}
           </div>
@@ -163,12 +125,12 @@ export default function AdminOutbox() {
 
       <ConfirmModal
         open={requeueId !== null}
-        onClose={() => !requeueLoading && setRequeueId(null)}
+        onClose={() => !requeue.isPending && setRequeueId(null)}
         title="החזרת אירוע לתור"
         description="לאשר החזרת אירוע שנכשל לסטטוס PENDING?"
         confirmLabel="אישור"
         variant="primary"
-        loading={requeueLoading}
+        loading={requeue.isPending}
         onConfirm={confirmRequeue}
       />
     </div>

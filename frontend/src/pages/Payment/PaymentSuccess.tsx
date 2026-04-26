@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -10,15 +10,19 @@ const TIMEOUT_MS = 30_000;
 
 export default function PaymentSuccess() {
   const { t } = useTranslation('billing');
-  const startedAtRef = useRef<number>(Date.now());
+  const [isTimedOut, setIsTimedOut] = useState(false);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setIsTimedOut(true), TIMEOUT_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
   const { data } = useBillingStatus({
     refetchInterval: (query) => {
-      const timedOut = Date.now() - startedAtRef.current >= TIMEOUT_MS;
-      if (timedOut || query.state.error || query.state.data?.is_premium) return false;
+      if (isTimedOut || query.state.error || query.state.data?.is_premium) return false;
       return POLL_INTERVAL_MS;
     },
   });
-  const isTimedOut = Date.now() - startedAtRef.current >= TIMEOUT_MS;
 
   const statusText = useMemo(() => {
     if (data?.is_premium) return t('paymentSuccessVerified');

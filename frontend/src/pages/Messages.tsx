@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
 import { listConversations } from '../api/chat';
-import type { ConversationListItem } from '../types/api';
+import { qk } from '../api/queryKeys';
 import { formatConversationTime } from '../utils/date';
 import ErrorBanner from '../components/ErrorBanner';
 import { getApiErrorMessage } from '../utils/apiError';
@@ -14,32 +14,27 @@ import styles from './Messages.module.css';
 export default function Messages() {
   const { user } = useAuth();
   const { openChat, panelConversationId, unreadMessages } = useChat();
-  const [list, setList] = useState<ConversationListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const fetchList = useCallback(async () => {
-    if (!user?.user_id) return;
-    setLoading(true);
-    setError('');
-    try {
+  const {
+    data,
+    isLoading: loading,
+    error: fetchError,
+  } = useQuery({
+    queryKey: qk.chat.conversations(),
+    queryFn: async () => {
       const { data } = await listConversations();
-      const sorted = (Array.isArray(data) ? data : []).slice().sort((a, b) => {
+      return (Array.isArray(data) ? data : []).slice().sort((a, b) => {
         const at = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
         const bt = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
         return bt - at;
       });
-      setList(sorted);
-    } catch (err) {
-      setError(getApiErrorMessage(err, apiErr('err_load_conversations')));
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.user_id]);
+    },
+    enabled: !!user?.user_id,
+    staleTime: 30_000,
+    refetchOnReconnect: false,
+  });
 
-  useEffect(() => {
-    fetchList();
-  }, [fetchList]);
+  const list = data ?? [];
+  const error = fetchError ? getApiErrorMessage(fetchError, apiErr('err_load_conversations')) : '';
 
   return (
     <div className={styles.container}>
@@ -73,7 +68,7 @@ export default function Messages() {
               >
                 <div className={styles.avatarWrap}>
                   {c.partner.avatar_url ? (
-                    <img src={c.partner.avatar_url} alt="" className={styles.avatar} />
+                    <img src={c.partner.avatar_url} alt="" className={styles.avatar} loading="lazy" />
                   ) : (
                     <span className={styles.avatarLetter}>
                       {(c.partner.full_name || '?').charAt(0).toUpperCase()}

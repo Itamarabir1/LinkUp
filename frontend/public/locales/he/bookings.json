@@ -1,0 +1,36 @@
+{
+  "myBookingsTitle": "ההזמנות שלי",
+  "driverTab": "כנהג",
+  "passengerTab": "כנוסע",
+  "noBookingsPassenger": "אין לך הזמנות כנוסע",
+  "noBookingsDriver": "אין הזמנות לנסיעות שלך",
+  "bookingStatus_pending": "ממתין",
+  "bookingStatus_approved": "אושר",
+  "bookingStatus_rejected": "נדחה",
+  "bookingStatus_cancelled": "בוטל",
+  "approve": "אשר",
+  "reject": "דחה",
+  "cancelRequest": "בטל בקשה"
+  ,"iAmPassenger": "אני נוסע"
+  ,"iAmDriver": "אני נהג"
+  ,"confirmCancelBooking": "האם אתה בטוח שאתה רוצה לבטל את ההזמנה הזו?"
+  ,"confirmCancelRide": "האם אתה בטוח שאתה רוצה לבטל את הנסיעה?"
+  ,"noPassengerBookings": "אין הזמנות כנוסע. חפש טרמפ ובקש להצטרף."
+  ,"noDriverBookings": "אין הזמנות שאישרת. נוסעים שאישרת יופיעו כאן."
+  ,"passengerHistoryTitle": "היסטוריית הזמנות נוסע"
+  ,"driverHistoryTitle": "היסטוריית נסיעות נהג"
+  ,"driver": "נהג:"
+  ,"shareLocation": "שתף מיקום"
+  ,"stopSharing": "הפסק שיתוף"
+  ,"chat": "צ'אט"
+  ,"cancelBooking": "בטל הזמנה"
+  ,"cancel": "בטל"
+  ,"openMap": "מפה"
+  ,"startRide": "התחל נסיעה"
+  ,"endRide": "סיים נסיעה"
+  ,"openRide": "פתוחה"
+  ,"requestsCount": "{count, plural, one {# בקשה} other {# בקשות}}"
+  ,"approvedCount": "{count, plural, one {# מאושר} other {# מאושרים}}"
+  ,"pickup": "עולה"
+  ,"dropoff": "יורד"
+}

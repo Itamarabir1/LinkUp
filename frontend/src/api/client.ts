@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/react';
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { STORAGE_KEYS } from '../config/constants';
 import { API_BASE_URL, API_TIMEOUT_MS } from '../config/env';
+import { throttle } from './throttle';
 
 // Log resolved API base (browser devtools console)
 console.log('[LinkUp Frontend] API Base URL:', API_BASE_URL);
@@ -64,6 +65,26 @@ function processQueue(error: AxiosError | null, token: string | null) {
   failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token)));
   failedQueue.length = 0;
 }
+
+api.interceptors.request.use(
+  async (config: InternalAxiosRequestConfig) => {
+    try {
+      await throttle();
+    } catch (err) {
+      if (import.meta.env.PROD) {
+        Sentry.addBreadcrumb({
+          category: 'throttle',
+          message: 'Request throttled',
+          level: 'warning',
+          data: { url: config.url },
+        });
+      }
+      return Promise.reject(err);
+    }
+    return config;
+  },
+  (err) => Promise.reject(err)
+);
 
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {

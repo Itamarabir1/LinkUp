@@ -1,69 +1,67 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cancelPassengerRequest, fetchMyPassengerRequests } from '../api/passengers';
+import { mk, qk } from '../api/queryKeys';
 import type { PassengerRequest } from '../types/api';
 import { getApiErrorMessage } from '../utils/apiError';
 import { apiErr } from '../utils/i18nError';
 import { useUserEvent } from '../hooks/useUserEvent';
 
-type RequestsStatus = 'loading' | 'idle' | 'error';
-
 export function useMyRequests() {
-  const [requests, setRequests] = useState<PassengerRequest[]>([]);
-  const [fetchStatus, setFetchStatus] = useState<RequestsStatus>('loading');
+  const queryClient = useQueryClient();
   const [error, setError] = useState('');
   const [requestToCancel, setRequestToCancel] = useState<PassengerRequest | null>(null);
-  const [cancelling, setCancelling] = useState(false);
-
-  const fetchRequests = useCallback(async () => {
-    try {
+  const { data, isLoading } = useQuery({
+    queryKey: qk.passengers.requests(),
+    queryFn: async () => {
       const { data } = await fetchMyPassengerRequests();
-      setRequests(Array.isArray(data) ? data : []);
-      setError('');
-      setFetchStatus('idle');
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, apiErr('err_load_requests')));
-      setFetchStatus('error');
-    }
-  }, []);
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 30_000,
+  });
+  const requests = data ?? [];
 
-  useEffect(() => {
-    void fetchRequests();
-  }, [fetchRequests]);
+  const { mutate: mutateCancel, isPending: cancelling } = useMutation({
+    mutationKey: mk.rides.cancel('request'),
+    mutationFn: (requestId: string) => cancelPassengerRequest(requestId),
+    onSuccess: (_, requestId) => {
+      queryClient.setQueryData(
+        qk.passengers.requests(),
+        (old: PassengerRequest[] = []) =>
+          old.map((r) =>
+            r.request_id === requestId ? { ...r, status: 'cancelled' } : r
+          )
+      );
+      setRequestToCancel(null);
+    },
+    onError: (err) => {
+      setError(getApiErrorMessage(err, apiErr('err_cancel_request')));
+    },
+  });
 
   useUserEvent(
     'REQUEST_EXPIRED',
     useCallback((detail) => {
       if (!detail.request_id) return;
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.request_id === detail.request_id ? { ...r, status: 'expired' } : r
-        )
+      queryClient.setQueryData(
+        qk.passengers.requests(),
+        (old: PassengerRequest[] = []) =>
+          old.map((r) =>
+            r.request_id === detail.request_id ? { ...r, status: 'expired' } : r
+          )
       );
-    }, [])
+    }, [queryClient])
   );
 
   const confirmCancelRequest = useCallback(async () => {
     if (!requestToCancel) return;
-    setCancelling(true);
     setError('');
-    try {
-      await cancelPassengerRequest(requestToCancel.request_id);
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.request_id === requestToCancel.request_id ? { ...r, status: 'cancelled' } : r
-        )
-      );
-      setRequestToCancel(null);
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, apiErr('err_cancel_request')));
-    } finally {
-      setCancelling(false);
-    }
-  }, [requestToCancel]);
+    mutateCancel(requestToCancel.request_id);
+  }, [requestToCancel, mutateCancel]);
 
   return {
     requests,
-    loading: fetchStatus === 'loading',
+    loading: isLoading,
     error,
     requestToCancel,
     setRequestToCancel,

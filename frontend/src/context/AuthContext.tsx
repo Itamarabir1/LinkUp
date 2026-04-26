@@ -6,6 +6,7 @@ import React, {
   useState,
 } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import * as Sentry from '@sentry/react';
 import {
   loginWithPassword,
   logoutSession,
@@ -85,29 +86,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient]);
 
   useEffect(() => {
-    let mounted = true;
     const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-    if (!token || !mounted) {
-      if (mounted) queueMicrotask(() => setState((s) => ({ ...s, isLoading: false })));
+    if (!token) {
+      queueMicrotask(() => setState((s) => ({ ...s, isLoading: false })));
       return;
     }
+    let cancelled = false;
     fetchCurrentUser()
       .then(({ data }) => {
-        if (mounted) {
-          queryClient.setQueryData(qk.auth.me(), data);
-          setState({ user: data, isAuthenticated: true, isLoading: false });
-          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            void initFCM();
-          }
+        if (cancelled) return;
+        queryClient.setQueryData(qk.auth.me(), data);
+        setState({ user: data, isAuthenticated: true, isLoading: false });
+        if (import.meta.env.PROD) {
+          Sentry.setUser({ id: data.user_id });
+        }
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          void initFCM();
         }
       })
       .catch(() => {
+        if (cancelled) return;
         queryClient.removeQueries({ queryKey: qk.auth.me() });
         clearTokens();
-        if (mounted) setState({ user: null, isAuthenticated: false, isLoading: false });
+        setState({ user: null, isAuthenticated: false, isLoading: false });
       });
     return () => {
-      mounted = false;
+      cancelled = true;
     };
   }, [queryClient]);
 
@@ -116,6 +120,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setTokens(data.access_token, data.refresh_token);
     queryClient.setQueryData(qk.auth.me(), data.user);
     setState({ user: data.user, isAuthenticated: true, isLoading: false });
+    if (import.meta.env.PROD) {
+      Sentry.setUser({ id: data.user.user_id });
+    }
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       void initFCM();
     }
@@ -130,6 +137,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setTokens(data.access_token, data.refresh_token);
     queryClient.setQueryData(qk.auth.me(), data.user);
     setState({ user: data.user, isAuthenticated: true, isLoading: false });
+    if (import.meta.env.PROD) {
+      Sentry.setUser({ id: data.user.user_id });
+    }
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       void initFCM();
     }
@@ -150,6 +160,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // ignore
     }
     queryClient.clear();
+    if (import.meta.env.PROD) {
+      Sentry.setUser(null);
+    }
     // 3. Clear local tokens
     clearTokens();
     setState({ user: null, isAuthenticated: false, isLoading: false });

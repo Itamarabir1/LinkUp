@@ -1,5 +1,4 @@
-import { fetchAdminHealth, type AdminHealthResponse } from '../api/health';
-import { useAdminFetch } from '../hooks/useAdminFetch';
+import { useAdminHealth } from '../queries/useAdminHealth';
 import page from '../styles/AdminPage.module.css';
 
 function ServiceStatus({ ok }: { ok: boolean }) {
@@ -12,9 +11,9 @@ function ServiceStatus({ ok }: { ok: boolean }) {
 }
 
 export default function AdminHealth() {
-  const { status, data } = useAdminFetch<AdminHealthResponse>(fetchAdminHealth);
-  if (status === 'loading') return <p className={page.muted}>טוען…</p>;
-  if (status === 'error' || !data) return <p className={page.error}>שגיאה בטעינת בריאות.</p>;
+  const { data, isLoading, isError } = useAdminHealth();
+  if (isLoading) return <p className={page.muted}>טוען…</p>;
+  if (isError || !data) return <p className={page.error}>שגיאה בטעינת בריאות.</p>;
   const healthy = data.status === 'healthy';
 
   return (

@@ -83,7 +83,7 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
         )}
 
         {partnerAvatarUrl ? (
-          <img src={partnerAvatarUrl} alt="" className={styles.partnerAvatar} />
+          <img src={partnerAvatarUrl} alt="" className={styles.partnerAvatar} loading="eager" />
         ) : (
           <div className={styles.partnerAvatarPlaceholder}>
             {(partnerName || '?').charAt(0).toUpperCase()}

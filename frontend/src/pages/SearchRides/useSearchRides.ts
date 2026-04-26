@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { fetchAddressFromCoords } from '../../api/geo';
@@ -23,6 +24,7 @@ export type AIParsedSearch = AISearchResult & {
 };
 
 export type SearchMode = 'datetime' | 'date_only' | 'time_range';
+type SearchParams = Record<string, string | number | undefined>;
 
 /**
  * Build GET /search-rides params only from AI output + groupId (no React state timing issues).
@@ -114,13 +116,10 @@ export function useSearchRides() {
   const [results, setResults] = useState<Ride[]>([]);
   const [resultsNextCursor, setResultsNextCursor] = useState<string | null>(null);
   const [resultsHasMore, setResultsHasMore] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
   const [driverInfoMap, setDriverInfoMap] = useState<Record<string, DriverInfo>>({});
   const [loadingDriverRideId, setLoadingDriverRideId] = useState<string | null>(null);
-  const [savingAlert, setSavingAlert] = useState(false);
   const [alertSaved, setAlertSaved] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -185,6 +184,73 @@ export function useSearchRides() {
     setDestinationRadius(null);
     setSearchMode('datetime');
   }, []);
+
+  const {
+    mutate: mutateSearch,
+    isPending: searching,
+  } = useMutation({
+    mutationKey: ['rides', 'search'] as const,
+    mutationFn: ({ params }: { opToken: number; params: SearchParams }) => searchRidesApi(params),
+    onMutate: () => {
+      setError('');
+      setResults([]);
+      setHasSearched(false);
+      setResultsNextCursor(null);
+      setResultsHasMore(false);
+      resetJoinState();
+      setDriverInfoMap({});
+      setAlertSaved(false);
+    },
+    onSuccess: (res, variables) => {
+      if (!isSearchOpCurrent(variables.opToken)) return;
+      setResults(res.data?.items ?? []);
+      setResultsNextCursor(res.data?.next_cursor ?? null);
+      setResultsHasMore(res.data?.has_more ?? false);
+      setHasSearched(true);
+    },
+    onError: (err, variables) => {
+      if (!isSearchOpCurrent(variables.opToken)) return;
+      setError(getApiErrorMessage(err, apiErr('err_search_rides')));
+    },
+  });
+
+  const {
+    mutate: mutateLoadMore,
+    isPending: loadingMore,
+  } = useMutation({
+    mutationKey: ['rides', 'search', 'loadMore'] as const,
+    mutationFn: ({ params }: { opToken: number; params: SearchParams }) => searchRidesApi(params),
+    onSuccess: (res, variables) => {
+      if (!isLoadMoreOpCurrent(variables.opToken)) return;
+      const newItems = res.data?.items ?? [];
+      setResults((prev) => [...prev, ...newItems]);
+      setResultsNextCursor(res.data?.next_cursor ?? null);
+      setResultsHasMore(res.data?.has_more ?? false);
+    },
+    onError: (err, variables) => {
+      if (!isLoadMoreOpCurrent(variables.opToken)) return;
+      setError(getApiErrorMessage(err, apiErr('err_load_more')));
+    },
+  });
+
+  const {
+    mutate: mutateSaveAlert,
+    isPending: savingAlert,
+  } = useMutation({
+    mutationKey: ['rides', 'saveAlert'] as const,
+    mutationFn: saveSearchAlert,
+    onSuccess: () => {
+      setAlertSaved(true);
+    },
+    onError: (err) => {
+      const status = getApiStatus(err);
+      if (status === 401) {
+        setError(apiErr('err_save_alert_session'));
+        return;
+      }
+      setError(getApiErrorMessage(err, apiErr('err_save_alert')));
+    },
+  });
 
   const parseWithAI = useCallback(async () => {
     const q = aiQuery.trim();
@@ -262,28 +328,7 @@ export function useSearchRides() {
       const autoParams = buildParamsFromAiResult(parsed, { groupId });
       if (autoParams) {
         const searchToken = claimSearch();
-        setError('');
-        setSearching(true);
-        setResults([]);
-        setHasSearched(false);
-        setResultsNextCursor(null);
-        setResultsHasMore(false);
-        resetJoinState();
-        setDriverInfoMap({});
-        setAlertSaved(false);
-        try {
-          const { data: searchData } = await searchRidesApi(autoParams);
-          if (!isSearchOpCurrent(searchToken)) return;
-          setResults(searchData?.items ?? []);
-          setResultsNextCursor(searchData?.next_cursor ?? null);
-          setResultsHasMore(searchData?.has_more ?? false);
-          setHasSearched(true);
-        } catch (err: unknown) {
-          if (isSearchOpCurrent(searchToken))
-            setError(getApiErrorMessage(err, apiErr('err_search_rides')));
-        } finally {
-          if (isSearchOpCurrent(searchToken)) setSearching(false);
-        }
+        mutateSearch({ opToken: searchToken, params: autoParams });
       }
     } catch (err: unknown) {
       if (isAiParseCurrent(token)) {
@@ -299,13 +344,12 @@ export function useSearchRides() {
     conversationHistory,
     groupId,
     isAiParseCurrent,
-    isSearchOpCurrent,
-    resetJoinState,
     t,
+    mutateSearch,
   ]);
 
-  const buildSearchParams = useCallback((): Record<string, string | number | undefined> => {
-    const params: Record<string, string | number | undefined> = {
+  const buildSearchParams = useCallback((): SearchParams => {
+    const params: SearchParams = {
       pickup_name: pickup.trim(),
       destination_name: destination.trim(),
       search_radius: searchRadius,
@@ -317,7 +361,7 @@ export function useSearchRides() {
   }, [pickup, destination, searchRadius, selectedDate, groupId]);
 
   const search = useCallback(
-    async (e: React.FormEvent) => {
+    (e: React.FormEvent) => {
       e.preventDefault();
       if (!pickup.trim() || !destination.trim()) {
         setError('יש למלא מוצא ויעד');
@@ -325,92 +369,47 @@ export function useSearchRides() {
       }
       claimLocation();
       const token = claimSearch();
-      setError('');
-      setSearching(true);
-      setResults([]);
-      setHasSearched(false);
-      setResultsNextCursor(null);
-      setResultsHasMore(false);
-      resetJoinState();
-      setDriverInfoMap({});
-      setAlertSaved(false);
-      try {
-        const { data } = await searchRidesApi(buildSearchParams());
-        if (!isSearchOpCurrent(token)) return;
-        setResults(data?.items ?? []);
-        setResultsNextCursor(data?.next_cursor ?? null);
-        setResultsHasMore(data?.has_more ?? false);
-        setHasSearched(true);
-      } catch (err: unknown) {
-        if (isSearchOpCurrent(token)) setError(getApiErrorMessage(err, apiErr('err_search_rides')));
-      } finally {
-        if (isSearchOpCurrent(token)) setSearching(false);
-      }
+      mutateSearch({ opToken: token, params: buildSearchParams() });
     },
     [
       buildSearchParams,
       claimLocation,
       claimSearch,
       destination,
-      isSearchOpCurrent,
+      mutateSearch,
       pickup,
-      resetJoinState,
     ]
   );
 
-  const loadMoreResults = useCallback(async () => {
+  const loadMoreResults = useCallback(() => {
     if (!resultsNextCursor || loadingMore || !pickup.trim() || !destination.trim()) return;
     const token = claimLoadMore();
-    setLoadingMore(true);
-    setError('');
-    try {
-      const params = { ...buildSearchParams(), after: resultsNextCursor };
-      const { data } = await searchRidesApi(params);
-      if (!isLoadMoreOpCurrent(token)) return;
-      const newItems = data?.items ?? [];
-      setResults((prev) => [...prev, ...newItems]);
-      setResultsNextCursor(data?.next_cursor ?? null);
-      setResultsHasMore(data?.has_more ?? false);
-    } catch (err: unknown) {
-      if (isLoadMoreOpCurrent(token)) setError(getApiErrorMessage(err, apiErr('err_load_more')));
-    } finally {
-      if (isLoadMoreOpCurrent(token)) setLoadingMore(false);
-    }
+    mutateLoadMore({
+      opToken: token,
+      params: { ...buildSearchParams(), after: resultsNextCursor },
+    });
   }, [
     buildSearchParams,
     claimLoadMore,
     destination,
-    isLoadMoreOpCurrent,
     loadingMore,
+    mutateLoadMore,
     pickup,
     resultsNextCursor,
   ]);
 
-  const saveAlert = async () => {
+  const saveAlert = () => {
     if (!pickup.trim() || !destination.trim()) return;
-    setSavingAlert(true);
     setError('');
-    try {
-      await saveSearchAlert({
-        pickup_name: pickup.trim(),
-        destination_name: destination.trim(),
-        requested_departure_time: selectedDate.toISOString(),
-        search_radius: searchRadius,
-        num_passengers: 1,
-        is_notification_active: true,
-        ...(groupId ? { group_id: groupId } : {}),
-      });
-      setAlertSaved(true);
-    } catch (err: unknown) {
-      const status = getApiStatus(err);
-      if (status === 401) {
-        setError(apiErr('err_save_alert_session'));
-        return;
-      }
-      setError(getApiErrorMessage(err, apiErr('err_save_alert')));
-    } finally {
-      setSavingAlert(false);
-    }
+    mutateSaveAlert({
+      pickup_name: pickup.trim(),
+      destination_name: destination.trim(),
+      requested_departure_time: selectedDate.toISOString(),
+      search_radius: searchRadius,
+      num_passengers: 1,
+      is_notification_active: true,
+      ...(groupId ? { group_id: groupId } : {}),
+    });
   };
 
   const fetchDriverInfo = async (rideId: string) => {

@@ -105,3 +105,45 @@ This follows a senior engineering principle: avoid premature optimization, but e
 - **When to revisit:**
   - If traffic patterns show clear abuse vectors not covered by current controls.
   - If incident data indicates need for layered gateway/app/user-tier policies.
+
+## Chat Full React Query Migration (Deferred)
+
+- **Decision:** Defer full chat-domain migration (`useConversationMessages` + `useChatPopup` + WS write path integration) for now.
+- **Current state:** Chat is WS-driven and stable in production.
+- **Why deferred:**
+  - Migration risk is currently higher than practical benefit at the current scale.
+  - The existing reconnect/backfill and message-stream behavior is reliable in production.
+  - A full shift to shared cache + infinite query + optimistic flow would increase blast radius in a high-risk domain.
+- **What was still worth shipping now (already done):**
+  - `useChatUnreadMessages` moved from manual `setInterval` to React Query `refetchInterval`.
+  - `Messages.tsx` conversations list moved from manual fetch lifecycle to `useQuery`.
+- **When to revisit:**
+  - If measurable UX issues appear (popup/thread desync, duplicate/missing messages, unread drift), or
+  - If traffic/complexity justifies a dedicated, isolated chat migration program.
+
+## S.4 — Optimistic Concurrency Control (OCC) (Deferred)
+
+- **Decision:** Defer OCC for user profile updates for now.
+- **Current state:** `PUT /users/me` exists in backend, but frontend `Profile.tsx` is currently read-only (no profile edit form).
+- **Why deferred:**
+  - OCC solves real risk when concurrent multi-tab editing exists.
+  - Without editable profile form in frontend, OCC adds protocol complexity without current product value.
+- **When to revisit:**
+  - When profile editing UI is introduced in frontend.
+  - Implement as a full contract: `version` field on `User` model + `If-Match` request header + explicit `409` conflict handling path in frontend UX.
+
+## Frontend Forms Scope: E.5/E.6 (Deferred / No-op)
+
+- **Decision (E.6 SearchRidesForm):** no RHF migration needed right now.
+- **Current state:** `SearchRidesForm` is presentational and controlled via props from `useSearchRides`; it has no local form-state ownership.
+- **Why no-op now:**
+  - RHF would duplicate existing control flow without reducing complexity.
+  - The meaningful network/state orchestration already lives in `useSearchRides` mutations.
+
+- **Decision (E.5 CreateRide):** defer RHF migration.
+- **Current state:** `useCreateRide` is a wizard/state-machine flow (preview/create, AI parse, geolocation, operation-token race guards).
+- **Why deferred:**
+  - `CreateRide` is orchestration-heavy (idle/locating/previewing/creating state machine + AI flow + operation-token race protection).
+  - RHF provides limited ROI in this flow and can increase complexity/risk for sequencing regressions.
+- **When to revisit:**
+  - If/when the wizard is simplified materially and form-state ownership becomes a clear fit for RHF+zod.

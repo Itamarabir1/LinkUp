@@ -133,7 +133,6 @@ export default function ConfirmModal({
         ref={panelRef}
         className={styles.box}
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
       >
         <h2 id={titleId} className={styles.title}>
           {title}

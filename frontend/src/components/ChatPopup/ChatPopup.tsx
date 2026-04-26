@@ -65,7 +65,7 @@ function ChatPopupContent({ conversationId }: ChatPopupProps) {
       <header className={styles.header}>
         <div className={styles.avatarWrap}>
           {partnerAvatar ? (
-            <img src={partnerAvatar} alt="" className={styles.avatar} />
+            <img src={partnerAvatar} alt="" className={styles.avatar} loading="eager" />
           ) : (
             <span className={styles.avatarLetter}>{partnerName.charAt(0).toUpperCase()}</span>
           )}

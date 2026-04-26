@@ -1,6 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { createGroup, getGroupImageUploadUrl, confirmGroupImage } from '../api/groups';
-import { useGroup } from '../context/GroupContext';
+import { qk } from '../api/queryKeys';
 import { getApiErrorMessage } from '../utils/apiError';
 import { apiErr } from '../utils/i18nError';
 
@@ -13,19 +17,56 @@ export interface CreatedGroupInfo {
   avatarLetter: string;
 }
 
+const createGroupSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().max(DESCRIPTION_MAX).optional(),
+});
+
+type CreateGroupForm = z.infer<typeof createGroupSchema>;
+
 export function useCreateGroup() {
-  const { refreshGroups } = useGroup();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const queryClient = useQueryClient();
+  const {
+    watch,
+    setValue,
+    handleSubmit: rhfHandleSubmit,
+    formState: { isSubmitting },
+  } = useForm<CreateGroupForm>({
+    resolver: zodResolver(createGroupSchema),
+    defaultValues: { name: '', description: '' },
+  });
+  const name = watch('name') ?? '';
+  const description = watch('description') ?? '';
+  const setName = useCallback((v: string) => {
+    setValue('name', v, { shouldDirty: true, shouldTouch: true });
+  }, [setValue]);
+  const setDescription = useCallback((v: string) => {
+    setValue('description', v, { shouldDirty: true, shouldTouch: true });
+  }, [setValue]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [imageError, setImageError] = useState<string | null>(null);
   const [createdGroup, setCreatedGroup] = useState<CreatedGroupInfo | null>(null);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const createMutation = useMutation({
+    mutationKey: ['groups', 'create'] as const,
+    mutationFn: async (payload: { name: string; description?: string }) => createGroup(payload),
+    onSuccess: (group) => {
+      void queryClient.invalidateQueries({ queryKey: qk.groups.list() });
+      setCreatedGroup({
+        inviteCode: group.invite_code,
+        name: group.name,
+        avatarLetter: group.name.charAt(0).toUpperCase(),
+      });
+    },
+    onError: (err) => {
+      setError(getApiErrorMessage(err, apiErr('err_create_group')));
+    },
+  });
 
   // Cleanup object URL on unmount or when previewUrl changes
   useEffect(() => {
@@ -42,17 +83,15 @@ export function useCreateGroup() {
     e.target.value = '';
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = name.trim();
+  const onSubmit = rhfHandleSubmit(async (formData) => {
+    const trimmed = formData.name.trim();
     if (!trimmed) return;
-    setSubmitting(true);
     setError('');
     setImageError(null);
     try {
-      const group = await createGroup({
+      const group = await createMutation.mutateAsync({
         name: trimmed,
-        description: description.trim().slice(0, DESCRIPTION_MAX) || undefined,
+        description: (formData.description ?? '').trim().slice(0, DESCRIPTION_MAX) || undefined,
       });
 
       // Upload image if provided
@@ -73,18 +112,10 @@ export function useCreateGroup() {
         }
       }
 
-      setCreatedGroup({
-        inviteCode: group.invite_code,
-        name: group.name,
-        avatarLetter: group.name.charAt(0).toUpperCase(),
-      });
-      await refreshGroups();
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, apiErr('err_create_group')));
-    } finally {
-      setSubmitting(false);
+    } catch {
+      // API error is handled by mutation onError.
     }
-  };
+  });
 
   const inviteUrl =
     createdGroup && typeof window !== 'undefined'
@@ -109,7 +140,7 @@ export function useCreateGroup() {
     description,
     setDescription,
     previewUrl,
-    submitting,
+    submitting: isSubmitting,
     error,
     imageError,
     createdGroup,
@@ -118,7 +149,7 @@ export function useCreateGroup() {
     copyError,
     fileInputRef,
     handleImageChange,
-    handleSubmit,
+    handleSubmit: onSubmit,
     handleCopy,
   };
 }

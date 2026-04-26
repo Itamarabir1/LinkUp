@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { Dispatch } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchMyNotifications } from '../api/users';
+import { qk } from '../api/queryKeys';
 import type { NotificationItem } from '../types/api';
 import { getApiErrorMessage } from '../utils/apiError';
 import { apiErr } from '../utils/i18nError';
@@ -16,34 +18,27 @@ export function useChatNotificationsFeed(
   notificationList: NotificationItem[],
   dispatch: Dispatch<ChatAction>
 ) {
-  const [notificationsLoading, setNotificationsLoading] = useState(true);
-  const [notificationsError, setNotificationsError] = useState('');
-  const isInitialLoadRef = useRef(true);
+  const queryClient = useQueryClient();
 
-  const refreshUnreadNotifications = useCallback(async () => {
-    const showLoading = isInitialLoadRef.current;
-    if (showLoading) {
-      setNotificationsLoading(true);
-    }
-    setNotificationsError('');
-    try {
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: qk.notifications.all(),
+    queryFn: async () => {
       const { data } = await fetchMyNotifications();
-      const list = Array.isArray(data) ? data : [];
-      dispatch({ type: 'SET_NOTIFICATION_STATE', list });
-    } catch (err) {
-      const msg = getApiErrorMessage(err, apiErr('err_load_notifications'));
-      setNotificationsError(msg);
-      if (import.meta.env.DEV) {
-        console.warn('[ChatContext] refreshUnreadNotifications:', msg);
-      }
-      dispatch({ type: 'SET_NOTIFICATION_STATE', list: [] });
-    } finally {
-      if (showLoading) {
-        setNotificationsLoading(false);
-      }
-      isInitialLoadRef.current = false;
-    }
-  }, [dispatch]);
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!userId,
+    staleTime: 0,
+    refetchInterval: 5 * 60_000,
+    refetchOnReconnect: false,
+  });
+  const notificationsLoading = !!userId && isLoading && data === undefined;
+  const notificationsError =
+    userId && isError ? getApiErrorMessage(error, apiErr('err_load_notifications')) : '';
 
   const markNotificationRead = useCallback(
     (key: string) => {
@@ -69,14 +64,30 @@ export function useChatNotificationsFeed(
 
   useEffect(() => {
     if (!userId) {
-      isInitialLoadRef.current = true;
       queueMicrotask(() => dispatch({ type: 'RESET_SESSION' }));
+      queryClient.removeQueries({ queryKey: qk.notifications.all() });
       return;
     }
-    queueMicrotask(() => void refreshUnreadNotifications());
-    const interval = setInterval(() => void refreshUnreadNotifications(), 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [userId, refreshUnreadNotifications, dispatch]);
+  }, [userId, dispatch, queryClient]);
+
+  useEffect(() => {
+    if (isError) {
+      if (import.meta.env.DEV) {
+        console.warn('[ChatContext] refreshUnreadNotifications:', notificationsError);
+      }
+      dispatch({ type: 'SET_NOTIFICATION_STATE', list: [] });
+    }
+  }, [isError, dispatch, notificationsError]);
+
+  useEffect(() => {
+    if (!userId || data === undefined) return;
+    dispatch({ type: 'SET_NOTIFICATION_STATE', list: data });
+  }, [data, dispatch, userId]);
+
+  const refreshUnreadNotifications = useCallback(() => {
+    if (!userId) return;
+    void queryClient.invalidateQueries({ queryKey: qk.notifications.all() });
+  }, [queryClient, userId]);
 
   return {
     refreshUnreadNotifications,

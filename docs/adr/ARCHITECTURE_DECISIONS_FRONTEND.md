@@ -105,6 +105,7 @@
 | **החלטה** | **i18next** + `react-i18next`; משאבים תחת [`frontend/src/i18n/locales/`](../../frontend/src/i18n/locales/) (`he` / `en`), כולל מפתחות **`common:err_*`** לטקסטי שגיאה כלליים. |
 | **למה** | מוצר מקומי עם אפשרות הדגמה/שימוש ב-LTR; מחרוזות UI ושגיאות נשארות מתורגמות גם מחוץ לרכיבי React (hooks) דרך `i18n.t`. |
 | **בקצרה לראיון** | "לא שומרים עברית קשיחה ב-hooks — מפתחות `common` ו-`apiErr`." |
+| **עדכון S.7** | `common`/`nav` נשארים **bundled** ב-`src/i18n/config.ts`, בעוד namespaces פיצ'ריים (`auth`,`rides`,`bookings`,`groups`,`profile`,`billing`) נטענים עצלנית דרך `i18next-http-backend` מ-`/locales/{{lng}}/{{ns}}.json` (מקור אמת נשאר ב-`src/i18n/locales`, והעתקה runtime ב-`public/locales`). |
 
 ---
 
@@ -168,6 +169,19 @@
 | **למה** | מפחית coupling בין transport events לבין UI state, משפר cache consistency, ושומר migration incremental עם סיכון נמוך לרגרסיות. |
 | **Trade-off** | יותר תלות ב-cache semantics ו-invalidation discipline; requires code-review vigilance על query keys. |
 | **בקצרה לראיון** | "אחרי שהקמנו QueryClient, השלמנו migration למסכים כבדים: Groups ו-MyRides. העברנו fetch/mutation ל-RQ ושינינו WS updates ל-invalidate דטרמיניסטי — אותה חוויית משתמש, פחות state management ידני." |
+
+---
+
+## 16. Web Vitals D — Sentry RUM + metrics (production-only)
+
+| | |
+|--|--|
+| **הקשר** | ניטור שגיאות בלבד לא נותן תמונת UX מלאה. נדרש למדוד איכות חוויית משתמש בזמן אמת (Core Web Vitals) ולקשר אותה לסשן/משתמש בסביבת production. |
+| **החלטה** | להרחיב את `Sentry.init` ב-[`frontend/src/main.tsx`](../../frontend/src/main.tsx) רק תחת `import.meta.env.PROD && APP_CONFIG.sentry.dsn` עם `browserTracingIntegration` + `replayIntegration`, sampling שמרני (`replaysSessionSampleRate: 0.05`, `replaysOnErrorSampleRate: 1.0`), ודיווח `CLS`/`LCP`/`INP` דרך dynamic import של `web-vitals`. |
+| **Identity alignment** | ב-[`frontend/src/context/AuthContext.tsx`](../../frontend/src/context/AuthContext.tsx) מתבצע `Sentry.setUser` ב-bootstrap/login/google-login ו-`Sentry.setUser(null)` ב-logout כדי לשייך traces/replays למשתמש נכון לאורך מחזור האימות. |
+| **למה** | נותן observability end-to-end של ביצועים אמיתיים אצל משתמשים בפרודקשן, תוך שמירה על פרטיות (`maskAllText`, `blockAllMedia`) ועל quota בעזרת sampling. |
+| **Trade-off** | מוסיף תלות telemetry נוספת ועלול להגדיל ingest אם sampling יעלה; לכן נשמרה הפעלה לפרודקשן בלבד ודיווח web-vitals נטען דינמית כדי לצמצם השפעה על bundle. |
+| **בקצרה לראיון** | "הוספנו RUM אמיתי: Trace + Replay + Web Vitals בפרודקשן, עם sampling זהיר ו-user context מה-auth flow, כדי למדוד UX אמיתי בלי להכביד על ה-bundle." |
 
 ---
 

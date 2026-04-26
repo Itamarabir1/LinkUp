@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { fetchAddressFromCoords } from '../api/geo';
@@ -8,6 +9,7 @@ import {
   type ConversationTurn,
 } from '../api/passengers';
 import { previewRideRoutes, createRideFromSession } from '../api/rides';
+import { qk, mk } from '../api/queryKeys';
 import { useAuth } from '../context/AuthContext';
 import type { RidePreviewResponse } from '../types/api';
 import { getApiErrorMessage } from '../utils/apiError';
@@ -94,6 +96,7 @@ export function useCreateRide() {
   const { groupId } = useParams<{ groupId?: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [originName, setOriginName] = useState('');
   const [destinationName, setDestinationName] = useState('');
@@ -119,6 +122,73 @@ export function useCreateRide() {
 
   const { claim, isCurrent } = useOperationToken();
   const { claim: claimAiParse, isCurrent: isAiParseCurrent } = useOperationToken();
+
+  const { mutateAsync: mutatePreviewAsync, isPending: isPreviewPending } = useMutation({
+    mutationKey: ['rides', 'preview'] as const,
+    mutationFn: (variables: {
+      opToken: number;
+      driver_id: string;
+      origin_name: string;
+      destination_name: string;
+      departure_time: string;
+      available_seats: number;
+      group_id?: string;
+    }) => {
+      const { opToken, ...payload } = variables;
+      void opToken;
+      return previewRideRoutes(payload);
+    },
+    onMutate: () => {
+      setStatus('previewing');
+      setError('');
+      setPreview(null);
+    },
+    onSuccess: (res, variables) => {
+      if (!isCurrent(variables.opToken)) return;
+      const routesList = Array.isArray(res.data.routes)
+        ? res.data.routes
+        : res.data.routes
+          ? [res.data.routes]
+          : [];
+      setPreview({ ...res.data, routes: routesList });
+      setSelectedRouteIndex(routesList.length === 1 ? 0 : -1);
+      setStatus('idle');
+    },
+    onError: (err, variables) => {
+      if (!isCurrent(variables.opToken)) return;
+      setError(getApiErrorMessage(err, apiErr('err_preview_ride')));
+      setStatus('idle');
+    },
+  });
+
+  const { mutateAsync: mutateCreateAsync, isPending: isCreatePending } = useMutation({
+    mutationKey: mk.rides.create(),
+    mutationFn: (variables: {
+      opToken: number;
+      session_id: string;
+      selected_route_index: number;
+      group_id?: string;
+    }) => {
+      const { opToken, ...payload } = variables;
+      void opToken;
+      return createRideFromSession(payload);
+    },
+    onMutate: () => {
+      setStatus('creating');
+      setError('');
+    },
+    onSuccess: (_res, variables) => {
+      if (!isCurrent(variables.opToken)) return;
+      void queryClient.invalidateQueries({ queryKey: qk.rides.list() });
+      setPreview(null);
+      navigate(groupId ? `/groups/${groupId}` : '/my-rides', { replace: true });
+    },
+    onError: (err, variables) => {
+      if (!isCurrent(variables.opToken)) return;
+      setError(getApiErrorMessage(err, apiErr('err_create_ride')));
+      setStatus('idle');
+    },
+  });
 
   const fillOriginFromMyLocation = useCallback(() => {
     if (!navigator.geolocation) {
@@ -181,12 +251,9 @@ export function useCreateRide() {
       }
 
       const token = claim();
-      setStatus('previewing');
-      setError('');
-      setPreview(null);
-
       try {
-        const { data } = await previewRideRoutes({
+        await mutatePreviewAsync({
+          opToken: token,
           driver_id: user.user_id,
           origin_name: origin.trim(),
           destination_name: destination.trim(),
@@ -194,22 +261,13 @@ export function useCreateRide() {
           available_seats: availableSeats,
           ...(groupId ? { group_id: groupId } : {}),
         });
-        if (!isCurrent(token)) return;
-        const routesList = Array.isArray(data.routes)
-          ? data.routes
-          : data.routes
-            ? [data.routes]
-            : [];
-        setPreview({ ...data, routes: routesList });
-        setSelectedRouteIndex(routesList.length === 1 ? 0 : -1);
       } catch (err) {
-        if (isCurrent(token))
-          setError(getApiErrorMessage(err, apiErr('err_preview_ride')));
-      } finally {
-        if (isCurrent(token)) setStatus('idle');
+        if (!isCurrent(token)) return;
+        setError(getApiErrorMessage(err, apiErr('err_preview_ride')));
+        setStatus('idle');
       }
     },
-    [user, groupId, claim, isCurrent]
+    [user, groupId, claim, isCurrent, mutatePreviewAsync]
   );
 
   const parseWithAI = useCallback(async () => {
@@ -321,23 +379,19 @@ export function useCreateRide() {
       return;
     }
     const token = claim();
-    setStatus('creating');
-    setError('');
     try {
-      await createRideFromSession({
+      await mutateCreateAsync({
+        opToken: token,
         session_id: preview.session_id,
         selected_route_index: routesCount === 1 ? 0 : selectedRouteIndex,
         ...(groupId ? { group_id: groupId } : {}),
       });
-      if (!isCurrent(token)) return;
-      setPreview(null);
-      navigate(groupId ? `/groups/${groupId}` : '/my-rides', { replace: true });
     } catch (err) {
-      if (isCurrent(token)) setError(getApiErrorMessage(err, apiErr('err_create_ride')));
-    } finally {
-      if (isCurrent(token)) setStatus('idle');
+      if (!isCurrent(token)) return;
+      setError(getApiErrorMessage(err, apiErr('err_create_ride')));
+      setStatus('idle');
     }
-  }, [preview, selectedRouteIndex, groupId, claim, isCurrent, navigate]);
+  }, [preview, selectedRouteIndex, groupId, claim, isCurrent, mutateCreateAsync]);
 
   return {
     groupId,
@@ -359,8 +413,8 @@ export function useCreateRide() {
     handleSwap,
     requestPreview,
     createRide,
-    loading: status === 'previewing',
-    creating: status === 'creating',
+    loading: isPreviewPending || status === 'previewing',
+    creating: isCreatePending || status === 'creating',
     locationLoading: status === 'locating',
     aiQuery,
     setAiQuery,

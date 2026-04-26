@@ -1,18 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import ConfirmModal from '../../../components/ConfirmModal/ConfirmModal';
-import { triggerNotificationToast } from '../../../components/NotificationToast/notificationToast.utils';
-import {
-  fetchAdminUsers,
-  patchAdminUserActive,
-  patchAdminUserAdmin,
-  type AdminUserRow,
-} from '../api/users';
+import type { AdminUserRow } from '../api/users';
+import { useAdminUsers } from '../queries/useAdminUsers';
+import { useToggleUserActive, useToggleUserAdmin } from '../mutations/useAdminUserMutations';
 import page from '../styles/AdminPage.module.css';
-
-type State =
-  | { status: 'loading' }
-  | { status: 'ready'; items: AdminUserRow[] }
-  | { status: 'error' };
 
 type PendingModal =
   | { kind: 'active'; user: AdminUserRow }
@@ -28,65 +19,40 @@ function stringToColor(str: string): string {
 
 export default function AdminUsers() {
   const [q, setQ] = useState('');
-  const [state, setState] = useState<State>({ status: 'loading' });
   const [modal, setModal] = useState<PendingModal>(null);
-  const [mutatingId, setMutatingId] = useState<string | null>(null);
 
   const queryParams = useMemo(() => {
     const qq = q.trim();
     return qq ? { q: qq, limit: 50 } : { limit: 50 };
   }, [q]);
-
-  const load = useCallback(async () => {
-    setState({ status: 'loading' });
-    try {
-      const { data } = await fetchAdminUsers(queryParams);
-      setState({ status: 'ready', items: Array.isArray(data) ? data : [] });
-    } catch {
-      setState({ status: 'error' });
-    }
-  }, [queryParams]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { data, isLoading, isError } = useAdminUsers(queryParams);
+  const items = useMemo(() => data ?? [], [data]);
+  const toggleActive = useToggleUserActive();
+  const toggleAdmin = useToggleUserAdmin();
+  const mutating = toggleActive.isPending || toggleAdmin.isPending;
+  const mutatingId = modal?.user.user_id ?? null;
+  const status: 'loading' | 'error' | 'ready' = isLoading ? 'loading' : isError ? 'error' : 'ready';
 
   const listSummary = useMemo(() => {
-    if (state.status !== 'ready') return null;
-    const items = state.items;
+    if (status !== 'ready') return null;
     const shown = items.length;
     const activeCount = items.filter((u) => u.is_active).length;
     const adminCount = items.filter((u) => u.is_admin).length;
     return { shown, activeCount, adminCount };
-  }, [state]);
+  }, [items, status]);
 
   async function runMutation() {
     if (!modal) return;
     const uid = modal.user.user_id;
-    setMutatingId(uid);
     try {
       if (modal.kind === 'active') {
-        await patchAdminUserActive(uid);
-        triggerNotificationToast({
-          title: 'עודכן',
-          body: 'סטטוס פעילות המשתמש עודכן.',
-        });
+        await toggleActive.mutateAsync(uid);
       } else {
-        await patchAdminUserAdmin(uid);
-        triggerNotificationToast({
-          title: 'עודכן',
-          body: 'סטטוס אדמין עודכן.',
-        });
+        await toggleAdmin.mutateAsync(uid);
       }
       setModal(null);
-      await load();
     } catch {
-      triggerNotificationToast({
-        title: 'שגיאה',
-        body: 'הפעולה נכשלה.',
-      });
-    } finally {
-      setMutatingId(null);
+      // toast handled in mutation hook
     }
   }
 
@@ -103,15 +69,15 @@ export default function AdminUsers() {
         />
       </div>
 
-      {state.status === 'loading' && <p className={page.muted}>טוען…</p>}
-      {state.status === 'error' && <p className={page.error}>שגיאה בטעינה.</p>}
-      {state.status === 'ready' && listSummary && (
+      {status === 'loading' && <p className={page.muted}>טוען…</p>}
+      {status === 'error' && <p className={page.error}>שגיאה בטעינה.</p>}
+      {status === 'ready' && listSummary && (
         <p className={`${page.muted} ${page.usersSummary}`}>
           בתוצאות המוצגות: {listSummary.shown} משתמשים | {listSummary.activeCount} פעילים |{' '}
           {listSummary.adminCount} אדמינים
         </p>
       )}
-      {state.status === 'ready' && (
+      {status === 'ready' && (
         <div className={page.tableWrap}>
           <table className={page.table}>
             <thead>
@@ -127,7 +93,7 @@ export default function AdminUsers() {
               </tr>
             </thead>
             <tbody>
-              {state.items.map((u) => (
+              {items.map((u) => (
                 <tr key={u.user_id}>
                   <td>
                     <div className={page.userCell}>
@@ -162,7 +128,7 @@ export default function AdminUsers() {
                     <button
                       type="button"
                       className={page.btnSm}
-                      disabled={mutatingId === u.user_id}
+                      disabled={mutating && mutatingId === u.user_id}
                       onClick={() => setModal({ kind: 'active', user: u })}
                     >
                       {u.is_active ? 'השבת' : 'הפעל'}
@@ -170,7 +136,7 @@ export default function AdminUsers() {
                     <button
                       type="button"
                       className={page.btnSm}
-                      disabled={mutatingId === u.user_id}
+                      disabled={mutating && mutatingId === u.user_id}
                       onClick={() => setModal({ kind: 'admin', user: u })}
                     >
                       {u.is_admin ? 'הסר אדמין' : 'הפוך לאדמין'}
@@ -185,7 +151,7 @@ export default function AdminUsers() {
 
       <ConfirmModal
         open={modal !== null}
-        onClose={() => !mutatingId && setModal(null)}
+        onClose={() => !mutating && setModal(null)}
         title={modal?.kind === 'active' ? 'שינוי פעילות משתמש' : 'שינוי הרשאת אדמין'}
         description={
           modal
@@ -195,7 +161,7 @@ export default function AdminUsers() {
         confirmLabel="אישור"
         cancelLabel="ביטול"
         variant="primary"
-        loading={mutatingId !== null}
+        loading={mutating}
         onConfirm={runMutation}
       />
     </div>

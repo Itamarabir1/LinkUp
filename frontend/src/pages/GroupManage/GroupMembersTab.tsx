@@ -110,7 +110,11 @@ export default function GroupMembersTab({ vm }: { vm: GroupManageViewModel }) {
               className={styles.modalBackdrop}
               role="button"
               aria-label={t('common:close')}
-              onClick={() => vm.setMembersModalOpen(false)}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  vm.setMembersModalOpen(false);
+                }
+              }}
               tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
@@ -119,10 +123,7 @@ export default function GroupMembersTab({ vm }: { vm: GroupManageViewModel }) {
                 }
               }}
             >
-              <div
-                className={styles.membersModalBox}
-                onClick={(e) => e.stopPropagation()}
-              >
+              <div className={styles.membersModalBox}>
                 <h2 id="members-modal-title" className={styles.membersModalTitle}>
                   {t('groups:membersModalTitle')}
                 </h2>

@@ -1,0 +1,36 @@
+{
+  "myBookingsTitle": "My Bookings",
+  "driverTab": "Driver",
+  "passengerTab": "Passenger",
+  "noBookingsPassenger": "You have no passenger bookings",
+  "noBookingsDriver": "No bookings for your rides",
+  "bookingStatus_pending": "Pending",
+  "bookingStatus_approved": "Approved",
+  "bookingStatus_rejected": "Rejected",
+  "bookingStatus_cancelled": "Cancelled",
+  "approve": "Approve",
+  "reject": "Reject",
+  "cancelRequest": "Cancel request"
+  ,"iAmPassenger": "I'm a passenger"
+  ,"iAmDriver": "I'm a driver"
+  ,"confirmCancelBooking": "Are you sure you want to cancel this booking?"
+  ,"confirmCancelRide": "Are you sure you want to cancel this ride?"
+  ,"noPassengerBookings": "No passenger bookings. Search rides and request to join."
+  ,"noDriverBookings": "No approved bookings yet. Approved passengers will appear here."
+  ,"passengerHistoryTitle": "Passenger booking history"
+  ,"driverHistoryTitle": "Driver ride history"
+  ,"driver": "Driver:"
+  ,"shareLocation": "Share location"
+  ,"stopSharing": "Stop sharing"
+  ,"chat": "Chat"
+  ,"cancelBooking": "Cancel booking"
+  ,"cancel": "Cancel"
+  ,"openMap": "Map"
+  ,"startRide": "Start ride"
+  ,"endRide": "End ride"
+  ,"openRide": "Open"
+  ,"requestsCount": "{count, plural, one {# request} other {# requests}}"
+  ,"approvedCount": "{count, plural, one {# approved} other {# approved}}"
+  ,"pickup": "Pickup"
+  ,"dropoff": "Dropoff"
+}

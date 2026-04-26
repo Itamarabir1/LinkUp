@@ -91,7 +91,12 @@ export default function CreateGroup() {
             aria-label={t('groups:createGroup')}
           >
             {previewUrl ? (
-              <img src={previewUrl} className={styles.avatarPreview} alt={t('rides:previewButton')} />
+              <img
+                src={previewUrl}
+                className={styles.avatarPreview}
+                alt={t('rides:previewButton')}
+                loading="lazy"
+              />
             ) : (
               <div className={styles.avatarPlaceholder}>
                 <Camera size={24} strokeWidth={1.5} />

@@ -1,0 +1,18 @@
+{
+  "premiumActive": "Premium פעיל",
+  "premiumSince": "הצטרפת בתאריך {{date}}",
+  "premiumSinceUnknown": "מועד ההצטרפות יעודכן בקרוב",
+  "upgradeTitle": "שדרג ל-Premium",
+  "upgradeSubtitle": "פתח גישה למאפיינים מתקדמים",
+  "upgradeNow": "שדרג עכשיו",
+  "upgradeLoading": "מעביר אותך לתשלום...",
+  "paymentSuccessTitle": "ברוך/ה הבא/ה ל-Premium!",
+  "paymentSuccessSubtitle": "התשלום התקבל בהצלחה.",
+  "paymentSuccessPolling": "מאמתים את השדרוג שלך. זה ייקח כמה שניות...",
+  "paymentSuccessVerified": "החשבון שלך עודכן ל-Premium.",
+  "paymentSuccessTimeout": "האימות מתעכב. אפשר לחזור לפרופיל ולבדוק שוב בעוד רגע.",
+  "paymentCancelTitle": "התשלום לא הושלם",
+  "paymentCancelSubtitle": "אפשר לנסות שוב או לחזור לפרופיל.",
+  "tryAgain": "נסה שוב",
+  "backToProfile": "חזרה לפרופיל"
+}

@@ -1,11 +1,9 @@
-import { fetchAdminGroups, type AdminGroupRow } from '../api/groups';
-import { useAdminFetch } from '../hooks/useAdminFetch';
+import { useAdminGroups } from '../queries/useAdminGroups';
 import page from '../styles/AdminPage.module.css';
 
 export default function AdminGroups() {
-  const { status, data: items } = useAdminFetch<AdminGroupRow[]>(
-    () => fetchAdminGroups({ limit: 200 })
-  );
+  const { data: items, isLoading, isError } = useAdminGroups({ limit: 200 });
+  const status = isLoading ? 'loading' : isError ? 'error' : 'ready';
 
   return (
     <div>

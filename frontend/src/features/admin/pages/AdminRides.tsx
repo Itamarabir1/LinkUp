@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -10,26 +10,26 @@ import {
   YAxis,
 } from 'recharts';
 import ConfirmModal from '../../../components/ConfirmModal/ConfirmModal';
-import { triggerNotificationToast } from '../../../components/NotificationToast/notificationToast.utils';
-import { fetchAdminStats } from '../api/stats';
-import { fetchAdminRides, postAdminCancelRide, type AdminRideRow } from '../api/rides';
-import { useAdminFetch } from '../hooks/useAdminFetch';
+import type { AdminRideRow } from '../api/rides';
+import { useAdminStats } from '../queries/useAdminStats';
+import { useAdminRides } from '../queries/useAdminRides';
+import { useCancelAdminRide } from '../mutations/useAdminRideMutations';
 import { useAdminTheme } from '../hooks/useAdminTheme';
 import { RIDE_STATUS_COLORS, RIDE_STATUS_LABELS } from '../adminConstants';
 import page from '../styles/AdminPage.module.css';
 
-type State =
-  | { status: 'loading' }
-  | { status: 'ready'; items: AdminRideRow[] }
-  | { status: 'error' };
-
 export default function AdminRides() {
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const [state, setState] = useState<State>({ status: 'loading' });
   const [cancelTarget, setCancelTarget] = useState<AdminRideRow | null>(null);
-  const [cancelling, setCancelling] = useState(false);
   const { chart: chartTheme } = useAdminTheme();
-  const { data: statsData } = useAdminFetch(fetchAdminStats);
+  const { data: statsData } = useAdminStats();
+  const { data, isLoading, isError } = useAdminRides({
+    status: statusFilter || undefined,
+    limit: 150,
+  });
+  const items = data ?? [];
+  const cancelRide = useCancelAdminRide();
+  const status: 'loading' | 'error' | 'ready' = isLoading ? 'loading' : isError ? 'error' : 'ready';
 
   const barData = useMemo(() => {
     const ridesByStatus = statsData?.rides_by_status ?? {};
@@ -42,35 +42,13 @@ export default function AdminRides() {
 
   const barTotal = useMemo(() => barData.reduce((s, d) => s + d.count, 0), [barData]);
 
-  const load = useCallback(async () => {
-    setState({ status: 'loading' });
-    try {
-      const { data } = await fetchAdminRides({
-        status: statusFilter || undefined,
-        limit: 150,
-      });
-      setState({ status: 'ready', items: Array.isArray(data) ? data : [] });
-    } catch {
-      setState({ status: 'error' });
-    }
-  }, [statusFilter]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
   async function confirmCancel() {
     if (!cancelTarget) return;
-    setCancelling(true);
     try {
-      await postAdminCancelRide(cancelTarget.ride_id);
-      triggerNotificationToast({ title: 'בוצע', body: 'הנסיעה בוטלה.' });
+      await cancelRide.mutateAsync(cancelTarget.ride_id);
       setCancelTarget(null);
-      await load();
     } catch {
-      triggerNotificationToast({ title: 'שגיאה', body: 'לא ניתן לבטל את הנסיעה.' });
-    } finally {
-      setCancelling(false);
+      // toast handled in mutation hook
     }
   }
 
@@ -144,9 +122,9 @@ export default function AdminRides() {
         </label>
       </div>
 
-      {state.status === 'loading' && <p className={page.muted}>טוען…</p>}
-      {state.status === 'error' && <p className={page.error}>שגיאה בטעינה.</p>}
-      {state.status === 'ready' && (
+      {status === 'loading' && <p className={page.muted}>טוען…</p>}
+      {status === 'error' && <p className={page.error}>שגיאה בטעינה.</p>}
+      {status === 'ready' && (
         <div className={page.tableWrap}>
           <table className={page.table}>
             <thead>
@@ -162,7 +140,7 @@ export default function AdminRides() {
               </tr>
             </thead>
             <tbody>
-              {state.items.map((r) => (
+              {items.map((r) => (
                 <tr key={r.ride_id}>
                   <td title={r.ride_id}>{r.ride_id.slice(0, 8)}…</td>
                   <td>
@@ -180,7 +158,7 @@ export default function AdminRides() {
                     <button
                       type="button"
                       className={page.btnSmDanger}
-                      disabled={r.status === 'cancelled' || cancelling}
+                      disabled={r.status === 'cancelled' || cancelRide.isPending}
                       onClick={() => setCancelTarget(r)}
                     >
                       ביטול נסיעה
@@ -195,7 +173,7 @@ export default function AdminRides() {
 
       <ConfirmModal
         open={cancelTarget !== null}
-        onClose={() => !cancelling && setCancelTarget(null)}
+        onClose={() => !cancelRide.isPending && setCancelTarget(null)}
         title="ביטול נסיעה"
         description={
           cancelTarget
@@ -204,7 +182,7 @@ export default function AdminRides() {
         }
         confirmLabel="בטל נסיעה"
         variant="danger"
-        loading={cancelling}
+        loading={cancelRide.isPending}
         onConfirm={confirmCancel}
       />
     </div>
