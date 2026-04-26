@@ -42,11 +42,13 @@ export default function RideCard({
 }: RideCardProps) {
   const variant = getStatusVariant(status);
   const style = STATUS_STYLES[variant] ?? STATUS_STYLES.neutral;
+  const Wrapper = onClick ? 'button' : 'article';
 
   return (
-    <article
+    <Wrapper
       className={styles.card}
       data-status={variant}
+      type={onClick ? 'button' : undefined}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -90,6 +92,6 @@ export default function RideCard({
         </span>
         {source && <span className={styles.source}>{source}</span>}
       </div>
-    </article>
+    </Wrapper>
   );
 }

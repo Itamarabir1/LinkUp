@@ -52,6 +52,17 @@ export default function Profile() {
                   }
                   onClick={() => hasValidAvatar && setAvatarExpanded(true)}
                   role={hasValidAvatar ? 'button' : undefined}
+                  tabIndex={hasValidAvatar ? 0 : undefined}
+                  onKeyDown={
+                    hasValidAvatar
+                      ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setAvatarExpanded(true);
+                          }
+                        }
+                      : undefined
+                  }
                   aria-label={hasValidAvatar ? t('profile:viewImageExpanded') : undefined}
                 >
                   {hasValidAvatar ? (
@@ -167,10 +178,15 @@ export default function Profile() {
         <div
           className={styles.avatarModalBackdrop}
           onClick={() => setAvatarExpanded(false)}
-          onKeyDown={(e) => e.key === 'Escape' && setAvatarExpanded(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-label={t('profile:profileImageExpanded')}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setAvatarExpanded(false);
+            }
+          }}
+          role="button"
+          aria-label={t('common:close')}
+          tabIndex={0}
         >
           <button
             ref={closeButtonRef}
@@ -181,16 +197,23 @@ export default function Profile() {
           >
             <X size={18} strokeWidth={2} />
           </button>
-          <img
-            src={avatarSrc}
-            alt={t('profile:profileImage')}
+          <button
+            type="button"
             className={styles.avatarModalImg}
             onClick={(e) => e.stopPropagation()}
-            onError={() => {
-              setAvatarExpanded(false);
-              handleAvatarImageError();
-            }}
-          />
+            onKeyDown={(e) => e.stopPropagation()}
+            aria-label={t('profile:profileImageExpanded')}
+          >
+            <img
+              src={avatarSrc}
+              alt={t('profile:profileImage')}
+              className={styles.avatarModalImg}
+              onError={() => {
+                setAvatarExpanded(false);
+                handleAvatarImageError();
+              }}
+            />
+          </button>
         </div>
       ) : null}
     </div>

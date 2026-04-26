@@ -118,10 +118,16 @@ export default function ConfirmModal({
   return (
     <div
       className={styles.backdrop}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={titleId}
+      role="button"
+      aria-label={title}
       onClick={handleBackdropClick}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && !loading) {
+          e.preventDefault();
+          onClose();
+        }
+      }}
     >
       <div
         ref={panelRef}

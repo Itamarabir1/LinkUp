@@ -29,7 +29,7 @@ export function useMyBookingsPassenger(
   });
   const passengerList = data ?? [];
 
-  const cancelMutation = useMutation({
+  const { mutate: cancelPassengerBookingMutation, isPending: isCancellingPassengerBooking } = useMutation({
     mutationKey: mk.bookings.cancel('passenger'),
     mutationFn: (bookingId: string) => cancelPassengerBooking(bookingId),
     onSuccess: (_, bookingId) => {
@@ -104,15 +104,15 @@ export function useMyBookingsPassenger(
   });
 
   const confirmCancelBooking = useCallback(() => {
-    if (bookingToCancel) cancelMutation.mutate(bookingToCancel);
-  }, [bookingToCancel, cancelMutation]);
+    if (bookingToCancel) cancelPassengerBookingMutation(bookingToCancel);
+  }, [bookingToCancel, cancelPassengerBookingMutation]);
 
   return {
     passengerList,
     passengerLoading,
     bookingToCancel,
     setBookingToCancel,
-    cancelling: cancelMutation.isPending,
+    cancelling: isCancellingPassengerBooking,
     confirmCancelBooking,
   };
 }

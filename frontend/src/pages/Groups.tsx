@@ -61,7 +61,7 @@ export default function Groups() {
             const isAdmin = g.admin_id === user?.user_id;
             const avatarStyle = getAvatarStyle(index);
             return (
-              <article
+              <div
                 key={g.group_id}
                 className={styles.card}
                 onClick={() => navigate(`/groups/${g.group_id}`)}
@@ -80,6 +80,7 @@ export default function Groups() {
                       src={g.avatar_url}
                       alt=""
                       className={styles.avatarImg}
+                      loading="lazy"
                     />
                   ) : (
                     <div
@@ -114,7 +115,7 @@ export default function Groups() {
                   )}
                   <span className={styles.badgeType}>{t('groups:privateGroup')}</span>
                 </div>
-              </article>
+              </div>
             );
           })}
         </div>

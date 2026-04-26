@@ -38,10 +38,10 @@ export function useMyBookingsDriver(
     enabled: activeTab === 'driver' && !!userId,
     staleTime: 30_000,
   });
-  const driverList = data ?? [];
+  const driverList = useMemo(() => data ?? [], [data]);
   const driverLoading = isLoading;
 
-  const approveMutation = useMutation({
+  const { mutate: approveBookingMutation } = useMutation({
     mutationKey: mk.bookings.approve(''),
     mutationFn: async (bookingId: string) => {
       setDriverStatus({ kind: 'action', bookingId });
@@ -56,7 +56,7 @@ export function useMyBookingsDriver(
     onSettled: () => setDriverStatus({ kind: 'idle' }),
   });
 
-  const rejectMutation = useMutation({
+  const { mutate: rejectBookingMutation } = useMutation({
     mutationKey: mk.bookings.reject(''),
     mutationFn: async (bookingId: string) => {
       setDriverStatus({ kind: 'action', bookingId });
@@ -140,13 +140,13 @@ export function useMyBookingsDriver(
 
   const handleApprove = useCallback((bookingId: string) => {
     if (!userId) return;
-    approveMutation.mutate(bookingId);
-  }, [approveMutation, userId]);
+    approveBookingMutation(bookingId);
+  }, [approveBookingMutation, userId]);
 
   const handleReject = useCallback((bookingId: string) => {
     if (!userId) return;
-    rejectMutation.mutate(bookingId);
-  }, [rejectMutation, userId]);
+    rejectBookingMutation(bookingId);
+  }, [rejectBookingMutation, userId]);
 
   const confirmCancelRide = useCallback(async () => {
     if (rideToCancel == null) return;

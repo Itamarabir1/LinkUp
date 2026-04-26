@@ -1,5 +1,6 @@
 /* View-model bundles refs with state; ref props and handlers are valid in render. */
 /* eslint-disable react-hooks/refs -- false positives when vm includes RefObjects */
+import { useEffect, useRef } from 'react';
 import { Camera, Pencil, Plus, Search, Settings } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Group } from '../../types/api';
@@ -14,7 +15,21 @@ export interface GroupManageHeaderProps {
 export default function GroupManageHeader({ vm, group }: GroupManageHeaderProps) {
   const { t } = useTranslation(['groups', 'common']);
   const { groupId, navigate, isAdmin } = vm;
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const descTextareaRef = useRef<HTMLTextAreaElement>(null);
   const memberCount = group.member_count ?? vm.members.length;
+
+  useEffect(() => {
+    if (vm.isEditingName) {
+      nameInputRef.current?.focus();
+    }
+  }, [vm.isEditingName]);
+
+  useEffect(() => {
+    if (vm.isEditingDesc) {
+      descTextareaRef.current?.focus();
+    }
+  }, [vm.isEditingDesc]);
 
   return (
     <header className={styles.groupHeader}>
@@ -44,9 +59,21 @@ export default function GroupManageHeader({ vm, group }: GroupManageHeaderProps)
         disabled={vm.headerSaving || !isAdmin}
       >
         {group.avatar_url && !vm.headerPreviewUrl ? (
-          <img src={group.avatar_url} alt={group.name} className={styles.headerAvatarImg} />
+          <img
+            src={group.avatar_url}
+            alt={group.name}
+            className={styles.headerAvatarImg}
+            loading="eager"
+            fetchPriority="high"
+          />
         ) : vm.headerPreviewUrl ? (
-          <img src={vm.headerPreviewUrl} alt={group.name} className={styles.headerAvatarImg} />
+          <img
+            src={vm.headerPreviewUrl}
+            alt={group.name}
+            className={styles.headerAvatarImg}
+            loading="eager"
+            fetchPriority="high"
+          />
         ) : (
           <div
             className={styles.headerAvatar}
@@ -79,12 +106,12 @@ export default function GroupManageHeader({ vm, group }: GroupManageHeaderProps)
       ) : (
         <div className={styles.inlineEditRow}>
           <input
+            ref={nameInputRef}
             type="text"
             className={styles.inlineInput}
             value={vm.editNameValue}
             onChange={(e) => vm.setEditNameValue(e.target.value)}
             maxLength={50}
-            autoFocus
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 void vm.handleNameSave();
@@ -137,11 +164,11 @@ export default function GroupManageHeader({ vm, group }: GroupManageHeaderProps)
       ) : (
         <div className={styles.inlineEditCol}>
           <textarea
+            ref={descTextareaRef}
             className={styles.inlineTextarea}
             value={vm.editDescriptionValue}
             onChange={(e) => vm.setEditDescriptionValue(e.target.value.slice(0, 500))}
             rows={2}
-            autoFocus
             disabled={vm.headerSaving}
           />
           <div className={styles.inlineActions}>
