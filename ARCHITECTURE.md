@@ -5,6 +5,8 @@ This root file intentionally stays short.
 For the canonical architecture documentation, use:
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system-wide architecture entry point
+- [`docs/FUTURE_WORK.md`](docs/FUTURE_WORK.md) — deferred architecture decisions and rollout timing
+- [`docs/FEATURE_DECISIONS.md`](docs/FEATURE_DECISIONS.md) — rationale/trade-offs, including Token Bucket + Sliding Window rate limiting
 - [`docs/architecture/API.md`](docs/architecture/API.md)
 - [`docs/architecture/DATABASE.md`](docs/architecture/DATABASE.md)
 - [`docs/architecture/EVENTS.md`](docs/architecture/EVENTS.md)

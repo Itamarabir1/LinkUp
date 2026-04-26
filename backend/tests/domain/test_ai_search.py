@@ -31,7 +31,6 @@ _TZ_IL = ZoneInfo("Asia/Jerusalem")
 
 
 class TestAISearchResult:
-
     def test_both_locations_present_clears_follow_up(self):
         """Locations + time anchor => ready to search (no follow-up)."""
         result = AISearchResult(
@@ -132,7 +131,6 @@ class TestAISearchResult:
 
 
 class TestAISearchQuery:
-
     def test_query_max_length(self):
         with pytest.raises(Exception):
             AISearchQuery(query="א" * 401)
@@ -163,7 +161,6 @@ class TestAISearchQuery:
 
 
 class TestSanitizeQuery:
-
     def test_removes_http_url(self):
         result = _sanitize_query("טרמפ מתל אביב https://evil.com לחיפה")
         assert "http" not in result
@@ -197,7 +194,6 @@ class TestSanitizeQuery:
 
 
 class TestParseRideSearchQuery:
-
     @pytest.fixture(autouse=True)
     def _groq_client(self):
         with patch(
@@ -217,22 +213,22 @@ class TestParseRideSearchQuery:
         )
 
     def test_happy_path_both_locations(self):
-        tomorrow = (
-            datetime.now(_TZ_IL) + timedelta(days=1)
-        ).strftime("%Y-%m-%d")
+        tomorrow = (datetime.now(_TZ_IL) + timedelta(days=1)).strftime("%Y-%m-%d")
 
-        with self._mock_groq({
-            "pickup_name": "תל אביב",
-            "destination_name": "חיפה",
-            "departure_time": f"{tomorrow}T08:00:00+03:00",
-            "search_radius": None,
-            "confidence": 0.95,
-            "raw_interpretation": "הבנתי: נסיעה מתל אביב לחיפה",
-            "needs_clarification": False,
-            "missing_fields": [],
-            "ambiguity_reasons": [],
-            "follow_up_question": None,
-        }):
+        with self._mock_groq(
+            {
+                "pickup_name": "תל אביב",
+                "destination_name": "חיפה",
+                "departure_time": f"{tomorrow}T08:00:00+03:00",
+                "search_radius": None,
+                "confidence": 0.95,
+                "raw_interpretation": "הבנתי: נסיעה מתל אביב לחיפה",
+                "needs_clarification": False,
+                "missing_fields": [],
+                "ambiguity_reasons": [],
+                "follow_up_question": None,
+            }
+        ):
             result = parse_ride_search_query("טרמפ מתל אביב לחיפה מחר בבוקר")
 
         assert result.pickup_name == "תל אביב"
@@ -241,18 +237,20 @@ class TestParseRideSearchQuery:
         assert result.follow_up_question is None
 
     def test_missing_pickup_triggers_follow_up(self):
-        with self._mock_groq({
-            "pickup_name": None,
-            "destination_name": "חיפה",
-            "departure_time": None,
-            "search_radius": None,
-            "confidence": 0.4,
-            "raw_interpretation": "הבנתי: נסיעה לחיפה",
-            "needs_clarification": True,
-            "missing_fields": ["pickup_name"],
-            "ambiguity_reasons": [],
-            "follow_up_question": "מאיפה אתה יוצא?",
-        }):
+        with self._mock_groq(
+            {
+                "pickup_name": None,
+                "destination_name": "חיפה",
+                "departure_time": None,
+                "search_radius": None,
+                "confidence": 0.4,
+                "raw_interpretation": "הבנתי: נסיעה לחיפה",
+                "needs_clarification": True,
+                "missing_fields": ["pickup_name"],
+                "ambiguity_reasons": [],
+                "follow_up_question": "מאיפה אתה יוצא?",
+            }
+        ):
             result = parse_ride_search_query("לחיפה מחר")
 
         assert result.pickup_name is None
@@ -282,18 +280,20 @@ class TestParseRideSearchQuery:
         assert result.pickup_name is None
 
     def test_search_radius_clamped_by_service(self):
-        with self._mock_groq({
-            "pickup_name": "תל אביב",
-            "destination_name": "חיפה",
-            "departure_time": None,
-            "search_radius": 500.0,  # way over max
-            "confidence": 0.9,
-            "raw_interpretation": "הבנתי",
-            "needs_clarification": False,
-            "missing_fields": [],
-            "ambiguity_reasons": [],
-            "follow_up_question": None,
-        }):
+        with self._mock_groq(
+            {
+                "pickup_name": "תל אביב",
+                "destination_name": "חיפה",
+                "departure_time": None,
+                "search_radius": 500.0,  # way over max
+                "confidence": 0.9,
+                "raw_interpretation": "הבנתי",
+                "needs_clarification": False,
+                "missing_fields": [],
+                "ambiguity_reasons": [],
+                "follow_up_question": None,
+            }
+        ):
             result = parse_ride_search_query("מתל אביב לחיפה")
 
         assert result.search_radius <= 50.0
@@ -313,18 +313,21 @@ class TestParseRideSearchQuery:
 
         def capture_call(messages):
             captured_messages.extend(messages)
-            return json.dumps({
-                "pickup_name": "תל אביב",
-                "destination_name": "חיפה",
-                "departure_time": None,
-                "search_radius": None,
-                "confidence": 0.9,
-                "raw_interpretation": "הבנתי",
-                "needs_clarification": False,
-                "missing_fields": [],
-                "ambiguity_reasons": [],
-                "follow_up_question": None,
-            }, ensure_ascii=False)
+            return json.dumps(
+                {
+                    "pickup_name": "תל אביב",
+                    "destination_name": "חיפה",
+                    "departure_time": None,
+                    "search_radius": None,
+                    "confidence": 0.9,
+                    "raw_interpretation": "הבנתי",
+                    "needs_clarification": False,
+                    "missing_fields": [],
+                    "ambiguity_reasons": [],
+                    "follow_up_question": None,
+                },
+                ensure_ascii=False,
+            )
 
         with patch(
             "app.domain.passengers.ai_search_service._call_groq",
@@ -338,21 +341,21 @@ class TestParseRideSearchQuery:
 
     def test_unsupported_intent_still_extracts_locations(self):
         """Unsupported fields (כלב, 2 נוסעים) don't break extraction."""
-        with self._mock_groq({
-            "pickup_name": "באר שבע",
-            "destination_name": "אילת",
-            "departure_time": None,
-            "search_radius": None,
-            "confidence": 0.85,
-            "raw_interpretation": "הבנתי: נסיעה מבאר שבע לאילת",
-            "needs_clarification": False,
-            "missing_fields": [],
-            "ambiguity_reasons": ["הבקשה כוללת תנאים שלא נתמכים"],
-            "follow_up_question": None,
-        }):
-            result = parse_ride_search_query(
-                "טרמפ ל-2 נוסעים עם כלב מבאר שבע לאילת"
-            )
+        with self._mock_groq(
+            {
+                "pickup_name": "באר שבע",
+                "destination_name": "אילת",
+                "departure_time": None,
+                "search_radius": None,
+                "confidence": 0.85,
+                "raw_interpretation": "הבנתי: נסיעה מבאר שבע לאילת",
+                "needs_clarification": False,
+                "missing_fields": [],
+                "ambiguity_reasons": ["הבקשה כוללת תנאים שלא נתמכים"],
+                "follow_up_question": None,
+            }
+        ):
+            result = parse_ride_search_query("טרמפ ל-2 נוסעים עם כלב מבאר שבע לאילת")
 
         assert result.pickup_name == "באר שבע"
         assert result.destination_name == "אילת"

@@ -1,6 +1,16 @@
+"""HTTP-level rate limit dependencies.
+
+Two algorithms by design (see ``docs/FEATURE_DECISIONS.md``):
+
+* ``rate_limit_auth``    — sliding window log (no burst, anti-bruteforce).
+* ``rate_limit_chat``    — token bucket (burst-tolerant API throttle).
+
+Both are atomic via Lua, both fail-open if Redis is unavailable.
+On rejection a 429 is raised with full ``X-RateLimit-*`` + ``Retry-After``
+header metadata surfaced by the central exception handler.
 """
-Rate limiting for sensitive endpoints (login, refresh, password-reset) — per IP.
-"""
+
+from __future__ import annotations
 
 from fastapi import Depends, Request
 
@@ -8,7 +18,8 @@ from app.api.dependencies.auth import get_current_user
 from app.core.config import settings
 from app.core.exceptions.infrastructure import RateLimitExceeded
 from app.domain.users.model import User
-from app.infrastructure.redis.client import redis_client
+from app.infrastructure.metrics import rate_limit_rejected_total
+from app.infrastructure.rate_limiter import rate_limiter
 
 
 def _client_ip(request: Request) -> str:
@@ -20,37 +31,43 @@ def _client_ip(request: Request) -> str:
 
 
 async def rate_limit_auth(request: Request) -> None:
-    """
-    Dependency: limits auth requests (login, refresh, password-reset) per IP.
-    On exceed — 429 Too Many Requests. Uses Redis; if Redis is unavailable — allows (fail open).
+    """Sliding-window limit on auth endpoints (login, refresh, password-reset) per IP.
+
+    Anti-bruteforce: a quiet attacker cannot stockpile a burst — every request
+    counts inside a true rolling window.
     """
     ip = _client_ip(request)
     key = f"ratelimit:auth:{ip}"
-    window = getattr(settings, "RATE_LIMIT_AUTH_WINDOW_SECONDS", 60)
-    max_req = getattr(settings, "RATE_LIMIT_AUTH_MAX_REQUESTS", 10)
-
-    allowed = await redis_client.rate_limit_check(key, window_seconds=window, max_count=max_req)
-    if not allowed:
-        raise RateLimitExceeded(retry_after=window)
+    result = await rate_limiter.sliding_window(
+        key,
+        window_seconds=settings.RATE_LIMIT_AUTH_WINDOW_SECONDS,
+        max_count=settings.RATE_LIMIT_AUTH_MAX_PER_WINDOW,
+        endpoint="auth",
+    )
+    if not result.allowed:
+        rate_limit_rejected_total.labels(algorithm="sliding_window", endpoint="auth").inc()
+        raise RateLimitExceeded(
+            retry_after=result.retry_after_seconds,
+            limit=result.limit,
+            remaining=result.remaining,
+        )
 
 
 async def rate_limit_chat(
     current_user: User = Depends(get_current_user),
 ) -> None:
-    """
-    Dependency: limits chat messages per user.
-    Max 30 messages per minute. Fail open if Redis unavailable.
-    """
+    """Token-bucket limit on chat per user. Burst tolerated up to capacity, then refills."""
     key = f"ratelimit:chat:{current_user.user_id}"
-    try:
-        allowed = await redis_client.rate_limit_check(
-            key,
-            window_seconds=60,
-            max_count=30,
+    result = await rate_limiter.token_bucket(
+        key,
+        capacity=settings.RATE_LIMIT_CHAT_BUCKET_CAPACITY,
+        refill_per_sec=settings.RATE_LIMIT_CHAT_REFILL_PER_SEC,
+        endpoint="chat",
+    )
+    if not result.allowed:
+        rate_limit_rejected_total.labels(algorithm="token_bucket", endpoint="chat").inc()
+        raise RateLimitExceeded(
+            retry_after=result.retry_after_seconds,
+            limit=result.limit,
+            remaining=result.remaining,
         )
-        if not allowed:
-            raise RateLimitExceeded(retry_after=60)
-    except RateLimitExceeded:
-        raise
-    except Exception:
-        pass  # fail open

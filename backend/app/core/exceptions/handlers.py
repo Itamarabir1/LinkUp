@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Any
 
 import sentry_sdk
@@ -56,8 +57,16 @@ async def link_up_exception_handler(request: Request, exc: LinkUpError):
     headers = {}
     if request_id:
         headers["X-Request-ID"] = request_id
-    if exc.error_code == "RATE_LIMIT_EXCEEDED" and exc.payload.get("retry_after"):
-        headers["Retry-After"] = str(exc.payload["retry_after"])
+    if exc.error_code == "RATE_LIMIT_EXCEEDED":
+        retry_after = exc.payload.get("retry_after")
+        if retry_after:
+            headers["Retry-After"] = str(retry_after)
+            # Reset = epoch seconds when the next request is expected to succeed.
+            headers["X-RateLimit-Reset"] = str(int(time.time()) + int(retry_after))
+        if exc.payload.get("limit") is not None:
+            headers["X-RateLimit-Limit"] = str(exc.payload["limit"])
+        if exc.payload.get("remaining") is not None:
+            headers["X-RateLimit-Remaining"] = str(exc.payload["remaining"])
 
     response = JSONResponse(
         status_code=exc.status_code,

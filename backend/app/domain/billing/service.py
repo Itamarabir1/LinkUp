@@ -19,6 +19,7 @@ from app.domain.billing.model import Payment, PaymentStatus
 from app.domain.billing.schema import CheckoutResponse, PaymentStatusResponse
 from app.domain.users.crud import crud_user
 from app.domain.users.model import User
+from app.infrastructure.audit.repo import audit_repo
 from app.infrastructure.metrics import (
     payments_initiated_total,
     payments_succeeded_total,
@@ -170,6 +171,27 @@ class BillingService:
         stripe_session_id = session.get("id")
         stripe_payment_intent_id = session.get("payment_intent")
         user_id = session.get("metadata", {}).get("user_id")
+
+        # Record attempt before idempotency checks so duplicate Stripe retries are auditable.
+        try:
+            await audit_repo.record(
+                db,
+                actor_user_id=UUID(user_id) if user_id else None,
+                action="billing_checkout_completed_webhook",
+                resource_type="billing_webhook",
+                resource_id=stripe_event_id or stripe_session_id,
+                metadata={
+                    "event_type": event.get("type"),
+                    "stripe_event_id": stripe_event_id,
+                    "stripe_session_id": stripe_session_id,
+                    "stripe_payment_intent_id": stripe_payment_intent_id,
+                },
+                ip_address=None,
+            )
+            await db.commit()
+        except Exception as audit_exc:
+            await db.rollback()
+            logger.warning("Audit log write failed for Stripe webhook attempt: %s", audit_exc)
 
         if not user_id or not stripe_payment_intent_id:
             logger.warning("Webhook missing user_id or payment_intent: %s", session)

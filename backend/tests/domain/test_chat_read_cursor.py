@@ -13,9 +13,7 @@ from tests.helpers.db_factories import make_user
 async def _make_conversation_with_participants(db_session):
     user_a = await make_user(db_session, "chat-a", email_suffix="chat")
     user_b = await make_user(db_session, "chat-b", email_suffix="chat")
-    user_1_id, user_2_id = (
-        (user_a.user_id, user_b.user_id) if user_a.user_id < user_b.user_id else (user_b.user_id, user_a.user_id)
-    )
+    user_1_id, user_2_id = (user_a.user_id, user_b.user_id) if user_a.user_id < user_b.user_id else (user_b.user_id, user_a.user_id)
     conv = Conversation(conversation_id=uuid4(), user_id_1=user_1_id, user_id_2=user_2_id)
     db_session.add(conv)
     db_session.add_all(
@@ -88,9 +86,7 @@ async def test_get_partner_read_up_to_message_id_returns_correct_cursor(db_sessi
     partner_participant.last_read_message_id = 5
     await db_session.flush()
 
-    read_up_to = await chat_crud.get_partner_read_up_to_message_id(
-        db_session, conv.conversation_id, current_user.user_id
-    )
+    read_up_to = await chat_crud.get_partner_read_up_to_message_id(db_session, conv.conversation_id, current_user.user_id)
     assert read_up_to == 5
 
 
@@ -125,7 +121,5 @@ async def test_get_partner_read_up_to_message_id_returns_partner_cursor_without_
     partner_participant.last_read_message_id = 5
     await db_session.flush()
 
-    read_up_to = await chat_crud.get_partner_read_up_to_message_id(
-        db_session, conv.conversation_id, current_user.user_id
-    )
+    read_up_to = await chat_crud.get_partner_read_up_to_message_id(db_session, conv.conversation_id, current_user.user_id)
     assert read_up_to == 5

@@ -150,24 +150,16 @@ async def test_get_all_rides_non_admin_returns_403(seeded_booking, api_client_wi
 
 
 @pytest.mark.asyncio
-async def test_get_matches_wrong_owner_returns_403(
-    seeded_booking, seeded_passenger_request, api_client_with_overrides
-):
+async def test_get_matches_wrong_owner_returns_403(seeded_booking, seeded_passenger_request, api_client_with_overrides):
     client, auth_ctx = api_client_with_overrides
     auth_ctx["user"] = seeded_booking["other"]
-    res = await client.get(
-        f"/api/v1/passenger/passengers/{seeded_passenger_request.request_id}/matches"
-    )
+    res = await client.get(f"/api/v1/passenger/passengers/{seeded_passenger_request.request_id}/matches")
     assert res.status_code == 403
 
 
 @pytest.mark.asyncio
-async def test_get_matches_correct_owner_succeeds(
-    seeded_booking, seeded_passenger_request, api_client_with_overrides
-):
+async def test_get_matches_correct_owner_succeeds(seeded_booking, seeded_passenger_request, api_client_with_overrides):
     client, auth_ctx = api_client_with_overrides
     auth_ctx["user"] = seeded_booking["passenger"]
-    res = await client.get(
-        f"/api/v1/passenger/passengers/{seeded_passenger_request.request_id}/matches"
-    )
+    res = await client.get(f"/api/v1/passenger/passengers/{seeded_passenger_request.request_id}/matches")
     assert res.status_code == 200

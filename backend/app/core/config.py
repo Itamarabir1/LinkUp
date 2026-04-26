@@ -193,9 +193,18 @@ class Settings(BaseSettings):
         description="Allowed CORS origins. If empty, FRONTEND_URL is used.",
     )
 
-    # --- Rate limiting (auth endpoints) ---
-    RATE_LIMIT_AUTH_WINDOW_SECONDS: int = Field(60, description="Auth rate-limit window (seconds)")
-    RATE_LIMIT_AUTH_MAX_REQUESTS: int = Field(10, description="Max auth requests per IP per window")
+    # --- Rate limiting ---
+    # Auth uses sliding-window log (no burst — anti-bruteforce). Chat uses
+    # token bucket (burst-tolerant API throttle). Two algorithms by design;
+    # see docs/FEATURE_DECISIONS.md (rate-limit-token-bucket).
+    RATE_LIMIT_AUTH_WINDOW_SECONDS: int = Field(60, description="Auth sliding-window length (seconds)")
+    RATE_LIMIT_AUTH_MAX_PER_WINDOW: int = Field(
+        10,
+        description="Max auth requests per IP per sliding window",
+        validation_alias=AliasChoices("RATE_LIMIT_AUTH_MAX_PER_WINDOW", "RATE_LIMIT_AUTH_MAX_REQUESTS"),
+    )
+    RATE_LIMIT_CHAT_BUCKET_CAPACITY: int = Field(30, description="Token-bucket capacity for chat per user")
+    RATE_LIMIT_CHAT_REFILL_PER_SEC: float = Field(0.5, description="Tokens added per second to chat bucket (0.5 = 30/min)")
 
     # --- Cloud (AWS & Firebase) — optional in local dev ---
     AWS_ACCESS_KEY_ID: str = Field("")

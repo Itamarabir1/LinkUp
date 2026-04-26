@@ -99,6 +99,25 @@ stripe_webhook_errors_total = Counter(
 )
 
 # =============================================================================
+# Rate limiting
+# =============================================================================
+rate_limit_rejected_total = Counter(
+    "rate_limit_rejected_total",
+    "Requests rejected by rate limiter",
+    ["algorithm", "endpoint"],
+)
+rate_limit_redis_errors_total = Counter(
+    "rate_limit_redis_errors_total",
+    "Rate limit fail-open events (Redis unavailable)",
+    ["endpoint"],
+)
+rate_limit_evaluation_seconds = Histogram(
+    "rate_limit_evaluation_seconds",
+    "Latency of Lua-backed rate-limit script evaluation",
+    ["algorithm"],
+)
+
+# =============================================================================
 # Auth
 # =============================================================================
 auth_registrations_total = Counter(
@@ -171,6 +190,21 @@ geo_cache_hits_total = Counter(
 geo_cache_misses_total = Counter(
     "geo_cache_misses_total",
     "Geocoding cache misses",
+)
+cache_lock_acquired_total = Counter(
+    "cache_lock_acquired_total",
+    "Cache mutex acquisitions",
+    ["key_prefix"],
+)
+cache_stampede_avoided_total = Counter(
+    "cache_stampede_avoided_total",
+    "Cache stampede events avoided by follower polling",
+    ["key_prefix"],
+)
+cache_fail_open_total = Counter(
+    "cache_fail_open_total",
+    "Cache fail-open events due to Redis/cache lock failures",
+    ["key_prefix"],
 )
 geo_circuit_breaker_state = Gauge(
     "geo_circuit_breaker_state",

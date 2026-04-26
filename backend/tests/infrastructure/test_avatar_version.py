@@ -16,18 +16,12 @@ def test_new_avatar_version_id_unique_and_shape():
 
 def test_versioned_prefix_concatenates_filename():
     prefix = "avatars/550e8400-e29b-41d4-a716-446655440000/v1700000000000000000_deadbeef/"
-    assert f"{prefix}400x400.webp" == (
-        "avatars/550e8400-e29b-41d4-a716-446655440000/v1700000000000000000_deadbeef/400x400.webp"
-    )
+    assert f"{prefix}400x400.webp" == ("avatars/550e8400-e29b-41d4-a716-446655440000/v1700000000000000000_deadbeef/400x400.webp")
 
 
 def test_is_versioned_avatar_prefix_true():
-    assert _is_versioned_avatar_prefix(
-        "avatars/550e8400-e29b-41d4-a716-446655440000/v1700000000000000000_deadbeef/"
-    )
-    assert _is_versioned_avatar_prefix(
-        "avatars/550e8400-e29b-41d4-a716-446655440000/v1700000000000000000_deadbeef"
-    )
+    assert _is_versioned_avatar_prefix("avatars/550e8400-e29b-41d4-a716-446655440000/v1700000000000000000_deadbeef/")
+    assert _is_versioned_avatar_prefix("avatars/550e8400-e29b-41d4-a716-446655440000/v1700000000000000000_deadbeef")
 
 
 def test_is_versioned_avatar_prefix_false_legacy_user_folder():

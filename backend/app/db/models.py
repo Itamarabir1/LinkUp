@@ -10,5 +10,6 @@ from app.domain.passengers.model import PassengerRequest
 from app.domain.rides.model import Ride
 from app.domain.scheduled_notifications.model import ScheduledNotification
 from app.domain.users.model import User
+from app.infrastructure.audit.model import AuditLog
 
-__all__ = ["Booking", "Group", "GroupMember", "PassengerRequest", "Payment", "Ride", "ScheduledNotification", "User"]
+__all__ = ["AuditLog", "Booking", "Group", "GroupMember", "PassengerRequest", "Payment", "Ride", "ScheduledNotification", "User"]

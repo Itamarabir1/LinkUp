@@ -254,6 +254,34 @@
 
 ---
 
+## 23. Rate limiting — split by threat model (Sliding Window + Token Bucket)
+
+| | |
+|--|--|
+| **הקשר** | מימוש קודם של rate limit ב-Redis היה fixed-window לא אטומי (`INCR` ואז `EXPIRE` בשתי פקודות). בגבול חלון ניתן להשיג burst של ~פי 2 מהמותר. בנוסף, אותו אלגוריתם שירת גם auth וגם chat למרות דרישות שונות. |
+| **החלטה** | מעבר לשני Lua scripts אטומיים שונים: **`sliding_window`** ל-auth (פר-IP, ללא burst, anti-bruteforce), ו-**`token_bucket`** לצ'אט (פר-user, burst-tolerant). ה-scripts נרשמים דרך `redis-py register_script` (EVALSHA + fallback אוטומטי ל-EVAL על `NOSCRIPT`). |
+| **למה** | **The right tool for the right threat**: ב-auth burst הוא בעיה אבטחתית ולכן Sliding Window. בצ'אט burst קצר הוא UX לגיטימי ולכן Token Bucket. בנוסף, אטומיות בלואה מבטלת race של fixed-window. |
+| **API/Observability** | `RateLimitExceeded` הועשר לשדות `limit`, `remaining`, `retry_after`; handler מרכזי מחזיר `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After`. נוספו מטריקות: `rate_limit_rejected_total{algorithm,endpoint}`, `rate_limit_redis_errors_total{endpoint}`, `rate_limit_evaluation_seconds{algorithm}`. |
+| **Trade-off** | זמן `now_ms` מגיע מהאפליקציה ולא מ-`redis.call('TIME')` (NTP-bounded skew), וחישובי refill משתמשים ב-float של Lua 5.1. ב-scale הנוכחי זה טרייד-אוף סביר לטובת פשטות ותאימות רפליקציה. |
+| **Fail-open** | כש-Redis לא זמין, הבקשה עוברת (זמינות עדיפה על חסימה גורפת של login/chat בזמן תקלת תשתית). האירוע נמדד ב-metrics. |
+| **בקצרה לראיון** | “שדרגתי rate limiting מרמת ‘counter בחלון’ לרמה תפעולית-ארכיטקטונית: שני אלגוריתמים שונים לפי איום, אטומיות ב-Lua, headers סטנדרטיים ל-clients ומדדים שמאפשרים SLO אמיתי.” |
+
+---
+
+## 24. Persistent audit log for admin actions and billing webhook attempts
+
+| | |
+|--|--|
+| **הקשר** | אדמין מבצע פעולות רגישות (user active/admin toggle, ride cancel, outbox requeue) ו-billing webhook יכול להישלח מחדש ע״י Stripe. לוגים בלבד לא מספיקים ל-forensics, ו-idempotency על `stripe_event_id` עלול להסתיר ניסיונות כפולים. |
+| **החלטה** | טבלת `audit_log` append-only ב-Postgres + repository ייעודי לכתיבה/קריאה. ב-admin שומרים גם logger (`[admin_audit]`) וגם DB record (defense in depth). ב-`checkout.session.completed` רושמים audit attempt **לפני** בדיקת event-level idempotency כדי לתעד גם duplicate retries. |
+| **סכימה** | `audit_log(id, actor_user_id, action, resource_type, resource_id, metadata JSONB, ip_address, created_at)` + indexes לפי `(actor_user_id, created_at DESC)` ו-`(resource_type, resource_id)`. |
+| **למה** | מחזק traceability, incident response ו-compliance בסיסי בלי תלות במערכת לוגים חיצונית בלבד. מאפשר feed אדמין מסונן לפי actor/resource/action עם limit. |
+| **Trade-off** | תוספת write-path לכל פעולה רגישה ונפח metadata שעלול לגדול. mitigation: metadata קומפקטי בלבד; בלי payloadים מלאים. |
+| **Fail policy** | ל-admin ול-billing נשמר best-effort pragmatic: כש-audit write נכשל — לוג warning, ולא שוברים את זרימת הדומיין הקריטית (במיוחד webhook processing). |
+| **בקצרה לראיון** | “תיעדתי פעולות רגישות בטבלת audit ייעודית, וב-billing הקפדתי על ordering נכון: audit לפני idempotency, כדי שגם retries כפולים יהיו נראים בחקירה.” |
+
+---
+
 ## קישורים
 
 - [README — מפת ADR](README.md)  

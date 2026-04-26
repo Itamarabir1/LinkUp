@@ -10,7 +10,13 @@ from app.infrastructure.redis.client import redis_client
 logger = logging.getLogger(__name__)
 
 
-async def check_health() -> dict[str, Any]:
+async def check_liveness() -> dict[str, str]:
+    """Process liveness only (no dependency checks)."""
+    return {"status": "alive"}
+
+
+async def check_readiness() -> dict[str, Any]:
+    """Dependency readiness: DB + Redis + RabbitMQ."""
     results: dict[str, Any] = {}
 
     try:
@@ -60,3 +66,11 @@ async def check_health() -> dict[str, Any]:
         logger.warning("Could not load circuit breaker state: %s", e)
 
     return results
+
+
+async def check_health() -> dict[str, Any]:
+    """
+    Backward-compatibility wrapper.
+    Keeps existing /api/v1/health semantics.
+    """
+    return await check_readiness()

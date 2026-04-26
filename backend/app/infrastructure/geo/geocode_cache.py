@@ -15,6 +15,7 @@ from app.core.constants import GEOCODE_CACHE_TTL
 from app.infrastructure.geo.geocoding import GeocodingService
 from app.infrastructure.metrics import geo_cache_hits_total, geo_cache_misses_total
 from app.infrastructure.redis.client import redis_client
+from app.infrastructure.redis.cache_stampede import get_or_compute
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +76,33 @@ async def get_coordinates(address: str) -> tuple[float, float] | None:
         return cached
     geo_cache_misses_total.inc()
 
-    lat, lon = await GeocodingService.get_coordinates_from_address(address)
-    if lat is None or lon is None:
+    cache_key = f"geocode:{address.strip()}"
+
+    async def _fetch_coords_payload() -> dict[str, float] | None:
+        lat, lon = await GeocodingService.get_coordinates_from_address(address)
+        if lat is None or lon is None:
+            return None
+        return {"lat": float(lat), "lon": float(lon)}
+
+    payload = await get_or_compute(
+        key=cache_key,
+        fetcher=_fetch_coords_payload,
+        ttl=GEOCODE_CACHE_TTL,
+        key_prefix="geocode",
+    )
+    if payload is None:
         return None
 
-    await set_cached_coords(address, lat, lon)
-    return lat, lon
+    # Backward compatibility: legacy entries may be raw {lat, lon} dicts.
+    if isinstance(payload, dict):
+        lat = payload.get("lat")
+        lon = payload.get("lon")
+        if lat is None or lon is None:
+            return None
+        return float(lat), float(lon)
+
+    if isinstance(payload, (list, tuple)) and len(payload) == 2:
+        return float(payload[0]), float(payload[1])
+
+    logger.warning("Unexpected geocode cache payload format for key=%s", cache_key)
+    return None

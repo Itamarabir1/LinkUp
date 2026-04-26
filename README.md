@@ -15,6 +15,7 @@ Linkup connects drivers and passengers for shared rides. Drivers publish trips w
 ## Engineering highlights (portfolio)
 
 Single doc for **stack, scale patterns, real-time chat (disconnect / last-seen debounce), Outbox, ops, CI/CD, tests, k6 load testing, auth under concurrent load (sync vs async), phone validation, frontend refactor, i18n/locale/error fallbacks/CSS fonts**: **[docs/ENGINEERING_HIGHLIGHTS.md](docs/ENGINEERING_HIGHLIGHTS.md)**.
+Deferred/next-step architecture decisions (including cache stampede Phase 2 early refresh rationale): **[docs/FUTURE_WORK.md](docs/FUTURE_WORK.md)**.
 
 ### Recent production upgrades
 
@@ -22,6 +23,7 @@ Single doc for **stack, scale patterns, real-time chat (disconnect / last-seen d
 - Rolling backend deploy with health-gated rollback (`docker compose ... --wait`).
 - Compose env hardening with multiple env files and fail-fast checks.
 - RabbitMQ reliability upgrades: self-healing consumer + DLQ tooling + metrics.
+- Atomic Redis rate limiting with split algorithms (sliding-window for auth, token-bucket for chat) + `X-RateLimit-*` headers.
 - Frontend runtime config via startup `envsubst` (`window.__APP_CONFIG__`).
 - Redis Sentinel HA + PgBouncer runtime pooling + direct migrate path.
 - Automated JWT secret sync between backend and chat-ws during deploy.

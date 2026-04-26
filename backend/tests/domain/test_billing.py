@@ -66,3 +66,40 @@ async def test_handle_webhook_invalid_signature_maps_to_domain_error():
                 payload=b"{}",
                 stripe_signature="t=1,v1=bad",
             )
+
+
+@pytest.mark.asyncio
+async def test_checkout_completed_duplicate_event_is_still_audited_before_idempotency_return():
+    db = AsyncMock()
+    event = {
+        "id": "evt_dup_123",
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "id": "cs_test_123",
+                "payment_intent": "pi_test_123",
+                "metadata": {"user_id": "11111111-1111-1111-1111-111111111111"},
+            },
+        },
+    }
+
+    with patch(
+        "app.domain.billing.service.stripe.Webhook.construct_event",
+        return_value=event,
+    ):
+        with patch(
+            "app.domain.billing.service.audit_repo.record",
+            new=AsyncMock(),
+        ) as mock_audit_record:
+            with patch(
+                "app.domain.billing.service.crud_billing.get_by_event_id",
+                new=AsyncMock(return_value=SimpleNamespace(payment_id="already_processed")),
+            ):
+                res = await BillingService.handle_webhook(
+                    db,
+                    payload=b"{}",
+                    stripe_signature="sig_ok",
+                )
+
+    assert res == {"status": "ok"}
+    mock_audit_record.assert_awaited_once()

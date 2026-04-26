@@ -88,27 +88,6 @@ class RedisClient:
             logger.error("Redis DELETE failed key=%s: %s", key, e, exc_info=True)
             raise RedisUnavailable() from e
 
-    async def rate_limit_check(self, key: str, window_seconds: int, max_count: int) -> bool:
-        """
-        Rate limit check: increments a counter in Redis, returns True if allowed, False if exceeded.
-        If Redis is disconnected or an error occurs — returns True (fail open).
-        """
-        if not self.client:
-            logger.warning("Rate limit skipped — Redis not connected | key=%s", key)
-            return True
-        try:
-            count = await self.client.incr(key)
-            if count == 1:
-                await self.client.expire(key, window_seconds)
-            return count <= max_count
-        except Exception as e:
-            logger.warning(
-                "Rate limit check failed — fail open (Redis unavailable) | key=%s error=%s",
-                key,
-                e,
-            )
-            return True
-
     async def add_to_denylist(self, jti: str, ttl_seconds: int) -> None:
         """Store denylist:{jti} with TTL. Fail-open: log errors, do not raise."""
         try:

@@ -2,7 +2,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -24,6 +24,7 @@ from app.domain.rides.service import RideService
 from app.domain.users.crud import crud_user
 from app.domain.users.model import User
 from app.infrastructure.health.health_service import check_health
+from app.infrastructure.audit.repo import audit_repo
 from app.infrastructure.outbox.model import OutboxEvent
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,13 @@ def _audit(actor: User, action: str, detail: str) -> None:
         detail,
         datetime.now(UTC).isoformat(),
     )
+
+
+def _client_ip(request: Request) -> str | None:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else None
 
 
 @router.get("/me")
@@ -180,6 +188,7 @@ async def admin_users(
 @router.patch("/users/{user_id}/active")
 async def admin_toggle_user_active(
     user_id: UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
@@ -187,6 +196,15 @@ async def admin_toggle_user_active(
     if not u:
         raise UserNotFoundError(identifier=str(user_id))
     u.is_active = not bool(u.is_active)
+    await audit_repo.record(
+        db,
+        actor_user_id=current_user.user_id,
+        action="toggle_user_active",
+        resource_type="user",
+        resource_id=str(user_id),
+        metadata={"is_active": bool(u.is_active)},
+        ip_address=_client_ip(request),
+    )
     await db.commit()
     await db.refresh(u)
     _audit(
@@ -200,6 +218,7 @@ async def admin_toggle_user_active(
 @router.patch("/users/{user_id}/admin")
 async def admin_toggle_user_admin(
     user_id: UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
@@ -207,6 +226,15 @@ async def admin_toggle_user_admin(
     if not u:
         raise UserNotFoundError(identifier=str(user_id))
     u.is_admin = not bool(u.is_admin)
+    await audit_repo.record(
+        db,
+        actor_user_id=current_user.user_id,
+        action="toggle_user_admin",
+        resource_type="user",
+        resource_id=str(user_id),
+        metadata={"is_admin": bool(u.is_admin)},
+        ip_address=_client_ip(request),
+    )
     await db.commit()
     await db.refresh(u)
     _audit(
@@ -262,6 +290,7 @@ async def admin_rides(
 @router.post("/rides/{ride_id}/cancel")
 async def admin_cancel_ride(
     ride_id: UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
     ride_svc: RideService = Depends(get_ride_service),
@@ -270,6 +299,16 @@ async def admin_cancel_ride(
     if not ride:
         raise RideNotFoundError(ride_id)
     await ride_svc.cancel_ride_by_driver(db, ride_id, ride.driver_id)
+    await audit_repo.record(
+        db,
+        actor_user_id=current_user.user_id,
+        action="cancel_ride",
+        resource_type="ride",
+        resource_id=str(ride_id),
+        metadata={"driver_id": str(ride.driver_id)},
+        ip_address=_client_ip(request),
+    )
+    await db.commit()
     _audit(current_user, "cancel_ride", f"ride_id={ride_id}")
     return {"ok": True, "ride_id": str(ride_id)}
 
@@ -349,6 +388,37 @@ async def admin_outbox(
     ]
 
 
+@router.get("/audit-log")
+async def admin_audit_log(
+    actor_user_id: UUID | None = Query(default=None),
+    resource_type: str | None = Query(default=None),
+    action: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=_QUERY_MAX_ADMIN_LIST_LIMIT),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    rows = await audit_repo.list_entries(
+        db,
+        actor_user_id=actor_user_id,
+        resource_type=resource_type,
+        action=action,
+        limit=limit,
+    )
+    return [
+        {
+            "id": str(r.id),
+            "actor_user_id": str(r.actor_user_id) if r.actor_user_id else None,
+            "action": r.action,
+            "resource_type": r.resource_type,
+            "resource_id": r.resource_id,
+            "metadata": r.metadata_json,
+            "ip_address": r.ip_address,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
 @router.get("/outbox/{event_id}")
 async def admin_outbox_by_id(
     event_id: UUID,
@@ -377,6 +447,7 @@ async def admin_outbox_by_id(
 @router.post("/outbox/{event_id}/requeue")
 async def admin_outbox_requeue(
     event_id: UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
@@ -395,6 +466,15 @@ async def admin_outbox_requeue(
             last_error=None,
             processed_at=None,
         ),
+    )
+    await audit_repo.record(
+        db,
+        actor_user_id=current_user.user_id,
+        action="outbox_requeue",
+        resource_type="outbox_event",
+        resource_id=str(event_id),
+        metadata={"status": "PENDING"},
+        ip_address=_client_ip(request),
     )
     await db.commit()
     _audit(current_user, "outbox_requeue", f"event_id={event_id}")

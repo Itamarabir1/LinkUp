@@ -29,7 +29,7 @@ from app.core.lifespan import lifespan
 from app.core.logging import request_id_ctx, setup_logging
 from app.core.middleware import HTTPSRedirectMiddleware, SecurityHeadersMiddleware
 from app.db.session import engine
-from app.infrastructure.health.health_service import check_health
+from app.infrastructure.health.health_service import check_health, check_liveness, check_readiness
 
 setup_logging()
 logger = structlog.get_logger(__name__)
@@ -164,6 +164,20 @@ def read_root():
 async def api_health(response: Response):
     """Health check: DB, Redis, RabbitMQ. 503 if any dependency is down."""
     health = await check_health()
+    response.status_code = 200 if health["status"] == "healthy" else 503
+    return health
+
+
+@app.get("/livez", tags=["Health"], include_in_schema=False)
+async def livez():
+    """Liveness probe: process is running."""
+    return await check_liveness()
+
+
+@app.get("/readyz", tags=["Health"], include_in_schema=False)
+async def readyz(response: Response):
+    """Readiness probe: dependencies are reachable."""
+    health = await check_readiness()
     response.status_code = 200 if health["status"] == "healthy" else 503
     return health
 

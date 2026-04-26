@@ -81,14 +81,31 @@ class InfrastructureError(LinkUpError):
 
 
 class RateLimitExceeded(LinkUpError):
-    """Too many requests; clients may read retry_after from payload."""
+    """Too many requests; clients may read retry_after from payload.
+
+    The optional ``limit`` and ``remaining`` carry standard rate-limit metadata
+    so the central error handler can emit ``X-RateLimit-Limit`` /
+    ``X-RateLimit-Remaining`` / ``X-RateLimit-Reset`` headers (Stripe / GitHub
+    convention).
+    """
 
     status_code = 429
     error_code = "RATE_LIMIT_EXCEEDED"
     message = "יותר מדי בקשות, נסה שוב בעוד מעט"
 
-    def __init__(self, retry_after: int = 60):
-        super().__init__(payload={"retry_after": retry_after})
+    def __init__(
+        self,
+        retry_after: int = 60,
+        *,
+        limit: int | None = None,
+        remaining: int | None = None,
+    ):
+        payload: dict[str, Any] = {"retry_after": retry_after}
+        if limit is not None:
+            payload["limit"] = limit
+        if remaining is not None:
+            payload["remaining"] = remaining
+        super().__init__(payload=payload)
 
 
 class S3UploadFailed(LinkUpError):
