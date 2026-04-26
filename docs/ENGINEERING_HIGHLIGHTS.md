@@ -5,15 +5,27 @@
 מסמך זה אוסף **במקום אחד** את הפיצ’רים, הטכנולוגיות, הדפוסים וההחלטות שמיועדות ל**סקייל, אמינות ותחזוקה** — כדי להציג את הפרויקט ברמת מומחה.  
 *זה סיכום “להצגה”, לא מיפוי כל שורה בקוד; אחרי סקירה מול ה-repo הוכנסו גם workers, AI, FCM, Brevo, Google, **חיזוק auth ועומס מקבילי**, **JWT עם `jti` + denylist ב-Redis אחרי logout**, **Idempotency-Key לבקשת הצטרפות מחיפוש (Redis, Stripe-style)**, **Circuit Breaker in-memory לכל קריאת Google Maps Platform בבקאנד (Geocoding / Directions / Distance Matrix) + חשיפת מצב המעגלים ב־`GET /api/v1/health`**, **k6**, **ריפקטור async משמעותי ב-passengers/bookings/rides**, **ריפקטור ארגון בפרונט**, **מסך אדמין פנימי (React + `/api/v1/admin`)**, **מעבר ארכיטקטוני ל-React Email renderer (Node.js/Express)**, **מדיה: S3 + CloudFront (אופציונלי) ואווטארים ב-prefix גרסתי immutable**, ו**i18n (עברית/אנגלית) + פורמט תאריכים לפי לוקאל + fallbacks לשגיאות API דרך `common:err_*` + איחוד פונטים ב־CSS Modules**.*
 
-**לראיון — מיפוי שורת CV ↔ איפה בקוד:** [`INTERVIEW_TECH_STACK_MAP.md`](INTERVIEW_TECH_STACK_MAP.md).
+**לראיון — מיפוי שורת CV ↔ איפה בקוד:** [`docs/internal/INTERVIEW_TECH_STACK_MAP.md`](internal/INTERVIEW_TECH_STACK_MAP.md).
 
-**לראיון — ניווט לפי נושא + טבלת Why / Alternatives / Trade-offs (מקביל למסמך הזה):** [`INTERVIEW_PLAYBOOK.md`](INTERVIEW_PLAYBOOK.md) · [`FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md).
+**לראיון — ניווט לפי נושא + טבלת Why / Alternatives / Trade-offs (מקביל למסמך הזה):** [`docs/internal/INTERVIEW_PLAYBOOK.md`](internal/INTERVIEW_PLAYBOOK.md) · [`FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md).
 
 לפרטים טכניים עמוקים יותר: `../ARCHITECTURE.md`, `ERRORS.md`, `architecture/REALTIME.md`, `architecture/EVENTS.md`, `architecture/DATABASE.md`, `architecture/API.md`, `backend/docs/GOOGLE_OAUTH.md`.
 
 ---
 
 ## Latest architecture updates
+
+- **Production hardening checklist (completed):**
+  - all runtime images build in CI and are pulled from GHCR on deploy
+  - single-EC2 rolling deploy with health-gated rollback (no full downtime window)
+  - compose env source-of-truth hardened with multiple `--env-file` inputs
+  - RabbitMQ consumers upgraded to self-healing behavior on iterator/channel close
+  - frontend runtime config moved to startup-time `envsubst` (`window.__APP_CONFIG__`)
+  - HTTPS redirect behavior hardened for loopback health checks
+  - deploy-time JWT secret sync between backend and chat-ws
+  - OAuth popup compatibility fixed with nginx COOP/COEP headers
+  - deploy disk pressure mitigated with aggressive image prune strategy
+  - production endpoint stabilized at `https://linkup.itamarabir.com`
 
 - **SLOs & Error Budgets observability baseline:** metrics surface הורחב מ-backend-only ל-backend + workers (`9091/9092/9093`) עם מדדי domain/reliability (auth, rides, bookings, billing, RabbitMQ, outbox, geo cache/circuit-breaker, S3, AI). זה מאפשר להגדיר SLOs רשמיים (availability/latency/reliability) ולנהל release decisions לפי error-budget consumption במקום לפי אינטואיציה.
 - **RabbitMQ PR1 reliability guardrails:** consumer runtime now includes supervision + draining states (`RUNNING -> DRAINING -> STOPPED`) and queue-scoped `x-death` parsing for retry observability. Workers run long-lived loops through `run_supervised` with bounded retries (`max_retries`) to prevent silent infinite crash loops.

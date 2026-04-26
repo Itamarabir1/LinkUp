@@ -6,6 +6,15 @@
 
 ---
 
+## עדכוני חובה להזכיר בדמו (2026)
+
+בפתיח/סגירה הוסף 2–3 משפטים על:
+
+- האתר רץ בפרודקשן על `https://linkup.itamarabir.com`.
+- פריסה רציפה בלי downtime על EC2 (rolling + rollback).
+- Billing + RabbitMQ DLQ/self-healing + PgBouncer + Redis HA.
+- Frontend runtime config בזמן startup (לא build-time bake).
+
 ## 0:00–0:25 — פתיח ומה זה LinkUp
 
 **מסך:** דף הבית או לנדינג.
@@ -76,4 +85,4 @@
 - שמירת התראה: `POST /api/v1/passenger/passengers/` עם גוף כמו יצירת בקשה (`is_notification_active`, ואופציונלית `group_id` בחיפוש בתוך קבוצה)
 - תיעוד מלא: `docs/architecture/API.md`, `ARCHITECTURE.md`, `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` סעיף 17
 - CI: ארבעה workflows ב־`.github/workflows/` — `backend-ci`, `frontend-ci`, `chat-ws-ci`, `email-renderer-ci`
-- סרטון ארכיטקטורה מפורט: `docs/VIDEO_SCRIPT_ARCHITECTURE.md`
+- סרטון ארכיטקטורה מפורט: `docs/internal/VIDEO_SCRIPT_ARCHITECTURE.md`

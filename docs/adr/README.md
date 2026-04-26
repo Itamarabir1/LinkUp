@@ -2,7 +2,7 @@
 
 מסמכים אלה מסכמים **למה** נבנתה LinkUp כפי שהיא — לא רק **מה** קיים. מקור אמת טכני נשאר במסמכי הארכיטקטורה והקוד.
 
-**מסלול “סניור” מאוחד (נקודת כניסה + Why/Alternatives לפי פיצ'ר):** [../INTERVIEW_PLAYBOOK.md](../INTERVIEW_PLAYBOOK.md) · [../FEATURE_DECISIONS.md](../FEATURE_DECISIONS.md)
+**מסלול “סניור” מאוחד (נקודת כניסה + Why/Alternatives לפי פיצ'ר):** [../internal/INTERVIEW_PLAYBOOK.md](../internal/INTERVIEW_PLAYBOOK.md) · [../FEATURE_DECISIONS.md](../FEATURE_DECISIONS.md)
 
 ## סדר קריאה מומלץ לפני ראיון
 
@@ -53,7 +53,7 @@ flowchart TB
 | FCM | [../FCM_SYSTEM_SUMMARY.md](../FCM_SYSTEM_SUMMARY.md) |
 | שגיאות API | [../ERRORS.md](../ERRORS.md) |
 | פרונט | [../../frontend/docs/ARCHITECTURE.md](../../frontend/docs/ARCHITECTURE.md) |
-| תסריטי וידאו (דמו / ארכיטקטורה) | [../VIDEO_SCRIPT_PROJECT_DEMO.md](../VIDEO_SCRIPT_PROJECT_DEMO.md), [../VIDEO_SCRIPT_ARCHITECTURE.md](../VIDEO_SCRIPT_ARCHITECTURE.md) |
+| תסריטי וידאו (דמו / ארכיטקטורה) | [../internal/VIDEO_SCRIPT_PROJECT_DEMO.md](../internal/VIDEO_SCRIPT_PROJECT_DEMO.md), [../internal/VIDEO_SCRIPT_ARCHITECTURE.md](../internal/VIDEO_SCRIPT_ARCHITECTURE.md) |
 | chat-ws | [../../chat-ws/ARCHITECTURE.md](../../chat-ws/ARCHITECTURE.md) |
 
 ## איך להשתמש בראיון

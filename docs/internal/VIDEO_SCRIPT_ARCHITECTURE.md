@@ -1,8 +1,19 @@
 # תסריט סרטון — ארכיטקטורה (LinkUp) · ~6–7 דקות
 
-מטרה: להסביר איך המערכת מפורקת לשירותים, איך נתונים ואירועים זורמים, ואיפה נכנס פיצ’ר הנוסע (חיפוש לעומת שמירת התראה). בסוף יש **קטלוג API** — מקור אמת מפורט: [`architecture/API.md`](architecture/API.md).
+מטרה: להסביר איך המערכת מפורקת לשירותים, איך נתונים ואירועים זורמים, ואיפה נכנס פיצ’ר הנוסע (חיפוש לעומת שמירת התראה). בסוף יש **קטלוג API** — מקור אמת מפורט: [`../architecture/API.md`](../architecture/API.md).
 
 ---
+
+## עדכוני פרודקשן חשובים (2026)
+
+כדאי לשלב במשפט-שניים בזמן הסרטון:
+
+- **Billing (Stripe):** flow מלא עם webhook idempotency ו-payment integrity.
+- **RabbitMQ reliability:** DLQ broker-native + consumer self-healing + metrics (`rabbitmq_consumer_iterator_restarts_total`).
+- **PgBouncer + Redis Sentinel HA:** backend/workers דרך pooler ו-failover ל-Redis.
+- **Single-EC2 rolling deploy:** health-gated deploy + rollback אוטומטי ב-`backend-ci.yml`.
+- **Frontend runtime config (12-factor):** `config.js` ו-`firebase-messaging-sw.js` נוצרים ב-startup עם `envsubst`.
+- **Ops hardening:** multi `--env-file`, JWT sync backend/chat-ws, ו-fail-fast guards בסקריפט deploy.
 
 ## חלק א׳ — מה רואים על המסך (0:00–1:00)
 
@@ -24,7 +35,7 @@
 **תגיד:**  
 “ה-worker מריץ כמה צרכנים: תור התראות — מייל דרך **Brevo + email-renderer (React Email)** ופוש דרך FCM; תור אווטאר ל-S3; תור מתוזמנות — תזכורות, תחזוקה, ועוד. בנוסף הוא מאזין ל-Redis על סיום שיחות להרצת ניתוח AI.”
 
-**מפת מפתחות:** `docs/architecture/EVENTS.md`, `ARCHITECTURE.md` (תרשים Communication Flow).
+**מפת מפתחות:** `docs/architecture/EVENTS.md`, `../ARCHITECTURE.md` (תרשים Communication Flow).
 
 ---
 
@@ -103,13 +114,13 @@
 | נושא | קובץ |
 |------|------|
 | API מלא | `docs/architecture/API.md` |
-| סקירת מערכת | `ARCHITECTURE.md`, `README.md` (שורש) |
+| סקירת מערכת | `../ARCHITECTURE.md`, `README.md` (שורש) |
 | אירועים ותורים | `docs/architecture/EVENTS.md` |
 | WS ו-GPS | `docs/architecture/REALTIME.md` |
 | ADR בקאנד כולל נוסע (סעיף 17) | `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` |
 | ADR פרונט | `docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md` |
-| chat-ws מול API | `chat-ws/ARCHITECTURE.md` |
-| ארכיטקטורת פרונט | `frontend/docs/ARCHITECTURE.md` |
+| chat-ws מול API | `chat-ws/../ARCHITECTURE.md` |
+| ארכיטקטורת פרונט | `frontend/docs/../ARCHITECTURE.md` |
 
 ---
 
@@ -134,7 +145,7 @@
 | +0:45–1:15 | **מיגרציות וסכימה** | Alembic כמקור שינויי סכימה; שירות **`migrate`** ב-Docker Compose לפני עליית ה-API; `db/schema.sql` כעזר. |
 | +1:00–1:45 | **פריסה מקומית מול K8s** | Compose: **db**, **redis**, **rabbitmq**, **`migrate`** (Job לפני API), **`email-renderer`**, **backend**, **outbox-worker**, **chat-ws**; `depends_on` + healthchecks; `UVICORN_WORKERS`. אז מעבר קצר ל־`k8s/` — מפת שירותים (כולל `k8s/email-renderer`), בלי לעבור כל מניפסט. |
 | +0:45–1:00 | **CI/CD** | **ארבעה** workflows ב־`.github/workflows/`: `backend-ci`, `frontend-ci`, `chat-ws-ci`, **`email-renderer-ci`** — lint/tests/build; ב־`main` דחיפת תמונות ל־GHCR (frontend ו־email-renderer). |
-| +1:15–2:00 | **chat-ws לעומק** | למה **Go** ל-WS; `PSubscribe` ל-Redis; אין DB בשרת — רק forward; JWT; `presence` + debounce; קריאת `last_seen` מ-REST הבקאנד. `chat-ws/ARCHITECTURE.md`, `docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`. |
+| +1:15–2:00 | **chat-ws לעומק** | למה **Go** ל-WS; `PSubscribe` ל-Redis; אין DB בשרת — רק forward; JWT; `presence` + debounce; קריאת `last_seen` מ-REST הבקאנד. `chat-ws/../ARCHITECTURE.md`, `docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`. |
 | +1:00–1:30 | **ערוצי התראות** | הפרדה: צ’אט (`chat:notification:*` דרך chat-ws) מול פיד האפליקציה (`/api/v1/notifications/ws` על FastAPI); Outbox → RabbitMQ → **Brevo** / **FCM**; **למה FCM רק מפת `data`** — `docs/FCM_SYSTEM_SUMMARY.md`, `docs/adr/FCM_AND_PUSH.md`. |
 | +0:45–1:00 | **אבטחה מפורטת** | rate limit על auth; **מניעת user enumeration** בלוגין; `get_current_user_ws` בלי DB ב-connect — trade-off. |
 | +0:45–1:00 | **איכות ועומס** | pytest בבקאנד; Vitest בפרונט; **k6** — מה בודקים (auth, זרימות ליבה), בלי להריץ live בסרטון. `backend/k6/scripts/`, `docs/ENGINEERING_HIGHLIGHTS.md`. |
@@ -154,3 +165,4 @@
 | שגיאות | `docs/ERRORS.md` |
 | אדמין | `ADMIN_DASHBOARD.md` (בשורש) |
 | Kubernetes (סדר פריסה) | `k8s/README.md` |
+

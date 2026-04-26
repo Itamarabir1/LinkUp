@@ -2,6 +2,11 @@
 
 This document is the operational source of truth for Linkup production deployment on EC2.
 
+Related operations docs:
+
+- [`docs/operations/RUNBOOK.md`](operations/RUNBOOK.md)
+- [`docs/operations/MONITORING.md`](operations/MONITORING.md)
+
 ## Production Topology
 
 - **Host:** single EC2 instance.

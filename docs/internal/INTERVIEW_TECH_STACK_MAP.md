@@ -1,6 +1,6 @@
 # LinkUp — מיפוי טכנולוגיות לראיון (מול קורות החיים)
 
-מסמך זה **משלים** את [`ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md): לכל ניסוח טיפוסי בקורות החיים / בפיץ’ — **איפה זה מופיע בפועל בפרויקט** (שירותים, תיקיות, קבצים מרכזיים). מומלץ להדפיס או לפתוח לצד ההיילייטס בראיון.
+מסמך זה **משלים** את [`ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md): לכל ניסוח טיפוסי בקורות החיים / בפיץ’ — **איפה זה מופיע בפועל בפרויקט** (שירותים, תיקיות, קבצים מרכזיים). מומלץ להדפיס או לפתוח לצד ההיילייטס בראיון.
 
 **שורת CV (אנגלית) — עוגן:**  
 *LinkUp — Full-Stack Ride-Sharing Platform | React, TypeScript, Python, Go, Node.js, PostgreSQL, Redis (2025–2026)*
@@ -11,7 +11,7 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| פלטפורמת נסיעות משותפות end-to-end | דומיינים: נסיעות, נוסעים, הזמנות, קבוצות, צ’אט, התראות, משתמשים — ראו סיכום טבלאות ב-[`ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) §1; API ב-[`docs/architecture/API.md`](architecture/API.md). |
+| פלטפורמת נסיעות משותפות end-to-end | דומיינים: נסיעות, נוסעים, הזמנות, קבוצות, צ’אט, התראות, משתמשים — ראו סיכום טבלאות ב-[`ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md) §1; API ב-[`docs/architecture/API.md`](../architecture/API.md). |
 
 ---
 
@@ -31,7 +31,7 @@
 |-------------|---------|
 | API מובנה | **FastAPI** תחת [`backend/app/`](../../backend/app/) — ראוטרים לפי דומיין (למשל `domain/rides`, `domain/bookings`, `domain/passengers`). |
 | גרסת API | קידומת נפוצה: `/api/v1/...` (בריאות, נסיעות, צ’אט HTTP, גיאו, אדמין). |
-| תיעוד ארכיטקטורה | [`docs/architecture/API.md`](architecture/API.md), [`ARCHITECTURE.md`](../ARCHITECTURE.md). |
+| תיעוד ארכיטקטורה | [`docs/architecture/API.md`](../architecture/API.md), [`ARCHITECTURE.md`](../ARCHITECTURE.md). |
 
 ---
 
@@ -40,8 +40,8 @@
 | בקורות חיים | בפרויקט |
 |-------------|---------|
 | שרת WS ייעודי ב-Go | [`chat-ws/`](../../chat-ws/) — `go.mod`, Dockerfile, לוגיקת subscribe/publish. |
-| Redis Pub/Sub לצ’אט | ה-API שומר הודעה ומפרסם לערוץ; `chat-ws` נרשם — פירוט זרימה ב-[`docs/architecture/REALTIME.md`](architecture/REALTIME.md), ADR ב-[`docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`](adr/ARCHITECTURE_DECISIONS_CHAT_WS.md). |
-| הפרדת DB Redis | DB **0** (cache, broadcast rides, rate limit וכו’) מול DB **1** (צ’אט + `user:{id}:events`) — [`docker-compose.yml`](../../docker-compose.yml), [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](adr/ARCHITECTURE_DECISIONS_BACKEND.md) §2. |
+| Redis Pub/Sub לצ’אט | ה-API שומר הודעה ומפרסם לערוץ; `chat-ws` נרשם — פירוט זרימה ב-[`docs/architecture/REALTIME.md`](../architecture/REALTIME.md), ADR ב-[`docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`](../adr/ARCHITECTURE_DECISIONS_CHAT_WS.md). |
+| הפרדת DB Redis | DB **0** (cache, broadcast rides, rate limit וכו’) מול DB **1** (צ’אט + `user:{id}:events`) — [`docker-compose.yml`](../../docker-compose.yml), [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md) §2. |
 
 ---
 
@@ -51,7 +51,7 @@
 |-------------|---------|
 | שירות רינדור HTML למיילים | [`email-renderer/`](../../email-renderer/) — `src/server.ts` (**Express**), `POST /render`, `GET /health`. |
 | תבניות React Email | `email-renderer/src/emails/templates/`, `registry.ts`, רכיבים ב-`components/`. |
-| אינטגרציה מהבקאנד | משתני סביבה כמו `EMAIL_RENDERER_URL`; worker/backend קוראים לרינדור לפני שליחה (Brevo) — ראו גם [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](adr/ARCHITECTURE_DECISIONS_BACKEND.md) §5. |
+| אינטגרציה מהבקאנד | משתני סביבה כמו `EMAIL_RENDERER_URL`; worker/backend קוראים לרינדור לפני שליחה (Brevo) — ראו גם [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md) §5. |
 | פריסה | שירות `email-renderer` ב-[`docker-compose.yml`](../../docker-compose.yml); מניפסטים תחת [`k8s/email-renderer/`](../../k8s/email-renderer/); CI: [`.github/workflows/email-renderer-ci.yml`](../../.github/workflows/email-renderer-ci.yml). |
 
 ---
@@ -60,7 +60,7 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| Worker נפרד מה-API | תהליכי **`notification-worker`**, **`task-worker`**, **`ai-worker`** (אותו codebase Python, entries נפרדים) — outbox dispatch, notifications, scheduled/avatar tasks, AI completion — [`docs/ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) §2א, [`docs/architecture/EVENTS.md`](architecture/EVENTS.md). |
+| Worker נפרד מה-API | תהליכי **`notification-worker`**, **`task-worker`**, **`ai-worker`** (אותו codebase Python, entries נפרדים) — outbox dispatch, notifications, scheduled/avatar tasks, AI completion — [`docs/ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md) §2א, [`docs/architecture/EVENTS.md`](../architecture/EVENTS.md). |
 | תורים נפרדים | למשל `notifications_queue`, `avatar_upload_queue`, `scheduled_tasks_queue`. |
 
 ---
@@ -69,7 +69,7 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| Outbox | טבלת `outbox_events`, פרסום אחרי commit — [`backend/app/infrastructure/outbox/`](../../backend/app/infrastructure/outbox/), ADR §4 ב-[`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](adr/ARCHITECTURE_DECISIONS_BACKEND.md). |
+| Outbox | טבלת `outbox_events`, פרסום אחרי commit — [`backend/app/infrastructure/outbox/`](../../backend/app/infrastructure/outbox/), ADR §4 ב-[`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md). |
 | RabbitMQ | שירות `rabbitmq` ב-Compose; routing keys / exchanges — `EVENTS.md`, ADR §3. |
 
 ---
@@ -79,7 +79,7 @@
 | בקורות חיים | בפרויקט |
 |-------------|---------|
 | PostGIS | אימג’ `postgis/postgis` ל-DB ב-Compose; גיאומטריה וחיפוש מרחבי בדומיין נסיעות/נוסעים. |
-| תיעוד סכמה | [`docs/architecture/DATABASE.md`](architecture/DATABASE.md). |
+| תיעוד סכמה | [`docs/architecture/DATABASE.md`](../architecture/DATABASE.md). |
 
 ---
 
@@ -96,7 +96,7 @@
 | בקורות חיים | בפרויקט |
 |-------------|---------|
 | העלאות presigned | זרימת PUT חתומה מהקליינט ל-S3 (אווטארים / קבוצות) — תיאור בהיילייטס §2 (מדיה) וקוד אינפרה תחת דומיין משתמשים/קבוצות. |
-| אווטארים גרסתיים | prefix `avatars/{user_id}/v{version}/`, מחיקת גרסה קודמת אחרי commit — [`ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) §2. |
+| אווטארים גרסתיים | prefix `avatars/{user_id}/v{version}/`, מחיקת גרסה קודמת אחרי commit — [`ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md) §2. |
 | CloudFront | משתנה `CLOUDFRONT_DOMAIN` ל-URLs יציבים לקריאה; בלעדיות S3 כשלא מוגדר — אותו מקטע בהיילייטס. |
 
 ---
@@ -105,7 +105,7 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| Firebase Admin / FCM | אינטגרציה מה-worker והתראות; **שליחה ב-`data` בלבד** (בלי `notification` של FCM) — [`docs/adr/FCM_AND_PUSH.md`](adr/FCM_AND_PUSH.md), [`docs/FCM_SYSTEM_SUMMARY.md`](FCM_SYSTEM_SUMMARY.md). |
+| Firebase Admin / FCM | אינטגרציה מה-worker והתראות; **שליחה ב-`data` בלבד** (בלי `notification` של FCM) — [`docs/adr/FCM_AND_PUSH.md`](../adr/FCM_AND_PUSH.md), [`docs/FCM_SYSTEM_SUMMARY.md`](../FCM_SYSTEM_SUMMARY.md). |
 | פרונט | Service Worker + Toast בחזית — מפורט ב-FCM_AND_PUSH ובהיילייטס §1–2. |
 
 ---
@@ -114,7 +114,7 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| ניתוח שיחה אחרי סגירה | מאזין Redis (`chat:completion:*`) ב-worker → קריאה ל-**Groq** → שמירה — [`ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) §1–2א; ADR §15 ב-[`ARCHITECTURE_DECISIONS_BACKEND.md`](adr/ARCHITECTURE_DECISIONS_BACKEND.md). |
+| ניתוח שיחה אחרי סגירה | מאזין Redis (`chat:completion:*`) ב-worker → קריאה ל-**Groq** → שמירה — [`ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md) §1–2א; ADR §15 ב-[`ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md). |
 
 ---
 
@@ -123,7 +123,7 @@
 | בקורות חיים | בפרויקט |
 |-------------|---------|
 | Google Sign-In | אימות `id_token` בבקאנד — [`backend/docs/GOOGLE_OAUTH.md`](../../backend/docs/GOOGLE_OAUTH.md). |
-| JWT + Refresh | טוקנים ורענון ב-DB; **access עם `jti`**; **logout** מוסיף denylist ב-Redis — [`ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) **§7ד**, ADR §18. |
+| JWT + Refresh | טוקנים ורענון ב-DB; **access עם `jti`**; **logout** מוסיף denylist ב-Redis — [`ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md) **§7ד**, ADR §18. |
 | bcrypt ללא חסימת event loop | `run_in_executor` — ADR §12 ב-backend ADR. |
 | Rate limiting | Redis על register/login — ADR §12, מימוש ב-auth domain. |
 | מניעת user enumeration | אותה תגובת שגיאה ללוגין — ADR §12. |
@@ -152,7 +152,7 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| `LinkUpError` + `error_code` + `trace_id` | [`backend/app/core/exceptions/`](../../backend/app/core/exceptions/), handlers ב-`main.py` — [`docs/ERRORS.md`](ERRORS.md), סיכום ב-[`ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) §2ב. |
+| `LinkUpError` + `error_code` + `trace_id` | [`backend/app/core/exceptions/`](../../backend/app/core/exceptions/), handlers ב-`main.py` — [`docs/ERRORS.md`](../ERRORS.md), סיכום ב-[`ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md) §2ב. |
 | Frontend | `useErrorHandler`, `i18nError` / מפתחות `common:err_*` — בהיילייטס §2. |
 | chat-ws | תגובות וקודי סגירה מתועדים — `ERRORS.md`. |
 
@@ -182,7 +182,7 @@
 | בקורות חיים | בפרויקט |
 |-------------|---------|
 | הגנה על תלות חיצונית (Maps APIs) | שלושה **singletons** ב־[`backend/app/infrastructure/geo/circuit_breaker.py`](../../backend/app/infrastructure/geo/circuit_breaker.py); אינטגרציה ב־[`geocoding.py`](../../backend/app/infrastructure/geo/geocoding.py) ו־[`client.py`](../../backend/app/infrastructure/geo/client.py). |
-| ניטור | מצב מעגלים ב־**`GET /api/v1/health`** תחת **`circuit_breakers`** — [`docs/architecture/API.md`](architecture/API.md#health), ADR [**§20**](adr/ARCHITECTURE_DECISIONS_BACKEND.md), [`ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) (Latest architecture updates). |
+| ניטור | מצב מעגלים ב־**`GET /api/v1/health`** תחת **`circuit_breakers`** — [`docs/architecture/API.md`](../architecture/API.md#health), ADR [**§20**](../adr/ARCHITECTURE_DECISIONS_BACKEND.md), [`ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md) (Latest architecture updates). |
 
 ---
 
@@ -190,12 +190,13 @@
 
 | נושא | מסמך |
 |------|------|
-| סיפור “מה בנינו” + דגשים | [`ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) |
-| החלטות backend/worker | [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](adr/ARCHITECTURE_DECISIONS_BACKEND.md) (כולל **§20** — Circuit Breaker ל-Google Maps) |
-| WS מתי ולמה | [`docs/adr/WEBSOCKETS.md`](adr/WEBSOCKETS.md) |
-| FCM | [`docs/adr/FCM_AND_PUSH.md`](adr/FCM_AND_PUSH.md) |
+| סיפור “מה בנינו” + דגשים | [`ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md) |
+| החלטות backend/worker | [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md) (כולל **§20** — Circuit Breaker ל-Google Maps) |
+| WS מתי ולמה | [`docs/adr/WEBSOCKETS.md`](../adr/WEBSOCKETS.md) |
+| FCM | [`docs/adr/FCM_AND_PUSH.md`](../adr/FCM_AND_PUSH.md) |
 | סקירה כללית | [`ARCHITECTURE.md`](../ARCHITECTURE.md) |
 
 ---
 
 *נוצר כמסמך מקביל לקורות חיים — עדכן אם הוספת שירות או שינית שם תיקייה קריטי.*
+

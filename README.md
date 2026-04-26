@@ -16,10 +16,21 @@ Linkup connects drivers and passengers for shared rides. Drivers publish trips w
 
 Single doc for **stack, scale patterns, real-time chat (disconnect / last-seen debounce), Outbox, ops, CI/CD, tests, k6 load testing, auth under concurrent load (sync vs async), phone validation, frontend refactor, i18n/locale/error fallbacks/CSS fonts**: **[docs/ENGINEERING_HIGHLIGHTS.md](docs/ENGINEERING_HIGHLIGHTS.md)**.
 
-**Interview prep (navigation + per-feature why / alternatives):** **[docs/INTERVIEW_PLAYBOOK.md](docs/INTERVIEW_PLAYBOOK.md)**, **[docs/FEATURE_DECISIONS.md](docs/FEATURE_DECISIONS.md)**. ADR deep dives: **[docs/adr/README.md](docs/adr/README.md)**.
+### Recent production upgrades
+
+- CI builds/pushes runtime images to GHCR; deploy pulls immutable tags on EC2.
+- Rolling backend deploy with health-gated rollback (`docker compose ... --wait`).
+- Compose env hardening with multiple env files and fail-fast checks.
+- RabbitMQ reliability upgrades: self-healing consumer + DLQ tooling + metrics.
+- Frontend runtime config via startup `envsubst` (`window.__APP_CONFIG__`).
+- Redis Sentinel HA + PgBouncer runtime pooling + direct migrate path.
+- Automated JWT secret sync between backend and chat-ws during deploy.
+- OAuth popup compatibility headers in nginx (`COOP` / `COEP`).
+
+**Interview prep (navigation + per-feature why / alternatives):** **[docs/internal/INTERVIEW_PLAYBOOK.md](docs/internal/INTERVIEW_PLAYBOOK.md)**, **[docs/FEATURE_DECISIONS.md](docs/FEATURE_DECISIONS.md)**. ADR deep dives: **[docs/adr/README.md](docs/adr/README.md)**.
 פרונט — רשימת ריפקטור מפורטת: **[frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md](frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md)**.  
 **FCM (Web push — `data` map מהשרת; SW + Toast ב־`App.tsx` + צליל; רישום אחרי login ב־`AuthContext`, ניקוי טוקן ב-logout):** **[docs/FCM_SYSTEM_SUMMARY.md](docs/FCM_SYSTEM_SUMMARY.md)**.  
-**Deployment / production runbook:** **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.  
+**Deployment / production runbook:** **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**. **Ops incidents & monitoring:** **[docs/operations/RUNBOOK.md](docs/operations/RUNBOOK.md)**, **[docs/operations/MONITORING.md](docs/operations/MONITORING.md)**.  
 **מסך אדמין פנימי (React, `/admin`, lazy routes, סטטיסטיקות + משתמשים + נסיעות/קבוצות + Outbox + חיפוש):** **[ADMIN_DASHBOARD.md](ADMIN_DASHBOARD.md)**.  
 **שגיאות API אחידות (`error_code`, `trace_id`, `LinkupError`):** **[docs/ERRORS.md](docs/ERRORS.md)** — בקאנד handlers מרוכזים; בפרונט `utils/apiError.ts` + `ChatErrorBoundary`; ב-chat-ws לוגים עם `slog` ותגובות JSON ל-HTTP.
 
@@ -216,7 +227,7 @@ docker compose ps            # סטטוס (backend: healthy / ממתין)
 | `mobile/`  | React Native (Expo) app |
 | `k8s/`     | Kubernetes base, backend, chat-ws, frontend, email-renderer (Node), workers (`notification-worker`, `task-worker`, `ai-worker`, legacy compatibility worker), infra (Postgres, Redis, RabbitMQ) |
 | `db/`      | Reference schema (`schema.sql`) and utility scripts; migrations live in `backend/alembic/` |
-| `docs/`    | Architecture: `docs/architecture/` — API.md, DATABASE.md, EVENTS.md (outbox, DLQ, retry), REALTIME.md (GPS, chat), DEVELOPMENT.md; ADR תחת `docs/adr/`; סיכום portfolio — `docs/ENGINEERING_HIGHLIGHTS.md`; תסריטי וידאו — `docs/VIDEO_SCRIPT_*.md` |
+| `docs/`    | Architecture: `docs/architecture/` — API.md, DATABASE.md, EVENTS.md, REALTIME.md, NOTIFICATIONS.md, AI.md, STORAGE.md, DEVELOPMENT.md; ADR תחת `docs/adr/`; ops תחת `docs/operations/`; internal interview/video assets תחת `docs/internal/` |
 | `email-renderer/` | Node microservice (Express + React Email): `GET /health`, `POST /render`; תבניות ב־`src/emails/`; נקרא מ־backend/notification-worker דרך `EMAIL_RENDERER_URL` |
 | `files/`   | מדריכי מיזוג / עזר (למשל `MERGE_GUIDE.md`) — לא מקור אמת לקוד חי |
 

@@ -252,7 +252,7 @@
 - **השתמש ב-ENGINEERING_HIGHLIGHTS** לקישור לנתיבי קבצים ומספור סעיפים.
 - **השתמש ב-ADR** כששואלים deep dive (מספור §).
 
-[← חזרה ל-Interview Playbook](INTERVIEW_PLAYBOOK.md)
+[← חזרה ל-Interview Playbook](internal/INTERVIEW_PLAYBOOK.md)
 
 ---
 
