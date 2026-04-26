@@ -17,7 +17,6 @@ export interface UseGroupManageMutationsParams {
 }
 
 /**
- * פעולות מוטציה בדף ניהול קבוצה: חברים, עזיבה וסגירה.
  */
 export function useGroupManageMutations({
   groupId,

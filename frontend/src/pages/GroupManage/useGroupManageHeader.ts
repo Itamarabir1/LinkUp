@@ -6,7 +6,6 @@ import { apiErr } from '../../utils/i18nError';
 import { GROUP_AVATAR_COLORS } from './groupManage.constants';
 
 /**
- * כותרת דף ניהול קבוצה: אווטאר/תמונה, עריכת שם ותיאור.
  */
 export function useGroupManageHeader(
   groupId: string | undefined,

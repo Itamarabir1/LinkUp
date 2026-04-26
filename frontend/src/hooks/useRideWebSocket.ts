@@ -9,7 +9,6 @@ interface Options {
 }
 
 /**
- * WebSocket לאירועי סטטוס נסיעה — עם reconnect אוטומטי.
  */
 export function useRideWebSocket({ rideId, onMessage, enabled = true }: Options) {
   useReconnectingWebSocket({

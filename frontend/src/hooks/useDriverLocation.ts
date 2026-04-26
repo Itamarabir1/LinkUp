@@ -13,7 +13,6 @@ export interface DriverLocationUpdate {
 }
 
 /**
- * נוסע מאזין למיקום הנהג – ערוץ booking_{booking_id}.
  */
 export function useDriverLocation(bookingId: string | null) {
   const [position, setPosition] = useState<DriverLocationUpdate | null>(null);

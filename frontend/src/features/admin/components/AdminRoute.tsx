@@ -3,8 +3,6 @@ import { useAuth } from '../../../context/AuthContext';
 import PageLoading from '../../../components/PageLoading';
 
 /**
- * אדמין דורש משתמש מחובר + is_admin.
- * השרת מחזיר is_admin ב־login / google-signin / refresh (LoginUserInfo), וה־AuthContext שומר את אותו אובייקט.
  */
 export default function AdminRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();

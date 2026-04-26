@@ -5,8 +5,6 @@ import { apiErr } from '../utils/i18nError';
 import { useLocationWatcher } from './useLocationWatcher';
 
 /**
- * נוסע שולח מיקום לנהג – POST /bookings/{booking_id}/passenger-location.
- * מופעל רק כאשר enabled=true (למשל לחיצה על "שתף מיקום").
  */
 export function usePassengerLocationBroadcast(bookingId: string | null, enabled: boolean) {
   const [error, setError] = useState<string | null>(null);

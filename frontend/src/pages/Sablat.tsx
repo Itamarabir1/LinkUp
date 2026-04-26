@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import styles from './Sablat.module.css';
 
 /**
- * אזור סבלט — דף בסיס; אפשר להרחיב כאן תוכן, API וניווט ייעודי.
  */
 export default function Sablat() {
   return (

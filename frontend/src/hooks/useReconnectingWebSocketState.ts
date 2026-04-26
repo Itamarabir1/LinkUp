@@ -18,8 +18,6 @@ interface State {
 }
 
 /**
- * WebSocket גנרי עם reconnect + connected/error state.
- * buildUrl נשמר ב-ref כדי לא לגרום ל-reconnect בכל render.
  */
 export function useReconnectingWebSocketState({
   buildUrl,

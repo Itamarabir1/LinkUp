@@ -200,7 +200,7 @@
 | **הקשר** | Stateless JWT access קצר; רק ניקוי **refresh** ב-DB לא מבטל את ה-access הנוכחי עד לפקיעת `exp`. |
 | **החלטה** | כל access token כולל **`jti`** (UUID). ב-**`POST /auth/logout`** עם **`Authorization: Bearer`** — אחרי ניקוי refresh, פענוח ה-access, חישוב **`TTL = max(0, int(exp − now))`** (שניות Unix), ו-**`SETEX denylist:{jti}`** ב-Redis DB0. ב-**`get_current_user`** / **`get_current_user_optional`** — אחרי `decode_access_token`, אם `jti` ב-denylist → 401 או `None`. |
 | **Fail-open** | **`add_to_denylist`** — שגיאת Redis נרשמת, לא מפילה logout; **`is_denied`** — אם Redis לא זמין → **לא** חוסם (מעדיף זמינות על פני revocation קשיח בזמן תקלה). |
-| **Trade-off** | WebSocket (`get_current_user_ws`) — **עדיין לא** בודק denylist (TODO); חיבורים קיימים תקפים עד פקיעת JWT. |
+| **Trade-off** | בדיקת denylist ב-WS handshake מוסיפה תלות Redis במסלול החיבור; נשמר fail-open אם Redis לא זמין כדי לא לפגוע בזמינות כוללת. |
 | **בקצרה לראיון** | “הוספתי `jti` וביטול מיידי דרך Redis כדי שלא נשאר access תקף אחרי logout — עם fail-open כדי לא לנעול משתמשים כש-Redis למטה.” |
 
 ---

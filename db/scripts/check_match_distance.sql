@@ -1,5 +1,3 @@
--- בדיקת מרחק מוצא הנוסע מהמסלול (request_id=47, ride_id=13)
--- הרץ ב-PostgreSQL כדי לראות אם ST_DWithin היה אמור להחזיר true
 
 SELECT
   pr.request_id,

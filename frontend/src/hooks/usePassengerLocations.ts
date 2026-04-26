@@ -14,7 +14,6 @@ export interface PassengerLocationUpdate {
 }
 
 /**
- * נהג מאזין לעדכוני מיקום נוסעים בנסיעה (ערוץ ride_{ride_id}:passenger_locations).
  */
 export function usePassengerLocations(rideId: string | null) {
   const [locations, setLocations] = useState<PassengerLocationUpdate[]>([]);

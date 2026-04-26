@@ -290,6 +290,70 @@
 
 ---
 
+<a id="rabbitmq-self-healing"></a>
+
+## RabbitMQ self-healing consumer loop
+
+| | |
+|--|--|
+| **בעיה** | אחרי ניתוק/סגירת channel, iterator של `aio_pika` יכול להיסגר ו-consumer להפסיק לעבוד עד restart חיצוני. |
+| **החלטה** | `consume()` הפך ללולאת self-healing: recreate iterator/channel, bounded backoff על `_setup()` failures, draining מסודר, ומדד אופרטיבי `rabbitmq_consumer_iterator_restarts_total`. |
+| **אלטרנטיבות** | (1) להסתמך רק על supervisor restart. (2) ליצור consumer חדש בכל restart חיצוני בלי recovery פנימי. |
+| **יתרון** | עמידות טובה יותר לבעיות Rabbit transient בלי dependency על restart orchestration. |
+| **Trade-off** | מורכבות לולאת consume עולה ודורשת observability כדי להבחין בין transient noise לבין תקלה כרונית. |
+| **Interview pitch (≈30s)** | *"במקום שריסטארט תהליך יהיה הפתרון, ה-consumer מרפא את עצמו: אם iterator נסגר הוא נבנה מחדש עם backoff ומדד iterator restarts. כך מפחיתים downtime שקט של תורים."* |
+| **הפניה** | `backend/app/infrastructure/rabbitmq/consumer.py`, `backend/app/infrastructure/metrics.py` |
+
+---
+
+<a id="frontend-runtime-config"></a>
+
+## Frontend runtime config (12-factor)
+
+| | |
+|--|--|
+| **בעיה** | `import.meta.env` ב-Vite מחליף ערכים בזמן build; image שנבנה בלי `VITE_*` גורם לפרונט שבור (`projectId` חסר ב-Firebase). |
+| **החלטה** | לעבור ל-runtime config: entrypoint מייצר `config.js` + `firebase-messaging-sw.js` עם `envsubst`; הקוד קורא `window.__APP_CONFIG__` עם fallback ל-`import.meta.env` בדב. |
+| **אלטרנטיבות** | (1) build-args + GH Secrets לכל VITE. (2) hardcode ציבורי בקוד. |
+| **יתרון** | image agnostic לסביבה; שינוי קונפיג = restart, לא rebuild/pipeline. |
+| **Trade-off** | עוד שכבת bootstrap בפרונט (template + entrypoint) וחובה לנהל env files בשרת בצורה עקבית. |
+| **Interview pitch (≈30s)** | *"הוצאתי קונפיג פרונט מזמן build לזמן runtime. אותו image רץ בכל סביבה, וה-entrypoint מייצר config.js מה-env. זה 12-factor נקי ומונע drift בין builds."* |
+| **הפניה** | `frontend/docker/40-render-config.sh`, `frontend/src/config/runtime.ts`, `docker-compose.yml` |
+
+---
+
+<a id="deploy-env-sot"></a>
+
+## Deploy env single source-of-truth (multi env-file + JWT sync)
+
+| | |
+|--|--|
+| **בעיה** | Compose interpolates env from selected env-file בלבד; בלי `frontend/.env` ערכי `VITE_*` לא נטענים, ובלי סנכרון סודות אפשר mismatch בין backend/chat-ws. |
+| **החלטה** | deploy script משתמש ב-`--env-file backend/.env --env-file frontend/.env`, מוסיף fail-fast guards לקבצים חסרים, ומסנכרן `JWT_SECRET` ב-`chat-ws/.env` מתוך `backend SECRET_KEY`. |
+| **אלטרנטיבות** | (1) root `.env` ענק לכל השירותים. (2) GH Secrets ל-VITE ציבוריים. (3) סנכרון ידני של JWT בין קבצים. |
+| **יתרון** | source-of-truth ברור לכל שכבה + הפחתת config drift בפריסות. |
+| **Trade-off** | יש תלות במשמעת ops סביב `.env.production` לכל שירות ו-copy step תקין לפני compose up. |
+| **Interview pitch (≈30s)** | *"חילקנו env לפי גבולות שירות אבל פריסה מרכיבה אותם במפורש. זה שומר runtime deterministic וגם מונע JWT mismatch בין backend ל-chat-ws."* |
+| **הפניה** | `.github/workflows/backend-ci.yml`, `docker-compose.yml` |
+
+---
+
+<a id="oauth-popup-coop"></a>
+
+## OAuth popup compatibility (COOP/COEP headers)
+
+| | |
+|--|--|
+| **בעיה** | Google OAuth popup עלול להיחסם ל-`window.postMessage` בגלל מדיניות COOP קשיחה. |
+| **החלטה** | הוספת headers ב-nginx: `Cross-Origin-Opener-Policy: same-origin-allow-popups` ו-`Cross-Origin-Embedder-Policy: unsafe-none` (עם `always`). |
+| **אלטרנטיבות** | (1) לנסות flow בלי popup. (2) להחליש headers חלקית ברמת נתיב בלי ניתוח מלא של השפעה. |
+| **יתרון** | תיקון יציב ל-flow OAuth הקיים בלי לשנות לוגיקת auth בפרונט/בקאנד. |
+| **Trade-off** | מדיניות COOP/COEP פחות קשיחה לטובת תאימות OAuth popup. |
+| **Interview pitch (≈30s)** | *"שגיאת popup postMessage נפתרה בשכבת ה-edge, לא ב-workaround בפרונט. הוספנו COOP/COEP תואם ל-Google popup תוך שמירה על HTTPS flow מלא."* |
+| **הפניה** | `nginx/nginx.conf` |
+
+---
+
 <a id="single-ec2-cd"></a>
 
 ## Single-EC2 CD rolling deploy (no ALB)

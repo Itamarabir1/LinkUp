@@ -1,5 +1,4 @@
 /**
- * דחיסה והמרה לתמונת WebP באמצעות Canvas (להעלאת אווטאר).
  */
 export interface CompressOptions {
   maxWidth: number;

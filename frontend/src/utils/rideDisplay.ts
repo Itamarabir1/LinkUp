@@ -5,7 +5,6 @@ import i18n from '../i18n';
 export type GroupNameRef = { group_id: string; name: string };
 
 /**
- * תווית מקור לנסיעה או בקשה: שם קבוצה או "ציבורי".
  */
 export function getRideSourceLabel(
   groupId: string | null | undefined,

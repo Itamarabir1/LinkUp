@@ -11,14 +11,12 @@ export function formatTimeHm(date: string | Date): string {
   return d.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' });
 }
 
-/** e.g. "14 April" / "14 באפריל" */
 export function formatDayMonthLong(date: string | Date): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   if (isNaN(d.getTime())) return '';
   return d.toLocaleDateString(getLocale(), { day: 'numeric', month: 'long' });
 }
 
-/** e.g. "April 2026" / "אפריל 2026" */
 export function formatMonthYearLong(date: string | Date): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   if (isNaN(d.getTime())) return '';
@@ -98,9 +96,7 @@ export function formatRideDate(date: string | Date): string {
 
 /**
  * Formats a notification timestamp relative to now.
- * - Same day: "לפני X דקות" / "לפני X שעות"
  * - Yesterday: "14:30"
- * - This week: "ב' 14:30" (day abbreviation + time)
  * - Older: "05/04"
  */
 export function formatRelativeNotificationTime(dateStr: string): string {

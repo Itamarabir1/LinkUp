@@ -6,7 +6,6 @@ import { apiErr } from '../../utils/i18nError';
 import type { GroupTab } from './groupManage.types';
 
 /**
- * טעינת חברים ונסיעות לדף ניהול קבוצה (מופרד מ-useGroupManage לקריאות).
  */
 export function useGroupManageLists(
   groupId: string | undefined,

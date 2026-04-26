@@ -14,7 +14,6 @@ interface State {
 }
 
 /**
- * תופס שגיאות רינדור בזרם הניתוב; מאפשר ניסיון חוזר בלי רענון מלא.
  */
 export default class RouteErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null };

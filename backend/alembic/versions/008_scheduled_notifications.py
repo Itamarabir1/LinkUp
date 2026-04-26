@@ -25,7 +25,6 @@ depends_on = None
 def upgrade() -> None:
     conn = op.get_bind()
 
-    # 1. טבלת scheduled_notifications
     conn.execute(sa.text("""
         CREATE TABLE IF NOT EXISTS scheduled_notifications (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -38,14 +37,12 @@ def upgrade() -> None:
         )
     """))
 
-    # 2. index על deliver_at — רק רשומות שטרם נשלחו (partial index, קטן ויעיל)
     conn.execute(sa.text("""
         CREATE INDEX IF NOT EXISTS idx_scheduled_notifications_deliver
         ON scheduled_notifications (deliver_at)
         WHERE sent_at IS NULL
     """))
 
-    # 3. הסרת reminder_sent מ-rides
     conn.execute(sa.text("""
         DO $$ BEGIN
             IF EXISTS (
@@ -57,7 +54,6 @@ def upgrade() -> None:
         END $$
     """))
 
-    # 4. הסרת reminder_sent מ-bookings
     conn.execute(sa.text("""
         DO $$ BEGIN
             IF EXISTS (
@@ -73,7 +69,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     conn = op.get_bind()
 
-    # החזרת reminder_sent (לצורך rollback)
     conn.execute(sa.text("""
         DO $$ BEGIN
             IF NOT EXISTS (

@@ -1,6 +1,4 @@
 /**
- * ממיר מספר דקות לשפה רגילה בעברית.
- * דוגמאות: 72 → "שעה ו-12 דק'", 60 → "שעה", 45 → "45 דק'", 125 → "שעתיים ו-5 דק'"
  */
 export function formatDurationMinutes(min: number): string {
   const m = Math.round(Number(min)) || 0;

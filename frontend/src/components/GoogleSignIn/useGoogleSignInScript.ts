@@ -3,7 +3,6 @@ import { APP_CONFIG } from '../../config/runtime';
 import './googleIdentity';
 
 /**
- * טוען את סקריפט Google Identity Services ומאתחל את google.accounts.id (פעם אחת).
  */
 export function useGoogleSignInScript(
   onError: ((msg: string) => void) | undefined,

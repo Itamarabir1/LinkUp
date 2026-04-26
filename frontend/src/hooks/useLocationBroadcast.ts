@@ -24,7 +24,6 @@ export interface UseLocationBroadcastOptions {
 }
 
 /**
- * הנהג שולח מיקום לשרת; אופציונלי: onStart אחרי שליחה ראשונה מוצלחת, onStop כשמשביתים שיתוף.
  */
 export function useLocationBroadcast(options: UseLocationBroadcastOptions) {
   const { rideId, driverId, enabled, bookingId: bookingIdProp, onPosition, onStart, onStop } = options;
@@ -121,7 +120,6 @@ export function useLocationBroadcast(options: UseLocationBroadcastOptions) {
         hasStartedRef.current = true;
       } catch (error: unknown) {
         const status = getApiStatus(error);
-        // 400 = ride already active or status disallows start — do not block location streaming
         if (status === 400) {
           hasStartedRef.current = true;
         }

@@ -51,7 +51,6 @@
   margin-bottom: 0;
 }
 
-/* ── Form card ── */
 .formBlock {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -64,7 +63,6 @@
   margin-bottom: 16px;
 }
 
-/* ── Route section ── */
 .routeSection {
   background: var(--bg-secondary);
   border-radius: var(--radius-lg);
@@ -167,7 +165,6 @@
   transform: rotate(180deg);
 }
 
-/* ── Meta row (radius + datetime) ── */
 .metaRow {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -273,7 +270,6 @@
 .searchBtn:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); box-shadow: 0 4px 18px rgba(79,70,229,0.35); }
 .searchBtn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-/* ── Results header ── */
 .resultsHeader {
   display: flex;
   align-items: center;
@@ -315,7 +311,6 @@
   font-family: var(--font-primary);
 }
 
-/* ── Ride result card ── */
 .cardList { display: flex; flex-direction: column; gap: 10px; }
 
 .card {
@@ -445,7 +440,6 @@
   font-size: 13px;
 }
 
-/* ── Empty state ── */
 .emptyText {
   text-align: center;
   color: var(--text-tertiary);
@@ -464,7 +458,6 @@
   .metaFieldWide { grid-column: span 1; }
 }
 
-/* ══════════════════════════════════════════════════
    AI Search Block — intelligent input, premium feel
    ══════════════════════════════════════════════════ */
 
@@ -485,7 +478,6 @@
   box-shadow: 0 0 0 3px var(--focus-ring-primary), var(--shadow-md);
 }
 
-/* ── Header ── */
 .aiHeader {
   display: flex;
   align-items: center;
@@ -539,7 +531,6 @@
   background: var(--primary-light);
 }
 
-/* ── Conversation history ── */
 .aiHistory {
   display: flex;
   flex-direction: column;
@@ -600,7 +591,6 @@
   margin-top: 1px;
 }
 
-/* ── Input row ── */
 .aiInputRow {
   display: flex;
   gap: 7px;
@@ -643,7 +633,6 @@
   pointer-events: none;
 }
 
-/* ── Send button — compact icon-only ── */
 .aiSendBtn {
   flex-shrink: 0;
   width: 44px;
@@ -691,7 +680,6 @@
   to { transform: rotate(360deg); }
 }
 
-/* ── Success result box ── */
 .aiSuccess {
   margin-top: 9px;
   background: var(--primary-light);
@@ -743,7 +731,6 @@
   font-family: var(--font-primary);
 }
 
-/* "חפש עכשיו" button — appears only when ready */
 .aiSearchNowBtn {
   align-self: flex-start;
   background: var(--primary);
@@ -764,7 +751,6 @@
   box-shadow: 0 4px 14px var(--focus-ring-primary);
 }
 
-/* ── Error message ── */
 .aiErrorMsg {
   margin: 7px 0 0;
   font-size: 12px;
@@ -777,7 +763,6 @@
   animation: aiSlideIn 0.15s ease-out both;
 }
 
-/* ── Divider ── */
 .aiDivider {
   display: flex;
   align-items: center;

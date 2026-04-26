@@ -1,4 +1,3 @@
--- 1. ניקוי ראשוני (זהירות: מוחק את כל הנתונים הקיימים)
 DROP TABLE IF EXISTS messages CASCADE;
 DROP TABLE IF EXISTS conversations CASCADE;
 DROP TABLE IF EXISTS bookings CASCADE;
@@ -10,12 +9,10 @@ DROP TYPE IF EXISTS ride_status CASCADE;
 DROP TYPE IF EXISTS booking_status CASCADE;
 DROP TYPE IF EXISTS passenger_request_status CASCADE;
 
--- 2. יצירת Custom Types (Enums) – רק ערכים באותיות קטנות, תואם ל-Python RideStatus
 CREATE TYPE ride_status AS ENUM ('open', 'full', 'completed', 'cancelled');
 CREATE TYPE booking_status AS ENUM ('pending_approval', 'confirmed', 'rejected', 'cancelled', 'completed');
 CREATE TYPE passenger_request_status AS ENUM ('active', 'matched', 'expired', 'cancelled', 'pending', 'approved', 'rejected', 'completed');
 
--- 3. פונקציית טריגר לעדכון זמן שינוי
 CREATE OR REPLACE FUNCTION update_modified_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -24,7 +21,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 4. טבלת משתמשים (Users)
 CREATE TABLE users (
     user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     full_name VARCHAR(100) NOT NULL,
@@ -44,7 +40,6 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
--- 5. טבלת קבוצות (Groups)
 CREATE TABLE groups (
     group_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
@@ -65,8 +60,6 @@ CREATE TABLE group_members (
     CONSTRAINT uq_group_member UNIQUE (group_id, user_id)
 );
 
--- 6. טבלת נסיעות (Rides)
--- שים לב: כל הזמנים הומרו ל-TIMESTAMP WITH TIME ZONE למניעת שגיאות Offset
 CREATE TABLE rides (
     ride_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     driver_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -89,7 +82,6 @@ CREATE TABLE rides (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
--- 7. טבלת בקשות נוסעים (Passenger Requests)
 CREATE TABLE passenger_requests (
     request_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     passenger_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -112,7 +104,6 @@ CREATE TABLE passenger_requests (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
--- 8. טבלת הזמנות (Bookings)
 CREATE TABLE bookings (
     booking_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     ride_id UUID NOT NULL REFERENCES rides(ride_id) ON DELETE CASCADE,
@@ -129,7 +120,6 @@ CREATE TABLE bookings (
     CONSTRAINT unique_passenger_per_ride UNIQUE (ride_id, passenger_id)
 );
 
--- 9. טבלאות צ'אט 1:1
 CREATE TABLE conversations (
     conversation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id_1 UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -152,8 +142,6 @@ CREATE INDEX idx_conversations_user_2 ON conversations (user_id_2);
 CREATE INDEX idx_messages_conversation ON messages (conversation_id);
 CREATE INDEX idx_messages_created ON messages (conversation_id, created_at);
 
--- 10. טבלת Outbox Events
--- כוללת את כל העמודות שהיו חסרות לוורקר
 CREATE TABLE outbox_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     event_name VARCHAR(100) NOT NULL,
@@ -168,13 +156,11 @@ CREATE TABLE outbox_events (
     idempotency_key VARCHAR(255) UNIQUE
 );
 
--- 11. הפעלת טריגרים לעדכון אוטומטי של updated_at
 CREATE TRIGGER update_user_modtime BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_modified_column();
 CREATE TRIGGER update_ride_modtime BEFORE UPDATE ON rides FOR EACH ROW EXECUTE FUNCTION update_modified_column();
 CREATE TRIGGER update_request_modtime BEFORE UPDATE ON passenger_requests FOR EACH ROW EXECUTE FUNCTION update_modified_column();
 CREATE TRIGGER update_booking_modtime BEFORE UPDATE ON bookings FOR EACH ROW EXECUTE FUNCTION update_modified_column();
 
--- 12. טבלת ניתוח AI של שיחות צ'אט
 CREATE TABLE chat_analysis (
     analysis_id BIGSERIAL PRIMARY KEY,
     conversation_id UUID NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
@@ -190,7 +176,6 @@ CREATE TABLE chat_analysis (
 
 CREATE INDEX idx_chat_analysis_conversation ON chat_analysis (conversation_id);
 
--- 13. אינדקסים לביצועים וגיאוגרפיה
 CREATE INDEX idx_users_location ON users USING GIST(last_location);
 CREATE INDEX idx_rides_origin_geom ON rides USING GIST(origin_geom);
 CREATE INDEX idx_rides_destination_geom ON rides USING GIST(destination_geom);

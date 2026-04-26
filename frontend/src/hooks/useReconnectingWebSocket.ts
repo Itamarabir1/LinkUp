@@ -13,8 +13,6 @@ interface Options {
 }
 
 /**
- * WebSocket גנרי עם reconnect אוטומטי — read-only, ללא state.
- * buildUrl נשמר ב-ref כדי לא לגרום ל-reconnect בכל render.
  */
 export function useReconnectingWebSocket({
   buildUrl,

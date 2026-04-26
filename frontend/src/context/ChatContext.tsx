@@ -1,6 +1,4 @@
 /**
- * ChatContext: פופאפ צ'אט, פנל שיחה במסך הודעות, ומונים להתראות/הודעות.
- * חשוב: ChatProvider חייב להיות בתוך Router (לא עוטף את Router) כדי ש-useLocation() יעבוד.
  */
 import { createContext, useContext, useMemo, useReducer } from 'react';
 import { useLocation } from 'react-router-dom';
