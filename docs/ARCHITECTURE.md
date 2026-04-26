@@ -5,8 +5,10 @@ This file is the canonical architecture entry point for Linkup.
 ## High-level docs
 
 - [`README.md`](../README.md) — product overview and getting started
+- [`frontend/README.md`](../frontend/README.md) — web client architecture notes (RTL/i18n, realtime, Premium UX flow, React Query migrations כולל Stage 3b Part 2 ל-MyBookings)
 - [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) — production deployment flow and rollback
 - [`docs/ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) — senior-level feature and reliability highlights
+- [`docs/SECURITY_HEADERS.md`](SECURITY_HEADERS.md) — nginx edge hardening policy (`HTTP/2`, browser security headers, CSP rollout)
 
 ## Architecture deep-dive by domain
 

@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Car, Plus, X } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cancelRide, fetchMyRides } from '../api/rides';
 import type { Ride } from '../types/api';
+import { mk, qk } from '../api/queryKeys';
 import { formatDateTimeNoSeconds } from '../utils/date';
 import { useGroup } from '../context/GroupContext';
 import Chips, { type ChipItem } from '../components/Chips/Chips';
@@ -22,12 +24,26 @@ import styles from './MyRides.module.css';
 export default function MyRides() {
   const { t } = useTranslation(['rides', 'common']);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { myGroups, activeChipId, setActiveChipId } = useGroup();
-  const [rides, setRides] = useState<Ride[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [rideToCancel, setRideToCancel] = useState<string | null>(null);
-  const [cancelling, setCancelling] = useState(false);
+  const [mutationError, setMutationError] = useState('');
+  const {
+    data: rides = [],
+    isLoading: loading,
+    error: fetchError,
+  } = useQuery({
+    queryKey: qk.rides.list(),
+    queryFn: async () => {
+      const { data } = await fetchMyRides();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 30_000,
+  });
+  const fetchErrorMessage = fetchError
+    ? getApiErrorMessage(fetchError, apiErr('err_load_rides'))
+    : '';
+  const error = mutationError || fetchErrorMessage;
 
   const chipItems: ChipItem[] = [
     { id: 'all', label: t('common:all') },
@@ -56,21 +72,21 @@ export default function MyRides() {
           new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime()
       )[0]?.ride_id ?? null;
 
-  const fetchRides = useCallback(async () => {
-    try {
-      const { data } = await fetchMyRides();
-      setRides(Array.isArray(data) ? data : []);
-      setError('');
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, apiErr('err_load_rides')));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchRides();
-  }, [fetchRides]);
+  const { mutate: cancelRideMutation, isPending: isCancellingRide } = useMutation({
+    mutationKey: mk.rides.cancel(rideToCancel ?? ''),
+    mutationFn: (rideId: string) => cancelRide(rideId),
+    onSuccess: (_, rideId) => {
+      queryClient.setQueryData(qk.rides.list(), (old: Ride[] = []) =>
+        old.map((r) => (r.ride_id === rideId ? { ...r, status: 'cancelled' as const } : r))
+      );
+      setMutationError('');
+      setRideToCancel(null);
+    },
+    onError: (err: unknown) => {
+      setMutationError(getApiErrorMessage(err, apiErr('err_cancel_ride')));
+      setRideToCancel(null);
+    },
+  });
 
   // Real-time updates from the user event stream (driver-owned events).
   useUserEvent(
@@ -78,15 +94,9 @@ export default function MyRides() {
     useCallback(
       (detail) => {
         if (!detail.ride_id) return;
-        setRides((prev) =>
-          prev.map((r) =>
-            r.ride_id === detail.ride_id
-              ? { ...r, status: (detail.status as Ride['status']) ?? 'completed' }
-              : r
-          )
-        );
+        void queryClient.invalidateQueries({ queryKey: qk.rides.list() });
       },
-      []
+      [queryClient]
     )
   );
 
@@ -101,30 +111,18 @@ export default function MyRides() {
           msg.event === 'RIDE_ENDED' ||
           msg.event === 'RIDE_STARTED'
         ) {
-          void fetchRides();
+          void queryClient.invalidateQueries({ queryKey: qk.rides.list() });
         }
       },
-      [fetchRides]
+      [queryClient]
     ),
   });
 
   const handleConfirmCancel = useCallback(async () => {
     if (rideToCancel == null) return;
-    setCancelling(true);
-    setError('');
-    try {
-      await cancelRide(rideToCancel);
-      setRides((prev) =>
-        prev.map((r) => (r.ride_id === rideToCancel ? { ...r, status: 'cancelled' } : r))
-      );
-      setRideToCancel(null);
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, apiErr('err_cancel_ride')));
-      setRideToCancel(null);
-    } finally {
-      setCancelling(false);
-    }
-  }, [rideToCancel]);
+    setMutationError('');
+    cancelRideMutation(rideToCancel);
+  }, [cancelRideMutation, rideToCancel]);
 
   if (loading) {
     return (
@@ -222,7 +220,7 @@ export default function MyRides() {
         title={t('rides:confirmCancelRide')}
         confirmLabel={t('common:confirm')}
         variant="danger"
-        loading={cancelling}
+        loading={isCancellingRide}
         onConfirm={handleConfirmCancel}
         titleId="confirm-cancel-ride-title"
       />

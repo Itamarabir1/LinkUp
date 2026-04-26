@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useAuth } from '../context/AuthContext';
 import GoogleSignIn from '../components/GoogleSignIn/GoogleSignIn.tsx';
 import ErrorBanner from '../components/ErrorBanner';
@@ -8,6 +11,13 @@ import LoadingButton from '../components/LoadingButton';
 import { ERROR_MESSAGES } from '../config/constants';
 import { getApiErrorMessage, isTimeoutOrAbortError } from '../utils/apiError';
 import styles from './Login.module.css';
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
+type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const { t } = useTranslation('auth');
@@ -17,22 +27,21 @@ export default function Login() {
     verified?: boolean;
     from?: { pathname: string; search?: string };
   } | null;
-  const [email, setEmail] = useState(state?.email ?? '');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [verifiedMessage] = useState(Boolean(state?.verified));
+  const { register, handleSubmit, clearErrors, formState } = useForm<LoginForm>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: state?.email ?? '',
+      password: '',
+    },
+  });
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim() || !password) {
-      setError(t('error_email_password'));
-      return;
-    }
+  const onSubmit = async ({ email, password }: LoginForm) => {
     setError('');
-    setLoading(true);
+    clearErrors();
     try {
       await login(email.trim(), password);
       const searchParams = new URLSearchParams(location.search);
@@ -53,8 +62,6 @@ export default function Login() {
         return;
       }
       setError(getApiErrorMessage(err, t('error_login_failed')));
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -87,7 +94,7 @@ export default function Login() {
           <p className={styles.verifiedBanner}>✓ {t('emailVerified')}</p>
         ) : null}
 
-        <form onSubmit={handleLogin} className={styles.form}>
+        <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
           {error ? <ErrorBanner message={error} className={styles.error} /> : null}
 
           <div className={styles.field}>
@@ -98,8 +105,7 @@ export default function Login() {
               id="login-email"
               type="email"
               placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              {...register('email')}
               className={styles.input}
               autoComplete="email"
             />
@@ -113,8 +119,7 @@ export default function Login() {
               id="login-password"
               type="password"
               placeholder={t('passwordPlaceholder')}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              {...register('password')}
               className={styles.input}
               autoComplete="current-password"
             />
@@ -123,7 +128,7 @@ export default function Login() {
           <LoadingButton
             type="submit"
             className={styles.button}
-            loading={loading}
+            loading={formState.isSubmitting}
             loadingLabel={t('loggingIn')}
           >
             {t('login')}
@@ -135,7 +140,7 @@ export default function Login() {
           <span className={styles.dividerLabel}>{t('orContinueWith')}</span>
         </div>
 
-        <GoogleSignIn onError={setError} disabled={loading} />
+        <GoogleSignIn onError={setError} disabled={formState.isSubmitting} />
 
         <p className={styles.link}>
           <Link to="/register">

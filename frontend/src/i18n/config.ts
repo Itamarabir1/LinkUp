@@ -10,6 +10,7 @@ import heRides from './locales/he/rides.json';
 import heBookings from './locales/he/bookings.json';
 import heGroups from './locales/he/groups.json';
 import heProfile from './locales/he/profile.json';
+import heBilling from './locales/he/billing.json';
 
 import enCommon from './locales/en/common.json';
 import enNav from './locales/en/nav.json';
@@ -18,6 +19,7 @@ import enRides from './locales/en/rides.json';
 import enBookings from './locales/en/bookings.json';
 import enGroups from './locales/en/groups.json';
 import enProfile from './locales/en/profile.json';
+import enBilling from './locales/en/billing.json';
 
 export type SupportedLang = 'he' | 'en';
 
@@ -35,6 +37,7 @@ i18n
         bookings: heBookings,
         groups: heGroups,
         profile: heProfile,
+        billing: heBilling,
       },
       en: {
         common: enCommon,
@@ -44,12 +47,13 @@ i18n
         bookings: enBookings,
         groups: enGroups,
         profile: enProfile,
+        billing: enBilling,
       },
     },
     lng: 'he',
     fallbackLng: 'he',
     defaultNS: 'common',
-    ns: ['common', 'nav', 'auth', 'rides', 'bookings', 'groups', 'profile'],
+    ns: ['common', 'nav', 'auth', 'rides', 'bookings', 'groups', 'profile', 'billing'],
     interpolation: { escapeValue: false },
     detection: {
       order: ['localStorage', 'navigator'],

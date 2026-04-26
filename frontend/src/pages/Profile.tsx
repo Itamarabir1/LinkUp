@@ -3,11 +3,16 @@ import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import ErrorBanner from '../components/ErrorBanner';
 import LoadingButton from '../components/LoadingButton';
+import PremiumBanner from '../components/PremiumBanner/PremiumBanner';
+import { useCreateCheckoutSession } from '../features/billing/mutations';
+import { useBillingStatus } from '../features/billing/queries';
 import { ACCEPT_AVATAR, useProfile } from './useProfile';
 import styles from './Profile.module.css';
 
 export default function Profile() {
   const { t } = useTranslation(['profile', 'auth', 'common']);
+  const { data: billing, isLoading: billingLoading } = useBillingStatus();
+  const checkout = useCreateCheckoutSession();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const {
     user,
@@ -139,6 +144,17 @@ export default function Profile() {
                 </div>
               ) : null}
             </div>
+
+            {!billingLoading &&
+              (billing?.is_premium ? (
+                <PremiumBanner mode="badge" premiumSince={billing.premium_since} />
+              ) : (
+                <PremiumBanner
+                  mode="upgrade"
+                  loading={checkout.isPending}
+                  onUpgrade={() => checkout.mutate()}
+                />
+              ))}
           </>
         )}
 

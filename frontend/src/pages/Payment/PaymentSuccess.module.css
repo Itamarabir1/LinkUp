@@ -1,0 +1,73 @@
+.page {
+  min-height: 100%;
+  padding: 2rem 1rem;
+  background: var(--bg-page);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-lg);
+  padding: 2rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.icon {
+  color: var(--success-text);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-primary);
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 0;
+  font-family: var(--font-primary);
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+.status {
+  margin: 0.25rem 0 0;
+  font-family: var(--font-primary);
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.primaryBtn {
+  margin-top: 0.5rem;
+  min-width: 11rem;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: var(--text-inverse);
+  font-family: var(--font-primary);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.primaryBtn:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}

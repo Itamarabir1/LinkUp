@@ -103,6 +103,47 @@
 
 ---
 
+## Frontend data layer — TanStack React Query
+
+| | |
+|--|--|
+| **בעיה** | קריאות רשת מפוזרות יוצרות policy לא עקבי ל-retry/cache ושגיאות כפולות ב-Sentry בין axios interceptors לבין שכבות UI. |
+| **החלטה** | `QueryClient` מרכזי עם `QueryCache`/`MutationCache`, retry policy מוגדר (network/5xx בלבד), תמיכה ב-`Retry-After` (seconds/date), ו-`mutations.retry=false`. |
+| **Dedup שגיאות** | axios מסמן `__sentryCaptured` לפני capture ל-5xx; React Query `onError` בודק marker ולא מדווח שוב. `ERR_CANCELED` מדולג בשתי השכבות. |
+| **Query key convention** | factories typed (`qk`/`mk`) במקום keys ידניים מפוזרים, כולל `Record<string, unknown>` לפילטרים. |
+| **יתרון** | cache/retry עקביים בכל הדומיינים, observability נקייה יותר (בלי double-capture), ובסיס טוב למיגרציה הדרגתית של מסכים ל-RQ hooks. |
+| **Trade-off** | שכבת תשתית נוספת בפרונט ודורשת משמעת של key factories כדי למנוע drift. |
+| **הפניה** | [`../frontend/src/api/queryClient.ts`](../frontend/src/api/queryClient.ts), [`../frontend/src/api/queryKeys.ts`](../frontend/src/api/queryKeys.ts), [`../frontend/src/api/client.ts`](../frontend/src/api/client.ts), ADR Frontend §13 |
+
+---
+
+## React Query migration Stage 3b — Groups + MyRides
+
+| | |
+|--|--|
+| **בעיה** | `GroupContext` ו-`MyRides` ניהלו fetch/state ידני (`useState` + `useEffect`), כולל עדכוני WS ב-`setState`, מה שהקשה על עקביות cache ועל תחזוקה. |
+| **החלטה** | להעביר `GroupContext` ל-`useQuery(qk.groups.list)` ולשמור את `useGroup()` contract זהה; להעביר `MyRides` ל-`useQuery(qk.rides.list)` + `useMutation(mk.rides.cancel)` עם invalidate על אירועי WS. |
+| **מדיניות cache** | `GroupContext` משתמש ב-`staleTime=2m`; `MyRides` ב-`staleTime=30s`; `refreshGroups` ממומש דרך `queryClient.invalidateQueries`. |
+| **עדכון בזמן אמת** | אירועי `RIDE_FINISHED/RIDE_CANCELLED/RIDE_ENDED/RIDE_STARTED` גורמים ל-invalidate של `qk.rides.list` במקום patch ידני מרובה. |
+| **יתרון** | מקור אמת יחיד לרשימות קבוצות/נסיעות, פחות race conditions בצד לקוח, ומיגרציה בטוחה בלי שינוי UX או מבנה JSX/CSS. |
+| **Trade-off** | דורש משמעת גבוהה לשימוש עקבי ב-query keys ומדיניות invalidation כדי למנוע stale data. |
+| **הפניה** | [`../frontend/src/context/GroupContext.tsx`](../frontend/src/context/GroupContext.tsx), [`../frontend/src/pages/MyRides.tsx`](../frontend/src/pages/MyRides.tsx), [`../frontend/src/api/queryKeys.ts`](../frontend/src/api/queryKeys.ts) |
+
+---
+
+## Auth Login form — react-hook-form + zod
+
+| | |
+|--|--|
+| **בעיה** | ניהול ידני של `email/password/loading` עם `useState` יוצר boilerplate וחזרתיות, ומגדיל סיכון לסטיות בין form validation לבין submit state. |
+| **החלטה** | להחליף את שכבת ניהול הטופס ב-`Login` ל-`react-hook-form` עם `zodResolver` (`email` תקין + `password` לא ריק), תוך שמירת JSX/CSS ו-auth/navigation flow ללא שינוי. |
+| **שימור behavior** | `defaultValues` משתמשים ב-`state?.email` ל-prefill; שגיאות API נשארות ב-`error` state נפרד; `formState.isSubmitting` מחליף loading state ומחובר גם ל-`LoadingButton` וגם ל-`GoogleSignIn disabled`. |
+| **יתרון** | קוד קצר ועקבי יותר למסכי auth, הפרדת אחריות נקייה (validation מול API errors), ובסיס טוב לסטנדרט דומה ב-Register/Forgot Password. |
+| **Trade-off** | תלות נוספת בפרונט ודורש משמעת סכמות/טיפוסים כדי להימנע מ-drift בין schema לשדות UI. |
+| **הפניה** | [`../frontend/src/pages/Login.tsx`](../frontend/src/pages/Login.tsx), [`../frontend/package.json`](../frontend/package.json) |
+
+---
+
 <a id="prometheus-grafana"></a>
 
 ## Prometheus + Grafana monitoring

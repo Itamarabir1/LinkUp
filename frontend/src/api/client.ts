@@ -123,7 +123,14 @@ api.interceptors.response.use(
         trace_id: (err.response?.data as { trace_id?: string } | undefined)?.trace_id,
         status: err.response?.status,
       });
-      if (import.meta.env.PROD && err.response?.status && err.response.status >= 500) {
+      if (
+        import.meta.env.PROD &&
+        axios.isAxiosError(err) &&
+        err.code !== 'ERR_CANCELED' &&
+        err.response?.status &&
+        err.response.status >= 500
+      ) {
+        (err as { __sentryCaptured?: boolean }).__sentryCaptured = true;
         Sentry.captureException(err);
       }
     }

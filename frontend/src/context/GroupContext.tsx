@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Group } from '../types/api';
 import { getMyGroups } from '../api/groups';
+import { qk } from '../api/queryKeys';
 import { getApiErrorMessage } from '../utils/apiError';
 import { apiErr } from '../utils/i18nError';
 import { useAuth } from './AuthContext';
@@ -22,30 +24,24 @@ const GroupContext = createContext<GroupContextValue | null>(null);
 
 export function GroupProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   const [activeGroup, setActiveGroupState] = useState<Group | null>(null);
   const [activeChipId, setActiveChipId] = useState<string>('all');
-  const [myGroups, setMyGroups] = useState<Group[]>([]);
-  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
-  const [groupsError, setGroupsError] = useState('');
+  const {
+    data: myGroups = [],
+    isLoading: isLoadingGroups,
+    error,
+  } = useQuery({
+    queryKey: qk.groups.list(),
+    queryFn: getMyGroups,
+    enabled: isAuthenticated,
+    staleTime: 2 * 60_000,
+  });
+  const groupsError = error ? getApiErrorMessage(error, apiErr('err_load_groups')) : '';
 
   const refreshGroups = useCallback(async () => {
-    if (!isAuthenticated) return;
-    setIsLoadingGroups(true);
-    setGroupsError('');
-    try {
-      const groups = await getMyGroups();
-      setMyGroups(groups);
-    } catch (err) {
-      setMyGroups([]);
-      setGroupsError(getApiErrorMessage(err, apiErr('err_load_groups')));
-    } finally {
-      setIsLoadingGroups(false);
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    refreshGroups();
-  }, [refreshGroups]);
+    await queryClient.invalidateQueries({ queryKey: qk.groups.list() });
+  }, [queryClient]);
 
   const setActiveGroup = (g: Group | null) => {
     setActiveGroupState(g);

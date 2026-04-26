@@ -1,5 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
 import { NotificationToast } from './components/NotificationToast/NotificationToast';
 import ThemeToggle from './components/ThemeToggle/ThemeToggle';
@@ -13,6 +15,7 @@ import PageLoading from './components/PageLoading';
 import styles from './App.module.css';
 import { AdminRoute } from './features/admin';
 import LangToggle from './components/LangToggle/LangToggle';
+import { queryClient } from './api/queryClient';
 
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
@@ -33,6 +36,8 @@ const JoinGroup = lazy(() => import('./pages/JoinGroup'));
 const FCMCheck = lazy(() => import('./pages/FCMCheck'));
 const PostLoginHub = lazy(() => import('./pages/PostLoginHub'));
 const Sablat = lazy(() => import('./pages/Sablat'));
+const PaymentSuccess = lazy(() => import('./pages/Payment/PaymentSuccess'));
+const PaymentCancel = lazy(() => import('./pages/Payment/PaymentCancel'));
 
 const AdminLayout = lazy(() => import('./features/admin/pages/AdminLayout'));
 const AdminHome = lazy(() => import('./features/admin/pages/AdminHome'));
@@ -103,6 +108,8 @@ function AppRoutes() {
             <Route path="messages" element={<Messages />} />
             <Route path="messages/:conversationId" element={<MessageThread />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="payment/success" element={<PaymentSuccess />} />
+            <Route path="payment/cancel" element={<PaymentCancel />} />
             <Route path="groups" element={<Groups />} />
             <Route path="groups/new" element={<CreateGroup />} />
             <Route path="groups/:groupId/rides/search" element={<SearchRides />} />
@@ -123,22 +130,25 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <ThemeProvider>
-        <LangProvider>
-          <AuthProvider>
-            <GroupProvider>
-              <ChatProvider>
-                <div className={styles.floatingControls}>
-                  <ThemeToggle />
-                  <LangToggle />
-                </div>
-                <AppRoutes />
-                <NotificationToast />
-              </ChatProvider>
-            </GroupProvider>
-          </AuthProvider>
-        </LangProvider>
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <LangProvider>
+            <AuthProvider>
+              <GroupProvider>
+                <ChatProvider>
+                  <div className={styles.floatingControls}>
+                    <ThemeToggle />
+                    <LangToggle />
+                  </div>
+                  <AppRoutes />
+                  <NotificationToast />
+                </ChatProvider>
+              </GroupProvider>
+            </AuthProvider>
+          </LangProvider>
+        </ThemeProvider>
+        {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+      </QueryClientProvider>
     </BrowserRouter>
   );
 }

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle,
   XCircle,
@@ -14,6 +15,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useChat, getNotificationItemKey } from '../context/ChatContext';
 import { api } from '../api/client';
+import { qk } from '../api/queryKeys';
 import type { NotificationItem } from '../types/api';
 import { formatMonthYearLong, formatRelativeNotificationTime, formatWeekdayLong } from '../utils/date';
 import { getApiErrorMessage } from '../utils/apiError';
@@ -44,28 +46,21 @@ export default function Notifications() {
     isNotificationRead,
     unreadNotifications,
   } = useChat();
-  const [list, setList] = useState<NotificationItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const fetchNotifications = useCallback(async () => {
-    if (!user?.user_id) {
-      setList([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError('');
-    try {
+  const queryClient = useQueryClient();
+  const {
+    data: list = [],
+    isLoading: loading,
+    error: fetchError,
+  } = useQuery({
+    queryKey: qk.notifications.all(),
+    queryFn: async () => {
       const { data } = await api.get<NotificationItem[]>('/users/me/notifications');
-      setList(Array.isArray(data) ? data : []);
-      refreshUnreadNotifications();
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, apiErr('err_load_notifications')));
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.user_id, refreshUnreadNotifications]);
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!user?.user_id,
+    staleTime: 30_000,
+  });
+  const error = fetchError ? getApiErrorMessage(fetchError, apiErr('err_load_notifications')) : '';
 
   const getTimeGroup = useCallback(
     (dateStr: string): string => {
@@ -85,16 +80,17 @@ export default function Notifications() {
   );
 
   useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+    if (!user?.user_id) return;
+    void refreshUnreadNotifications();
+  }, [user?.user_id, list, refreshUnreadNotifications]);
 
   useEffect(() => {
     const onRefresh = () => {
-      void fetchNotifications();
+      void queryClient.invalidateQueries({ queryKey: qk.notifications.all() });
     };
     window.addEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
     return () => window.removeEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
-  }, [fetchNotifications]);
+  }, [queryClient]);
 
   const groupedList = useMemo(() => {
     const groups: Record<string, { label: string; date: Date; items: NotificationItem[] }> = {};

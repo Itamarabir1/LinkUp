@@ -24,11 +24,18 @@ Deferred/next-step architecture decisions (including cache stampede Phase 2 earl
 - Compose env hardening with multiple env files and fail-fast checks.
 - RabbitMQ reliability upgrades: self-healing consumer + DLQ tooling + metrics.
 - Atomic Redis rate limiting with split algorithms (sliding-window for auth, token-bucket for chat) + `X-RateLimit-*` headers.
+- Frontend data layer standardized with TanStack React Query (`QueryClient`, typed query-key factories, bounded retry policy with `Retry-After` support, and Sentry dedup via `__sentryCaptured` marker).
+- Stage 3b React Query migration completed for `GroupContext` and `MyRides`: query-driven groups/rides state, mutation-based ride cancel flow, and WS-driven cache invalidation.
+- Stage 3b Part 2 completed for `MyBookings` (driver + passenger): both hooks now use React Query with user-scoped booking keys, mutation-driven approve/reject/cancel flows, and websocket-triggered cache invalidation while preserving existing view-model contracts.
+- Login form migrated to `react-hook-form` + `zod` schema validation, preserving existing auth/navigation behavior and UI structure while reducing manual form state boilerplate.
+- Stage 3a RQ migration shipped: `useGoogleMapsKey` moved to React Query (`qk.geo.mapsKey`), Notifications page moved from manual fetch state to `qk.notifications.all()` with event-driven invalidation, and AuthContext now syncs `qk.auth.me()` cache (plus `useCurrentUser` hook).
+- Premium frontend flow shipped: profile upsell/banner (`PremiumBanner`), checkout trigger, and protected payment result pages (`/payment/success`, `/payment/cancel`) wired to billing status polling.
 - Frontend runtime config via startup `envsubst` (`window.__APP_CONFIG__`).
 - Redis Sentinel HA + PgBouncer runtime pooling + direct migrate path.
 - Automated JWT secret sync between backend and chat-ws during deploy.
 - OAuth popup compatibility headers in nginx (`COOP` / `COEP`).
 - Nginx probe routing hardening: exact-match `/livez` and loopback-only `/readyz` to prevent frontend fallback and readiness information exposure.
+- Edge hardening in nginx: `listen 443 ssl http2`, HSTS (`includeSubDomains`), `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, and staged `Content-Security-Policy-Report-Only` with `report-uri` telemetry.
 
 **Interview prep (navigation + per-feature why / alternatives):** **[docs/internal/INTERVIEW_PLAYBOOK.md](docs/internal/INTERVIEW_PLAYBOOK.md)**, **[docs/FEATURE_DECISIONS.md](docs/FEATURE_DECISIONS.md)**. ADR deep dives: **[docs/adr/README.md](docs/adr/README.md)**.
 פרונט — רשימת ריפקטור מפורטת: **[frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md](frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md)**.  
@@ -137,7 +144,7 @@ flowchart LR
 - ✅ Real-time chat (WebSocket) between driver and passenger; **presence**: `users.last_active_at` + debounced PATCH on disconnect; **WS** `user_online` / `user_offline` for immediate header status (see `docs/architecture/REALTIME.md`)
 - ✅ AI conversation summary (Groq / Llama) and email on chat end
 - ✅ **AI free-text assistants (rides):** both passenger search and driver CreateRide use `POST /api/v1/passenger/passengers/ai-parse-search` to prefill route fields; CreateRide keeps stricter rules (future date+time required) and never auto-submits.
-- ✅ **Billing (Stripe, production-hardened):** new `/api/v1/billing/*` flow for premium checkout/status/history/webhook, with idempotent webhook processing (`stripe_event_id` + `payment_intent` guards), enum-backed payment statuses, and deterministic `Decimal` amount handling.
+- ✅ **Billing (Stripe, production-hardened):** `/api/v1/billing/*` flow for premium checkout/status/history/webhook, with idempotent webhook processing (`stripe_event_id` + `payment_intent` guards), enum-backed payment statuses, deterministic `Decimal` amount handling, and frontend integration via React Query + profile Premium banner + payment success/cancel routes.
 - ✅ Push (**FCM**): מהשרת רק מפת **`data`** ב־FCM; בחזית Toast ב־`App.tsx` + צליל, ברקע SW (`push`); רישום טוקן ב־`AuthContext` אחרי login, ניקוי ב־logout; מייל (**Brevo**) — **`docs/FCM_SYSTEM_SUMMARY.md`**
 - ✅ **In-app notification feed (web):** חיבור ראשי ל־**`GET /api/v1/notifications/ws?token=JWT`** דרך [`useChatNotificationsWebSocket`](frontend/src/context/useChatNotificationsWebSocket.ts) על גבי [`useReconnectingWebSocket`](frontend/src/hooks/useReconnectingWebSocket.ts); ב־**`onOpen`** (כולל אחרי reconnect) — רענון פיד, unread ואירוע מותאם `linkup-notifications-refresh`. גיבוי: [`useChatNotificationsFeed`](frontend/src/context/useChatNotificationsFeed.ts) — polling REST כל **~5 דקות**. פירוט: [`ARCHITECTURE.md`](ARCHITECTURE.md) (סעיף In-app notifications), [`docs/architecture/REALTIME.md`](docs/architecture/REALTIME.md).
 - ✅ Google OAuth and email/password auth with JWT + refresh
@@ -226,7 +233,7 @@ docker compose ps            # סטטוס (backend: healthy / ממתין)
 | `backend/` | FastAPI app: API, domain logic, split workers (`notification_worker`, `task_worker`, `ai_worker`), Alembic migrations |
 | `chat-ws/` | Go WebSocket server: Redis subscribe, JWT auth, message fan-out to clients |
 | `frontend/`| React (Vite) web app; Dockerfile + `nginx.conf` לתוך image סטטי; מודול אדמין ב־`src/features/admin/` (מסלולים `/admin/*`); WebSocket — [`frontend/README.md`](frontend/README.md), חוזי JSON ב־[`docs/architecture/REALTIME.md`](docs/architecture/REALTIME.md) |
-| `nginx/`   | קונפיג Nginx ל־Compose — reverse proxy (פורט 80): API, chat-ws, פרונט |
+| `nginx/`   | קונפיג Nginx ל־Compose — reverse proxy ל־API/chat-ws/frontend, TLS ב־443 עם `HTTP/2`, ו-security headers/CSP rollout מתועד |
 | `mobile/`  | React Native (Expo) app |
 | `k8s/`     | Kubernetes base, backend, chat-ws, frontend, email-renderer (Node), workers (`notification-worker`, `task-worker`, `ai-worker`, legacy compatibility worker), infra (Postgres, Redis, RabbitMQ) |
 | `db/`      | Reference schema (`schema.sql`) and utility scripts; migrations live in `backend/alembic/` |
@@ -241,6 +248,7 @@ docker compose ps            # סטטוס (backend: healthy / ממתין)
 - **Request tracing:** every request gets a unique Request ID (8 chars); returned in `X-Request-ID` header and in logs for tracing.
 - **Structured logging:** JSON in production (python-json-logger); level and format via env (LOG_LEVEL, LOG_FORMAT).
 - **Sentry error monitoring:** `sentry_sdk.init()` active in backend (`setup_logging()`) when `SENTRY_DSN` is set — FastAPI/SQLAlchemy/Redis integrations, `traces_sample_rate=0.1`; `capture_exception` on 5xx only (reduces noise). Frontend: `Sentry.init()` in `main.tsx` + `captureException` in axios interceptor (5xx), `ChatErrorBoundary`, `RouteErrorBoundary`. DSN kept in `.env` only — never committed.
+- **Edge/browser security policy:** nginx terminates TLS with `HTTP/2` and returns hardened browser headers (`HSTS`, `nosniff`, `DENY`, `Referrer-Policy`, `Permissions-Policy`, COOP/COEP). CSP is intentionally deployed as `Content-Security-Policy-Report-Only` with `report-uri` for one-week observation before enforcement. Full rollout guide: [`docs/SECURITY_HEADERS.md`](docs/SECURITY_HEADERS.md).
 - **Prometheus + Grafana (monitoring profile):** backend exposes `/metrics` via `prometheus-fastapi-instrumentator`; docker-compose includes `prometheus` and `grafana` services under `--profile monitoring` with ready provisioning (`monitoring/prometheus.yml`, `monitoring/grafana/provisioning/*`) and a starter dashboard (`monitoring/grafana/dashboards/linkup.json`).
 - **SLOs & Error Budgets (new):** Prometheus now scrapes backend + worker metrics (`notification-worker:9091`, `task-worker:9092`, `ai-worker:9093`) to support service-level objectives (availability/latency) and error-budget based release decisions.
 - **RabbitMQ retry & DLQ:** notifications and avatar queues use broker-native retry via `retry_exchange` + `<queue>.retry` TTL queue + `x-death` counting (no manual republish loop in workers). After max retries, messages are routed to per-queue `.dlq`. See `docs/architecture/EVENTS.md`.

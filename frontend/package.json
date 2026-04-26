@@ -12,8 +12,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
     "@react-oauth/google": "^0.12.1",
     "@sentry/react": "^9.0.0",
+    "@tanstack/react-query": "^5.100.5",
+    "@tanstack/react-query-devtools": "^5.100.5",
     "@types/react-datepicker": "^6.2.0",
     "axios": "^1.13.5",
     "date-fns": "^4.1.0",
@@ -25,6 +28,7 @@
     "react": "^19.2.0",
     "react-datepicker": "^9.1.0",
     "react-dom": "^19.2.0",
+    "react-hook-form": "^7.74.0",
     "react-i18next": "^17.0.3",
     "react-router-dom": "^7.13.0",
     "recharts": "^3.8.1",
@@ -32,6 +36,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@tanstack/eslint-plugin-query": "^5.100.5",
     "@testing-library/react": "^16.3.2",
     "@types/i18next": "^12.1.0",
     "@types/node": "^24.10.1",

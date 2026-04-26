@@ -128,6 +128,49 @@
 
 ---
 
+## 13. React Query infrastructure (QueryClient + keys + error ownership)
+
+| | |
+|--|--|
+| **הקשר** | שכבת רשת עשירה עם retries, שגיאות transport, ומספר דומיינים עם reads/mutations חוזרות. נדרש סטנדרט אחיד לקאשינג, retry policy ו-observability בלי double-capture ב-Sentry. |
+| **החלטה** | להוסיף `QueryClient` מרכזי ב־[`frontend/src/api/queryClient.ts`](../../frontend/src/api/queryClient.ts) עם `QueryCache`/`MutationCache`, wrapper `captureExceptionOnce`, ו-policy אחיד: `staleTime`, `gcTime`, retry רק לשגיאות retryable (network/5xx), `Retry-After` parsing (delta/date), ו-`mutations.retry=false`. |
+| **Dedup pattern (Sentry)** | ה-axios interceptor מסמן `__sentryCaptured=true` לפני capture ל-5xx; ב-React Query `onError` בודק את הסמן ולא מצלם שוב. cancellation (`ERR_CANCELED`) מדולג בשתי השכבות. |
+| **Query key convention** | factories typed ב־[`frontend/src/api/queryKeys.ts`](../../frontend/src/api/queryKeys.ts): `qk` ל-queries, `mk` ל-mutations; שימוש ב-`Record<string, unknown>` לפילטרים לשיפור יציבות טיפוסית והפחתת key drift. |
+| **Error ownership** | Axios interceptor = transport/server failures; Query/Mutation cache = fallback capture עם context של request lifecycle; ErrorBoundary = render/runtime errors בלבד. |
+| **למה** | מונע פיצול policy בין hooks/קומפוננטות, משפר cache consistency, ומוריד רעש observability (no double-capture). |
+| **Trade-off** | שכבת תשתית נוספת בפרונט ודורשת משמעת שימוש ב-query key factories; mis-keying עדיין אפשרי בלי code review/ESLint rules. |
+| **בקצרה לראיון** | "בנינו QueryClient מרכזי עם retry policy מבוסס HTTP semantics, dedup לסנטרי בין interceptor ל-React Query, ו-factories אחידים ל-query keys כדי לשמור cache עקבי בסקייל." |
+
+---
+
+## 14. Login form standardization (react-hook-form + zod)
+
+| | |
+|--|--|
+| **הקשר** | מסך `Login` נוהל ידנית עם `useState` עבור ערכים ו-loading, מה שהוביל ליותר boilerplate ופחות עקביות עם כיוון ארכיטקטורת forms typed בפרונט. |
+| **החלטה** | לאמץ `react-hook-form` + `zodResolver` במסך `Login`, עם סכמת `loginSchema` (`email`/`password`) ו-`defaultValues` שמכבדים `location.state?.email` ל-prefill אחרי redirect/verification flow. |
+| **גבולות החלטה** | לא משנים מבנה JSX/CSS או auth logic (`login` + `navigate` chain) — רק שכבת ניהול מצב הטופס וה-submit. |
+| **Error ownership** | validation נשארת בתוך RHF+Zod; שגיאות API נשארות ב-`error` state נפרד ומוצגות ב-`ErrorBanner` כמו קודם. |
+| **למה** | עקביות, תחזוקה קלה יותר, ומוכנות למיגרציה הדרגתית של מסכי auth נוספים לאותו pattern בלי breaking UX. |
+| **Trade-off** | תלות נוספת ונדרש discipline לשמור schema/field names מסונכרנים. |
+| **בקצרה לראיון** | "השארתי את ה-UX וה-auth flow זהים, והחלפתי רק את שכבת form-state ל-RHF+Zod — פחות boilerplate, יותר correctness, ואותו behavior למשתמש." |
+
+---
+
+## 15. React Query migration Stage 3b (GroupContext + MyRides)
+
+| | |
+|--|--|
+| **הקשר** | לאחר תשתית RQ (ADR §13), נותרו שני מוקדי state ידני: `GroupContext` ו-`MyRides`, כולל fetch ידני ועדכוני WS דרך `setState`. |
+| **החלטה** | להעביר את `GroupContext` ל-`useQuery(qk.groups.list)` עם `enabled: isAuthenticated` ו-`refreshGroups` מבוסס invalidate; להעביר את `MyRides` ל-`useQuery(qk.rides.list)` + `useMutation(mk.rides.cancel)`. |
+| **Realtime policy** | במקום patch ידני על state מקומי לכל אירוע, hooks של WS מבצעים `invalidateQueries` על `qk.rides.list` עבור אירועי ride lifecycle. |
+| **גבולות** | לא לשנות public API של `useGroup()`, לא לשנות JSX/CSS/UX, ולהשאיר `activeChipId`/`rideToCancel` ב-`useState`. |
+| **למה** | מפחית coupling בין transport events לבין UI state, משפר cache consistency, ושומר migration incremental עם סיכון נמוך לרגרסיות. |
+| **Trade-off** | יותר תלות ב-cache semantics ו-invalidation discipline; requires code-review vigilance על query keys. |
+| **בקצרה לראיון** | "אחרי שהקמנו QueryClient, השלמנו migration למסכים כבדים: Groups ו-MyRides. העברנו fetch/mutation ל-RQ ושינינו WS updates ל-invalidate דטרמיניסטי — אותה חוויית משתמש, פחות state management ידני." |
+
+---
+
 ## קישורים
 
 - [README.md](README.md) (מפת ADR)  

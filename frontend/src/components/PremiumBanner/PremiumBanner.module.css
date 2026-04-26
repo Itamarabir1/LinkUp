@@ -1,0 +1,103 @@
+.banner {
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.badge {
+  background: linear-gradient(135deg, var(--success-bg) 0%, var(--bg-card) 100%);
+  border-color: var(--success-border);
+}
+
+.upgrade {
+  background: linear-gradient(135deg, var(--info-tint-bg) 0%, var(--bg-card) 100%);
+  border-color: var(--primary-soft-border);
+}
+
+.textBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-primary);
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin: 0;
+  font-family: var(--font-primary);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.iconWrap {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.badge .iconWrap {
+  color: var(--success-text);
+  border-color: var(--success-border);
+}
+
+.upgrade .iconWrap {
+  color: var(--primary);
+  border-color: var(--primary-soft-border);
+}
+
+.cta {
+  height: 44px;
+  border: 1px solid var(--primary);
+  border-radius: 12px;
+  background: var(--primary);
+  color: var(--text-inverse);
+  font-family: var(--font-primary);
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 0.6rem 1.2rem;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.cta:hover:not(:disabled) {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.cta:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+@media (max-width: 560px) {
+  .upgrade {
+    flex-wrap: wrap;
+  }
+
+  .upgrade .cta {
+    width: 100%;
+    order: 3;
+  }
+}

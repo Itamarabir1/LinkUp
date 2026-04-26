@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { qk, mk } from '../../api/queryKeys';
 import { apiErr } from '../../utils/i18nError';
 import { useUserEvent } from '../../hooks/useUserEvent';
 import { approveBooking, fetchDriverSummary, rejectBooking } from '../../api/bookings';
@@ -20,58 +22,68 @@ export function useMyBookingsDriver(
   setError: (message: string) => void
 ) {
   const userId = user?.user_id;
-  const [driverList, setDriverList] = useState<DriverBookingItem[]>([]);
+  const queryClient = useQueryClient();
   const [driverStatus, setDriverStatus] = useState<DriverStatus>({ kind: 'idle' });
   const [sharingRideId, setSharingRideId] = useState<string | null>(null);
   const [liveRideId, setLiveRideId] = useState<string | null>(null);
   const [rideToCancel, setRideToCancel] = useState<string | null>(null);
   const [cancellingRide, setCancellingRide] = useState(false);
 
-  const fetchDriverBookings = useCallback(async (busyBookingId?: string) => {
-    if (!userId) return;
-    setDriverStatus(
-      busyBookingId !== undefined ? { kind: 'loading', busyBookingId } : { kind: 'loading' }
-    );
-    setError('');
-    try {
+  const { data, isLoading } = useQuery({
+    queryKey: qk.bookings.driver(userId),
+    queryFn: async () => {
       const { data } = await fetchDriverSummary();
-      setDriverList(mapDriverSummaryToItems(data));
-    } catch (err: unknown) {
-      setError(getApiErrorMessage(err, apiErr('err_load_driver_bookings')));
-    } finally {
-      setDriverStatus({ kind: 'idle' });
-    }
-  }, [userId, setError]);
+      return mapDriverSummaryToItems(data);
+    },
+    enabled: activeTab === 'driver' && !!userId,
+    staleTime: 30_000,
+  });
+  const driverList = data ?? [];
+  const driverLoading = isLoading;
 
-  useEffect(() => {
-    if (activeTab === 'driver') void fetchDriverBookings();
-  }, [activeTab, fetchDriverBookings]);
+  const approveMutation = useMutation({
+    mutationKey: mk.bookings.approve(''),
+    mutationFn: async (bookingId: string) => {
+      setDriverStatus({ kind: 'action', bookingId });
+      await approveBooking(bookingId);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
+    },
+    onError: (err) => {
+      setError(getApiErrorMessage(err, apiErr('err_approve_booking')));
+    },
+    onSettled: () => setDriverStatus({ kind: 'idle' }),
+  });
+
+  const rejectMutation = useMutation({
+    mutationKey: mk.bookings.reject(''),
+    mutationFn: async (bookingId: string) => {
+      setDriverStatus({ kind: 'action', bookingId });
+      await rejectBooking(bookingId);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
+    },
+    onError: (err) => {
+      setError(getApiErrorMessage(err, apiErr('err_reject_booking')));
+    },
+    onSettled: () => setDriverStatus({ kind: 'idle' }),
+  });
 
   useUserEvent(
     'booking.passenger_join_request',
     useCallback(() => {
-      void fetchDriverBookings();
-    }, [fetchDriverBookings])
+      void queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
+    }, [queryClient, userId])
   );
 
   useUserEvent(
     'RIDE_FINISHED',
     useCallback((detail) => {
       if (!detail.ride_id) return;
-      setDriverList((prev) =>
-        prev.map((item) =>
-          item.ride.ride_id === detail.ride_id
-            ? {
-                ...item,
-                ride: {
-                  ...item.ride,
-                  status: (detail.status as typeof item.ride.status) ?? 'completed',
-                },
-              }
-            : item
-        )
-      );
-    }, [])
+      void queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
+    }, [queryClient, userId])
   );
 
   const handleShareStart = useCallback(
@@ -79,20 +91,20 @@ export function useMyBookingsDriver(
       setError('');
       try {
         await startRide(rideId);
-        await fetchDriverBookings();
+        await queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
       } catch (err: unknown) {
         const status = getApiStatus(err);
         const code = getApiErrorCode(err);
         const detail = getApiErrorMessage(err, '');
         if (status === 400 && (code === 'RIDE_INVALID_STATUS' || /active|ACTIVE|פעיל/i.test(detail))) {
-          await fetchDriverBookings();
+          await queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
           return;
         }
         setError(detail || apiErr('err_start_ride'));
         throw err;
       }
     },
-    [fetchDriverBookings, setError]
+    [queryClient, setError, userId]
   );
 
   const handleShareStop = useCallback(
@@ -105,10 +117,10 @@ export function useMyBookingsDriver(
         if (status === 400) return;
         console.error('handleShareStop error:', err);
       } finally {
-        await fetchDriverBookings();
+        await queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
       }
     },
-    [fetchDriverBookings]
+    [queryClient, userId]
   );
 
   const driverShareConfirmedBookingId = useMemo(() => {
@@ -126,39 +138,15 @@ export function useMyBookingsDriver(
     onStop: handleShareStop,
   });
 
-  const handleApprove = useCallback(
-    async (bookingId: string) => {
-      if (!userId) return;
-      setDriverStatus({ kind: 'action', bookingId });
-      setError('');
-      try {
-        await approveBooking(bookingId);
-        await fetchDriverBookings(bookingId);
-      } catch (err: unknown) {
-        setError(getApiErrorMessage(err, apiErr('err_approve_booking')));
-      } finally {
-        setDriverStatus({ kind: 'idle' });
-      }
-    },
-    [userId, fetchDriverBookings, setError]
-  );
+  const handleApprove = useCallback((bookingId: string) => {
+    if (!userId) return;
+    approveMutation.mutate(bookingId);
+  }, [approveMutation, userId]);
 
-  const handleReject = useCallback(
-    async (bookingId: string) => {
-      if (!userId) return;
-      setDriverStatus({ kind: 'action', bookingId });
-      setError('');
-      try {
-        await rejectBooking(bookingId);
-        await fetchDriverBookings(bookingId);
-      } catch (err: unknown) {
-        setError(getApiErrorMessage(err, apiErr('err_reject_booking')));
-      } finally {
-        setDriverStatus({ kind: 'idle' });
-      }
-    },
-    [userId, fetchDriverBookings, setError]
-  );
+  const handleReject = useCallback((bookingId: string) => {
+    if (!userId) return;
+    rejectMutation.mutate(bookingId);
+  }, [rejectMutation, userId]);
 
   const confirmCancelRide = useCallback(async () => {
     if (rideToCancel == null) return;
@@ -166,23 +154,25 @@ export function useMyBookingsDriver(
     setError('');
     try {
       await cancelRide(rideToCancel);
-      setDriverList((prev) =>
-        prev.map((item) =>
-          item.ride.ride_id === rideToCancel
-            ? { ...item, ride: { ...item.ride, status: 'cancelled' } }
-            : item
-        )
+      queryClient.setQueryData(
+        qk.bookings.driver(userId),
+        (old: DriverBookingItem[] = []) =>
+          old.map((item) =>
+            item.ride.ride_id === rideToCancel
+              ? { ...item, ride: { ...item.ride, status: 'cancelled' } }
+              : item
+          )
       );
       if (sharingRideId === rideToCancel) setSharingRideId(null);
       setLiveRideId((prev) => (prev === rideToCancel ? null : prev));
       setRideToCancel(null);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, apiErr('err_cancel_ride')));
-      await fetchDriverBookings();
+      await queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
     } finally {
       setCancellingRide(false);
     }
-  }, [rideToCancel, sharingRideId, fetchDriverBookings, setError]);
+  }, [rideToCancel, sharingRideId, queryClient, userId, setError]);
 
   const actionBookingIdForUi =
     driverStatus.kind === 'action'
@@ -193,7 +183,7 @@ export function useMyBookingsDriver(
 
   return {
     driverList,
-    driverLoading: driverStatus.kind === 'loading',
+    driverLoading,
     sharingRideId,
     setSharingRideId,
     liveRideId,

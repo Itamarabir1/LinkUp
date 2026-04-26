@@ -1,42 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { qk } from '../api/queryKeys';
 import { fetchMapsKey } from '../api/geo';
 import { GOOGLE_MAPS_API_KEY } from '../config/env';
 
 export function useGoogleMapsKey() {
-  const [resolvedKey, setResolvedKey] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const { data, error, isPending } = useQuery({
+    queryKey: qk.geo.mapsKey(),
+    queryFn: async () => {
+      if (GOOGLE_MAPS_API_KEY) return GOOGLE_MAPS_API_KEY;
+      const { data } = await fetchMapsKey();
+      return data?.google_maps_api_key ?? '';
+    },
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: 2,
+  });
 
-  useEffect(() => {
-    if (GOOGLE_MAPS_API_KEY) {
-      queueMicrotask(() => setResolvedKey(GOOGLE_MAPS_API_KEY));
-      return;
-    }
-
-    let cancelled = false;
-    fetchMapsKey()
-      .then(({ data }) => {
-        if (cancelled) return;
-        if (data?.google_maps_api_key) setResolvedKey(data.google_maps_api_key);
-        else setResolvedKey('');
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setResolvedKey('');
-          setLoadError('לא ניתן לטעון מפתח מפה');
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (resolvedKey === '') {
-      queueMicrotask(() => setLoadError('לא הוגדר מפתח מפה'));
-    }
-  }, [resolvedKey]);
-
-  return { resolvedKey, loadError };
+  return {
+    resolvedKey: isPending ? null : (data ?? null),
+    loadError: error ? 'לא ניתן לטעון מפתח מפה' : data === '' ? 'לא הוגדר מפתח מפה' : null,
+  };
 }
 

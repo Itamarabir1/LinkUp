@@ -1,17 +1,36 @@
 .button {
-  /* Positioning lives on App floatingControls wrapper */
+  /* Positioning lives on App floatingControls wrapper.
+     Size/elevation matches ThemeToggle so the floating dock stacks as a
+     matched pair. Typography stays monospace by design — see
+     docs/ENGINEERING_HIGHLIGHTS.md §14 (LangToggle is the deliberate
+     exception to --font-primary because it displays a language code, not UI copy). */
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-primary);
-  border-radius: 999px;
-  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: "DM Mono", "DM Sans", monospace;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
+  letter-spacing: 0.02em;
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-dropdown);
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
 }
 
 .button:hover {
   background: var(--bg-secondary);
+  transform: scale(1.04);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
 }

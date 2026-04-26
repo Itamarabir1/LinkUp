@@ -1,0 +1,18 @@
+{
+  "premiumActive": "Premium active",
+  "premiumSince": "Member since {{date}}",
+  "premiumSinceUnknown": "Membership start date will be updated soon",
+  "upgradeTitle": "Upgrade to Premium",
+  "upgradeSubtitle": "Unlock access to advanced features",
+  "upgradeNow": "Upgrade now",
+  "upgradeLoading": "Redirecting to checkout...",
+  "paymentSuccessTitle": "Welcome to Premium!",
+  "paymentSuccessSubtitle": "Your payment was completed successfully.",
+  "paymentSuccessPolling": "Verifying your upgrade. This may take a few seconds...",
+  "paymentSuccessVerified": "Your account is now upgraded to Premium.",
+  "paymentSuccessTimeout": "Verification is taking longer than expected. You can return to profile and check again shortly.",
+  "paymentCancelTitle": "Payment was not completed",
+  "paymentCancelSubtitle": "You can try again or return to your profile.",
+  "tryAgain": "Try again",
+  "backToProfile": "Back to profile"
+}

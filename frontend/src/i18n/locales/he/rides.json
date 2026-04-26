@@ -1,6 +1,7 @@
 {
   "noRides": "אין נסיעות עדיין",
   "createFirstRide": "צור את הנסיעה הראשונה שלך",
+  "createRide": "צור נסיעה",
   "activeRides": "נסיעות פעילות",
   "pastRides": "נסיעות עבר",
   "cancelRide": "בטל נסיעה",
