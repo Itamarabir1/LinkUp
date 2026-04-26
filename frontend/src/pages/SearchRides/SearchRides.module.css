@@ -458,8 +458,7 @@
   .metaFieldWide { grid-column: span 1; }
 }
 
-   AI Search Block — intelligent input, premium feel
-   ══════════════════════════════════════════════════ */
+/* AI Search block: intelligent input styling */
 
 .aiBlock {
   text-align: start;
