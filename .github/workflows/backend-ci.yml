@@ -238,6 +238,7 @@ jobs:
             $COMPOSE up -d --no-deps notification-worker task-worker ai-worker
             $COMPOSE up -d --no-deps chat-ws
             $COMPOSE --profile prod up -d --no-deps frontend nginx
+            $COMPOSE --profile prod up -d --no-deps --force-recreate nginx
 
             if BACKEND_IMAGE="$NEW_IMAGE" $COMPOSE up -d --no-deps --wait --wait-timeout 90 backend; then
               echo "$IMAGE_TAG" > "$PREV_TAG_FILE"
