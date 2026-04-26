@@ -147,3 +147,14 @@ This follows a senior engineering principle: avoid premature optimization, but e
   - RHF provides limited ROI in this flow and can increase complexity/risk for sequencing regressions.
 - **When to revisit:**
   - If/when the wizard is simplified materially and form-state ownership becomes a clear fit for RHF+zod.
+
+## Frontend Forms Scope: E.7/E.8 (Deferred / No-op)
+
+- **Decision (E.7 MessageThread + E.8 ChatPopup):** defer RHF migration.
+- **Current state:** message send forms are single-field textarea flows with no validation requirements.
+- **Why deferred:**
+  - Input state is managed in `useMessageThread` with draft saving to `localStorage`.
+  - The composer path is integrated with WebSocket typing indicators and send flow.
+  - RHF adds little practical value for this shape (single input, no schema validation), while increasing integration complexity with the WS layer.
+- **When to revisit:**
+  - If chat composer evolves into multi-field input or adds real validation/business rules where RHF+zod yields clear ROI.
