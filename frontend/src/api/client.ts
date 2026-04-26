@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/react';
-import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import axios, { type AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios';
 import { STORAGE_KEYS } from '../config/constants';
 import { API_BASE_URL, API_TIMEOUT_MS } from '../config/env';
 import { throttle } from './throttle';
@@ -12,6 +12,20 @@ export const api = axios.create({
   timeout: API_TIMEOUT_MS,
   headers: { 'Content-Type': 'application/json' },
 });
+
+/**
+ * Orval mutator wrapper around the shared Axios instance.
+ * Returns response payload directly so generated clients stay typed and concise.
+ */
+export const apiMutator = <T>(
+  config: AxiosRequestConfig,
+  options?: AxiosRequestConfig
+): Promise<T> => {
+  return api({
+    ...config,
+    ...options,
+  }).then(({ data }) => data as T);
+};
 
 function getStoredAccessToken(): string | null {
   return localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);

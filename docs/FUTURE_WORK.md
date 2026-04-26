@@ -158,3 +158,11 @@ This follows a senior engineering principle: avoid premature optimization, but e
   - RHF adds little practical value for this shape (single input, no schema validation), while increasing integration complexity with the WS layer.
 - **When to revisit:**
   - If chat composer evolves into multi-field input or adds real validation/business rules where RHF+zod yields clear ROI.
+
+## OpenAPI Snapshot CI Gate (Planned)
+
+- **Decision:** Add a CI gate that enforces API client regeneration from the OpenAPI snapshot.
+- **Scope:**
+  - Run `npm run gen:api` in frontend CI.
+  - Run `git diff --exit-code frontend/src/api/generated/` and fail if generated files changed.
+- **Why:** Prevent drift between backend schema and committed frontend generated client/types.

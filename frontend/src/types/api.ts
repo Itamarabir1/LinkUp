@@ -1,3 +1,6 @@
+// Re-export generated types (source of truth from OpenAPI)
+export * from '../api/generated/types'
+
 export interface User {
   user_id: string;
   email: string;

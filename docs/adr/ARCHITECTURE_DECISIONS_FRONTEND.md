@@ -185,6 +185,19 @@
 
 ---
 
+## 17. OpenAPI snapshot codegen with Orval (committed generated client)
+
+| | |
+|--|--|
+| **הקשר** | שכבת API ידנית בפרונט גדלה במהירות ומייצרת סיכון ל-contract drift מול backend. |
+| **החלטה** | לאמץ Orval עם snapshot מקומי (`frontend/openapi-snapshot.json`) ולייצר `client/types` לתיקיית `frontend/src/api/generated`, עם mutator אחיד `apiMutator` מעל ה-axios instance הקיים. |
+| **Source of truth policy** | קבצי generated נכנסים ל-git במכוון כדי שכל שינוי API יהיה reviewable כחלק מה-PR. |
+| **למה** | סוגר פערים בין schema לקוד לקוח, מוריד boilerplate ידני, ומחזק type-safety מקצה לקצה. |
+| **Trade-off** | מוסיף שלב generation לתהליך הפיתוח ודורש gate ב-CI למניעת שכחת regeneration. |
+| **בקצרה לראיון** | "עברנו מ-API types ידניים ל-codegen חוזי עם Orval; ה-generated client מחויב ב-repo ונבדק ב-CI כדי למנוע drift בין backend ל-frontend." |
+
+---
+
 ## קישורים
 
 - [README.md](README.md) (מפת ADR)  

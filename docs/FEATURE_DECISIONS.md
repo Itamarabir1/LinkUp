@@ -131,6 +131,19 @@
 
 ---
 
+## OpenAPI snapshot code generation (Orval)
+
+| | |
+|--|--|
+| **בעיה** | טייפים/clients ידניים בפרונט נוטים לסטייה מה-schema של backend עם הזמן. |
+| **החלטה** | לייצר client/types אוטומטית מ-`frontend/openapi-snapshot.json` באמצעות Orval (`orval.config.ts`) ל-`frontend/src/api/generated`, עם mutator אחיד (`apiMutator`) שמתחבר ל-axios instance הקיים. |
+| **Source of truth** | קבצי generated נכנסים ל-git במכוון כדי לשמור reviewable API contract snapshot בכל commit. |
+| **יתרון** | מפחית drift חוזי בין backend/frontend, מקטין boilerplate ידני, ומשפר type-safety בזמן קומפילציה. |
+| **Trade-off** | דורש discipline תהליכי: כל שינוי schema מחייב regeneration לפני merge. |
+| **הפניה** | [`../frontend/orval.config.ts`](../frontend/orval.config.ts), [`../frontend/src/api/client.ts`](../frontend/src/api/client.ts), [`../frontend/src/api/generated/client.ts`](../frontend/src/api/generated/client.ts) |
+
+---
+
 ## Auth Login form — react-hook-form + zod
 
 | | |
