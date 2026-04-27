@@ -111,20 +111,19 @@ messaging.Message(
 
 ### 3.4 Firebase Admin init
 
-- [`backend/app/infrastructure/firebase_core/firebase.py`](backend/app/infrastructure/firebase_core/firebase.py) — `FIREBASE_CREDENTIALS_JSON` or `FIREBASE_SERVICE_ACCOUNT_PATH`
-- The **outbox-worker** loads the same module when handling push; it must see valid credentials in every environment where FCM is used.
+- [`backend/app/infrastructure/firebase_core/firebase.py`](backend/app/infrastructure/firebase_core/firebase.py) — production source of truth is `FIREBASE_CREDENTIALS_JSON` (Model B). `FIREBASE_SERVICE_ACCOUNT_PATH` is local-dev fallback only.
+- Workers load the same module and therefore must receive the same env contract.
 
-### 3.5 Docker Compose — credentials on disk
+### 3.5 Docker Compose — production secret contract
 
-- The service account JSON is **not** baked into the image (see `backend/.dockerignore`). At runtime, Compose mounts the host file into **both** `backend` and `outbox-worker`:
+- Firebase credentials are not baked into the image and are not mounted as credential files in production.
+- Runtime source is `backend/.env` via `env_file` for backend/worker services, with:
 
-  `backend/app/infrastructure/firebase_core/firebase-credentials.json` → `/app/infrastructure/firebase_core/firebase-credentials.json` (read-only)
+  `FIREBASE_CREDENTIALS_JSON={...single-line-json...}`
 
-- Set in `backend/.env` (used by both services via `env_file`):
+- Post-deploy assertion should verify the env reached runtime:
 
-  `FIREBASE_SERVICE_ACCOUNT_PATH=/app/infrastructure/firebase_core/firebase-credentials.json`
-
-- Without this mount + path, push from the worker can fail with Firebase Admin errors such as “The default Firebase app does not exist.”
+  `docker exec linkup_backend printenv | grep FIREBASE_CREDENTIALS_JSON`
 
 ## 4) Example Sequence (e.g. passenger join request)
 

@@ -26,8 +26,9 @@
   - **פיתוח:** `docker compose up -d` → תשתית + **migrate** + 3 workers + backend (**8000**) + chat-ws (**8081**). פרונט: **`npm run dev`** בתיקיית `frontend`, לא קונטיינר.
    - **WebSocket בפיתוח:** צ'אט — `ws://localhost:8081/ws` (chat-ws); נסיעות / מיקום / **פיד התראות in-app** — `ws://localhost:8000/api/v1/...` (backend). מרוכז ב־[`frontend/src/config/env.ts`](../../frontend/src/config/env.ts).
    - **סטאק מלא מאחורי Nginx (פורט 80):** `docker compose --profile prod up -d --build`.
-  - **FCM:** `firebase-credentials.json` ממופה read-only ל־**backend** ול־**notification-worker** (נתיב בקונטיינר: `/app/infrastructure/firebase_core/firebase-credentials.json`); `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env` חייב להתאים (הקובץ לא נכנס ל־image בגלל `.dockerignore`).
+  - **FCM (Model B לפרודקשן):** אין mount של קובץ credentials לקונטיינרים. בפרודקשן מגדירים `FIREBASE_CREDENTIALS_JSON` ב־`backend/.env` (JSON בשורה אחת). `FIREBASE_SERVICE_ACCOUNT_PATH` נשאר fallback לפיתוח לוקאלי בלבד.
    - **שינוי `backend/.env`:** משתני הסביבה של מיכל ה-backend נטענים בעת **יצירת** הקונטיינר. אחרי עריכת הקובץ הרץ `docker compose up -d --force-recreate backend` (לא מספיק `docker compose restart backend`).
+  - **ולידציית פרודקשן אחרי שינוי סודות:** הרץ `bash scripts/ops/firebase-modelb-smoke.sh` משורש הפרויקט כדי לאמת טעינת Firebase + Redis contracts בפועל.
 
 3. **הרצה לוקאלית (בלי Docker ל-backend / frontend)**
   - תשתיות + workers: `docker compose up -d` (או לפחות `db`, `redis`, `rabbitmq`, `chat-ws`; אם workers כבר רצים ב־Compose — **אל** תריץ במקביל worker מקומי נוסף). אם **לא** מרימים את שירות **`migrate`** בדוקר — להריץ ידנית `alembic upgrade head` לפני הבקאנד המקומי.
@@ -91,8 +92,8 @@
 | S3_BUCKET_NAME | | |
 | CLOUDFRONT_DOMAIN | מדיה ציבורית (אופציונלי) | דומיין CloudFront (ללא `https://`) — URLs ציבוריים לתמונות; בלי ערך — presigned GET ל-S3 |
 | UPLOAD_TEMP_DIR | — | תיקייה לקבצים זמניים |
-| FIREBASE_SERVICE_ACCOUNT_PATH | לפוש | |
-| FIREBASE_CREDENTIALS_JSON | לפוש (פרודקשן) | |
+| FIREBASE_SERVICE_ACCOUNT_PATH | אופציונלי (לוקאלי) | fallback לפיתוח מקומי בלבד |
+| FIREBASE_CREDENTIALS_JSON | כן (פרודקשן) | מקור אמת יחיד לפרודקשן (Model B, בלי mount קובץ) |
 | RATE_LIMIT_AUTH_WINDOW_SECONDS | — | 60 |
 | RATE_LIMIT_AUTH_MAX_REQUESTS | — | 10 |
 | FORCE_HTTPS_REDIRECT | — | false (true מאחורי proxy) |
@@ -243,7 +244,7 @@ LinkUp/
 ## Push (FCM) — Web
 
 - פרונט: משתני `VITE_FIREBASE_*` + `VITE_FIREBASE_VAPID_KEY` ב־`frontend/.env` (ראה `frontend/.env.example`).
-- בקאנד: `FIREBASE_CREDENTIALS_JSON` או `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env`.
+- בקאנד: בפרודקשן `FIREBASE_CREDENTIALS_JSON` בלבד; `FIREBASE_SERVICE_ACCOUNT_PATH` מיועד לפיתוח מקומי.
 - מחזור חיים (Web): רישום טוקן אחרי התחברות / טעינת סשן אם הרשאת דפדפן `granted`; ניקוי `fcm_token` בשרת + `cleanupFCM` ב־logout — פירוט ב־**`docs/FCM_SYSTEM_SUMMARY.md`** (סעיף Initialization).
 - זרימה מלאה (FCM מהשרת: `data` בלבד; Service Worker; Toast ב־`App.tsx` + צליל בחזית): **`docs/FCM_SYSTEM_SUMMARY.md`**.
 

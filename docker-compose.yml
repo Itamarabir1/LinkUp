@@ -381,6 +381,7 @@ services:
     environment:
       - PORT=8081
       - BACKEND_URL=http://backend:8000
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
       - REDIS_MASTER_NAME=mymaster
       - REDIS_SENTINEL_ADDR=redis-sentinel:26379
     depends_on:
