@@ -248,6 +248,10 @@ class Settings(BaseSettings):
         description="json (production) or text (local dev)",
     )
     USER_EVENTS_ENABLED: bool = True
+    ADMIN_CAPABILITIES_JSON: str = Field(
+        "",
+        description="Optional JSON map from admin email to allowed capabilities. Empty = full admin access.",
+    )
 
     # --- Pydantic Configuration ---
     model_config = SettingsConfigDict(

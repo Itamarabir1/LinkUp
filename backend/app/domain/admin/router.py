@@ -1,4 +1,5 @@
 import logging
+from json import loads as json_loads
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -16,6 +17,7 @@ from app.api.dependencies.services import get_ride_service
 from app.db.session import get_db
 from app.domain.bookings.enum import BookingStatus
 from app.domain.bookings.model import Booking
+from app.domain.billing.model import Payment, PaymentStatus
 from app.domain.groups.model import Group, GroupMember
 from app.domain.rides.crud import crud_ride
 from app.domain.rides.enum import RideStatus
@@ -23,9 +25,12 @@ from app.domain.rides.model import Ride
 from app.domain.rides.service import RideService
 from app.domain.users.crud import crud_user
 from app.domain.users.model import User
+from app.core.config import settings
 from app.infrastructure.health.health_service import check_health
 from app.infrastructure.audit.repo import audit_repo
 from app.infrastructure.outbox.model import OutboxEvent
+from app.infrastructure.rabbitmq.client import outbox_rabbit_client, rabbit_client, worker_rabbit_client
+from app.infrastructure.rabbitmq.topology import QUEUE_SPECS
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +64,49 @@ def _client_ip(request: Request) -> str | None:
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else None
+
+
+def _normalize_email(email: str | None) -> str:
+    return (email or "").strip().lower()
+
+
+def _admin_caps_for(user: User) -> set[str]:
+    """
+    Incremental capability model:
+    - If ADMIN_CAPABILITIES_JSON is unset/invalid -> full admin access ("*")
+    - If set, expected JSON map: {"email@example.com": ["admin.billing.read", ...]}
+    """
+    raw = (getattr(settings, "ADMIN_CAPABILITIES_JSON", None) or "").strip()
+    if not raw:
+        return {"*"}
+    try:
+        parsed = json_loads(raw)
+        if not isinstance(parsed, dict):
+            return {"*"}
+        caps = parsed.get(_normalize_email(user.email), ["*"])
+        if not isinstance(caps, list):
+            return {"*"}
+        return {str(c).strip() for c in caps if str(c).strip()}
+    except Exception:
+        return {"*"}
+
+
+def _require_capability(user: User, capability: str) -> None:
+    caps = _admin_caps_for(user)
+    if "*" in caps or capability in caps:
+        return
+    raise HTTPException(status_code=403, detail=f"Missing admin capability: {capability}")
+
+
+def _paginated(*, items: list, limit: int, offset: int, total: int) -> dict:
+    next_offset = offset + limit if (offset + limit) < total else None
+    return {
+        "items": items,
+        "limit": limit,
+        "offset": offset,
+        "total": total,
+        "next_offset": next_offset,
+    }
 
 
 @router.get("/me")
@@ -404,6 +452,108 @@ async def admin_groups(
     return items
 
 
+@router.get("/bookings")
+async def admin_bookings(
+    status: str | None = Query(default=None),
+    ride_id: UUID | None = Query(default=None),
+    passenger_id: UUID | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=_QUERY_MAX_ADMIN_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    _require_capability(current_user, "admin.bookings.read")
+    query = select(Booking)
+    if status:
+        query = query.where(Booking.status == status)
+    if ride_id:
+        query = query.where(Booking.ride_id == ride_id)
+    if passenger_id:
+        query = query.where(Booking.passenger_id == passenger_id)
+    total = int((await db.scalar(select(func.count()).select_from(query.subquery()))) or 0)
+    result = await db.execute(query.order_by(Booking.created_at.desc()).offset(offset).limit(limit))
+    rows = list(result.scalars().all())
+    items = [
+        {
+            "booking_id": str(b.booking_id),
+            "ride_id": str(b.ride_id),
+            "passenger_id": str(b.passenger_id),
+            "request_id": str(b.request_id) if b.request_id else None,
+            "num_seats": b.num_seats,
+            "pickup_name": b.pickup_name,
+            "pickup_time": b.pickup_time.isoformat() if b.pickup_time else None,
+            "status": getattr(b.status, "value", None) or str(b.status),
+            "created_at": b.created_at.isoformat() if b.created_at else None,
+            "updated_at": b.updated_at.isoformat() if b.updated_at else None,
+        }
+        for b in rows
+    ]
+    return _paginated(items=items, limit=limit, offset=offset, total=total)
+
+
+@router.get("/billing/payments")
+async def admin_billing_payments(
+    status: str | None = Query(default=None),
+    user_id: UUID | None = Query(default=None),
+    currency: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=_QUERY_MAX_ADMIN_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    _require_capability(current_user, "admin.billing.read")
+    query = select(Payment)
+    if status:
+        query = query.where(Payment.status == status)
+    if user_id:
+        query = query.where(Payment.user_id == user_id)
+    if currency:
+        query = query.where(Payment.currency == currency.lower())
+    total = int((await db.scalar(select(func.count()).select_from(query.subquery()))) or 0)
+    result = await db.execute(query.order_by(Payment.created_at.desc()).offset(offset).limit(limit))
+    rows = list(result.scalars().all())
+    items = [
+        {
+            "payment_id": str(p.payment_id),
+            "user_id": str(p.user_id),
+            "amount": float(p.amount),
+            "currency": p.currency,
+            "status": getattr(p.status, "value", None) or str(p.status),
+            "stripe_payment_intent_id": p.stripe_payment_intent_id,
+            "stripe_session_id": p.stripe_session_id,
+            "stripe_event_id": p.stripe_event_id,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+        }
+        for p in rows
+    ]
+    return _paginated(items=items, limit=limit, offset=offset, total=total)
+
+
+@router.get("/billing/payments/{payment_id}")
+async def admin_billing_payment_by_id(
+    payment_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    _require_capability(current_user, "admin.billing.read")
+    payment = (await db.execute(select(Payment).where(Payment.payment_id == payment_id))).scalars().first()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    return {
+        "payment_id": str(payment.payment_id),
+        "user_id": str(payment.user_id),
+        "amount": float(payment.amount),
+        "currency": payment.currency,
+        "status": getattr(payment.status, "value", None) or str(payment.status),
+        "stripe_payment_intent_id": payment.stripe_payment_intent_id,
+        "stripe_session_id": payment.stripe_session_id,
+        "stripe_event_id": payment.stripe_event_id,
+        "created_at": payment.created_at.isoformat() if payment.created_at else None,
+        "updated_at": payment.updated_at.isoformat() if payment.updated_at else None,
+    }
+
+
 @router.get("/outbox")
 async def admin_outbox(
     status: str | None = Query(default=None, description="PENDING/PROCESSED/FAILED"),
@@ -438,18 +588,37 @@ async def admin_audit_log(
     actor_user_id: UUID | None = Query(default=None),
     resource_type: str | None = Query(default=None),
     action: str | None = Query(default=None),
+    created_from: datetime | None = Query(default=None),
+    created_to: datetime | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=_QUERY_MAX_ADMIN_LIST_LIMIT),
+    offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
-    rows = await audit_repo.list_entries(
-        db,
-        actor_user_id=actor_user_id,
-        resource_type=resource_type,
-        action=action,
-        limit=limit,
+    _require_capability(current_user, "admin.audit.read")
+    from app.infrastructure.audit.model import AuditLog  # local import to avoid cycle
+    query = select(AuditLog)
+    if actor_user_id is not None:
+        query = query.where(AuditLog.actor_user_id == actor_user_id)
+    if resource_type:
+        query = query.where(AuditLog.resource_type == resource_type)
+    if action:
+        query = query.where(AuditLog.action == action)
+    if created_from:
+        query = query.where(AuditLog.created_at >= created_from)
+    if created_to:
+        query = query.where(AuditLog.created_at <= created_to)
+
+    total_stmt = select(func.count()).select_from(query.subquery())
+    total = int((await db.scalar(total_stmt)) or 0)
+    rows = list(
+        (
+            await db.execute(
+                query.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit),
+            )
+        ).scalars().all(),
     )
-    return [
+    items = [
         {
             "id": str(r.id),
             "actor_user_id": str(r.actor_user_id) if r.actor_user_id else None,
@@ -462,19 +631,51 @@ async def admin_audit_log(
         }
         for r in rows
     ]
+    await audit_repo.record(
+        db,
+        actor_user_id=current_user.user_id,
+        action="admin_audit_log_read",
+        resource_type="audit_log",
+        resource_id=None,
+        metadata={
+            "limit": limit,
+            "offset": offset,
+            "actor_user_id": str(actor_user_id) if actor_user_id else None,
+            "resource_type": resource_type,
+            "action_filter": action,
+            "created_from": created_from.isoformat() if created_from else None,
+            "created_to": created_to.isoformat() if created_to else None,
+        },
+        ip_address=None,
+    )
+    await db.commit()
+    return _paginated(items=items, limit=limit, offset=offset, total=total)
 
 
 @router.get("/outbox/{event_id}")
 async def admin_outbox_by_id(
     event_id: UUID,
+    include_payload: bool = Query(default=False, description="Include raw payload/metadata (audited sensitive read)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
+    _require_capability(current_user, "admin.outbox.read")
     stmt = select(OutboxEvent).where(OutboxEvent.id == event_id)
     result = await db.execute(stmt)
     e = result.scalars().first()
     if not e:
         raise OutboxEventNotFoundError(event_id)
+    if include_payload:
+        await audit_repo.record(
+            db,
+            actor_user_id=current_user.user_id,
+            action="admin_outbox_payload_read",
+            resource_type="outbox_event",
+            resource_id=str(event_id),
+            metadata={"include_payload": True},
+            ip_address=None,
+        )
+        await db.commit()
     return {
         "id": str(e.id),
         "event_name": e.event_name,
@@ -482,8 +683,8 @@ async def admin_outbox_by_id(
         "retry_count": e.retry_count,
         "last_error": e.last_error,
         "targets": list(e.targets or []),
-        "payload": e.payload,
-        "metadata": e.metadata_json,
+        "payload": e.payload if include_payload else None,
+        "metadata": e.metadata_json if include_payload else None,
         "created_at": e.created_at.isoformat() if e.created_at else None,
         "processed_at": e.processed_at.isoformat() if e.processed_at else None,
     }
@@ -577,4 +778,80 @@ async def admin_booking_by_id(
         "status": status_val,
         "created_at": b.created_at.isoformat() if b.created_at else None,
         "updated_at": b.updated_at.isoformat() if b.updated_at else None,
+    }
+
+
+@router.get("/system/overview")
+async def admin_system_overview(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    _require_capability(current_user, "admin.ops.read")
+    health = await check_health()
+    outbox_pending = int((await db.scalar(select(func.count()).select_from(OutboxEvent).where(OutboxEvent.status == "PENDING"))) or 0)
+    outbox_failed = int((await db.scalar(select(func.count()).select_from(OutboxEvent).where(OutboxEvent.status == "FAILED"))) or 0)
+    payments_pending = int((await db.scalar(select(func.count()).select_from(Payment).where(Payment.status == PaymentStatus.PENDING))) or 0)
+    payments_failed = int((await db.scalar(select(func.count()).select_from(Payment).where(Payment.status == PaymentStatus.FAILED))) or 0)
+    return {
+        "health": health,
+        "outbox": {"pending": outbox_pending, "failed": outbox_failed},
+        "billing": {"pending": payments_pending, "failed": payments_failed},
+        "rabbitmq_clients": {
+            "api": rabbit_client.is_connected(),
+            "worker": worker_rabbit_client.is_connected(),
+            "outbox": outbox_rabbit_client.is_connected(),
+        },
+    }
+
+
+@router.get("/queues")
+async def admin_queues(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+):
+    _require_capability(current_user, "admin.ops.read")
+    outbox_pending = int((await db.scalar(select(func.count()).select_from(OutboxEvent).where(OutboxEvent.status == "PENDING"))) or 0)
+    outbox_failed = int((await db.scalar(select(func.count()).select_from(OutboxEvent).where(OutboxEvent.status == "FAILED"))) or 0)
+    queues = []
+    for queue_name, spec in QUEUE_SPECS.items():
+        queues.append(
+            {
+                "queue_name": queue_name,
+                "exchange_names": list(spec.exchange_names),
+                "retry_enabled": spec.retry_enabled,
+                "retry_delay_ms": spec.retry_delay_ms,
+                "max_retries": spec.max_retries,
+                "prefetch_count": spec.prefetch_count,
+                "durable": spec.durable,
+            },
+        )
+    return {
+        "queues": queues,
+        "outbox_depth": {"pending": outbox_pending, "failed": outbox_failed},
+    }
+
+
+@router.get("/workers")
+async def admin_workers(
+    current_user: User = Depends(get_current_admin_user),
+):
+    _require_capability(current_user, "admin.ops.read")
+    return {
+        "workers": [
+            {
+                "name": "notification-worker",
+                "metrics_port": 9091,
+                "rabbitmq_client_connected": worker_rabbit_client.is_connected(),
+            },
+            {
+                "name": "task-worker",
+                "metrics_port": 9092,
+                "rabbitmq_client_connected": worker_rabbit_client.is_connected(),
+            },
+            {
+                "name": "ai-worker",
+                "metrics_port": 9093,
+                "rabbitmq_client_connected": worker_rabbit_client.is_connected(),
+            },
+        ],
     }

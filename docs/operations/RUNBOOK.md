@@ -153,3 +153,22 @@ make admin-revoke EMAIL=user@example.com
 - Prefer backend admin endpoints for day-to-day role changes; Makefile commands are an ops fallback.
 - Re-login after role change to refresh auth payload.
 
+## 7) Admin Ops / Billing / Audit Pages Show Empty or 403
+
+### Symptoms
+
+- `/admin/ops`, `/admin/billing`, or `/admin/audit` loads but data is empty/error
+- backend returns 403 with `Missing admin capability`
+
+### Checks
+
+```bash
+docker logs linkup_backend --tail 200 | grep -E "Missing admin capability|admin_audit_log_read|admin_outbox_payload_read"
+```
+
+### Actions
+
+- If `ADMIN_CAPABILITIES_JSON` is not configured, all admins have full access by default.
+- If configured, ensure the admin email appears in the JSON map with required scopes (e.g. `admin.ops.read`, `admin.billing.read`, `admin.audit.read`).
+- Re-login after updating capability configuration.
+

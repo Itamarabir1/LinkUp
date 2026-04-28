@@ -2,10 +2,14 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity,
   Building2,
+  BookCheck,
   CarFront,
+  Cpu,
+  CreditCard,
   LayoutDashboard,
   LogOut,
   Search,
+  ShieldCheck,
   Users,
   Inbox,
 } from 'lucide-react';
@@ -22,8 +26,12 @@ const nav: Array<{
   { to: '/admin/health', label: 'בריאות', icon: Activity },
   { to: '/admin/users', label: 'משתמשים', icon: Users },
   { to: '/admin/rides', label: 'נסיעות', icon: CarFront },
+  { to: '/admin/bookings', label: 'הזמנות', icon: BookCheck },
   { to: '/admin/groups', label: 'קבוצות', icon: Building2 },
+  { to: '/admin/billing', label: 'Billing', icon: CreditCard },
+  { to: '/admin/audit', label: 'Audit', icon: ShieldCheck },
   { to: '/admin/outbox', label: 'Outbox', icon: Inbox },
+  { to: '/admin/ops', label: 'Ops', icon: Cpu },
   { to: '/admin/lookup', label: 'חיפוש', icon: Search },
 ];
 

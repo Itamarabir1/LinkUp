@@ -43,6 +43,12 @@ export const qk = {
     rides: (filters?: Record<string, unknown>) => ['admin', 'rides', filters] as const,
     groups: (filters?: Record<string, unknown>) => ['admin', 'groups', filters] as const,
     outbox: (filters?: Record<string, unknown>) => ['admin', 'outbox', filters] as const,
+    bookings: (filters?: Record<string, unknown>) => ['admin', 'bookings', filters] as const,
+    billing: (filters?: Record<string, unknown>) => ['admin', 'billing', filters] as const,
+    audit: (filters?: Record<string, unknown>) => ['admin', 'audit', filters] as const,
+    opsOverview: () => ['admin', 'ops', 'overview'] as const,
+    queues: () => ['admin', 'queues'] as const,
+    workers: () => ['admin', 'workers'] as const,
     health: () => ['admin', 'health'] as const,
   },
 } as const;
