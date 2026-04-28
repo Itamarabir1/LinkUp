@@ -17,6 +17,7 @@
 
 1. **Clone והעתקת env**
    - `.env` בשורש — העתק מ־`.env.example`: credentials ל־Compose בלבד (Postgres, Redis, RabbitMQ bootstrap); חייבים ליישר עם `backend/.env`.
+   - `pgbouncer` תלוי בערכי root `.env` עבור `POSTGRES_USER`/`POSTGRES_DB`/`POSTGRES_PASSWORD`; אם אחד חסר/ריק ה-healthcheck ייכשל.
    - `backend/.env` — העתק מ־`backend/.env.example`.
    - `chat-ws/.env` — העתק מ־`chat-ws/.env.example` (כולל `REDIS_URL`, `JWT_SECRET` זהה ל־`SECRET_KEY` בבקאנד).
 

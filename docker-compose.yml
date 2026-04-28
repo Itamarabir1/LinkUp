@@ -29,13 +29,22 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - ./.env
     environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       PGPASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - ./infrastructure/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
       - ./infrastructure/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
     healthcheck:
-      test: ["CMD-SHELL", "PGPASSWORD=${POSTGRES_PASSWORD} psql -h 127.0.0.1 -p 6432 -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c 'SELECT 1' -q 2>/dev/null || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "[ -n \"$$POSTGRES_USER\" ] && [ -n \"$$POSTGRES_DB\" ] && [ -n \"$$PGPASSWORD\" ] && psql -h 127.0.0.1 -p 6432 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -c 'SELECT 1' -q 2>/dev/null || exit 1",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
