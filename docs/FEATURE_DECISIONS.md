@@ -138,22 +138,36 @@
 | **בעיה** | טייפים/clients ידניים בפרונט נוטים לסטייה מה-schema של backend עם הזמן. |
 | **החלטה** | לייצר client/types אוטומטית מ-`frontend/openapi-snapshot.json` באמצעות Orval (`orval.config.ts`) ל-`frontend/src/api/generated`, עם mutator אחיד (`apiMutator`) שמתחבר ל-axios instance הקיים. |
 | **Source of truth** | קבצי generated נכנסים ל-git במכוון כדי לשמור reviewable API contract snapshot בכל commit. |
+| **אכיפה ב-CI** | `frontend-ci` מריץ gate ייעודי: `npm run gen:api` ואז `git diff --exit-code -- src/api/generated/` (אחרי `git update-index -q --refresh`) כדי לחסום merge כשיש drift. |
 | **יתרון** | מפחית drift חוזי בין backend/frontend, מקטין boilerplate ידני, ומשפר type-safety בזמן קומפילציה. |
 | **Trade-off** | דורש discipline תהליכי: כל שינוי schema מחייב regeneration לפני merge. |
 | **הפניה** | [`../frontend/orval.config.ts`](../frontend/orval.config.ts), [`../frontend/src/api/client.ts`](../frontend/src/api/client.ts), [`../frontend/src/api/generated/client.ts`](../frontend/src/api/generated/client.ts) |
 
 ---
 
-## Auth Login form — react-hook-form + zod
+## Auth forms — react-hook-form + zod
 
 | | |
 |--|--|
-| **בעיה** | ניהול ידני של `email/password/loading` עם `useState` יוצר boilerplate וחזרתיות, ומגדיל סיכון לסטיות בין form validation לבין submit state. |
-| **החלטה** | להחליף את שכבת ניהול הטופס ב-`Login` ל-`react-hook-form` עם `zodResolver` (`email` תקין + `password` לא ריק), תוך שמירת JSX/CSS ו-auth/navigation flow ללא שינוי. |
-| **שימור behavior** | `defaultValues` משתמשים ב-`state?.email` ל-prefill; שגיאות API נשארות ב-`error` state נפרד; `formState.isSubmitting` מחליף loading state ומחובר גם ל-`LoadingButton` וגם ל-`GoogleSignIn disabled`. |
-| **יתרון** | קוד קצר ועקבי יותר למסכי auth, הפרדת אחריות נקייה (validation מול API errors), ובסיס טוב לסטנדרט דומה ב-Register/Forgot Password. |
+| **בעיה** | ניהול ידני/לא אחיד במסכי auth יוצר boilerplate וחזרתיות, ומגדיל סיכון לסטיות בין validation לבין submit state. |
+| **החלטה** | לאחד את `Login`/`Register`/`VerifyEmail` תחת `react-hook-form` + `zodResolver`, עם סכמות ייעודיות לכל מסך ושמירת JSX/CSS ו-auth/navigation flow ללא שינוי. |
+| **שימור behavior** | `Login` שומר `defaultValues` מ-`state?.email`; `Register` מחבר `PhoneInput` דרך `Controller`; `VerifyEmail` משאיר `resendLoading` נפרד ו-`formState.isSubmitting` ל-verify בלבד; שגיאות API נשארות ב-`error` state נפרד. |
+| **יתרון** | קוד עקבי יותר בין כל מסכי auth, הפרדת אחריות נקייה (validation מול API errors), ותחזוקה פשוטה יותר להרחבות עתידיות. |
 | **Trade-off** | תלות נוספת בפרונט ודורש משמעת סכמות/טיפוסים כדי להימנע מ-drift בין schema לשדות UI. |
-| **הפניה** | [`../frontend/src/pages/Login.tsx`](../frontend/src/pages/Login.tsx), [`../frontend/package.json`](../frontend/package.json) |
+| **הפניה** | [`../frontend/src/pages/Login.tsx`](../frontend/src/pages/Login.tsx), [`../frontend/src/pages/Register.tsx`](../frontend/src/pages/Register.tsx), [`../frontend/src/pages/VerifyEmail.tsx`](../frontend/src/pages/VerifyEmail.tsx), [`../frontend/package.json`](../frontend/package.json) |
+
+---
+
+## AdminLookup on-demand fetch — `useMutation` (React Query)
+
+| | |
+|--|--|
+| **בעיה** | `AdminLookup` עבד עם manual async/state (`idle/loading/ready/error`) למרות שמדובר ב-trigger יזום משתמש (lookup לפי מזהה בלחיצה), מה שיצר state-machine אד-הוק מחוץ ל-RQ conventions. |
+| **החלטה** | להעביר את flow ל-`useMutation` נפרד ל-ride ול-booking lookup, עם state נגזר מ-`isPending/isError/data` במקום `Result` ידני. |
+| **שימור behavior** | UI נשאר זהה: אותם placeholders, כפתורים, הודעות `idle/loading/error`, ו-JSON output. ללא שינוי CSS. |
+| **למה** | זה pattern נכון ל-imperative on-demand fetch ב-TanStack Query, מפחית state ידני, ומשפר עקביות ארכיטקטונית במסכי admin. |
+| **Trade-off** | נוסף coupling קטן ל-RQ mutation state במסך יחיד, אבל הפחתת ה-boilerplate והסיכון ל-state drift עדיפה. |
+| **הפניה** | [`../frontend/src/features/admin/pages/AdminLookup.tsx`](../frontend/src/features/admin/pages/AdminLookup.tsx), [`../frontend/src/features/admin/api/lookup.ts`](../frontend/src/features/admin/api/lookup.ts) |
 
 ---
 

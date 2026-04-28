@@ -12,7 +12,7 @@ For production, use Docker (see root `docker-compose.yml`).
 - **Uvicorn workers (Docker):** `backend/entrypoint.sh` מריץ `uvicorn ... --workers` לפי **`UVICORN_WORKERS`** ב-`backend/.env` (ברירת מחדל 1). ב-`.env.example`: **`UVICORN_WORKERS=4`**. פיתוח לוקאלי בלי דוקר: `run-backend.sh` / `run-backend.bat` — `--reload`, worker אחד.
 - **WebSocket auth:** `get_current_user_ws` מאמת **JWT בלבד** (אובייקט `WsUser`), בלי `SELECT` ל-DB בזמן חיבור — ראו `app/api/dependencies/auth.py`. HTTP endpoints עם `get_current_user` עדיין טוענים משתמש מ-DB.
 
-**Push (FCM):** ב־Compose קובץ השירות של Firebase נטען מ־volume לנתיב בקונטיינר; הגדר `FIREBASE_SERVICE_ACCOUNT_PATH` ב־`backend/.env` (נדרש ל־`notification-worker`) — פירוט ב־`docs/FCM_SYSTEM_SUMMARY.md` וב־README בשורש.
+**Push (FCM):** בפרודקשן (Model B) הגדר `FIREBASE_CREDENTIALS_JSON` ב־`backend/.env` (JSON בשורה אחת, ללא file mount). `FIREBASE_SERVICE_ACCOUNT_PATH` נשאר fallback לפיתוח מקומי בלבד — פירוט ב־`docs/FCM_SYSTEM_SUMMARY.md` וב־README בשורש.
 
 ## Email rendering architecture
 

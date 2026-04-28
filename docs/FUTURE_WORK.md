@@ -159,6 +159,30 @@ This follows a senior engineering principle: avoid premature optimization, but e
 - **When to revisit:**
   - If chat composer evolves into multi-field input or adds real validation/business rules where RHF+zod yields clear ROI.
 
+## SBOM Generation + Release Artifact Flow (Deferred)
+
+- **Decision:** Defer SBOM generation and release artifact publication for now.
+- **Current state:** No dedicated SBOM generation step is enforced in CI/CD release flow.
+- **Why deferred:**
+  - Requires choosing a single toolchain and ownership model (generation, storage, and verification).
+  - Adds release-pipeline steps that should be rolled out together with clear supply-chain policy.
+  - Current priority is functional/platform hardening already in progress.
+- **When to revisit:**
+  - When release hardening scope includes software supply-chain controls.
+  - Implement with a CI step that generates SBOM on every release build and publishes it as a versioned artifact.
+
+## Web Vitals Thresholds Enforcement (Deferred)
+
+- **Decision:** Defer explicit Web Vitals threshold enforcement as a formal release gate.
+- **Current state:** RUM instrumentation exists, but explicit `LCP`/`INP`/`CLS` thresholds are not enforced as guardrails.
+- **Why deferred:**
+  - Reliable thresholds should be calibrated from real traffic baselines to avoid noisy false positives.
+  - Enforcement path (CI/post-deploy + alert routing) should be introduced as one coherent policy.
+  - Current observability maturity is improving, but threshold policy is not yet finalized.
+- **When to revisit:**
+  - After baseline vitals distributions are stable enough to define actionable thresholds.
+  - Add automated regression enforcement (post-deploy check and alerting) tied to release criteria.
+
 ## OpenAPI Snapshot CI Gate (Planned)
 
 - **Decision:** Add a CI gate that enforces API client regeneration from the OpenAPI snapshot.

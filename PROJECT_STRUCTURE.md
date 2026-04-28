@@ -278,8 +278,7 @@ backend/
 │   │   │       └── websocket.py
 │   │   ├── firebase_core/
 │   │   │   ├── firebase-credentials.example.json
-│   │   │   ├── firebase-credentials.json   # local only, in .gitignore
-│   │   │   └── firebase.py
+│   │   │   └── firebase.py   # production uses FIREBASE_CREDENTIALS_JSON (Model B); local may use FIREBASE_SERVICE_ACCOUNT_PATH
 │   │   ├── geo/
 │   │   │   ├── circuit_breaker.py   # Circuit Breaker singletons ל-Google Maps APIs
 │   │   │   ├── client.py            # Directions + Distance Matrix (GeoClient)

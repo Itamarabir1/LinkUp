@@ -144,17 +144,18 @@
 
 ---
 
-## 14. Login form standardization (react-hook-form + zod)
+## 14. Auth forms standardization (react-hook-form + zod)
 
 | | |
 |--|--|
-| **הקשר** | מסך `Login` נוהל ידנית עם `useState` עבור ערכים ו-loading, מה שהוביל ליותר boilerplate ופחות עקביות עם כיוון ארכיטקטורת forms typed בפרונט. |
-| **החלטה** | לאמץ `react-hook-form` + `zodResolver` במסך `Login`, עם סכמת `loginSchema` (`email`/`password`) ו-`defaultValues` שמכבדים `location.state?.email` ל-prefill אחרי redirect/verification flow. |
-| **גבולות החלטה** | לא משנים מבנה JSX/CSS או auth logic (`login` + `navigate` chain) — רק שכבת ניהול מצב הטופס וה-submit. |
-| **Error ownership** | validation נשארת בתוך RHF+Zod; שגיאות API נשארות ב-`error` state נפרד ומוצגות ב-`ErrorBanner` כמו קודם. |
-| **למה** | עקביות, תחזוקה קלה יותר, ומוכנות למיגרציה הדרגתית של מסכי auth נוספים לאותו pattern בלי breaking UX. |
-| **Trade-off** | תלות נוספת ונדרש discipline לשמור schema/field names מסונכרנים. |
-| **בקצרה לראיון** | "השארתי את ה-UX וה-auth flow זהים, והחלפתי רק את שכבת form-state ל-RHF+Zod — פחות boilerplate, יותר correctness, ואותו behavior למשתמש." |
+| **הקשר** | מסכי auth (`Login`/`Register`/`VerifyEmail`) נוהלו בחלקם ידנית עם `useState`, מה שהוביל ליותר boilerplate ופחות עקביות ב-validation/submit semantics. |
+| **החלטה** | לאמץ `react-hook-form` + `zodResolver` בשלושת המסכים: `loginSchema`, `registerSchema` (כולל password-confirm refine), ו-`verifyEmailSchema` (code מספרי באורך 6). |
+| **גבולות החלטה** | לא משנים מבנה JSX/CSS או auth logic (API calls + `navigate` flow) — רק שכבת ניהול מצב הטופס וה-submit. |
+| **Behavior parity** | ב-`Login` נשמר `defaultValues` מ-`location.state?.email`; ב-`Register` שדה `PhoneInput` מנוהל דרך `Controller`; ב-`VerifyEmail` `resendLoading` נשאר state נפרד, ו-`isSubmitting` שייך לפעולת verify בלבד. |
+| **Error ownership** | validation נשארת בתוך RHF+Zod; שגיאות API נשארות ב-`error` state נפרד ומוצגות ב-`ErrorBanner`/inline error slots כמו קודם. |
+| **למה** | עקביות בין מסכי auth, תחזוקה קלה יותר, והפרדת אחריות נקייה בין schema validation לשגיאות transport. |
+| **Trade-off** | תלות נוספת ונדרש discipline לשמור schema/field names מסונכרנים לאורך זמן. |
+| **בקצרה לראיון** | "סטנדרטנו את כל מסכי ה-auth סביב RHF+Zod בלי לשנות UX או flows — פחות boilerplate, validation אמין יותר, ואותו behavior למשתמש." |
 
 ---
 
@@ -193,7 +194,8 @@
 | **החלטה** | לאמץ Orval עם snapshot מקומי (`frontend/openapi-snapshot.json`) ולייצר `client/types` לתיקיית `frontend/src/api/generated`, עם mutator אחיד `apiMutator` מעל ה-axios instance הקיים. |
 | **Source of truth policy** | קבצי generated נכנסים ל-git במכוון כדי שכל שינוי API יהיה reviewable כחלק מה-PR. |
 | **למה** | סוגר פערים בין schema לקוד לקוח, מוריד boilerplate ידני, ומחזק type-safety מקצה לקצה. |
-| **Trade-off** | מוסיף שלב generation לתהליך הפיתוח ודורש gate ב-CI למניעת שכחת regeneration. |
+| **Trade-off** | מוסיף שלב generation לתהליך הפיתוח ומאריך מעט את זמן CI, אבל מצמצם משמעותית סיכון ל-contract drift. |
+| **CI enforcement (final)** | ב-`frontend-ci` יש job ייעודי `contract-codegen` שמריץ `npm run gen:api`, אחריו `git update-index -q --refresh`, ואז `git diff --exit-code -- src/api/generated/` כדי לחסום merge כשקבצי generated לא מסונכרנים. |
 | **בקצרה לראיון** | "עברנו מ-API types ידניים ל-codegen חוזי עם Orval; ה-generated client מחויב ב-repo ונבדק ב-CI כדי למנוע drift בין backend ל-frontend." |
 
 ---

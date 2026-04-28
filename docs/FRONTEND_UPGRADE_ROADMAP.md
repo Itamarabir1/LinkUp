@@ -18,8 +18,8 @@ To avoid missing anything, the section below includes an exhaustive checklist ma
 
 ## Open Prerequisites (Must Be Closed Early)
 
-1. Add `SENTRY_AUTH_TOKEN` to GitHub Secrets for sourcemap upload flow (Tier-2 S.1 finish).
-2. Run `orval + FastAPI` smoke test against `/openapi.json` before Tier-1 Stage A implementation.
+1. `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` are now wired for frontend sourcemap upload in `publish-image`; remaining S.1 work is post-deploy verification/tuning.
+2. `orval + FastAPI` smoke test for Tier-1 Stage A was completed as part of codegen adoption; CI gate now enforces ongoing sync.
 3. Run post-deploy verification for HTTP/2 + WebSocket stability in production.
 
 ---
@@ -41,7 +41,6 @@ Legend:
 - `[~]` `stage-3b-passengers` - passenger requests/search/infinite/mutations + idempotency preservation
 - `[ ]` `stage-3b-uploads` - presigned upload flow migration + readiness polling query
 - `[~]` `stage-3b-createride` - migrate `useCreateRide` operation-token workflow to RQ mutations/signal
-- `[ ]` `stage-3c-admin` - rebuild admin API usage to RQ across all admin pages; remove `useAdminFetch`
 - `[~]` `stage-3d-chat` - standalone high-risk chat migration (infinite + optimistic + WS cache sync)
 - `[ ]` `stage-4-msw` - MSW server/handlers/rqRender + test setup integration
 - `[ ]` `stage-4-tests` - migrate targeted `useAISearch.test.ts` to MSW
@@ -53,8 +52,6 @@ Notes:
 
 ### B) Tier-1 Senior FE (`frontend_senior_architecture_tier_1_05d98f56.plan.md`)
 
-- `[ ]` `tier1-a-codegen` - orval types+axios generation flow + CI regen gate
-- `[ ]` `tier1-b-bundle` - visualizer + size-limit + manualChunks + phase budget gating
 - `[ ]` `tier1-c-a11y-setup` - install/configure `jsx-a11y`, `axe`, Lighthouse CI baseline
 - `[ ]` `tier1-c-a11y-auth` - auth pages remediation
 - `[ ]` `tier1-c-a11y-rides` - rides pages remediation
@@ -62,9 +59,6 @@ Notes:
 - `[ ]` `tier1-c-a11y-groups` - groups pages remediation
 - `[ ]` `tier1-c-a11y-chat` - messages/chat remediation
 - `[ ]` `tier1-d-rum` - web vitals + extended Sentry RUM + dashboard + budget guardrails
-- `[ ]` `tier1-e-form-login`
-- `[ ]` `tier1-e-form-register`
-- `[ ]` `tier1-e-form-verify`
 - `[~]` `tier1-e-form-creategroup` - implemented via `useCreateGroup` RHF+Zod migration with full `CreateGroup.tsx` contract compatibility.
 - `[~]` `tier1-e-form-createride` - deferred by architecture decision (wizard/state-machine complexity; risk > ROI at current scale).
 - `[~]` `tier1-e-form-searchrides` - intentionally no-op by architecture decision (`SearchRidesForm` is props-driven/presentational; RHF adds no practical value).
@@ -85,24 +79,20 @@ Notes:
 
 ### C) Tier-2 Hardening (`tier2_senior_fe_hardening_05d516e1.plan.md`)
 
-- `[~]` `tier2-s1-csp` - finish S.1 tail work (Sentry token wiring, sourcemap hidden/upload pipeline, post-deploy smoke)
-- `[ ]` `tier2-s2-dependabot`
+- `[~]` `tier2-s1-csp` - finish S.1 tail work (post-deploy smoke + sourcemap verification/tuning)
 - `[ ]` `tier2-s2-sbom`
-- `[ ]` `tier2-s3-xss`
 - `[ ]` `tier2-s4-be-version`
 - `[ ]` `tier2-s4-fe-version`
 - `[ ]` `tier2-s5-waterfall-audit`
-- `[ ]` `tier2-s6-throttle`
 - `[ ]` `tier2-s7-assets`
-- `[ ]` `tier2-s8-runbook`
 - `[ ]` `tier2-docs`
 
 ### Remaining Count (Detailed)
 
-- RQ detailed remaining: **15 items** (plus partial completion validation)
-- Tier-1 detailed remaining: **22 items**
-- Tier-2 detailed remaining: **11 items**
-- Total detailed remaining backlog: **48 checklist items**
+- RQ detailed remaining: **14 items** (plus partial completion validation)
+- Tier-1 detailed remaining: **17 items**
+- Tier-2 detailed remaining: **7 items**
+- Total detailed remaining backlog: **38 checklist items**
 
 This is why the first version looked short: it grouped these into macro milestones.
 
@@ -121,8 +111,7 @@ This is why the first version looked short: it grouped these into macro mileston
 - [ ] `CreateRide` migration: replace `useOperationToken` pattern with RQ mutation + `signal`, migrate preview/create/parse/geocode calls.
 
 ### Stage 3c
-- [ ] Admin domain rebuild: replace all `features/admin/api/*` fetch paths with RQ hooks across admin pages.
-- [ ] Remove legacy admin fetch abstraction after migration.
+- Completed and removed from remaining scope (`stage-3c-admin`).
 
 ### Stage 3d (high risk, standalone PR)
 - [~] Chat domain unified migration:
@@ -157,11 +146,10 @@ Additional progress (recently completed outside full-chat scope):
 ## 2) Tier-1 Senior FE Architecture - Remaining
 
 ### Stage A - OpenAPI Codegen
-- [ ] Configure and adopt `orval` (types + typed axios client only; no generated RQ hooks).
-- [ ] Add codegen CI consistency check.
+- Completed and removed from remaining scope (`tier1-a-codegen`).
 
 ### Stage B - Bundle Budget + Visualizer
-- [ ] Add bundle visualizer + `size-limit` gates.
+- Completed and removed from remaining scope (`tier1-b-bundle`).
 - [ ] Apply Phase-1 budget target: main bundle <= 400KB (after Tier-2 S.7 work lands).
 
 ### Stage C - Accessibility
@@ -175,6 +163,9 @@ Additional progress (recently completed outside full-chat scope):
 ### Stage E - Forms Migration
 - [~] Migrate 9 form surfaces to `react-hook-form + zod`.
 - Current status update:
+  - E.1 Login: completed.
+  - E.2 Register: completed.
+  - E.3 VerifyEmail: completed.
   - E.4 CreateGroup: completed.
   - E.5 CreateRide: deferred (documented decision).
   - E.6 SearchRidesForm: no-op (documented decision).
@@ -187,26 +178,20 @@ Additional progress (recently completed outside full-chat scope):
 ## 3) Tier-2 Senior FE Hardening - Remaining
 
 ### S.1 Security Headers + Sourcemap Hardening (finish)
-- [ ] Finalize CSP/Sentry key and complete sourcemap hardening pipeline (`hidden` sourcemaps + Sentry upload plugin).
+- [~] CSP/Sentry key + sourcemap upload plugin pipeline implemented; remaining: post-deploy verification and tuning.
 - [ ] Execute post-deploy HTTP/2 + WS smoke test.
 
 ### S.2 Supply Chain
-- [ ] Add Dependabot policy + security CI gate.
-- [ ] Add SBOM generation and release artifact flow.
+- [ ] SBOM generation/release artifact flow deferred to `docs/FUTURE_WORK.md`.
 
 ### S.3 XSS Hardening
-- [ ] Enforce `react/no-danger:error`.
-- [ ] Add sanitization wrapper with explicit allowlist.
-
-### S.4 Optimistic Concurrency
-- [ ] Backend: Versioned mixin prep (if needed) + Alembic + `If-Match` validation.
-- [ ] Frontend: send `If-Match`, handle 409 conflicts, update cache/recovery UX.
+- Completed and removed from remaining scope (`tier2-s3-xss`).
 
 ### S.5 Waterfall Audit
 - [ ] Add/execute waterfall checks across RQ Stage 3 sub-PRs.
 
 ### S.6 Client-side Global Throttle
-- [ ] Add token-bucket request throttle + retry integration and tests.
+- Completed and removed from remaining scope (`tier2-s6-throttle`).
 
 ### S.7 Asset Hardening
 - [ ] Image lazy/eager strategy.
@@ -214,7 +199,7 @@ Additional progress (recently completed outside full-chat scope):
 - [ ] Preconnect hints.
 
 ### S.8 Performance Runbook
-- [ ] Create frontend performance runbook documentation.
+- Completed and removed from remaining scope (`tier2-s8-runbook`).
 
 ---
 
@@ -223,6 +208,7 @@ Additional progress (recently completed outside full-chat scope):
 1. Complete RQ Stage 1 foundations before adding client throttle and advanced RUM extensions.
 2. Coordinate shared-file changes (especially `CreateRide`, `client.ts`, `main.tsx`) to avoid PR collision.
 3. Ship backend optimistic concurrency primitives before frontend conflict UX.
+   - Note: OCC scope deferred to `docs/FUTURE_WORK.md` for current planning window.
 4. Execute bundle budget gates only after asset hardening baseline improvements.
 5. Keep chat migration as a standalone PR due to higher behavioral risk.
 
@@ -239,6 +225,81 @@ Additional progress (recently completed outside full-chat scope):
 7. Execute Tier-1 A/B/D.
 8. Execute Tier-1 C/E.
 9. Execute Tier-1 F and Tier-2 S.8.
+
+---
+
+## 6) Implementation Audit Matrix (Cloud-Ready Status)
+
+Use this section as the authoritative status when sharing to cloud/remote reviewers.
+
+Status keys:
+- `Implemented in code`: `Yes` / `No` / `Partial`
+- `Completion`: `FULL` / `PARTIAL` / `NOT IMPLEMENTED`
+- `Missing for FULL`: exact remaining work
+
+### 6.3 `tier1-c-a11y-setup` + remediation
+
+- Implemented in code: `Partial`
+- Completion: `PARTIAL`
+- Evidence:
+  - `frontend/eslint.config.js` (`eslint-plugin-jsx-a11y`)
+  - `frontend/src/main.tsx` (`@axe-core/react` in dev)
+- Missing for FULL:
+  - Close remediation across targeted domains (auth/rides/bookings/groups/chat).
+  - Add stable CI-level accessibility verification beyond local/dev checks.
+
+### 6.4 `tier1-d-rum` (Web Vitals + Sentry RUM)
+
+- Implemented in code: `Yes`
+- Completion: `PARTIAL`
+- Evidence:
+  - `frontend/src/main.tsx` (Sentry tracing/replay + `web-vitals`)
+- Missing for FULL:
+  - Deferred to `docs/FUTURE_WORK.md` (`Web Vitals Thresholds Enforcement`).
+
+### 6.9 `tier2-s7-assets`
+
+- Implemented in code: `Yes`
+- Completion: `PARTIAL`
+- Evidence:
+  - `frontend/index.html` (`preconnect`/`dns-prefetch`)
+  - `frontend/src/i18n/config.ts` (`i18next-http-backend`)
+  - route/image lazy loading in frontend code
+- Missing for FULL:
+  - Add measurable acceptance criteria + verification gates to prevent regressions.
+
+### 6.11 `stage-3b` (RQ domain migration)
+
+- Implemented in code: `Partial`
+- Completion: `PARTIAL`
+- Evidence:
+  - Multiple domain hooks migrated to RQ in frontend
+- Missing for FULL:
+  - Complete uploads scope under RQ (`presigned + confirm + readiness polling`).
+  - Complete remaining `CreateRide` migration scope as defined in stage goals.
+
+### 6.12 `stage-3c` (Admin migration)
+
+- Implemented in code: `Yes`
+- Completion: `FULL`
+- Evidence:
+  - Most admin hooks are RQ-based
+  - legacy `useAdminFetch.ts` path removed
+  - `AdminLookup.tsx` now uses `useMutation` for on-demand ride/booking lookup instead of manual async state
+- Missing for FULL:
+  - None.
+
+### 6.13 `stage-3d` (Chat migration)
+
+- Implemented in code: `Partial`
+- Completion: `PARTIAL`
+- Evidence:
+  - Unread/conversation subset moved to RQ
+- Missing for FULL:
+  - shared popup/thread cache
+  - infinite messages model (bounded pages)
+  - optimistic send cache patching
+  - WS event-to-cache synchronization closure
 
 ---
 

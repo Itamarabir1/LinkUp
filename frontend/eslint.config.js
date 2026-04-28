@@ -1,6 +1,7 @@
 import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
+import react from 'eslint-plugin-react'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import queryPlugin from '@tanstack/eslint-plugin-query'
 import tseslint from 'typescript-eslint'
@@ -24,11 +25,13 @@ export default defineConfig([
     },
     plugins: {
       '@tanstack/query': queryPlugin,
+      react,
     },
     rules: {
       '@tanstack/query/stable-query-client': 'error',
       '@tanstack/query/no-unstable-deps': 'warn',
       '@tanstack/query/exhaustive-deps': 'warn',
+      'react/no-danger': 'error',
       // a11y phase-1 setup: warn-only, progressive fixes in follow-up PRs.
       'jsx-a11y/alt-text': 'warn',
       'jsx-a11y/aria-props': 'warn',

@@ -34,6 +34,7 @@
   - תשתיות + workers: `docker compose up -d` (או לפחות `db`, `redis`, `rabbitmq`, `chat-ws`; אם workers כבר רצים ב־Compose — **אל** תריץ במקביל worker מקומי נוסף). אם **לא** מרימים את שירות **`migrate`** בדוקר — להריץ ידנית `alembic upgrade head` לפני הבקאנד המקומי.
    - מתוך `backend/`: `alembic upgrade head`, ואז `uvicorn app.main:app --reload` (פורט 8000 — מתאים ל־`frontend` ב־dev, ראו `frontend/src/config/env.ts`).
   - Worker מקומי: רק אם **אין** workers בדוקר — הרץ entrypoint ייעודי (`python -m app.workers.notification_worker` / `task_worker` / `ai_worker`).
+  - Frontend security baseline: `eslint` אוכף `react/no-danger` כ-`error`; עבור HTML דינמי יש להשתמש ב-`frontend/src/utils/sanitize.ts` (`sanitizeHtml`) ולא לגשת ישירות ל-`dangerouslySetInnerHTML` בלי סניטציה.
 
 ---
 

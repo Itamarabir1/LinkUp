@@ -1,25 +1,38 @@
 import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { fetchAdminBooking, fetchAdminRide } from '../api/lookup';
 import page from '../styles/AdminPage.module.css';
 import styles from './AdminLookup.module.css';
 
-type Result = { status: 'idle' | 'loading' | 'ready' | 'error'; data?: unknown };
-
 export default function AdminLookup() {
   const [rideId, setRideId] = useState('');
   const [bookingId, setBookingId] = useState('');
-  const [result, setResult] = useState<Result>({ status: 'idle' });
+  const [activeKind, setActiveKind] = useState<'ride' | 'booking' | null>(null);
 
-  async function run(kind: 'ride' | 'booking') {
-    setResult({ status: 'loading' });
-    try {
-      const id = (kind === 'ride' ? rideId : bookingId).trim();
-      const res = kind === 'ride' ? await fetchAdminRide(id) : await fetchAdminBooking(id);
-      setResult({ status: 'ready', data: res.data });
-    } catch {
-      setResult({ status: 'error' });
+  const rideMutation = useMutation({
+    mutationFn: (id: string) => fetchAdminRide(id),
+  });
+
+  const bookingMutation = useMutation({
+    mutationFn: (id: string) => fetchAdminBooking(id),
+  });
+
+  function run(kind: 'ride' | 'booking') {
+    const id = (kind === 'ride' ? rideId : bookingId).trim();
+    if (!id) return;
+    setActiveKind(kind);
+    if (kind === 'ride') {
+      rideMutation.mutate(id);
+      return;
     }
+    bookingMutation.mutate(id);
   }
+
+  const activeMutation = activeKind === 'ride' ? rideMutation : activeKind === 'booking' ? bookingMutation : null;
+  const isIdle = activeMutation == null || activeMutation.isIdle;
+  const isLoading = activeMutation?.isPending ?? false;
+  const isError = activeMutation?.isError ?? false;
+  const data = activeMutation?.data?.data;
 
   return (
     <div>
@@ -65,11 +78,11 @@ export default function AdminLookup() {
         </div>
       </div>
       <h3 className={styles.resultTitle}>תוצאה</h3>
-      {result.status === 'idle' && <p className={page.muted}>הזן מזהה ולחץ שליפה.</p>}
-      {result.status === 'loading' && <p className={page.muted}>טוען…</p>}
-      {result.status === 'error' && <p className={page.error}>לא נמצא או שגיאה.</p>}
-      {result.status === 'ready' && (
-        <pre className={page.preJson}>{JSON.stringify(result.data, null, 2)}</pre>
+      {isIdle && <p className={page.muted}>הזן מזהה ולחץ שליפה.</p>}
+      {isLoading && <p className={page.muted}>טוען…</p>}
+      {isError && <p className={page.error}>לא נמצא או שגיאה.</p>}
+      {!isIdle && !isLoading && !isError && (
+        <pre className={page.preJson}>{JSON.stringify(data, null, 2)}</pre>
       )}
     </div>
   );

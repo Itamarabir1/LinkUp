@@ -28,10 +28,11 @@ Deferred/next-step architecture decisions (including cache stampede Phase 2 earl
 - Stage 3b React Query migration completed for `GroupContext` and `MyRides`: query-driven groups/rides state, mutation-based ride cancel flow, and WS-driven cache invalidation.
 - Stage 3b Part 2 completed for `MyBookings` (driver + passenger): both hooks now use React Query with user-scoped booking keys, mutation-driven approve/reject/cancel flows, and websocket-triggered cache invalidation while preserving existing view-model contracts.
 - Stage 3c admin migration completed: legacy `useAdminFetch` was replaced by domain-scoped hooks under `frontend/src/features/admin/queries` and `frontend/src/features/admin/mutations` (`Users`, `Rides`, `Groups`, `Outbox`, `Health`, `Stats`).
+- Admin lookup flow (`AdminLookup`) now follows RQ on-demand pattern via `useMutation` (ride/booking lookup), replacing manual async result-state handling.
 - Stage 3d (safe subset) completed for Chat: `useChatUnreadMessages` and `useChatNotificationsFeed` moved from manual intervals to React Query polling, and `Messages` conversations list moved from manual fetch state to `qk.chat.conversations()` while preserving WS-driven chat transport layers unchanged.
 - Stage 3b Part 6 completed for passenger search flows: `useSearchRides` moved network edges (`search`, `load more`, `save alert`) to React Query mutations while preserving wizard/AI/geolocation/token race logic; `useJoinRide` request-scoped idempotency remains unchanged.
 - Stage 5 cleanup completed: `useMyRequests` migrated to React Query (`qk.passengers.requests` + mutation cache patching for cancel/expire), and `AuthContext` initial boot effect fixed with a proper cancellable async pattern (removed dead mounted guard).
-- OpenAPI-to-frontend contract hardening shipped: Orval codegen from `frontend/openapi-snapshot.json` now generates committed client/types under `frontend/src/api/generated` using the shared Axios mutator.
+- OpenAPI-to-frontend contract hardening shipped: Orval codegen from `frontend/openapi-snapshot.json` now generates committed client/types under `frontend/src/api/generated` using the shared Axios mutator, with CI drift enforcement (`npm run gen:api` + `git diff --exit-code -- src/api/generated/`).
 - Login form migrated to `react-hook-form` + `zod` schema validation, preserving existing auth/navigation behavior and UI structure while reducing manual form state boilerplate.
 - S.6 client-side throttle shipped in frontend HTTP layer (`frontend/src/api/throttle.ts`) and wired as the first Axios request interceptor (`frontend/src/api/client.ts`) for bounded request bursts.
 - Bundle budget tooling shipped: `rollup-plugin-visualizer`, `size-limit`, and explicit Vite `manualChunks` strategy (`react-vendor`, `query`, `firebase`, `sentry`, `i18n`, `forms`, `charts`).
@@ -44,6 +45,7 @@ Deferred/next-step architecture decisions (including cache stampede Phase 2 earl
 - Premium frontend flow shipped: profile upsell/banner (`PremiumBanner`), checkout trigger, and protected payment result pages (`/payment/success`, `/payment/cancel`) wired to billing status polling.
 - S.7 Asset hardening shipped: targeted `img` eager/lazy + `fetchpriority` tuning, locale preload + S3 preconnect hints in `index.html`, and hybrid i18n loading (`common`/`nav` bundled + feature namespaces lazy-loaded from `/public/locales` via `i18next-http-backend`).
 - Web Vitals D shipped: production-only Sentry RUM (`BrowserTracing` + `Replay` with sampled sessions), dynamic `web-vitals` reporting (CLS/LCP/INP), and `Sentry.setUser` wiring in auth login/google-login/logout/bootstrap flows.
+- Frontend sourcemap upload hardening shipped: Vite integrates `@sentry/vite-plugin` behind production+env guards (`SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`), CI injects secrets only in `publish-image`, and uploaded sourcemaps are deleted from `dist` after upload.
 - Frontend runtime config via startup `envsubst` (`window.__APP_CONFIG__`).
 - Redis Sentinel HA + PgBouncer runtime pooling + direct migrate path.
 - Automated JWT secret sync between backend and chat-ws during deploy.
@@ -199,7 +201,7 @@ cp frontend/.env.example frontend/.env
 
 - **`.env` בשורש** — רק משתנים ש־`docker-compose` צורך להקמת Postgres / Redis / RabbitMQ; יישור עם `POSTGRES_*`, `REDIS_PASSWORD`, `RABBITMQ_*` ב־`backend/.env`.
 - **`chat-ws/.env`** — כולל `REDIS_URL` (לדוקר: `redis://:<סיסמה>@redis:6379/1`) ו־`JWT_SECRET` זהה ל־`SECRET_KEY` ב־`backend/.env`.
-- **FCM בדוקר:** `firebase-credentials.json` ממופה read-only ל־**backend** ול־**notification-worker**; ב־`backend/.env` הגדר `FIREBASE_SERVICE_ACCOUNT_PATH` (נתיב בקונטיינר: `/app/infrastructure/firebase_core/firebase-credentials.json`).
+- **FCM בדוקר (Model B לפרודקשן):** אין mount של קובץ credentials. הגדר `FIREBASE_CREDENTIALS_JSON` ב־`backend/.env` (JSON בשורה אחת). `FIREBASE_SERVICE_ACCOUNT_PATH` מיועד לפיתוח מקומי בלבד.
 
 **מיגרציות:** ב־**Docker Compose** שירות **`migrate`** מריץ `alembic upgrade head` פעם אחת לפני **backend** וכל ה־workers (`notification-worker`, `task-worker`, `ai-worker`). אם המיגרציה נכשלת ה־API וה־workers לא יעלו. **לוקאלי בלי Compose:** `cd backend && alembic upgrade head` (עם `db/schema.sql` כעזר) לפני `uvicorn`.
 
@@ -265,6 +267,7 @@ docker compose ps            # סטטוס (backend: healthy / ממתין)
 - **Structured logging:** JSON in production (python-json-logger); level and format via env (LOG_LEVEL, LOG_FORMAT).
 - **Sentry error monitoring:** `sentry_sdk.init()` active in backend (`setup_logging()`) when `SENTRY_DSN` is set — FastAPI/SQLAlchemy/Redis integrations, `traces_sample_rate=0.1`; `capture_exception` on 5xx only (reduces noise). Frontend: `Sentry.init()` in `main.tsx` + `captureException` in axios interceptor (5xx), `ChatErrorBoundary`, `RouteErrorBoundary`. DSN kept in `.env` only — never committed.
 - **Frontend RUM + Web Vitals:** in production with DSN, frontend initializes Sentry Browser Tracing + Replay (`replaysSessionSampleRate=0.05`, `replaysOnErrorSampleRate=1.0`, `maskAllText`, `blockAllMedia`), sends Web Vitals (CLS/LCP/INP) via dynamic `web-vitals` import to avoid main-bundle inflation, and aligns identity context with `Sentry.setUser` on auth lifecycle.
+- **Frontend sourcemap upload (CI + Vite):** production builds enable Vite sourcemaps and conditionally activate `@sentry/vite-plugin` only when `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + `SENTRY_PROJECT` are present. `frontend-ci` passes these secrets only in `publish-image`; `.map` files are removed from `dist` after successful upload (`filesToDeleteAfterUpload`) so they are not copied into runtime nginx image.
 - **Edge/browser security policy:** nginx terminates TLS with `HTTP/2` and returns hardened browser headers (`HSTS`, `nosniff`, `DENY`, `Referrer-Policy`, `Permissions-Policy`, COOP/COEP). CSP is intentionally deployed as `Content-Security-Policy-Report-Only` with `report-uri` for one-week observation before enforcement. Full rollout guide: [`docs/SECURITY_HEADERS.md`](docs/SECURITY_HEADERS.md).
 - **Prometheus + Grafana (monitoring profile):** backend exposes `/metrics` via `prometheus-fastapi-instrumentator`; docker-compose includes `prometheus` and `grafana` services under `--profile monitoring` with ready provisioning (`monitoring/prometheus.yml`, `monitoring/grafana/provisioning/*`) and a starter dashboard (`monitoring/grafana/dashboards/linkup.json`).
 - **SLOs & Error Budgets (new):** Prometheus now scrapes backend + worker metrics (`notification-worker:9091`, `task-worker:9092`, `ai-worker:9093`) to support service-level objectives (availability/latency) and error-budget based release decisions.
@@ -302,12 +305,28 @@ push to `main` or `develop` (only when relevant files change).
 |-----------|----------|-------|
 | backend   | `backend-ci.yml`  | lint (Ruff), format check, migrations (`alembic upgrade head`), tests (pytest), Docker build → push to GHCR (`latest` + `sha`), deploy to EC2 over SSH (`appleboy/ssh-action`), health gate, auto rollback |
 | chat-ws   | `chat-ws-ci.yml`  | build, vet, Docker build → push to GHCR |
-| frontend  | `frontend-ci.yml` | ESLint, build (`tsc -b` + Vite), Docker build → push to GHCR |
+| frontend  | `frontend-ci.yml` | `quality` (ESLint, build, bundle-size), `contract-codegen` (Orval drift gate on `src/api/generated`), `publish-image` (main push only, GHCR) |
 
 Docker images are published to GitHub Container Registry on every push to `main`:
 - `ghcr.io/Itamarabir1/linkup-backend:latest`
 - `ghcr.io/Itamarabir1/linkup-chat-ws:latest`
 - `ghcr.io/Itamarabir1/linkup-frontend:latest`
+
+### Dependency updates (Dependabot)
+
+The repo uses **Dependabot** for automated dependency update PRs:
+
+- **Frontend**: npm updates under `/frontend` (weekly)
+- **Backend**: Python updates under `/backend` (weekly)
+- **Docker**: base image updates from repo root (monthly)
+
+### Frontend XSS baseline
+
+Frontend now enforces an explicit XSS guardrail baseline:
+
+- ESLint blocks raw HTML injection via `react/no-danger` (`error`).
+- Shared sanitizer utility exists at `frontend/src/utils/sanitize.ts` (`sanitizeHtml` over `DOMPurify` allowlist).
+- Policy: any future `dangerouslySetInnerHTML` usage must pass through this sanitizer utility.
 
 ---
 

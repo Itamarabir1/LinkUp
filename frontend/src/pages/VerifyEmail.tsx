@@ -2,11 +2,20 @@ import { useState } from 'react';
 import { Mail } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { resendVerificationEmail, verifyEmailCode } from '../api/auth';
 import ErrorBanner from '../components/ErrorBanner';
 import LoadingButton from '../components/LoadingButton';
 import { getApiErrorMessage } from '../utils/apiError';
 import styles from './VerifyEmail.module.css';
+
+const verifySchema = z.object({
+  code: z.string().length(6).regex(/^\d+$/),
+});
+
+type VerifyForm = z.infer<typeof verifySchema>;
 
 export default function VerifyEmail() {
   const { t } = useTranslation('auth');
@@ -16,11 +25,18 @@ export default function VerifyEmail() {
   const emailFromQuery = new URLSearchParams(location.search).get('email');
   const email = emailFromState ?? emailFromQuery ?? '';
 
-  const [code, setCode] = useState('');
-  const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<VerifyForm>({
+    resolver: zodResolver(verifySchema),
+    defaultValues: { code: '' },
+  });
 
   if (!email) {
     return (
@@ -46,15 +62,9 @@ export default function VerifyEmail() {
     );
   }
 
-  const handleVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!code.trim()) {
-      setError(t('error_missing_verification_code'));
-      return;
-    }
+  const handleVerify = async ({ code }: VerifyForm) => {
     setError('');
     setSuccess('');
-    setLoading(true);
     try {
       await verifyEmailCode(email, code.trim());
       setSuccess(t('verify_success'));
@@ -63,8 +73,6 @@ export default function VerifyEmail() {
       }, 1200);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, t('error_verify_failed')));
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -106,7 +114,7 @@ export default function VerifyEmail() {
           {t('verificationIntro2')}
         </p>
 
-        <form onSubmit={handleVerify}>
+        <form onSubmit={handleSubmit(handleVerify)}>
           {error ? <ErrorBanner message={error} className={styles.error} /> : null}
           {success ? <p className={styles.successText}>{success}</p> : null}
 
@@ -117,17 +125,22 @@ export default function VerifyEmail() {
               autoComplete="one-time-code"
               className={styles.otpDigit}
               maxLength={6}
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              {...register('code')}
+              onChange={(e) => {
+                setValue('code', e.target.value.replace(/\D/g, '').slice(0, 6), {
+                  shouldValidate: true,
+                });
+              }}
               placeholder={t('verificationCodePlaceholder')}
               aria-label={t('verificationCode')}
             />
           </div>
+          {errors.code ? <p className={styles.error}>{t('error_missing_verification_code')}</p> : null}
 
           <LoadingButton
             type="submit"
             className={styles.button}
-            loading={loading}
+            loading={isSubmitting}
             loadingLabel={t('verifying')}
           >
             {t('verifyAccountButton')}

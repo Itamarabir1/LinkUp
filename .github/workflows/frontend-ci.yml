@@ -5,24 +5,31 @@ on:
     branches: [main, develop]
     paths:
       - 'frontend/**'
+      - 'nginx/**'
+      - '.github/workflows/frontend-ci.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'frontend/**'
+      - 'nginx/**'
+      - '.github/workflows/frontend-ci.yml'
+
+concurrency:
+  group: frontend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 defaults:
   run:
     working-directory: frontend
 
 jobs:
-  lint-and-build:
+  quality:
     runs-on: ubuntu-latest
     # JS-based actions (checkout, setup-node, docker/*) run on Node 24 per GitHub deprecation timeline
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     permissions:
       contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v5
 
@@ -42,8 +49,51 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Check bundle size
+        run: npm run size
+
+  contract-codegen:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check Orval drift
+        run: |
+          npm run gen:api
+          git update-index -q --refresh
+          git diff --exit-code -- src/api/generated/ || \
+            (echo "ERROR: Generated API client is out of sync. Run 'npm run gen:api' locally." && exit 1)
+
+  publish-image:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs: [quality, contract-codegen]
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
       - name: Login to GHCR
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -51,14 +101,16 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set lowercase owner
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         id: lowercase
         run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Build and push frontend image
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: true
+          build-args: |
+            SENTRY_AUTH_TOKEN=${{ env.SENTRY_AUTH_TOKEN }}
+            SENTRY_ORG=${{ env.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ env.SENTRY_PROJECT }}
           tags: ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/frontend:latest

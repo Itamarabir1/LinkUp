@@ -2,7 +2,7 @@
 
 אפליקציית ווב ב-React + TypeScript (Vite) ל-LinkUp: ניהול נסיעות, קבוצות, צ'אט בזמן אמת, התחברות עם Google ואימייל/סיסמה, תמונות פרופיל (S3), **תמיכה ב-RTL ובאנגלית (i18next)** עם מעבר שפה, ופורמט תאריכים לפי לוקאל.
 
-> **הערה:** ריצת Frontend CI ב-GitHub מופעלת רק כשקומיט משנה קבצים תחת `frontend/`.
+> **הערה:** ריצת Frontend CI ב-GitHub מופעלת כשקומיט משנה `frontend/**`, `nginx/**`, או את `.github/workflows/frontend-ci.yml`.
 
 ---
 
@@ -59,6 +59,7 @@ cp frontend/.env.example frontend/.env
 - `npm run lint` – הרצת ESLint על TypeScript/React.
 - `npm run size` – בדיקת תקציבי bundle עם `size-limit`.
 - `npm run analyze` – build שמייצר דוח ויזואלי `dist/stats.html`.
+- `npm run gen:api` – יצירת Orval client/types מ-`openapi-snapshot.json` לתיקיית `src/api/generated`.
 
 ---
 
@@ -73,6 +74,17 @@ cp frontend/.env.example frontend/.env
 
 ---
 
+## OpenAPI / Orval CI Gate
+
+- **Source of truth** – קבצי `src/api/generated/*` מחויבים ל-git כחלק מחוזה API reviewable.
+- **CI enforcement** – ב-`frontend-ci` יש job ייעודי `contract-codegen` שמריץ:
+  - `npm run gen:api`
+  - `git update-index -q --refresh`
+  - `git diff --exit-code -- src/api/generated/`
+- **Failure action** – אם CI נכשל על drift, מריצים מקומית `npm run gen:api`, מקמיטים את השינויים ב-`src/api/generated`, ודוחפים מחדש.
+
+---
+
 ## Web Vitals D — Sentry RUM
 
 - **Production-only instrumentation** – `Sentry.init` רץ רק תחת `import.meta.env.PROD && APP_CONFIG.sentry.dsn`.
@@ -82,17 +94,25 @@ cp frontend/.env.example frontend/.env
 - **Auth identity alignment** – `AuthContext` מעדכן `Sentry.setUser` ב-bootstrap/login/google-login ומאפס ב-logout לקבלת traces/replays מיוחסים למשתמש.
 - **Guardrail** – אין הפעלת Sentry/RUM במצב dev.
 
+## Sentry Sourcemaps Upload
+
+- **Plugin** – הפרויקט משתמש ב-`@sentry/vite-plugin` ב-`vite.config.ts`.
+- **Activation policy** – ה-plugin מופעל רק ב-`mode=production` ורק כשקיימים `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`.
+- **CI path** – ב-`frontend-ci` הסודות מוזרקים רק ב-job של `publish-image` (main push), ולא ב-PR quality build.
+- **Artifact hygiene** – `filesToDeleteAfterUpload: ['dist/**/*.map']` מוחק sourcemaps אחרי upload כדי שלא ייכנסו ל-image של nginx.
+
 ---
 
 ## נקודות מפתח בפרונטנד
 
 - **RTL, עברית ואנגלית** – **i18next** + קבצים ב־`src/i18n/locales/{he,en}/`; **`LangContext`** מגדיר `dir` ו־`--font-primary` על `<html>`. פורמט תאריכים/שעות: **`src/utils/date.ts`** + **`getLocale()`**. Fallback לטקסטי שגיאת API ב־hooks: **`apiErr`** ב־`src/utils/i18nError.ts` (מפתחות `common:err_*`). **CSS Modules:** `font-family: var(--font-primary)` (חריג: `LangToggle`). ADR: **`docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md`** §10–12.
-- **אימות** – קומפוננטות התחברות/הרשמה עובדות מול backend OAuth/JWT; תמיכה ב-Google Sign-In באמצעות `GoogleSignIn.tsx` ו-`VITE_GOOGLE_CLIENT_ID`. בצד השרת יש **rate limiting** על רישום והתחברות (Redis) — בבדיקות עומס או ניסיונות חוזרים מהירים אפשר לקבל 429; ראו `docs/architecture/API.md` ו-`backend/README.md`.
+- **אימות** – קומפוננטות Login/Register/VerifyEmail מבוססות `react-hook-form + zod` עם שמירת behavior parity מול הזרימה הקיימת (אותם API calls, אותם נתיבי navigation ואותן הודעות שגיאה כלליות). ב-`Register` שדה `PhoneInput` מחובר דרך `Controller`. תמיכה ב-Google Sign-In באמצעות `GoogleSignIn.tsx` ו-`VITE_GOOGLE_CLIENT_ID`. בצד השרת יש **rate limiting** על רישום והתחברות (Redis) — בבדיקות עומס או ניסיונות חוזרים מהירים אפשר לקבל 429; ראו `docs/architecture/API.md` ו-`backend/README.md`.
 - **מיילים ארכיטקטורית** – רינדור תבניות מייל עבר ל-service ייעודי `email-renderer` (Node.js/Express + React Email) בצד הבקאנד/worker; לפרונט אין תלות ישירה, אבל תכני מייל/טמפלטים מנוהלים כעת ב-`email-renderer/src/emails/templates/`.
 - **Premium / Billing UX** – הפרונט כולל אינטגרציה מלאה ל-`/api/v1/billing`: `PremiumBanner` במסך הפרופיל (badge למנוי פעיל או upgrade CTA), mutation ל-Stripe checkout, ועמודי תוצאה מוגנים `payment/success` + `payment/cancel`. מסך success מבצע polling ל-`/billing/status` כל 2 שניות עד אישור `is_premium` או timeout של 30 שניות.
 - **Stage 3a — React Query (Geo + Notifications + Auth-shadow)** – `useGoogleMapsKey` עובד דרך `useQuery` עם `qk.geo.mapsKey` ו-cache ארוך טווח; `Notifications` עבר מ-fetch ידני ל-`qk.notifications.all` עם invalidate מאירוע `linkup-notifications-refresh`; `AuthContext` מסנכרן cache של `qk.auth.me()` אחרי login/sign-in, מנקה cache ב-logout (`queryClient.clear()`), ונוסף `useCurrentUser()` query hook לצרכנים מבוססי RQ.
 - **Stage 3b Part 2 — React Query (MyBookings Driver + Passenger)** – הוקי `useMyBookingsPassenger`/`useMyBookingsDriver` עובדים דרך `useQuery` עם keys scoped לפי משתמש (`qk.bookings.passenger(userId)`, `qk.bookings.driver(userId)`), פעולות approve/reject/cancel עברו ל-`useMutation`, ואירועי WS מבצעים invalidate/query updates במקום fetch ידני; נשמרו `driverStatus` machine, local UI state וחוזה ההחזרה ל-`useMyBookings`.
 - **Stage 3b Part 6 — React Query (SearchRides network edges)** – [`useSearchRides.ts`](src/pages/SearchRides/useSearchRides.ts) עבר ממימוש ידני ל-mutations עבור `search`, `load more`, ו-`save alert`; נשמרו `useOperationToken`, AI parse flow, geolocation flow, וחוזה ההחזרה ל-UI. [`useJoinRide.ts`](src/pages/SearchRides/useJoinRide.ts) נשאר ללא שינוי כדי לשמר `idempotencyKeyRef` request-scoped.
+- **Stage 3c — Admin RQ completion** – מסכי admin עובדים בתבנית RQ, כולל `AdminLookup` שעבר מ-manual async/result state ל-`useMutation` עבור lookup יזום משתמש (ride/booking) תוך שמירת UI parity.
 - **Stage 5 cleanup — React Query + auth boot safety** – [`useMyRequests.ts`](src/pages/useMyRequests.ts) הומר ל-`useQuery`/`useMutation` עם cache patching ל-cancel/expire, ובמקביל תוקן initial-load effect ב-[`AuthContext.tsx`](src/context/AuthContext.tsx) ל-cancellable async pattern במקום `mounted` dead-check.
 - **Web Vitals D — Sentry RUM + vitals metrics** – [`main.tsx`](src/main.tsx) מרחיב Sentry ב-PROD עם BrowserTracing/Replay sampling ודיווח `CLS/LCP/INP` מ-`web-vitals` ב-dynamic import; [`AuthContext.tsx`](src/context/AuthContext.tsx) מסנכרן `Sentry.setUser` ב-bootstrap/login/google-login ומנקה ב-logout.
 - **Stage 3d — Chat RQ (safe subset)** – שכבות polling/fetch בצ׳אט הועברו ל-React Query בלי לשנות שכבות WS הקריטיות: [`useChatUnreadMessages.ts`](src/context/useChatUnreadMessages.ts) משתמש ב-`qk.chat.unread()` + `refetchInterval` במקום `setInterval`, [`useChatNotificationsFeed.ts`](src/context/useChatNotificationsFeed.ts) משתמש ב-`qk.notifications.all()` + invalidate refresh API במקום polling ידני, ו-[`Messages.tsx`](src/pages/Messages.tsx) משתמש ב-`qk.chat.conversations()` במקום fetch ידני; נשמרו semantics של מיון/טעינה/שגיאה ותאימות ל-`ChatContext`.

@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Controller, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useAuth } from '../context/AuthContext';
 import type { RegisterData } from '../context/AuthContext';
 import ErrorBanner from '../components/ErrorBanner';
@@ -9,55 +12,65 @@ import PhoneInput from '../components/PhoneInput/PhoneInput';
 import { getApiErrorMessage } from '../utils/apiError';
 import styles from './Register.module.css';
 
+const registerSchema = z
+  .object({
+    full_name: z.string().min(1),
+    email: z.string().email(),
+    phone_number: z.string().min(1),
+    password: z.string().min(8),
+    confirm_password: z.string().min(1),
+  })
+  .refine((data) => data.password === data.confirm_password, {
+    message: 'error_passwords_mismatch',
+    path: ['confirm_password'],
+  });
+
+type RegisterForm = z.infer<typeof registerSchema>;
+
 export default function Register() {
   const { t } = useTranslation('auth');
-  const [form, setForm] = useState<RegisterData>({
-    full_name: '',
-    email: '',
-    phone_number: '',
-    password: '',
-    confirm_password: '',
-  });
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { register } = useAuth();
+  const { register: registerUser } = useAuth();
   const navigate = useNavigate();
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterForm>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      full_name: '',
+      email: '',
+      phone_number: '',
+      password: '',
+      confirm_password: '',
+    },
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (
-      !form.full_name.trim() ||
-      !form.email.trim() ||
-      !form.phone_number.trim() ||
-      !form.password ||
-      !form.confirm_password
-    ) {
-      setError(t('error_fill_all'));
-      return;
-    }
-    if (form.password !== form.confirm_password) {
-      setError(t('error_passwords_mismatch'));
-      return;
-    }
-    if (form.password.length < 8) {
-      setError(t('error_password_too_short'));
-      return;
-    }
+  const onSubmit = async (form: RegisterForm) => {
     setError('');
-    setLoading(true);
     try {
-      await register({
+      await registerUser({
         ...form,
         full_name: form.full_name.trim(),
         email: form.email.trim(),
         phone_number: form.phone_number.trim(),
-      });
+      } as RegisterData);
       navigate('/verify-email', { replace: true, state: { email: form.email.trim() } });
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, t('error_register_failed')));
-    } finally {
-      setLoading(false);
     }
+  };
+
+  const renderFieldError = (key: keyof RegisterForm) => {
+    const fieldError = errors[key];
+    if (!fieldError) return null;
+    if (key === 'password' && fieldError.type === 'too_small') {
+      return <span className={styles.fieldHint}>{t('error_password_too_short')}</span>;
+    }
+    const message = typeof fieldError.message === 'string' ? fieldError.message : '';
+    return <span className={styles.fieldHint}>{t(message || 'error_fill_all')}</span>;
   };
 
   return (
@@ -85,7 +98,7 @@ export default function Register() {
         <h1 className={styles.title}>{t('registerTitle')}</h1>
         <p className={styles.subtitle}>{t('registerSubtitle')}</p>
 
-        <form onSubmit={handleSubmit} className={styles.form}>
+        <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
           {error ? <ErrorBanner message={error} className={styles.error} /> : null}
 
           <div className={styles.field}>
@@ -96,11 +109,11 @@ export default function Register() {
               id="reg-name"
               type="text"
               placeholder={t('fullNamePlaceholder')}
-              value={form.full_name}
-              onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
+              {...register('full_name')}
               className={styles.input}
               autoComplete="name"
             />
+            {renderFieldError('full_name')}
           </div>
 
           <div className={styles.field}>
@@ -111,23 +124,31 @@ export default function Register() {
               id="reg-email"
               type="email"
               placeholder="you@example.com"
-              value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              {...register('email')}
               className={styles.input}
               autoComplete="email"
             />
+            {renderFieldError('email')}
           </div>
 
           <div className={styles.field}>
             <label className={styles.fieldLabel} htmlFor="reg-phone">
               {t('phone')}
             </label>
-            <PhoneInput
-              id="reg-phone"
-              value={form.phone_number}
-              onChange={(e164) => setForm((f) => ({ ...f, phone_number: e164 }))}
-              defaultCountryCode="IL"
+            <Controller
+              control={control}
+              name="phone_number"
+              render={({ field }) => (
+                <PhoneInput
+                  id="reg-phone"
+                  value={field.value}
+                  onChange={field.onChange}
+                  defaultCountryCode="IL"
+                  error={Boolean(errors.phone_number)}
+                />
+              )}
             />
+            {renderFieldError('phone_number')}
           </div>
 
           <div className={styles.field}>
@@ -138,14 +159,12 @@ export default function Register() {
               id="reg-password"
               type="password"
               placeholder={t('passwordPlaceholder')}
-              value={form.password}
-              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+              {...register('password')}
               className={styles.input}
               autoComplete="new-password"
             />
-            <span className={styles.fieldHint}>
-              {t('passwordHint')}
-            </span>
+            <span className={styles.fieldHint}>{t('passwordHint')}</span>
+            {renderFieldError('password')}
           </div>
 
           <div className={styles.field}>
@@ -156,17 +175,17 @@ export default function Register() {
               id="reg-confirm"
               type="password"
               placeholder={t('confirmPasswordPlaceholder')}
-              value={form.confirm_password}
-              onChange={(e) => setForm((f) => ({ ...f, confirm_password: e.target.value }))}
+              {...register('confirm_password')}
               className={styles.input}
               autoComplete="new-password"
             />
+            {renderFieldError('confirm_password')}
           </div>
 
           <LoadingButton
             type="submit"
             className={styles.button}
-            loading={loading}
+            loading={isSubmitting}
             loadingLabel={t('registering')}
           >
             {t('register')}
