@@ -86,6 +86,15 @@ class BillingService:
                     },
                 ],
                 mode="payment",
+                phone_number_collection={"enabled": False},
+                locale="he",
+                custom_text={
+                    "submit": {"message": "לאחר התשלום תקבל גישה מיידית לכל פיצ'רי LinkUp Premium"},
+                },
+                payment_intent_data={
+                    "description": "LinkUp Premium - גישה מלאה לכל פיצ'רי LinkUp",
+                    "metadata": {"user_id": str(user.user_id)},
+                },
                 success_url=f"{settings.FRONTEND_URL}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
                 cancel_url=f"{settings.FRONTEND_URL}/payment/cancel",
                 metadata={"user_id": str(user.user_id)},
