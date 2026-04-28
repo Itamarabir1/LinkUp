@@ -597,6 +597,7 @@ async def admin_audit_log(
 ):
     _require_capability(current_user, "admin.audit.read")
     from app.infrastructure.audit.model import AuditLog  # local import to avoid cycle
+
     query = select(AuditLog)
     if actor_user_id is not None:
         query = query.where(AuditLog.actor_user_id == actor_user_id)
@@ -616,7 +617,9 @@ async def admin_audit_log(
             await db.execute(
                 query.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit),
             )
-        ).scalars().all(),
+        )
+        .scalars()
+        .all(),
     )
     items = [
         {
