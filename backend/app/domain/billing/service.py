@@ -87,7 +87,7 @@ class BillingService:
                 ],
                 mode="payment",
                 phone_number_collection={"enabled": False},
-                locale="he",
+                locale="auto",
                 custom_text={
                     "submit": {"message": "לאחר התשלום תקבל גישה מיידית לכל פיצ'רי LinkUp Premium"},
                 },
