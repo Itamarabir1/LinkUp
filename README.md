@@ -237,11 +237,12 @@ docker compose --profile prod up -d --build
 ### פקודות שימושיות
 
 ```bash
-docker compose down          # עצור
+make down                    # עצור
 docker compose down -v       # עצור + איפוס volumes (DB וכו׳)
+make logs                    # לוגים לכל השירותים (follow)
 docker compose logs migrate  # לוג מיגרציה (אם נכשל — לבדוק כאן)
-docker compose logs backend  # לוגים
-docker compose ps            # סטטוס (backend: healthy / ממתין)
+docker compose logs backend  # לוגים לבקאנד בלבד
+make ps                      # סטטוס כל השירותים
 ```
 
 ---
