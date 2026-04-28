@@ -288,7 +288,7 @@ docker compose ps            # סטטוס (backend: healthy / ממתין)
 
 - **Redis HA + DB separation.** Runtime Redis is deployed as Sentinel topology (`redis-primary` + `redis-replica` + `redis-sentinel`). Logical DB split still applies: DB=0 for cache/rate-limit/idempotency/denylist and DB=1 for chat/pub-sub, so failover improves availability without changing domain contracts.
 
-- **Single-EC2 rolling CD (senior pragmatic).** Instead of full blue/green infra, backend deploy runs as a low-downtime rolling replace on the same host: immutable GHCR tag (`sha`) is deployed via GitHub Actions SSH job, post-deploy health is verified on `/api/v1/health`, and rollback to previous tag is automatic on failure. This keeps ops robust on `t3.medium` without extra AWS cost.
+- **Single-EC2 rolling CD (senior pragmatic).** Instead of full blue/green infra, backend deploy runs as a low-downtime rolling replace on the same host: immutable GHCR tag (`sha`) is deployed via GitHub Actions SSH job, post-deploy smoke checks validate backend readiness (`/readyz`), Firebase env presence, and public nginx reachability (`/livez`, `/config.js`), then rollback to previous tag runs automatically on failure. This keeps ops robust on `t3.medium` without extra AWS cost.
 
 - **Redis completion listener + `ai-worker` for AI chat summary (not a separate service).** The AI flow is “on conversation end, analyze and persist.” The backend publishes a completion event to Redis DB=1; the `ai-worker` subscribes and runs `handle_conversation_completion`. This keeps deployment surface small while preserving async execution.
 
@@ -303,7 +303,7 @@ push to `main` or `develop` (only when relevant files change).
 
 | Service   | Workflow | Steps |
 |-----------|----------|-------|
-| backend   | `backend-ci.yml`  | lint (Ruff), format check, migrations (`alembic upgrade head`), tests (pytest), Docker build → push to GHCR (`latest` + `sha`), deploy to EC2 over SSH (`appleboy/ssh-action`), health gate, auto rollback |
+| backend   | `backend-ci.yml`  | lint (Ruff), format check, migrations (`alembic upgrade head`), tests (pytest), Docker build → push to GHCR (`latest` + `sha`), deploy to EC2 over SSH (`appleboy/ssh-action`), post-deploy smoke gate (`/readyz` + runtime env + public nginx probes), auto rollback |
 | chat-ws   | `chat-ws-ci.yml`  | build, vet, Docker build → push to GHCR |
 | frontend  | `frontend-ci.yml` | `quality` (ESLint, build, bundle-size), `contract-codegen` (Orval drift gate on `src/api/generated`), `publish-image` (main push only, GHCR) |
 
