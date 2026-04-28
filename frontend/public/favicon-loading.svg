@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="#4F46E5" />
+  <g stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <animateTransform
+      attributeName="transform"
+      type="translate"
+      values="0 0;0 -1;0 0;0 1;0 0"
+      dur="900ms"
+      repeatCount="indefinite"
+    />
+    <path d="M18 44H14a4 4 0 0 1-4-4V28a4 4 0 0 1 4-4h26l10 10h2a4 4 0 0 1 4 4v4h-4" />
+    <circle cx="24" cy="44" r="5" />
+    <circle cx="44" cy="44" r="5" />
+  </g>
+  <circle cx="24" cy="44" r="7" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="1.5" fill="none">
+    <animateTransform
+      attributeName="transform"
+      type="rotate"
+      from="0 24 44"
+      to="360 24 44"
+      dur="700ms"
+      repeatCount="indefinite"
+    />
+  </circle>
+  <circle cx="44" cy="44" r="7" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="1.5" fill="none">
+    <animateTransform
+      attributeName="transform"
+      type="rotate"
+      from="0 44 44"
+      to="360 44 44"
+      dur="700ms"
+      repeatCount="indefinite"
+    />
+  </circle>
+</svg>

@@ -16,6 +16,7 @@ import styles from './App.module.css';
 import { AdminRoute } from './features/admin';
 import LangToggle from './components/LangToggle/LangToggle';
 import { queryClient } from './api/queryClient';
+import { useFaviconLoader } from './hooks/useFaviconLoader';
 
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
@@ -154,22 +155,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <LangProvider>
-            <AuthProvider>
-              <GroupProvider>
-                <ChatProvider>
-                  <div className={styles.floatingControls}>
-                    <ThemeToggle />
-                    <LangToggle />
-                  </div>
-                  <AppRoutes />
-                  <NotificationToast />
-                </ChatProvider>
-              </GroupProvider>
-            </AuthProvider>
-          </LangProvider>
-        </ThemeProvider>
+        <AppContent />
         {import.meta.env.DEV && (
           <ReactQueryDevtools
             initialIsOpen={false}
@@ -178,5 +164,28 @@ export default function App() {
         )}
       </QueryClientProvider>
     </BrowserRouter>
+  );
+}
+
+function AppContent() {
+  useFaviconLoader();
+
+  return (
+    <ThemeProvider>
+      <LangProvider>
+        <AuthProvider>
+          <GroupProvider>
+            <ChatProvider>
+              <div className={styles.floatingControls}>
+                <ThemeToggle />
+                <LangToggle />
+              </div>
+              <AppRoutes />
+              <NotificationToast />
+            </ChatProvider>
+          </GroupProvider>
+        </AuthProvider>
+      </LangProvider>
+    </ThemeProvider>
   );
 }
