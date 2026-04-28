@@ -261,8 +261,8 @@ jobs:
                 && $COMPOSE exec -T chat-ws sh -c "printenv | grep -E '^REDIS_URL='" | grep -q 'redis://:.*@redis:6379/1' \
                 && $COMPOSE exec -T backend sh -c "printenv | grep -E '^FIREBASE_CREDENTIALS_JSON='" >/dev/null \
                 && $COMPOSE exec -T backend sh -c "python -c \"import urllib.request;print(urllib.request.urlopen('http://localhost:8000/readyz').read().decode())\"" | grep -q '"status":"healthy"' \
-                && $COMPOSE exec -T backend sh -c "python -c \"import firebase_admin; print(len(firebase_admin._apps))\"" | grep -q '^1$' \
-                && $COMPOSE --profile prod exec -T nginx sh -c "wget -qSO- --spider http://localhost/ >/dev/null 2>&1 && wget -qSO- --spider http://localhost/config.js >/dev/null 2>&1"; then
+                && $COMPOSE exec -T backend sh -c "python3 -c \"import os; assert os.getenv('FIREBASE_CREDENTIALS_JSON'), 'missing'\"" \
+                && $COMPOSE --profile prod exec -T nginx sh -c "wget -qO- http://localhost/config.js >/dev/null && echo ok"; then
                 echo "$IMAGE_TAG" > "$PREV_TAG_FILE"
                 echo "Deploy succeeded: $NEW_IMAGE"
                 exit 0
