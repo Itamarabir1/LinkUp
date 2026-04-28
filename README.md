@@ -209,11 +209,13 @@ cp frontend/.env.example frontend/.env
 
 ```bash
 # טרמינל 1
-docker compose up -d
+make up
 
 # טרמינל 2
-cd frontend && npm run dev
+cd frontend && make dev
 ```
+
+> חשוב: השתמשו ב־`make up` (ולא `docker compose up` ישירות), כדי להבטיח ש־Compose תמיד רץ עם `--env-file backend/.env --env-file frontend/.env`.
 
 - **פרונט:** http://localhost:5173  
 - **אדמין (משתמש עם `is_admin`):** http://localhost:5173/admin — פירוט API ומבנה: [`ADMIN_DASHBOARD.md`](ADMIN_DASHBOARD.md)  
