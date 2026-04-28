@@ -262,7 +262,8 @@ jobs:
                 && $COMPOSE exec -T backend sh -c "printenv | grep -E '^FIREBASE_CREDENTIALS_JSON='" >/dev/null \
                 && $COMPOSE exec -T backend sh -c "python -c \"import urllib.request;print(urllib.request.urlopen('http://localhost:8000/readyz').read().decode())\"" | grep -q '"status":"healthy"' \
                 && $COMPOSE exec -T backend sh -c "python3 -c \"import os; assert os.getenv('FIREBASE_CREDENTIALS_JSON'), 'missing'\"" \
-                && $COMPOSE --profile prod exec -T nginx sh -c "wget -qO- http://localhost/config.js >/dev/null && echo ok"; then
+                && curl -sf --http1.1 --max-time 10 https://linkup.itamarabir.com/livez > /dev/null \
+                && curl -sf --http1.1 --max-time 10 https://linkup.itamarabir.com/config.js > /dev/null; then
                 echo "$IMAGE_TAG" > "$PREV_TAG_FILE"
                 echo "Deploy succeeded: $NEW_IMAGE"
                 exit 0
