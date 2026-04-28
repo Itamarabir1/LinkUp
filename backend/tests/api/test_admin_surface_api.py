@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 import pytest_asyncio
@@ -26,7 +27,7 @@ async def seeded_admin_surface(e2e_session_factory: async_sessionmaker):
             amount=Decimal("49.90"),
             currency="ils",
             status=PaymentStatus.SUCCEEDED,
-            stripe_session_id="cs_test_surface_1",
+            stripe_session_id=f"cs_test_surface_{uuid4()}",
         )
         s.add(payment)
         await s.commit()
