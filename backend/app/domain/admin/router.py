@@ -2,7 +2,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -219,30 +219,75 @@ async def admin_toggle_user_active(
 async def admin_toggle_user_admin(
     user_id: UUID,
     request: Request,
+    action: str | None = Query(default=None, description="grant | revoke | toggle (default)"),
+    reason: str | None = Query(default=None, description="Optional audit reason"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
 ):
     u = await crud_user.get_by_id(db, user_id)
     if not u:
         raise UserNotFoundError(identifier=str(user_id))
-    u.is_admin = not bool(u.is_admin)
+    normalized_action = (action or "toggle").strip().lower()
+    if normalized_action not in {"toggle", "grant", "revoke"}:
+        raise HTTPException(status_code=400, detail="Invalid action. Use grant, revoke, or toggle.")
+
+    before_is_admin = bool(u.is_admin)
+    if normalized_action == "grant":
+        next_is_admin = True
+    elif normalized_action == "revoke":
+        next_is_admin = False
+    else:
+        next_is_admin = not before_is_admin
+
+    if before_is_admin and not next_is_admin and u.user_id == current_user.user_id:
+        raise HTTPException(status_code=400, detail="Self-demotion is not allowed.")
+
+    if before_is_admin and not next_is_admin:
+        admin_count = await db.scalar(select(func.count()).select_from(User).where(User.is_admin.is_(True)))
+        if int(admin_count or 0) <= 1:
+            raise HTTPException(status_code=400, detail="At least one admin must remain.")
+
+    u.is_admin = next_is_admin
+    after_is_admin = bool(u.is_admin)
+    changed = before_is_admin != after_is_admin
+    audit_action = (
+        "grant_user_admin"
+        if (not before_is_admin and after_is_admin)
+        else "revoke_user_admin"
+        if (before_is_admin and not after_is_admin)
+        else "toggle_user_admin_noop"
+    )
     await audit_repo.record(
         db,
         actor_user_id=current_user.user_id,
-        action="toggle_user_admin",
+        action=audit_action,
         resource_type="user",
         resource_id=str(user_id),
-        metadata={"is_admin": bool(u.is_admin)},
+        metadata={
+            "target_email": u.email,
+            "before_is_admin": before_is_admin,
+            "after_is_admin": after_is_admin,
+            "changed": changed,
+            "requested_action": normalized_action,
+            "reason": reason,
+        },
         ip_address=_client_ip(request),
     )
     await db.commit()
     await db.refresh(u)
     _audit(
         current_user,
-        "toggle_user_admin",
-        f"target={user_id} is_admin={u.is_admin}",
+        audit_action,
+        f"target={user_id} before={before_is_admin} after={after_is_admin} changed={changed}",
     )
-    return {"user_id": str(u.user_id), "is_admin": bool(u.is_admin)}
+    return {
+        "user_id": str(u.user_id),
+        "is_admin": bool(u.is_admin),
+        "before_is_admin": before_is_admin,
+        "after_is_admin": after_is_admin,
+        "changed": changed,
+        "action": normalized_action,
+    }
 
 
 @router.get("/rides")

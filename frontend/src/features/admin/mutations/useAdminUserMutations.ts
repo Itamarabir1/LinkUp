@@ -20,7 +20,8 @@ export function useToggleUserActive() {
 export function useToggleUserAdmin() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (userId: string) => patchAdminUserAdmin(userId),
+    mutationFn: ({ userId, makeAdmin }: { userId: string; makeAdmin: boolean }) =>
+      patchAdminUserAdmin(userId, makeAdmin ? 'grant' : 'revoke'),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: qk.admin.users() });
       triggerNotificationToast({ title: 'עודכן', body: 'סטטוס אדמין עודכן.' });

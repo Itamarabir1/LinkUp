@@ -243,6 +243,9 @@ make logs                    # לוגים לכל השירותים (follow)
 docker compose logs migrate  # לוג מיגרציה (אם נכשל — לבדוק כאן)
 docker compose logs backend  # לוגים לבקאנד בלבד
 make ps                      # סטטוס כל השירותים
+make admin-check EMAIL=user@example.com   # בדיקת הרשאת אדמין לפי אימייל
+make admin-grant EMAIL=user@example.com   # הענקת אדמין לפי אימייל (ops)
+make admin-revoke EMAIL=user@example.com  # הסרת אדמין לפי אימייל (ops)
 ```
 
 ---

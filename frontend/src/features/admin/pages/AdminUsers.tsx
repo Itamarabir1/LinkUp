@@ -48,7 +48,7 @@ export default function AdminUsers() {
       if (modal.kind === 'active') {
         await toggleActive.mutateAsync(uid);
       } else {
-        await toggleAdmin.mutateAsync(uid);
+        await toggleAdmin.mutateAsync({ userId: uid, makeAdmin: !modal.user.is_admin });
       }
       setModal(null);
     } catch {

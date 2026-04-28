@@ -28,8 +28,21 @@ export function patchAdminUserActive(userId: string) {
   );
 }
 
-export function patchAdminUserAdmin(userId: string) {
-  return api.patch<{ user_id: string; is_admin: boolean }>(
-    `/admin/users/${userId}/admin`
+export function patchAdminUserAdmin(
+  userId: string,
+  action: 'grant' | 'revoke' | 'toggle' = 'toggle',
+  reason?: string,
+) {
+  return api.patch<{
+    user_id: string;
+    is_admin: boolean;
+    before_is_admin: boolean;
+    after_is_admin: boolean;
+    changed: boolean;
+    action: string;
+  }>(
+    `/admin/users/${userId}/admin`,
+    undefined,
+    { params: { action, reason } },
   );
 }

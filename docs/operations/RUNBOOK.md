@@ -126,3 +126,30 @@ docker exec linkup_frontend sh -lc "grep -n 'projectId' /usr/share/nginx/html/co
   - `--env-file frontend/.env`
 - verify nginx sends COOP/COEP headers for OAuth popup compatibility
 
+## 6) Admin Access Redirects to `/my-rides`
+
+### Symptoms
+
+- user opens `/admin` and is redirected to `/my-rides` or `/`
+- admin API returns unauthorized/forbidden for the same user
+
+### Checks
+
+```bash
+make admin-check EMAIL=user@example.com
+```
+
+### Actions
+
+```bash
+make admin-grant EMAIL=user@example.com
+# or
+make admin-revoke EMAIL=user@example.com
+```
+
+### Notes
+
+- Admin access in UI is controlled by `user.is_admin`.
+- Prefer backend admin endpoints for day-to-day role changes; Makefile commands are an ops fallback.
+- Re-login after role change to refresh auth payload.
+
