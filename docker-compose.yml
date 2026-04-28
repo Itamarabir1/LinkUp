@@ -97,7 +97,12 @@ services:
       - sh
       - -c
       - |
-        printf 'port 26379\ndir /tmp\nsentinel monitor mymaster 172.20.0.10 6379 1\nsentinel auth-pass mymaster %s\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\n' "$$REDIS_PASSWORD" > /tmp/sentinel.conf
+        {
+          printf 'port 26379\ndir /tmp\nsentinel monitor mymaster 172.20.0.10 6379 1\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\n'
+          if [ -n "$$REDIS_PASSWORD" ]; then
+            printf 'sentinel auth-pass mymaster %s\n' "$$REDIS_PASSWORD"
+          fi
+        } > /tmp/sentinel.conf
         redis-server /tmp/sentinel.conf --sentinel
     depends_on:
       redis-primary:
