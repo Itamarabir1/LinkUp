@@ -26,6 +26,10 @@
   - OAuth popup compatibility fixed with nginx COOP/COEP headers
   - deploy disk pressure mitigated with aggressive image prune strategy
   - production endpoint stabilized at `https://linkup.itamarabir.com`
+  - local runbook standardized with root `Makefile` wrapper (`make up/down/build/...`) so Compose always includes the required env-file flags
+  - `pgbouncer` root `.env` coupling removed from compose service definition; deploy runtime vars are resolved from CI `--env-file backend/.env --env-file frontend/.env`
+  - EC2 deploy script now exports `POSTGRES_DB` alongside `POSTGRES_USER`/`POSTGRES_PASSWORD` before compose rollout for deterministic pgbouncer env resolution
+  - CSP report-only policy expanded for real production integrations (GTM/Google Accounts, Firebase endpoints, Google Analytics, Stripe frame/form flows, S3 upload domain) to reduce noisy violations before enforce-mode rollout
 
 - **Supply chain baseline (Dependabot):** added `.github/dependabot.yml` to open scheduled update PRs for:
   - npm (`/frontend`, weekly)

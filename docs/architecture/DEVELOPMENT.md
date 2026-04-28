@@ -17,11 +17,12 @@
 
 1. **Clone והעתקת env**
    - `.env` בשורש — העתק מ־`.env.example`: credentials ל־Compose בלבד (Postgres, Redis, RabbitMQ bootstrap); חייבים ליישר עם `backend/.env`.
-   - `pgbouncer` תלוי בערכי root `.env` עבור `POSTGRES_USER`/`POSTGRES_DB`/`POSTGRES_PASSWORD`; אם אחד חסר/ריק ה-healthcheck ייכשל.
+   - בפריסה (CI/EC2) `pgbouncer` לא תלוי ב־root `.env`; ה־deploy מריץ Compose עם `--env-file backend/.env --env-file frontend/.env`, ולכן `POSTGRES_*` מגיעים מ־`backend/.env`.
    - `backend/.env` — העתק מ־`backend/.env.example`.
    - `chat-ws/.env` — העתק מ־`chat-ws/.env.example` (כולל `REDIS_URL`, `JWT_SECRET` זהה ל־`SECRET_KEY` בבקאנד).
 
 2. **הרצה עם Docker**
+  - מומלץ להשתמש ב־`Makefile` בשורש כ-entrypoint אחיד: `make up`, `make down`, `make build`, `make logs`, `make ps`, `make restart`, `make migrate` (כולם מריצים Compose עם `--env-file backend/.env --env-file frontend/.env`).
   - `docker-compose.yml`: ל־`db`, **`pgbouncer`**, `redis`, `rabbitmq`, **`migrate`**, `notification-worker`, `task-worker`, `ai-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **`migrate`** מריץ `alembic upgrade head` פעם אחת ויוצא (`restart: "no"`) ונשאר direct ל-`db`; **backend** וה־workers תלויים ב־`service_completed_successfully:migrate` וגם ב־`pgbouncer:service_healthy`. **backend** עם **`8000:8000`** ל־host, **healthcheck** על `/api/v1/health` (גוף התשובה כולל גם **`circuit_breakers`** למעגלי Google Maps — מידע תפעולי; **`status`** נקבע רק מ־DB/Redis/RabbitMQ — ראו **`docs/architecture/API.md`**). **`frontend`** ו־**`nginx`** מוגדרים באותו קובץ עם `profiles: ["prod"]` — עולים רק עם `docker compose --profile prod`; **nginx** תלוי ב־**backend** ב־`service_healthy`.
   - **PgBouncer image:** נבנה מקומית מ-`infrastructure/pgbouncer/Dockerfile` (ולא image ציבורי), כדי להבטיח שקובץ `pgbouncer.ini` הממופה ב-volume נשאר מקור אמת.
   - **פיתוח:** `docker compose up -d` → תשתית + **migrate** + 3 workers + backend (**8000**) + chat-ws (**8081**). פרונט: **`npm run dev`** בתיקיית `frontend`, לא קונטיינר.
