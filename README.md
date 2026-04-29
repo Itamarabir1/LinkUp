@@ -64,6 +64,10 @@ Deferred/next-step architecture decisions (including cache stampede Phase 2 earl
 
 ## Architecture
 
+Visual overview (services, workers, data stores, externals, and avatar upload path):
+
+![LinkUp — system overview](docs/assets/linkup-system-overview.png)
+
 ```mermaid
 flowchart LR
     subgraph clients

@@ -2,6 +2,10 @@
 
 This file is the canonical architecture entry point for Linkup.
 
+![LinkUp — system overview](./assets/linkup-system-overview.png)
+
+Also surfaced in the repo root [`README.md`](../README.md#architecture).
+
 ## High-level docs
 
 - [`README.md`](../README.md) — product overview and getting started
