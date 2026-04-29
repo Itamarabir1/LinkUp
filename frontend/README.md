@@ -126,4 +126,3 @@ cp frontend/.env.example frontend/.env
 - **שכבות WS שלא שונו במכוון במיגרציית Stage 3d** – [`useConversationMessages`](src/pages/MessageThread/useConversationMessages.ts), [`useChatPopup`](src/context/useChatPopup.ts), [`useChatWebSocket`](src/context/useChatWebSocket.ts), ו-[`processChatWebSocketMessage`](src/pages/MessageThread/processChatWebSocketMessage.ts) נשארו transport/message-stream raw כדי לשמור יציבות בזמן מיגרציה מדורגת.
 
 למידע רחב יותר על הארכיטקטורה וההרצה הכוללת (Docker, Kubernetes, chat-ws, mobile) ראו את ה-`README` בשורש הפרויקט.
-
