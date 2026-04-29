@@ -2,7 +2,7 @@ import http from "k6/http";
 import ws from "k6/ws";
 import { check, sleep } from "k6";
 import { Rate, Trend, Counter } from "k6/metrics";
-import { BASE_URL, registerAndLogin } from "../lib/helpers.js";
+import { BASE_URL, loginExisting } from "../lib/helpers.js";
 import { buildOptions } from "../lib/options.js";
 
 const wsConnectErrors = new Rate("ws_connect_errors");
@@ -28,7 +28,7 @@ function baseHost() {
 }
 
 export default function () {
-  const session = registerAndLogin("ws");
+  const session = loginExisting(__ENV.USER_EMAIL, __ENV.USER_PASSWORD);
   if (!session.ok) return;
 
   // 1) chat-ws channel
