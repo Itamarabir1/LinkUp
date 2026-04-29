@@ -266,6 +266,7 @@ jobs:
                 && $COMPOSE exec -T backend sh -c "python3 -c \"import os; assert os.getenv('FIREBASE_CREDENTIALS_JSON'), 'missing'\"" \
                 && curl -sf --http1.1 --max-time 10 https://linkup.itamarabir.com/livez > /dev/null \
                 && curl -sf --http1.1 --max-time 10 https://linkup.itamarabir.com/config.js > /dev/null; then
+                mkdir -p "$STATE_DIR"
                 echo "$IMAGE_TAG" > "$PREV_TAG_FILE"
                 echo "Deploy succeeded: $NEW_IMAGE"
                 exit 0
