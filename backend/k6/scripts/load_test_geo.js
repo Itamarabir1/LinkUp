@@ -1,7 +1,7 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
 import { Rate, Trend } from "k6/metrics";
-import { BASE_URL, registerAndLogin, jsonOrNull } from "../lib/helpers.js";
+import { BASE_URL, loginExisting, jsonOrNull } from "../lib/helpers.js";
 import { buildOptions } from "../lib/options.js";
 
 const mapsKeyErrors = new Rate("geo_maps_key_errors");
@@ -32,7 +32,7 @@ export const options = buildOptions(thresholds, [
 ]);
 
 export default function () {
-  const session = registerAndLogin("geo");
+  const session = loginExisting(__ENV.USER_EMAIL, __ENV.USER_PASSWORD);
   if (!session.ok) return;
 
   const mapsKeyRes = http.get(`${BASE_URL}/geo/maps-key`, { headers: session.authHeaders });
@@ -56,7 +56,7 @@ export default function () {
   // There is no dedicated /geo/geocode endpoint in this backend.
   // Simulate geocoding pressure via passenger search, which performs address->coords.
   const geocodeRes = http.get(
-    `${BASE_URL}/passenger/passengers/search-rides?pickup_name=${encodeURIComponent("תל אביב")}&destination_name=${encodeURIComponent("ירושלים")}&search_radius=5000&limit=5`,
+    `${BASE_URL}/passenger/passengers/search-rides?pickup_name=${encodeURIComponent("תל אביב")}&destination_name=${encodeURIComponent("ירושלים")}&search_radius=50&limit=5`,
     { headers: session.authHeaders }
   );
   geocodeDuration.add(geocodeRes.timings.duration);

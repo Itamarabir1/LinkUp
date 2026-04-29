@@ -42,6 +42,12 @@ k6 run backend/k6/scripts/load_test_geo.js
 k6 run backend/k6/scripts/load_test_ws.js
 ```
 
+## Results convention
+
+- Save test outputs under `backend/k6/results/<script_name>/`.
+- Example for rides: `backend/k6/results/load_test_rides/results-YYYYMMDD-HHMMSS.txt`.
+- The repository keeps the folder structure (`.gitkeep`), while generated result files are ignored by `.gitignore`.
+
 Optional environment overrides:
 
 - `BASE_URL` (default `http://localhost:8000/api/v1`)

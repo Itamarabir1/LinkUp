@@ -124,3 +124,9 @@ postgres_data/
 .cache/
 celerybeat-schedule
 celerybeat.pid
+
+# --- k6 load test results (keep structure only) ---
+backend/k6/results/**/*.txt
+backend/k6/results/**/*.json
+backend/k6/results/**/*.csv
+backend/k6/results/**/*.html
