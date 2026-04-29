@@ -165,7 +165,8 @@ jobs:
             mkdir -p "$STATE_DIR"
 
             cd "$DEPLOY_DIR"
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             # Env files: each <svc>/.env.production lives on EC2 (gitignored).
             # frontend/.env.production must contain VITE_* + APP_ENV — they are
