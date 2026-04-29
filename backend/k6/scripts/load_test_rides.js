@@ -119,7 +119,7 @@ export default function (data) {
   const rideId = createBody.ride_id;
 
   const searchRes = http.get(
-    `${BASE_URL}/passenger/passengers/search-rides?pickup_name=${encodeURIComponent("Tel Aviv")}&destination_name=${encodeURIComponent("Jerusalem")}&search_radius=5000&limit=10`,
+    `${BASE_URL}/passenger/passengers/search-rides?pickup_name=${encodeURIComponent("Tel Aviv")}&destination_name=${encodeURIComponent("Jerusalem")}&search_radius=50&limit=10`,
     { headers: passenger1.authHeaders }
   );
   searchDuration.add(searchRes.timings.duration);
@@ -138,7 +138,7 @@ export default function (data) {
       pickup_name: ORIGIN.name,
       destination_name: DESTINATION.name,
       requested_departure_time: departureTime(),
-      search_radius: 5000,
+      search_radius: 50,
       is_notification_active: true,
       pickup_lat: ORIGIN.lat,
       pickup_lon: ORIGIN.lon,
@@ -180,7 +180,7 @@ export default function (data) {
       pickup_name: ORIGIN.name,
       destination_name: DESTINATION.name,
       requested_departure_time: departureTime(),
-      search_radius: 5000,
+      search_radius: 50,
       is_notification_active: true,
       pickup_lat: ORIGIN.lat,
       pickup_lon: ORIGIN.lon,
