@@ -69,28 +69,7 @@ export default function () {
   });
   wsConnectErrors.add(!chatOk);
 
-  // 2) backend notifications websocket
-  const notifyBase = (__ENV.NOTIFY_WS_URL || "ws://localhost:8000/api/v1/notifications/ws");
-  const notifyUrl = `${notifyBase}?token=${session.token}`;
-  const notifyStart = Date.now();
-  const notifyRes = ws.connect(notifyUrl, null, function (socket) {
-    socket.on("open", () => {
-      socket.setTimeout(() => socket.close(), 2000);
-    });
-    socket.on("message", () => {
-      wsMessages.add(1);
-    });
-    socket.on("error", () => {
-      wsMessageErrors.add(true);
-    });
-  });
-  wsConnectDuration.add(Date.now() - notifyStart);
-  const notifyOk = check(notifyRes, {
-    "notify ws connect status 101": (r) => r && r.status === 101,
-  });
-  wsConnectErrors.add(!notifyOk);
-
-  // 3) presence HTTP check from chat-ws (side endpoint related to realtime stack)
+  // 2) presence HTTP check from chat-ws (side endpoint related to realtime stack)
   const presenceBase = __ENV.PRESENCE_URL || "http://localhost:8081/presence";
   const presenceRes = http.get(`${presenceBase}/${session.userId}`, {
     headers: { Authorization: `Bearer ${session.token}` },

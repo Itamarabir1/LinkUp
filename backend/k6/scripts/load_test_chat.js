@@ -1,7 +1,7 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
 import { Rate, Trend } from "k6/metrics";
-import { BASE_URL, registerAndLogin, jsonOrNull } from "../lib/helpers.js";
+import { BASE_URL, loginExisting, jsonOrNull } from "../lib/helpers.js";
 import { buildOptions } from "../lib/options.js";
 
 const conversationErrors = new Rate("chat_conversation_errors");
@@ -32,8 +32,8 @@ export const options = buildOptions(thresholds, [
 ]);
 
 export default function () {
-  const userA = registerAndLogin("chat_a");
-  const userB = registerAndLogin("chat_b");
+  const userA = loginExisting(__ENV.USER_EMAIL, __ENV.USER_PASSWORD);
+  const userB = loginExisting(__ENV.USER_EMAIL, __ENV.USER_PASSWORD);
   if (!userA.ok || !userB.ok) return;
 
   const convRes = http.post(

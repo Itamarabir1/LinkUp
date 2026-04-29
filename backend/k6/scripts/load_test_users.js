@@ -1,7 +1,7 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
 import { Rate, Trend } from "k6/metrics";
-import { BASE_URL, registerAndLogin, jsonOrNull } from "../lib/helpers.js";
+import { BASE_URL, loginExisting, jsonOrNull } from "../lib/helpers.js";
 import { buildOptions } from "../lib/options.js";
 
 const meErrors = new Rate("users_me_errors");
@@ -32,11 +32,12 @@ export const options = buildOptions(thresholds, [
 ]);
 
 export default function () {
-  const session = registerAndLogin("users");
+  const session = loginExisting(__ENV.USER_EMAIL, __ENV.USER_PASSWORD);
   if (!session.ok) return;
 
   const meRes = http.get(`${BASE_URL}/users/me`, { headers: session.authHeaders });
   meDuration.add(meRes.timings.duration);
+  const meBody = jsonOrNull(meRes);
   const meOk = check(meRes, { "users/me status 200": (r) => r.status === 200 });
   meErrors.add(!meOk);
   if (!meOk) return;
@@ -45,8 +46,8 @@ export default function () {
     `${BASE_URL}/users/me`,
     JSON.stringify({
       full_name: `Updated ${Date.now()}`,
-      phone_number: session.user.phone_number,
-      email: session.user.email,
+      phone_number: meBody?.phone_number,
+      email: meBody?.email,
     }),
     { headers: session.authHeaders }
   );

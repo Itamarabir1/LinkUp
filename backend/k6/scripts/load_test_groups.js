@@ -1,7 +1,7 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
 import { Rate, Trend } from "k6/metrics";
-import { BASE_URL, registerAndLogin, jsonOrNull } from "../lib/helpers.js";
+import { BASE_URL, loginExisting, jsonOrNull } from "../lib/helpers.js";
 import { buildOptions } from "../lib/options.js";
 
 const createErrors = new Rate("groups_create_errors");
@@ -31,8 +31,8 @@ export const options = buildOptions(thresholds, [
 ]);
 
 export default function () {
-  const owner = registerAndLogin("group_owner");
-  const member = registerAndLogin("group_member");
+  const owner = loginExisting(__ENV.USER_EMAIL, __ENV.USER_PASSWORD);
+  const member = loginExisting(__ENV.USER_EMAIL, __ENV.USER_PASSWORD);
   if (!owner.ok || !member.ok) return;
 
   const createRes = http.post(
