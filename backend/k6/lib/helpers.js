@@ -70,6 +70,37 @@ export function registerAndLogin(role = "user") {
   };
 }
 
+export function loginExisting(email, password) {
+  const loginRes = http.post(
+    `${BASE_URL}/auth/login`,
+    JSON.stringify({ email, password }),
+    { headers: HEADERS }
+  );
+  if (loginRes.status !== 200) {
+    return { ok: false, step: "login", response: loginRes, user: { email } };
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(loginRes.body);
+  } catch {
+    return { ok: false, step: "login_parse", response: loginRes, user: { email } };
+  }
+
+  if (!payload.access_token || !payload.user?.user_id) {
+    return { ok: false, step: "login_payload", response: loginRes, user: { email } };
+  }
+
+  return {
+    ok: true,
+    user: { email },
+    token: payload.access_token,
+    userId: payload.user.user_id,
+    authHeaders: { ...HEADERS, Authorization: `Bearer ${payload.access_token}` },
+    loginRes,
+  };
+}
+
 export function jsonOrNull(response) {
   try {
     return JSON.parse(response.body);

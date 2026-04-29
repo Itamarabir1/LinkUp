@@ -1,7 +1,7 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
 import { Rate, Trend } from "k6/metrics";
-import { BASE_URL, registerAndLogin, jsonOrNull } from "../lib/helpers.js";
+import { BASE_URL, loginExisting, jsonOrNull } from "../lib/helpers.js";
 import { buildOptions } from "../lib/options.js";
 
 const previewErrors = new Rate("preview_errors");
@@ -50,9 +50,35 @@ function departureTime() {
   return new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
 }
 
-export default function () {
-  const driver = registerAndLogin("driver");
-  if (!driver.ok) return;
+export function setup() {
+  const driver = loginExisting(__ENV.USER_EMAIL, __ENV.USER_PASSWORD);
+  const passenger1 = loginExisting(__ENV.USER_EMAIL_P1, __ENV.USER_PASSWORD_P1);
+  const passenger2 = loginExisting(__ENV.USER_EMAIL_P2, __ENV.USER_PASSWORD_P2);
+
+  if (!driver.ok || !passenger1.ok || !passenger2.ok) {
+    throw new Error(
+      `setup login failed: driver=${driver.ok} passenger1=${passenger1.ok} passenger2=${passenger2.ok}`
+    );
+  }
+
+  return {
+    driver: {
+      userId: driver.userId,
+      authHeaders: driver.authHeaders,
+    },
+    passenger1: {
+      authHeaders: passenger1.authHeaders,
+    },
+    passenger2: {
+      authHeaders: passenger2.authHeaders,
+    },
+  };
+}
+
+export default function (data) {
+  const driver = data.driver;
+  const passenger1 = data.passenger1;
+  const passenger2 = data.passenger2;
 
   const previewRes = http.post(
     `${BASE_URL}/rides/preview-routes`,
@@ -91,8 +117,6 @@ export default function () {
   if (!createOk) return;
 
   const rideId = createBody.ride_id;
-  const passenger1 = registerAndLogin("p1");
-  if (!passenger1.ok) return;
 
   const searchRes = http.get(
     `${BASE_URL}/passenger/passengers/search-rides?pickup_name=${encodeURIComponent("Tel Aviv")}&destination_name=${encodeURIComponent("Jerusalem")}&search_radius=5000&limit=10`,
@@ -149,8 +173,6 @@ export default function () {
   approveErrors.add(!approveOk);
   if (!approveOk) return;
 
-  const passenger2 = registerAndLogin("p2");
-  if (!passenger2.ok) return;
   const req2 = http.post(
     `${BASE_URL}/passenger/passengers/`,
     JSON.stringify({
