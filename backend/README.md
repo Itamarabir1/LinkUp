@@ -159,3 +159,5 @@ k6 run k6/scripts/load_test_auth.js
 - Redis cache now stores geocoding results for 24 hours to reduce repeated calls for the same address input.
 - The cache is fail-open: geo flows continue even if Redis is unavailable.
 - This complements the existing 24h ride-preview cache and reduces external API pressure during repeated searches.
+
+

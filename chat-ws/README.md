@@ -109,3 +109,5 @@ import (
 ### ניתוח AI
 
 ניתוח AI של שיחות רץ ב-backend (`ai-worker`). לבדיקה: הרץ את ה-worker והפעל סיום שיחה מהאפליקציה; התוצאות נשמרות ב-DB ונגישות ב-`GET /api/v1/chat/conversations/{id}/analysis`.
+
+
