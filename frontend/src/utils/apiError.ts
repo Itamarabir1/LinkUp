@@ -30,6 +30,27 @@ export function getApiErrorCode(err: unknown): string | undefined {
   return typeof data?.error_code === 'string' ? data.error_code : undefined;
 }
 
+export function getRegisterErrorMessage(err: unknown, t: (key: string) => string): string {
+  const code = getApiErrorCode(err);
+  if (code === 'USER_EMAIL_TAKEN') return t('error_email_taken');
+  if (code === 'USER_PHONE_TAKEN') return t('error_phone_taken');
+
+  if (code === 'VALIDATION_ERROR') {
+    const details = (err as { response?: { data?: { details?: { fields?: Array<{ field?: string }> } } } })?.response
+      ?.data?.details;
+    const fields = Array.isArray(details?.fields) ? details.fields : [];
+    const normalizedFields = fields
+      .map((f) => (typeof f?.field === 'string' ? f.field.split('.').pop() : ''))
+      .filter(Boolean);
+
+    if (normalizedFields.includes('email')) return t('error_email_invalid');
+    if (normalizedFields.includes('phone_number')) return t('error_phone_invalid');
+    if (normalizedFields.includes('password')) return t('error_password_weak');
+  }
+
+  return getApiErrorMessage(err, t('error_register_failed'));
+}
+
 /** Axios timeout/abort detector for dedicated timeout handling paths. */
 export function isTimeoutOrAbortError(err: unknown): boolean {
   const ax = err as { code?: string; message?: string };

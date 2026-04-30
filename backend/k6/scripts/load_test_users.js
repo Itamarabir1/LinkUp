@@ -31,9 +31,20 @@ export const options = buildOptions(thresholds, [
   { duration: "30s", target: 0 },
 ]);
 
-export default function () {
+export function setup() {
   const session = loginExisting(__ENV.USER_EMAIL, __ENV.USER_PASSWORD);
-  if (!session.ok) return;
+  if (!session.ok) {
+    throw new Error(`setup login failed: session_ok=${session.ok}`);
+  }
+  return {
+    userId: session.userId,
+    token: session.token,
+    authHeaders: session.authHeaders,
+  };
+}
+
+export default function (data) {
+  const session = data;
 
   const meRes = http.get(`${BASE_URL}/users/me`, { headers: session.authHeaders });
   meDuration.add(meRes.timings.duration);

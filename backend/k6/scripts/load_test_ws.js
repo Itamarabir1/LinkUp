@@ -7,13 +7,15 @@ import { buildOptions } from "../lib/options.js";
 
 const wsConnectErrors = new Rate("ws_connect_errors");
 const wsMessageErrors = new Rate("ws_message_errors");
-const wsConnectDuration = new Trend("ws_connect_duration", true);
+const wsHandshakeDuration = new Trend("ws_handshake_duration", true);
+const wsSessionDuration = new Trend("ws_session_duration", true);
 const wsMessages = new Counter("ws_messages_total");
 
 const thresholds = {
   ws_connect_errors: ["rate<0.15"],
   ws_message_errors: ["rate<0.25"],
-  ws_connect_duration: ["p(95)<3000"],
+  ws_handshake_duration: ["p(95)<2000"],
+  ws_session_duration: ["p(95)<10000"],
 };
 
 export const options = buildOptions(thresholds, [
@@ -63,7 +65,9 @@ export default function () {
       socket.close();
     }, 2500);
   });
-  wsConnectDuration.add(Date.now() - chatStart);
+  // k6 ws.connect exposes timing buckets; "connecting" represents handshake phase.
+  wsHandshakeDuration.add(chatRes?.timings?.connecting ?? 0);
+  wsSessionDuration.add(Date.now() - chatStart);
   const chatOk = check(chatRes, {
     "chat ws connect status 101": (r) => r && r.status === 101,
   });

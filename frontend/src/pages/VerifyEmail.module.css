@@ -99,12 +99,14 @@
 }
 
 .otpDigit {
-  width: 92px;
+  width: 220px;
   height: 54px;
   border: 2px solid var(--border);
   border-radius: 12px;
   font-size: 22px;
   font-weight: 700;
+  letter-spacing: 12px;
+  padding: 0 16px;
   text-align: center;
   color: var(--text-primary);
   background: var(--bg-secondary);

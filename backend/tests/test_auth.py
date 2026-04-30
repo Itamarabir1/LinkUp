@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from unittest.mock import AsyncMock, patch
 
 from app.core.exceptions.auth import InvalidCredentialsError
-from app.core.exceptions.user import EmailAlreadyRegisteredError
+from app.core.exceptions.user import EmailAlreadyRegisteredError, UserNotFoundError
 from app.domain.auth.schema import UserRegister
 from app.api.dependencies.services import get_auth_service
 
@@ -145,3 +145,50 @@ async def test_login_nonexistent_email_raises(db_session: AsyncSession):
             email="ghost@example.com",
             password="Test@1234!",
         )
+
+
+# ============================================================
+# Resend verification tests
+# ============================================================
+
+
+@pytest.mark.asyncio
+async def test_resend_verification_user_not_found(db_session: AsyncSession):
+    auth_svc = get_auth_service()
+    with pytest.raises(UserNotFoundError):
+        await auth_svc.initiate_email_verification(db=db_session, email="missing@example.com")
+
+
+@pytest.mark.asyncio
+async def test_resend_verification_already_verified(db_session: AsyncSession, registered_user):
+    auth_svc = get_auth_service()
+    registered_user.is_verified = True
+    db_session.add(registered_user)
+    await db_session.flush()
+
+    result = await auth_svc.initiate_email_verification(db=db_session, email=registered_user.email)
+    assert result == {"message": "Account already verified", "status": "success"}
+
+
+@pytest.mark.asyncio
+async def test_resend_verification_success(db_session: AsyncSession, registered_user):
+    auth_svc = get_auth_service()
+    registered_user.is_verified = False
+    db_session.add(registered_user)
+    await db_session.flush()
+
+    save_event_mock = AsyncMock()
+    with patch(
+        "app.domain.auth.verification_service.verification_service.create_verification_event",
+        new=AsyncMock(return_value="654321"),
+    ):
+        with patch.object(auth_svc.outbox_repo, "save_event", save_event_mock):
+            result = await auth_svc.initiate_email_verification(db=db_session, email=registered_user.email)
+
+    assert result == {"message": "Verification code sent to email", "status": "success"}
+    save_event_mock.assert_awaited_once()
+    outbox_event = save_event_mock.await_args.args[1]
+    assert outbox_event.event_name == "auth.email_verification"
+    assert outbox_event.payload["user_id"] == str(registered_user.user_id)
+    assert outbox_event.payload["data"]["email"] == registered_user.email
+    assert outbox_event.payload["data"]["code"] == "654321"

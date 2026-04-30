@@ -4,12 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import type { RegisterData } from '../context/AuthContext';
 import ErrorBanner from '../components/ErrorBanner';
 import LoadingButton from '../components/LoadingButton';
 import PhoneInput from '../components/PhoneInput/PhoneInput';
-import { getApiErrorMessage } from '../utils/apiError';
+import { getRegisterErrorMessage } from '../utils/apiError';
 import styles from './Register.module.css';
 
 const registerSchema = z
@@ -30,6 +31,7 @@ type RegisterForm = z.infer<typeof registerSchema>;
 export default function Register() {
   const { t } = useTranslation('auth');
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const { register: registerUser } = useAuth();
   const navigate = useNavigate();
   const {
@@ -59,7 +61,7 @@ export default function Register() {
       } as RegisterData);
       navigate('/verify-email', { replace: true, state: { email: form.email.trim() } });
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, t('error_register_failed')));
+      setError(getRegisterErrorMessage(err, t));
     }
   };
 
@@ -155,14 +157,24 @@ export default function Register() {
             <label className={styles.fieldLabel} htmlFor="reg-password">
               {t('password')}
             </label>
-            <input
-              id="reg-password"
-              type="password"
-              placeholder={t('passwordPlaceholder')}
-              {...register('password')}
-              className={styles.input}
-              autoComplete="new-password"
-            />
+            <div className={styles.passwordWrapper}>
+              <input
+                id="reg-password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder={t('passwordPlaceholder')}
+                {...register('password')}
+                className={`${styles.input} ${styles.passwordInput}`}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                className={styles.eyeBtn}
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             <span className={styles.fieldHint}>{t('passwordHint')}</span>
             {renderFieldError('password')}
           </div>

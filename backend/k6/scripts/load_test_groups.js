@@ -30,10 +30,26 @@ export const options = buildOptions(thresholds, [
   { duration: "30s", target: 0 },
 ]);
 
-export default function () {
+export function setup() {
   const owner = loginExisting(__ENV.USER_EMAIL, __ENV.USER_PASSWORD);
-  const member = loginExisting(__ENV.USER_EMAIL, __ENV.USER_PASSWORD);
-  if (!owner.ok || !member.ok) return;
+  const member = loginExisting(__ENV.USER_EMAIL_P1, __ENV.USER_PASSWORD_P1);
+  if (!owner.ok || !member.ok) {
+    throw new Error(`setup login failed: owner=${owner.ok} member=${member.ok}`);
+  }
+
+  return {
+    owner: {
+      authHeaders: owner.authHeaders,
+    },
+    member: {
+      authHeaders: member.authHeaders,
+    },
+  };
+}
+
+export default function (data) {
+  const owner = data.owner;
+  const member = data.member;
 
   const createRes = http.post(
     `${BASE_URL}/groups`,

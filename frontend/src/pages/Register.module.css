@@ -109,6 +109,28 @@
   font-weight: 300;
 }
 
+.passwordWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.passwordInput {
+  padding-inline-end: 42px;
+}
+
+.eyeBtn {
+  position: absolute;
+  inset-inline-end: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  padding: 0;
+}
+
 .button {
   width: 100%;
   height: 46px;

@@ -12,12 +12,16 @@ export function useUserEventStream({ enabled = true, onEvent }: UseUserEventStre
     buildUrl: (token) => WS_URLS.chat(token),
     enabled,
     onMessage: (ev) => {
-      try {
-        const parsed = UserEventSchema.safeParse(JSON.parse(String(ev.data)));
-        if (!parsed.success) return;
-        onEvent(parsed.data);
-      } catch {
-        /* ignore invalid messages from shared stream */
+      const chunks = String(ev.data).split('\n');
+      for (const line of chunks) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = UserEventSchema.safeParse(JSON.parse(line));
+          if (!parsed.success) continue;
+          onEvent(parsed.data);
+        } catch {
+          continue;
+        }
       }
     },
   });

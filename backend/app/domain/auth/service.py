@@ -179,25 +179,24 @@ class AuthService:
             raise UserNotFoundError(identifier=email)
 
         if user.is_verified:
-            return {"detail": "Account already verified"}
+            return {"message": "Account already verified", "status": "success"}
 
         # Store code in Redis under the same key verify_user_email uses (user_id + event_name)
         verification_code = await verification_service.create_verification_event(str(user.user_id), "email_verification")
 
-        # Same shape as outbox: consumer expects user_id + data with code/email
-        await self.rabbit.publish(
-            message={
-                "user_id": str(user.user_id),
-                "data": {
-                    "email": user.email,
-                    "code": verification_code,
-                    "user_name": getattr(user, "full_name", None) or "",
+        await self.outbox_repo.save_event(
+            db,
+            OutboxEvent(
+                event_name="auth.email_verification",
+                payload={
+                    "user_id": str(user.user_id),
+                    "data": {"code": verification_code, "email": user.email},
                 },
-            },
-            routing_key="auth.email_verification",
-            exchange_name="user",
+                targets=[DispatchTarget.RABBITMQ.value],
+            ),
         )
-        return {"detail": "Verification code sent to email"}
+        await db.commit()
+        return {"message": "Verification code sent to email", "status": "success"}
 
     async def authenticate_and_create_token(
         self,

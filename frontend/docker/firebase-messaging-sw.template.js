@@ -12,23 +12,12 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-self.addEventListener('push', (event) => {
-  const data = event.data?.json()?.data || {};
+messaging.onBackgroundMessage((payload) => {
+  const data = payload.data || {};
   const title = data.title || 'LinkUp';
   const body = data.body || '';
-  event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon: '/favicon.png',
-      silent: false,
-    })
-  );
-});
-
-messaging.onBackgroundMessage((payload) => {
-  const { title, body } = payload.notification || {};
-  self.registration.showNotification(title || 'LinkUp', {
-    body: body || '',
+  self.registration.showNotification(title, {
+    body,
     icon: '/favicon.png',
     silent: false,
     vibrate: [180, 80, 180],

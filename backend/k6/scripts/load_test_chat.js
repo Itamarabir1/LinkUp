@@ -31,10 +31,28 @@ export const options = buildOptions(thresholds, [
   { duration: "30s", target: 0 },
 ]);
 
-export default function () {
+export function setup() {
   const userA = loginExisting(__ENV.USER_EMAIL, __ENV.USER_PASSWORD);
-  const userB = loginExisting(__ENV.USER_EMAIL, __ENV.USER_PASSWORD);
-  if (!userA.ok || !userB.ok) return;
+  const userB = loginExisting(__ENV.USER_EMAIL_P1, __ENV.USER_PASSWORD_P1);
+  if (!userA.ok || !userB.ok) {
+    throw new Error(`setup login failed: userA=${userA.ok} userB=${userB.ok}`);
+  }
+
+  return {
+    userA: {
+      userId: userA.userId,
+      authHeaders: userA.authHeaders,
+    },
+    userB: {
+      userId: userB.userId,
+      authHeaders: userB.authHeaders,
+    },
+  };
+}
+
+export default function (data) {
+  const userA = data.userA;
+  const userB = data.userB;
 
   const convRes = http.post(
     `${BASE_URL}/chat/conversations`,
