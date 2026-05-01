@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { sendMessage } from '../../api/chat';
 import { useAuth } from '../../context/AuthContext';
-import { getApiErrorMessage } from '../../utils/apiError';
+import type { ChatListRow } from '../../types/chatList';
+import { getApiErrorMessage, isChatIdempotencyKeyMismatch } from '../../utils/apiError';
+import { applyInboundRealMessage, removePendingByClientId } from '../../utils/chatMessagesMerge';
+import { consumeOrCreateKey, resetOutboundKey } from '../../utils/outboundIdempotencyKey';
 import { apiErr } from '../../utils/i18nError';
 import { useConversationMessages } from './useConversationMessages';
 import { useChatWebSocket } from './useChatWebSocket';
@@ -52,6 +55,14 @@ export function useMessageThread(conversationIdOverride?: string) {
     partnerIdRef.current = partnerId;
   }, [partnerId]);
 
+  const chatSendIdempotencyKeyRef = useRef<string | null>(null);
+  const outboundPendingRef = useRef<{ client_message_id: string; body: string } | null>(null);
+
+  useEffect(() => {
+    resetOutboundKey(chatSendIdempotencyKeyRef);
+    outboundPendingRef.current = null;
+  }, [cid]);
+
   useEffect(() => {
     setPartnerTyping(false);
     setPartnerTypingName(null);
@@ -83,6 +94,7 @@ export function useMessageThread(conversationIdOverride?: string) {
     refreshUnread,
     partnerIdRef,
     setMessages,
+    outboundPendingRef,
     setPartnerTyping,
     setPartnerTypingName,
     setPartnerPresence,
@@ -97,26 +109,53 @@ export function useMessageThread(conversationIdOverride?: string) {
     async (e: React.FormEvent) => {
       e.preventDefault();
       const body = input.trim();
-      if (!body || !cid || sending || !recipientId) return;
+      if (!body || !cid || sending || !recipientId || !user?.user_id) return;
       setSending(true);
       setError('');
+      const client_message_id = crypto.randomUUID();
+      outboundPendingRef.current = { client_message_id, body };
+      const pendingRow: ChatListRow = {
+        kind: 'pending',
+        client_message_id,
+        conversation_id: cid,
+        sender_id: user.user_id,
+        body,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, pendingRow]);
+      setInput('');
       try {
-        const { data } = await sendMessage(cid, body);
-        setMessages((prev) => [...prev, data]);
-        setInput('');
+        localStorage.removeItem(`chat_draft_${cid}`);
+      } catch {
+        // ignore
+      }
+      try {
+        const key = consumeOrCreateKey(chatSendIdempotencyKeyRef);
+        const { data } = await sendMessage(cid, body, key);
+        resetOutboundKey(chatSendIdempotencyKeyRef);
+        setMessages((prev) =>
+          applyInboundRealMessage(prev, data, { dropPendingClientId: client_message_id })
+        );
+        outboundPendingRef.current = null;
+        sendTypingStop(recipientId);
+      } catch (err: unknown) {
+        if (isChatIdempotencyKeyMismatch(err)) {
+          resetOutboundKey(chatSendIdempotencyKeyRef);
+        }
+        setMessages((prev) => removePendingByClientId(prev, client_message_id));
+        outboundPendingRef.current = null;
+        setInput(body);
         try {
-          localStorage.removeItem(`chat_draft_${cid}`);
+          localStorage.setItem(`chat_draft_${cid}`, body);
         } catch {
           // ignore
         }
-        sendTypingStop(recipientId);
-      } catch (err: unknown) {
         setError(getApiErrorMessage(err, apiErr('err_send_message')));
       } finally {
         setSending(false);
       }
     },
-    [input, cid, sending, recipientId, setMessages, setError, sendTypingStop]
+    [input, cid, sending, recipientId, user?.user_id, setMessages, setError, sendTypingStop]
   );
 
   const onInputChange = useCallback(

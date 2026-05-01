@@ -25,6 +25,16 @@ export function getApiStatus(err: unknown): number | undefined {
   return (err as { response?: { status?: number } })?.response?.status;
 }
 
+/** POST chat Idempotency-Key reused with different body (FastAPI `detail.code`). */
+export function isChatIdempotencyKeyMismatch(err: unknown): boolean {
+  if (getApiStatus(err) !== 422) return false;
+  const detail = (
+    err as { response?: { data?: { detail?: unknown } } }
+  )?.response?.data?.detail;
+  if (detail === null || typeof detail !== 'object' || Array.isArray(detail)) return false;
+  return (detail as { code?: string }).code === 'idempotency_key_mismatch';
+}
+
 export function getApiErrorCode(err: unknown): string | undefined {
   const data = (err as { response?: { data?: { error_code?: string } } })?.response?.data;
   return typeof data?.error_code === 'string' ? data.error_code : undefined;

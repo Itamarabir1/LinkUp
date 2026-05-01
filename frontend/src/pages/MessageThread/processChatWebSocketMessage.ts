@@ -2,20 +2,28 @@ import type { MutableRefObject } from 'react';
 import { markConversationRead } from '../../api/chat';
 import type { PartnerPresence } from '../../api/presence';
 import type { MessageResponse } from '../../types/api';
+import type { ChatListRow } from '../../types/chatList';
 import { ChatMessageSchema, ChatPresenceEventSchema, MessageReadEventSchema } from '../../types/wsEvents';
+import { applyInboundRealMessage } from '../../utils/chatMessagesMerge';
 import { TYPING_DISPLAY_TIMEOUT_MS } from './messageThread.constants';
+
+export type OutboundPendingRef = MutableRefObject<{
+  client_message_id: string;
+  body: string;
+} | null>;
 
 export interface ChatWebSocketProcessContext {
   cid: string;
   userId: string | undefined;
   refreshUnread: () => void;
   partnerIdRef: MutableRefObject<string | undefined>;
-  setMessages: React.Dispatch<React.SetStateAction<MessageResponse[]>>;
+  setMessages: React.Dispatch<React.SetStateAction<ChatListRow[]>>;
   setPartnerTyping: React.Dispatch<React.SetStateAction<boolean>>;
   setPartnerTypingName: React.Dispatch<React.SetStateAction<string | null>>;
   setPartnerPresence: React.Dispatch<React.SetStateAction<PartnerPresence | null>>;
   typingHideTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
   setConversationRead: (readUpToId: number) => void;
+  outboundPendingRef: OutboundPendingRef;
 }
 
 /**
@@ -101,10 +109,21 @@ export function processChatWebSocketMessage(
     void markConversationRead(ctx.cid)
       .then(() => ctx.refreshUnread())
       .catch(() => {});
+
+    const isOwn = msg.sender_id === ctx.userId;
+    const pending = ctx.outboundPendingRef.current;
+    const dropPendingClientId =
+      isOwn && pending ? pending.client_message_id : null;
+
     ctx.setMessages((prev) => {
-      if (prev.some((existing) => existing.message_id === msg.message_id)) return prev;
-      return [...prev, msg];
+      const next = applyInboundRealMessage(prev, msg, { dropPendingClientId });
+      return next;
     });
+
+    if (isOwn && dropPendingClientId) {
+      ctx.outboundPendingRef.current = null;
+    }
+
     if (msg.sender_id !== ctx.userId) ctx.setPartnerTyping(false);
     return;
   }

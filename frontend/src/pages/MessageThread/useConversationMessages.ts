@@ -1,14 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getConversation, getMessages, markConversationRead } from '../../api/chat';
 import type { ConversationDetail, MessageResponse } from '../../types/api';
+import type { ChatListRow } from '../../types/chatList';
+import { isConfirmedRow, toConfirmedRows } from '../../types/chatList';
 import { useChat } from '../../context/ChatContext';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { apiErr } from '../../utils/i18nError';
+import { fetchMissedGap } from './fetchMissedGap';
+
+function confirmedMessages(rows: ChatListRow[]): MessageResponse[] {
+  return rows.filter(isConfirmedRow).map((r) => r.message);
+}
+
+/** Contiguous pending row(s) at the end of the list only (optimistic outbound). */
+function pendingTail(rows: ChatListRow[]): ChatListRow[] {
+  let start = rows.length;
+  for (let j = rows.length - 1; j >= 0; j--) {
+    if (rows[j].kind === 'pending') start = j;
+    else break;
+  }
+  return start === rows.length ? [] : rows.slice(start);
+}
+
+function mergeConfirmedWithTail(
+  mergedReals: MessageResponse[],
+  tail: ChatListRow[]
+): ChatListRow[] {
+  return [...toConfirmedRows(mergedReals), ...tail];
+}
 
 export function useConversationMessages(cid: string, userId: string | undefined) {
   const { refreshUnread } = useChat();
   const [conversation, setConversation] = useState<ConversationDetail | null>(null);
-  const [messages, setMessages] = useState<MessageResponse[]>([]);
+  const [messages, setMessages] = useState<ChatListRow[]>([]);
   const [messagesNextCursor, setMessagesNextCursor] = useState<string | null>(null);
   const [messagesHasMore, setMessagesHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -18,6 +42,7 @@ export function useConversationMessages(cid: string, userId: string | undefined)
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastMessageIdRef = useRef<number | null>(null);
   const isFetchingMissedRef = useRef(false);
+  const cidRef = useRef(cid);
 
   const fetchConversation = useCallback(async () => {
     if (!cid || !userId) return;
@@ -30,7 +55,7 @@ export function useConversationMessages(cid: string, userId: string | undefined)
       ]);
       setConversation(convRes.data);
       const paginated = msgRes.data;
-      setMessages(paginated?.items ?? []);
+      setMessages(toConfirmedRows(paginated?.items ?? []));
       setMessagesNextCursor(paginated?.next_cursor ?? null);
       setMessagesHasMore(paginated?.has_more ?? false);
     } catch (err: unknown) {
@@ -47,7 +72,7 @@ export function useConversationMessages(cid: string, userId: string | undefined)
       const msgRes = await getMessages(cid, { limit: 30, before: parseInt(messagesNextCursor, 10) });
       const paginated = msgRes.data;
       const older = paginated?.items ?? [];
-      setMessages((prev) => [...older, ...prev]);
+      setMessages((prev) => [...toConfirmedRows(older), ...prev]);
       setMessagesNextCursor(paginated?.next_cursor ?? null);
       setMessagesHasMore(paginated?.has_more ?? false);
     } catch (err: unknown) {
@@ -61,15 +86,21 @@ export function useConversationMessages(cid: string, userId: string | undefined)
     async (afterMessageId: number) => {
       if (!cid || isFetchingMissedRef.current) return;
       isFetchingMissedRef.current = true;
+      const startedCid = cid;
       try {
-        const res = await getMessages(cid, { after: afterMessageId, limit: 30 });
-        const newMsgs = res.data?.items ?? [];
+        const { messages: newMsgs } = await fetchMissedGap(cid, afterMessageId, {
+          shouldAbort: () => cidRef.current !== startedCid,
+        });
         if (newMsgs.length === 0) return;
         setMessages((prev) => {
-          const existingIds = new Set(prev.map((m) => m.message_id));
+          if (cidRef.current !== startedCid) return prev;
+          const tail = pendingTail(prev);
+          const reals = confirmedMessages(prev);
+          const existingIds = new Set(reals.map((m) => m.message_id));
           const toAdd = newMsgs.filter((m) => !existingIds.has(m.message_id));
           if (toAdd.length === 0) return prev;
-          return [...prev, ...toAdd].sort((a, b) => a.message_id - b.message_id);
+          const mergedReals = [...reals, ...toAdd].sort((a, b) => a.message_id - b.message_id);
+          return mergeConfirmedWithTail(mergedReals, tail);
         });
       } catch {
         // ignore reconnect backfill errors
@@ -79,6 +110,10 @@ export function useConversationMessages(cid: string, userId: string | undefined)
     },
     [cid]
   );
+
+  useEffect(() => {
+    cidRef.current = cid;
+  }, [cid]);
 
   useEffect(() => {
     fetchConversation();
@@ -96,8 +131,9 @@ export function useConversationMessages(cid: string, userId: string | undefined)
   }, [cid]);
 
   useEffect(() => {
-    const maxId = messages.reduce((max, m) => Math.max(max, m.message_id), 0);
-    lastMessageIdRef.current = maxId || null;
+    const reals = confirmedMessages(messages);
+    const maxId = reals.reduce((max, m) => Math.max(max, m.message_id), 0);
+    lastMessageIdRef.current = reals.length > 0 ? maxId : null;
   }, [messages]);
 
   useEffect(() => {

@@ -39,6 +39,7 @@ The same parser endpoint (`POST /api/v1/passenger/passengers/ai-parse-search`) i
 - **Rate limiting:** Redis-backed limiter on **`POST /api/v1/auth/register`** and other sensitive auth routes (see `app/api/dependencies/rate_limit.py`); window/size from `RATE_LIMIT_AUTH_*` in config.
 - **Username enumeration (OWASP):** `authenticate_and_create_token` raises the same **`InvalidCredentialsError`** (401) for unknown email and wrong password so clients cannot infer whether an account exists. Covered in `tests/test_auth.py` (with `DATABASE_URL`).
 - **Email / reset OTP:** `VerificationService` uses **`secrets`** for codes, **`hmac.compare_digest`** for comparison, Redis-backed **attempt counter** (brute-force guard), counter **reset** when a new OTP is issued — see `app/domain/auth/verification_service.py`.
+- **Chat message idempotency:** optional **`Idempotency-Key`** on **`POST …/chat/conversations/{conversation_id}/messages`** — דפוס מקביל ל־§19 עם מפתח `idempotency:chat_message:{user_id}:{key}` וקוד תחת **`app/domain/chat/message_idempotency.py`**. פירוט: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §25**.
 
 Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 
@@ -50,7 +51,7 @@ Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 
 **Error responses (JSON, `error_code`, `trace_id`, handlers):** [`docs/ERRORS.md`](../docs/ERRORS.md).
 
-**Health & Google Maps circuit breakers:** `GET /api/v1/health` runs DB, Redis, and RabbitMQ checks; response includes **`status`** (`healthy` if all three are `ok`, else `unhealthy` — **503** in that case) and informational **`circuit_breakers`** (`google_geocoding`, `google_directions`, `google_distance_matrix` — values `closed` / `open` / `half_open`). See [`../docs/architecture/API.md`](../docs/architecture/API.md#health) and [`../docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md) §20.
+**Health & circuit breakers (Google Maps + Brevo email):** `GET /api/v1/health` runs DB, Redis, and RabbitMQ checks; response includes **`status`** (`healthy` if all three are `ok`, else `unhealthy` — **503** in that case) and informational **`circuit_breakers`** (`google_geocoding`, `google_directions`, `google_distance_matrix`, `brevo_email` — values `closed` / `open` / `half_open`). See [`../docs/architecture/API.md`](../docs/architecture/API.md#health), [`../docs/architecture/NOTIFICATIONS.md`](../docs/architecture/NOTIFICATIONS.md), and [`../docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md) §20.
 
 **Logging (structured):** בפרודקשן `LOG_FORMAT=json` עם **structlog** (`JSONRenderer`); בפיתוח `LOG_FORMAT=text` עם `ConsoleRenderer` — ראו `app/core/logging.py` ו־`RequestIDMiddleware` ב־`app/main.py` (מקור אמת: `ARCHITECTURE.md` — Observability).
 

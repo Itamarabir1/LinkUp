@@ -1,12 +1,25 @@
 import type { FormEvent, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowRight, Send } from 'lucide-react';
+import { ArrowRight, Loader2, Send } from 'lucide-react';
 import ErrorBanner from '../../components/ErrorBanner';
 import { formatDateFull, formatTimeHm } from '../../utils/date';
 import { formatChatLastSeen } from './messageThread.utils';
+import type { ChatListRow } from '../../types/chatList';
 import type { MessageThreadViewModel } from './useMessageThread';
 import styles from './MessageThread.module.css';
+
+function rowCreatedAt(row: ChatListRow): string {
+  return row.kind === 'confirmed' ? row.message.created_at : row.created_at;
+}
+
+function rowSenderId(row: ChatListRow): string {
+  return row.kind === 'confirmed' ? row.message.sender_id : row.sender_id;
+}
+
+function rowBody(row: ChatListRow): string {
+  return row.kind === 'confirmed' ? row.message.body : row.body;
+}
 
 export interface MessageThreadPanelProps {
   vm: MessageThreadViewModel;
@@ -118,29 +131,56 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
         {messages.length === 0 ? (
           <p className={styles.emptyMessages}>{t('msg_empty_thread')}</p>
         ) : (
-          messages.reduce<ReactNode[]>((acc, m, i) => {
-            const isMe = m.sender_id === user?.user_id;
-            const msgIsRead = partnerReadUpToId !== null && m.message_id <= partnerReadUpToId;
-            const msgDay = new Date(m.created_at).toDateString();
-            const prevDay = i > 0 ? new Date(messages[i - 1].created_at).toDateString() : null;
+          messages.reduce<ReactNode[]>((acc, row, i) => {
+            const createdAt = rowCreatedAt(row);
+            const isMe = rowSenderId(row) === user?.user_id;
+            const isPending = row.kind === 'pending';
+            const msgIsRead =
+              row.kind === 'confirmed' &&
+              partnerReadUpToId !== null &&
+              row.message.message_id <= partnerReadUpToId;
+            const msgDay = new Date(createdAt).toDateString();
+            const prevDay =
+              i > 0 ? new Date(rowCreatedAt(messages[i - 1])).toDateString() : null;
 
             if (msgDay !== prevDay) {
               acc.push(
                 <div key={`day-${msgDay}-${i}`} className={styles.dayDivider}>
                   <div className={styles.dayLine} aria-hidden />
-                  <span className={styles.dayLabel}>{formatDateFull(m.created_at)}</span>
+                  <span className={styles.dayLabel}>{formatDateFull(createdAt)}</span>
                   <div className={styles.dayLine} aria-hidden />
                 </div>
               );
             }
 
+            const bubbleKey =
+              row.kind === 'confirmed' ? row.message.message_id : `pending-${row.client_message_id}`;
+            const bubbleClass = [
+              isMe ? styles.msgBubbleMe : styles.msgBubbleThem,
+              isPending ? styles.msgPending : '',
+            ]
+              .filter(Boolean)
+              .join(' ');
+
             acc.push(
-              <div key={m.message_id} className={isMe ? styles.msgBubbleMe : styles.msgBubbleThem}>
+              <div
+                key={bubbleKey}
+                className={bubbleClass}
+                aria-busy={isPending ? true : undefined}
+              >
                 <div className={styles.msgBody}>
-                  <div className={styles.msgText}>{m.body}</div>
+                  <div className={styles.msgText}>{rowBody(row)}</div>
                   <div className={styles.msgTime}>
-                    {formatTimeHm(m.created_at)}
-                    {isMe && (
+                    {formatTimeHm(createdAt)}
+                    {isMe && isPending ? (
+                      <Loader2
+                        className={styles.msgPendingSpinner}
+                        size={12}
+                        aria-hidden
+                        strokeWidth={2.5}
+                      />
+                    ) : null}
+                    {isMe && !isPending ? (
                       <span
                         className={styles.readReceipt}
                         aria-label={msgIsRead ? t('msg_read') : t('msg_sent')}
@@ -167,7 +207,7 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
                           />
                         </svg>
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </div>

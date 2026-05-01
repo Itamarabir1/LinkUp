@@ -300,10 +300,17 @@ async def get_messages(
 
 
 async def publish_read_receipt(db: AsyncSession, conversation_id: UUID, reader_id: UUID) -> None:
+    """
+    Broadcast read progress to Redis on chat:conversation:{id}.
+
+    Contract (1:1, chat-ws PublishChatMessage): include ``recipient_id`` — the WS
+    routing target (the other participant who should render ✓✓), same field as chat messages.
+    """
     try:
         conv = await chat_crud.get_conversation_by_id(db, conversation_id, reader_id)
         if not conv:
             return
+        partner_id = conv.user_id_2 if conv.user_id_1 == reader_id else conv.user_id_1
         reader_result = await db.execute(
             select(ConversationParticipant.last_read_message_id).where(
                 ConversationParticipant.conversation_id == conversation_id,
@@ -315,6 +322,7 @@ async def publish_read_receipt(db: AsyncSession, conversation_id: UUID, reader_i
             "type": "message_read",
             "conversation_id": str(conversation_id),
             "reader_id": str(reader_id),
+            "recipient_id": str(partner_id),
         }
         if read_up_to is not None:
             payload["read_up_to_message_id"] = read_up_to

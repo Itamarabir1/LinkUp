@@ -41,7 +41,7 @@ Legend:
 - `[~]` `stage-3b-passengers` - passenger requests/search/infinite/mutations + idempotency preservation
 - `[ ]` `stage-3b-uploads` - presigned upload flow migration + readiness polling query
 - `[~]` `stage-3b-createride` - migrate `useCreateRide` operation-token workflow to RQ mutations/signal
-- `[~]` `stage-3d-chat` - standalone high-risk chat migration (infinite + optimistic + WS cache sync)
+- `[~]` `stage-3d-chat` - standalone high-risk chat migration: **optimistic outbound send + `ChatListRow` + WS/REST reconciliation shipped** (`types/chatList`, `applyInboundRealMessage`); **remaining**: React Query for thread/popup/infinite scroll + broader “WS cache sync” if still desired
 - `[ ]` `stage-4-msw` - MSW server/handlers/rqRender + test setup integration
 - `[ ]` `stage-4-tests` - migrate targeted `useAISearch.test.ts` to MSW
 - `[ ]` `stage-5-cleanup` - dead-guard cleanup + docs/FUTURE_WORK + lint sweep
@@ -133,6 +133,7 @@ Remaining under `stage-3d-chat`:
 - WS event-to-cache synchronization strategy
 
 Additional progress (recently completed outside full-chat scope):
+- Chat **outbound REST**: stable **Idempotency-Key** lifecycle in `useMessageThread` / `useChatPopup` (shared helpers in `utils/outboundIdempotencyKey.ts`), **`appendMessageDedupById`** for list updates + WebSocket path (`utils/chatMessagesMerge.ts`), **`isChatIdempotencyKeyMismatch` on 422** (`utils/apiError.ts`); documented in `docs/ENGINEERING_HIGHLIGHTS.md`, `docs/architecture/API.md`, ADR Frontend §2 / Backend §25.
 - `useSearchRides` network edges migrated to React Query mutations (`search`, `load more`, `save alert`) while preserving AI/wizard/token-race behavior.
 - `useMyRequests` migrated to React Query (`qk.passengers.requests` + cancel/expire cache updates).
 - `AuthContext` initial mount effect dead-check fixed (cancellable async bootstrap pattern).

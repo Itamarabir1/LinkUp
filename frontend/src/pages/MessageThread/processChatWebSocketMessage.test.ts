@@ -3,6 +3,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { processChatWebSocketMessage } from './processChatWebSocketMessage';
 import type { ChatWebSocketProcessContext } from './processChatWebSocketMessage';
 import type { MessageResponse } from '../../types/api';
+import type { ChatListRow } from '../../types/chatList';
 import type { PartnerPresence } from '../../api/presence';
 import { TYPING_DISPLAY_TIMEOUT_MS } from './messageThread.constants';
 
@@ -24,6 +25,7 @@ function makeCtx(overrides: Partial<ChatWebSocketProcessContext> = {}): ChatWebS
     setPartnerPresence: vi.fn(),
     setConversationRead: vi.fn(),
     typingHideTimeoutRef: { current: null },
+    outboundPendingRef: { current: null },
     ...overrides,
   };
 }
@@ -92,7 +94,7 @@ describe('processChatWebSocketMessage', () => {
   });
 
   it('appends message and clears partner typing when sender is partner', () => {
-    const setMessages = vi.fn() as Dispatch<SetStateAction<MessageResponse[]>>;
+    const setMessages = vi.fn() as Dispatch<SetStateAction<ChatListRow[]>>;
     const ctx = makeCtx({ setMessages });
     const msg: MessageResponse = {
       message_id: 3,
@@ -104,9 +106,9 @@ describe('processChatWebSocketMessage', () => {
     processChatWebSocketMessage(msg as unknown as Record<string, unknown>, ctx);
     expect(setMessages).toHaveBeenCalled();
     const updater = (setMessages as ReturnType<typeof vi.fn>).mock.calls[0][0] as (
-      p: MessageResponse[]
-    ) => MessageResponse[];
-    expect(updater([])).toEqual([msg]);
+      p: ChatListRow[]
+    ) => ChatListRow[];
+    expect(updater([])).toEqual([{ kind: 'confirmed', message: msg }]);
     expect(ctx.setPartnerTyping).toHaveBeenCalledWith(false);
   });
 
@@ -200,7 +202,7 @@ describe('processChatWebSocketMessage', () => {
   });
 
   it('dedupes repeated message frames by message_id', () => {
-    const setMessages = vi.fn() as Dispatch<SetStateAction<MessageResponse[]>>;
+    const setMessages = vi.fn() as Dispatch<SetStateAction<ChatListRow[]>>;
     const ctx = makeCtx({ setMessages });
     const msg: MessageResponse = {
       message_id: 3,
@@ -211,9 +213,40 @@ describe('processChatWebSocketMessage', () => {
     };
     processChatWebSocketMessage(msg as unknown as Record<string, unknown>, ctx);
     const updater = (setMessages as ReturnType<typeof vi.fn>).mock.calls[0][0] as (
-      p: MessageResponse[]
-    ) => MessageResponse[];
-    expect(updater([msg])).toEqual([msg]);
+      p: ChatListRow[]
+    ) => ChatListRow[];
+    const prev: ChatListRow[] = [{ kind: 'confirmed', message: msg }];
+    expect(updater(prev)).toEqual(prev);
+  });
+
+  it('own message from WS drops matching pending and appends confirmed once', () => {
+    const outboundPendingRef = {
+      current: { client_message_id: 'cid-1', body: 'hello' },
+    } as MutableRefObject<{ client_message_id: string; body: string } | null>;
+    const setMessages = vi.fn() as Dispatch<SetStateAction<ChatListRow[]>>;
+    const ctx = makeCtx({ setMessages, outboundPendingRef, userId: 'u-me' });
+    const msg: MessageResponse = {
+      message_id: 3,
+      conversation_id: 'conv-1',
+      sender_id: 'u-me',
+      body: 'hello',
+      created_at: 't',
+    };
+    processChatWebSocketMessage(msg as unknown as Record<string, unknown>, ctx);
+    const updater = (setMessages as ReturnType<typeof vi.fn>).mock.calls[0][0] as (
+      p: ChatListRow[]
+    ) => ChatListRow[];
+    const prev: ChatListRow[] = [
+      { kind: 'pending', client_message_id: 'cid-1', conversation_id: 'conv-1', sender_id: 'u-me', body: 'hello', created_at: 't0' },
+    ];
+    expect(updater(prev)).toEqual([{ kind: 'confirmed', message: msg }]);
+    expect(outboundPendingRef.current).toBeNull();
+    processChatWebSocketMessage(msg as unknown as Record<string, unknown>, ctx);
+    const updater2 = (setMessages as ReturnType<typeof vi.fn>).mock.calls[1][0] as (
+      p: ChatListRow[]
+    ) => ChatListRow[];
+    const afterFirst = [{ kind: 'confirmed', message: msg }] as ChatListRow[];
+    expect(updater2(afterFirst)).toEqual(afterFirst);
   });
 
   it('ignores message_read for self or other conversation', () => {

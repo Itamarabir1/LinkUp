@@ -3,7 +3,7 @@
 מסמך **מקביל** ל-[ENGINEERING_HIGHLIGHTS.md](ENGINEERING_HIGHLIGHTS.md).  
 **HIGHLIGHTS** = "מה בניתי + איפה בקוד". **מסמך זה** = להצגה בראיון: בעיה, החלטה, חלופות, מחיר, משפט פתיחה קצר.
 
-> פירוט ADR מלא: [adr/ARCHITECTURE_DECISIONS_BACKEND.md](adr/ARCHITECTURE_DECISIONS_BACKEND.md) (§1–22) ו־[adr/ARCHITECTURE_DECISIONS_FRONTEND.md](adr/ARCHITECTURE_DECISIONS_FRONTEND.md), [adr/ARCHITECTURE_DECISIONS_CHAT_WS.md](adr/ARCHITECTURE_DECISIONS_CHAT_WS.md).
+> פירוט ADR מלא: [adr/ARCHITECTURE_DECISIONS_BACKEND.md](adr/ARCHITECTURE_DECISIONS_BACKEND.md) (§1–25) ו־[adr/ARCHITECTURE_DECISIONS_FRONTEND.md](adr/ARCHITECTURE_DECISIONS_FRONTEND.md), [adr/ARCHITECTURE_DECISIONS_CHAT_WS.md](adr/ARCHITECTURE_DECISIONS_CHAT_WS.md).
 
 ---
 
@@ -46,12 +46,38 @@
 | | |
 |--|--|
 | **בעיה** | הודעות 1:1 + typing + presence — צריך הרבה idle connections; לא רוצים לייבל את path ה-DB ב-Python. |
-| **החלטה** | **Go `chat-ws`**: WebSocket, JWT ב-handshake, מנוי ל-**Redis** (`chat:conversation:*`, notification/typing, `user:*:events`), fan-out. Python שומר הודעה + publish ל-Redis. |
+| **החלטה** | **Go `chat-ws`**: WebSocket, JWT ב-handshake, מנוי ל-**Redis** (`chat:conversation:*`, notification/typing, `user:*:events`), fan-out. Python שומר הודעה + publish ל-Redis. במסלול הנכנס: **`SetReadLimit(2048)`** על המסר; דילול **פרסום `typing_*` לרדיס** פר־חיבור עם **`x/time/rate`** (**`ping`** פטור). **מסגרות WS יוצאות** יכולות לאחות כמה JSONים עם newline — הפרונט מפצל לפני parse (**`useUserEventStream`**); **`message_read`** דורש **`recipient_id`** ב-payload כדי לנתב עדכוני read receipt חיים לשולח. |
 | **אלטרנטיבות** | (1) WebSocket ב-FastAPI בלבד — אפשרי אבל per-connection cost גבוה ב-Python. (2) SaaS (Pusher/Ably) — עלות+vendor. (3) רק long polling — גרוע ל-UX. |
 | **יתרון** | הפרדת "מסע real-time" משכבת REST/DB; גורוטינים זולים per connection. |
 | **Trade-off** | שני runtimes (Python + Go); אותו `SECRET_KEY` ל-WS. |
 | **Interview pitch (≈30s)** | *"צ'אט: FastAPI שומר ב-Postgres ומפרסם ל-Redis, chat-ws ב-Go מנוי ודוחף ללקוח. בחרתי Go כי אלפי חיבורים idle זולים שם ולא שולפים load על SQLAlchemy."* |
-| **הפניה** | [adr/ARCHITECTURE_DECISIONS_CHAT_WS.md](adr/ARCHITECTURE_DECISIONS_CHAT_WS.md), HIGHLIGHTS §4, [architecture/REALTIME.md](architecture/REALTIME.md) |
+| **הפניה** | [adr/ARCHITECTURE_DECISIONS_CHAT_WS.md](adr/ARCHITECTURE_DECISIONS_CHAT_WS.md) (כולל §7), HIGHLIGHTS §4 + Latest updates, [architecture/REALTIME.md](architecture/REALTIME.md), [chat-ws/README.md](../chat-ws/README.md) |
+
+---
+
+<a id="chat-thread-reconnect"></a>
+
+## Chat thread — REST backfill על `WS onOpen` (`after`)
+
+| | |
+|--|--|
+| **בעיה** | אם **`lastMessageIdRef`** היה **`null`** (שיחה בלי עדיין הודעות ב־state, או באג **`maxId \|\| null`**), הקוד הקודם **לא קרא** **`fetchMissedMessages`** בעליית החיבור — פער בשיחות בזמן ניתוק. בשלב מאוחר יותר: גם קריאה **בודדת** עם **`after`** ו־**`limit` 30** השאירה **זנב** שקט בהפסקות ארוכות (יותר מ־30 הודעות בפער). |
+| **החלטה** | **`onopen` תמיד** — **`fetchMissedMessages(lastMessageIdRef ?? 0)`**; עדכון ref — **`messages.length > 0 ? max(message_id) : null`**. ההשלמה בפועל עוברת דרך **`fetchMissedGap`** — עמוד ראשון עם **`after`**, המשך עם **`before=next_cursor`** כל עוד **`has_more`**, בהתאם לחוזה ב־[API messages](architecture/API.md) (זהה ל־pagination של גלילה לעבר הישן). |
+| **Trade-off** | הרבה יותר HTTP בפערים גדולים (עד **~50** עמודים × **`limit` 30**, עם **שני** ניסיונות חוזרים לכל עמוד); כפילויות נסגרות ע"י **`message_id`** ב־merge; אם הגענו למכסה או השיחה מתחלפת באמצע — חלק מהפער עלול להישאר (**`shouldAbort`** / **`cidRef`**). |
+| **הפניה** | [architecture/REALTIME.md](architecture/REALTIME.md), [ENGINEERING_HIGHLIGHTS.md](ENGINEERING_HIGHLIGHTS.md) (Latest updates), [`fetchMissedGap.ts`](../frontend/src/pages/MessageThread/fetchMissedGap.ts), [`fetchMissedGap.test.ts`](../frontend/src/pages/MessageThread/fetchMissedGap.test.ts), [`useChatWebSocket.ts`](../frontend/src/pages/MessageThread/useChatWebSocket.ts), [`useConversationMessages.ts`](../frontend/src/pages/MessageThread/useConversationMessages.ts) |
+
+---
+
+<a id="chat-optimistic-outbound"></a>
+
+## Chat — optimistic outbound UI (frontend)
+
+| | |
+|--|--|
+| **בעיה** | משתמש לוחץ Send ומחכה ל-REST — תחושת המתנה גם כשהרשת איטית; צריך גם ליישר עם WS שיכול להגיע לפני או אחרי תשובת השרת בלי כפילויות בבועות. |
+| **החלטה** | רשימת הודעות ב-UI היא **`ChatListRow[]`**: **`confirmed`** (עוטף **`MessageResponse`**) או **`pending`** עם **`client_message_id`** (UUID). בשליחה: append **pending**, ניקוי שדה הקלט; ב-success REST או פריים WS — **`applyInboundRealMessage`** מסיר את ה-pending המתואם ומזין **`appendMessageDedupById`**; בכשל REST — **`removePendingByClientId`** והחזרת טקסט. **`useMessageThread`**: **`outboundPendingRef`** + **`processChatWebSocketMessage`**; **`useChatPopup`**: אותו מיזוג ללא WS. מפתח אידמפוטנטיות: **`consumeOrCreateKey` / `resetOutboundKey`** ללא שינוי. |
+| **Trade-off** | שליחה בודדת בכל רגע (`sending`) — לא תור multi-flight; מודל pending לא נשמר ב-API (רק ב-state). |
+| **הפניה** | [`types/chatList.ts`](../frontend/src/types/chatList.ts), [`chatMessagesMerge.ts`](../frontend/src/utils/chatMessagesMerge.ts), [`useMessageThread.ts`](../frontend/src/pages/MessageThread/useMessageThread.ts), [`useChatPopup.ts`](../frontend/src/components/ChatPopup/useChatPopup.ts), **ADR Frontend §2**, [ENGINEERING_HIGHLIGHTS.md](ENGINEERING_HIGHLIGHTS.md) (Latest updates) |
 
 ---
 
@@ -251,6 +277,22 @@
 
 ---
 
+<a id="chat-message-idempotency"></a>
+
+## Idempotency-Key — `POST …/chat/conversations/{id}/messages`
+
+| | |
+|--|--|
+| **בעיה** | double tap / retry רשת → שתי הודעות DB לאותה כוונה בשיחה. |
+| **החלטה** | כותרת אופציונלית, מפתח Redis נפרד (`idempotency:chat_message:{user_id}:{key}`), fingerprint על `conversation_id` + תוכן; cache רק **201**; 409/`Retry-After` בזמן processing; **fail-open** בלי Redis — אותם עקרונות כמו §19. |
+| **אלטרנטיבות** | (1) idempotency רק ב-UI — לא אמין. (2) unique digest ב-DB — דורש schema + edge cases למחיקות. |
+| **יתרון** | אותו story כמו Stripe/e-commerce; `message_idempotency.py` + router דק בלי להזיז לוגיקת שמירה עמוקות. |
+| **Trade-off** | בלי Redis אין dedup. |
+| **Interview pitch (≈30s)** | *“החלפתי את אותה מסגרת Stripe-style מנסיעות לצ’אט: מפתח פר-משתמש, fingerprint על conversation+body, שומרים רק תשובת הצלחה.”* |
+| **הפניה** | ADR §25, Frontend ADR §2, HIGHLIGHTS (Latest updates + §7ה); [Chat — optimistic outbound UI](#chat-optimistic-outbound); [`frontend/src/api/chat.ts`](../frontend/src/api/chat.ts), [`types/chatList.ts`](../frontend/src/types/chatList.ts), [`useMessageThread.ts`](../frontend/src/pages/MessageThread/useMessageThread.ts), [`useChatPopup.ts`](../frontend/src/components/ChatPopup/useChatPopup.ts), [`chatMessagesMerge.ts`](../frontend/src/utils/chatMessagesMerge.ts) |
+
+---
+
 <a id="auth-session"></a>
 
 ## Auth: JWT + `jti` + denylist (logout)
@@ -269,17 +311,17 @@
 
 <a id="circuit-breaker"></a>
 
-## Circuit Breaker — Google Maps (באקאנד)
+## Circuit Breaker — Google Maps + Brevo email (באקאנד)
 
 | | |
 |--|--|
-| **בעיה** | Geocoding/Directions איטי או 429 → storm של requests חוסמים workers. |
-| **החלטה** | In-memory per-process circuit לכל API; OPEN = אין HTTP ל-Google; health מדווח `circuit_breakers` בלי לסמן את השרת unhealthy בגלל Google. |
+| **בעיה** | Geocoding/Directions איטי או 429 → storm של requests; Brevo down + Tenacity על ה-SDK → retries מציפים את הספק ואת ה-worker. |
+| **החלטה** | מחלקה משותפת **`CircuitBreaker`** עם `Gauge` מוזרק; **גיאו:** מעגל in-memory לכל API — OPEN = אין HTTP ל-Google; **מייל:** `brevo_email_cb` — OPEN = `EmailProviderCircuitOpenError` בלי קריאה ל-Brevo (Tenacity רק כשהמעגל מאפשר). health מדווח `circuit_breakers` (כולל `brevo_email`) בלי לסמן את השרת unhealthy. |
 | **אלטרנטיבות** | (1) Retry בלי cap — מחמיר. (2) rate limit בלבד. (3) sidecar (Envoy) — overkill. |
-| **יתרון** | fail-fast; מגן על CPU ו-external budget. |
+| **יתרון** | fail-fast; מגן על CPU ו-external budget; מדדי `geo_*` / `brevo_*` נפרדים. |
 | **Trade-off** | מעגל **לא** משותף בין instances — reset אחרי deploy. |
-| **Interview pitch (≈30s)** | *"לכל API של Google מעגל נפרד; אחרי סף כשלים נכנסים ל-OPEN — לא קוראים חיצונית, מחזירים שכבה ריקה. Health מציג מצב אבל status הכללי תלוי DB/Redis/Rabbit בלבד."* |
-| **הפניה** | ADR §20, HIGHLIGHTS §0א |
+| **Interview pitch (≈30s)** | *"מחלקה אחת, שני סוגי מדדים: גיאו — מעגל לכל API; Brevo — מעגל לפני ה-SDK. Health מציג מצב אבל status הכללי תלוי DB/Redis/Rabbit בלבד."* |
+| **הפניה** | ADR §20, HIGHLIGHTS §0א, `docs/architecture/NOTIFICATIONS.md` |
 
 ---
 

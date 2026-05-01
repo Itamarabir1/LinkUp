@@ -15,6 +15,7 @@
 - ✅ Presence / debounce לעדכון last-seen ב-DB:
   - `presence:{user_id}` TTL 60s
   - `debounce:last_seen:{user_id}` + `last_seen:hold:{user_id}`
+- ✅ **הגנה על פריימים נכנסים (hub):** **`conn.SetReadLimit(int64(maxMessageSize))`** עם **`maxMessageSize = 2048`** ב־[`internal/hub/conn.go`](internal/hub/conn.go) — מגבלה על גודל מסר WebSocket מהלקוח; חריגה סוגרת את החיבור בצד gorilla עם `ErrReadLimit`. **Rate limit פר־חיבור** (`golang.org/x/time/rate`, **`rate.Limit(30)`/`Burst 60`**) על פרסום **`typing_start`/`typing_stop`** ל־Redis בלבד — פריים שחורגים נזרקים בשקט; **`ping`** לא נספר ולא נחסם.
 
 **מה לא:**
 - ❌ Calendar export
@@ -64,6 +65,10 @@
 - ניתוח רץ ב-`ai-worker` אחרי `chat:completion:*`; התוצאה נשמרת ב-DB ונקראת דרך REST
 
 ## זרימה מומלצת
+
+### חוזה payloads על `chat:conversation:{id}` (מסירה נקודתית)
+
+כל פריים שמגיע ל־Go דרך `PublishChatMessage` (אחרי `PSubscribe` על `chat:conversation:*`) חייב לכלול **`recipient_id`**: מזהה המשתמש שאליו chat-ws מעביר את הפריים (`SendToUser`). זה נכון גם להודעת צ'אט וגם לאירוע `message_read` מה־backend — אחרת `RecipientID` ריק והפריים לא יגיע ללקוח.
 
 ### 1. שליחת הודעה
 ```

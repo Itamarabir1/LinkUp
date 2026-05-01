@@ -211,6 +211,11 @@ geo_circuit_breaker_state = Gauge(
     "Circuit breaker state: 0=closed, 1=half_open, 2=open",
     ["name"],
 )
+brevo_circuit_breaker_state = Gauge(
+    "brevo_circuit_breaker_state",
+    "Brevo email circuit breaker state: 0=closed, 1=half_open, 2=open",
+    ["name"],
+)
 
 # =============================================================================
 # S3

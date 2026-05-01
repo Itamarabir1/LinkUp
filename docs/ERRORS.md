@@ -58,6 +58,7 @@
 | REDIS_UNAVAILABLE | 503 | backend | Redis |
 | WORKER_TASK_FAILED | 500 | backend | משימות worker |
 | EXTERNAL_SERVICE_ERROR | 502 | backend | שירות חיצוני כללי |
+| EMAIL_CIRCUIT_OPEN | 503 | backend | מעגל circuit breaker לשליחת מייל Brevo ב־OPEN — **`EmailProviderCircuitOpenError`**; אין קריאה לספק עד התאוששות |
 | CHAT_ROOM_NOT_FOUND | 404 | backend | צ׳אט |
 | CHAT_UNAUTHORIZED_ACCESS | 403 | backend | צ׳אט |
 | CHAT_MESSAGE_SEND_FAILED | 500 | backend | צ׳אט |

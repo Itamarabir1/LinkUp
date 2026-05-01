@@ -42,7 +42,7 @@
 ## חלק ג׳ — Real-time: נסיעות, מיקום, צ’אט, התראות באפליקציה (2:30–4:00)
 
 **תגיד:**  
-“לצ’אט יש מסלול ייעודי: הודעה נשלחת ב-POST לבקאנד, נשמרת ב-DB, ומפורסמת ל-Redis; chat-ws מנוי על הערוץ ודוחף ל-WebSocket של המשתמשים בשיחה. יש typing, נראות, ו-debounce לעדכון last-seen בבקאנד.”
+“לצ’אט יש מסלול ייעודי: הודעה נשלחת ב-POST לבקאנד עם **Idempotency-Key** יציב מהפרונט לכל ניסיון שליחה, נשמרת ב-DB, ומפורסמת ל-Redis; chat-ws מנוי על הערוץ ודוחף ל-WebSocket של המשתמשים בשיחה — וב-UI מאחדים הודעות לפי **`message_id`** כדי שלא יכפיל replay. יש typing, נראות, ו-debounce לעדכון last-seen בבקאנד.”
 
 **תגיד:**  
 “מיקום בזמן אמת בנסיעה פעילה עובר ב-REST לבקאנד שמפרסם ל-Redis, והלקוחות מאזינים ב-WebSocket על שרת ה-FastAPI — ערוצים נפרדים לנהג ולנוסעים לפי התיעוד ב-REALTIME.”
@@ -145,7 +145,7 @@
 | +0:45–1:15 | **מיגרציות וסכימה** | Alembic כמקור שינויי סכימה; שירות **`migrate`** ב-Docker Compose לפני עליית ה-API; `db/schema.sql` כעזר. |
 | +1:00–1:45 | **פריסה מקומית מול K8s** | Compose: **db**, **redis**, **rabbitmq**, **`migrate`** (Job לפני API), **`email-renderer`**, **backend**, **outbox-worker**, **chat-ws**; `depends_on` + healthchecks; `UVICORN_WORKERS`. אז מעבר קצר ל־`k8s/` — מפת שירותים (כולל `k8s/email-renderer`), בלי לעבור כל מניפסט. |
 | +0:45–1:00 | **CI/CD** | **ארבעה** workflows ב־`.github/workflows/`: `backend-ci`, `frontend-ci`, `chat-ws-ci`, **`email-renderer-ci`** — lint/tests/build; ב־`main` דחיפת תמונות ל־GHCR (frontend ו־email-renderer). |
-| +1:15–2:00 | **chat-ws לעומק** | למה **Go** ל-WS; `PSubscribe` ל-Redis; אין DB בשרת — רק forward; JWT; `presence` + debounce; קריאת `last_seen` מ-REST הבקאנד. `chat-ws/../ARCHITECTURE.md`, `docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`. |
+| +1:15–2:00 | **chat-ws לעומק** | למה **Go** ל-WS; `PSubscribe` ל-Redis; אין DB בשרת — רק forward; JWT; `presence` + debounce; קריאת `last_seen` מ-REST הבקאנד; **הגבלות נכנסות:** **`SetReadLimit`**, דילול פרסום **typing**. `chat-ws/../ARCHITECTURE.md`, `docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md` (כולל §7). |
 | +1:00–1:30 | **ערוצי התראות** | הפרדה: צ’אט (`chat:notification:*` דרך chat-ws) מול פיד האפליקציה (`/api/v1/notifications/ws` על FastAPI); Outbox → RabbitMQ → **Brevo** / **FCM**; **למה FCM רק מפת `data`** — `docs/FCM_SYSTEM_SUMMARY.md`, `docs/adr/FCM_AND_PUSH.md`. |
 | +0:45–1:00 | **אבטחה מפורטת** | rate limit על auth; **מניעת user enumeration** בלוגין; `get_current_user_ws` בלי DB ב-connect — trade-off. |
 | +0:45–1:00 | **איכות ועומס** | pytest בבקאנד; Vitest בפרונט; **k6** — מה בודקים (auth, זרימות ליבה), בלי להריץ live בסרטון. `backend/k6/scripts/`, `docs/ENGINEERING_HIGHLIGHTS.md`. |

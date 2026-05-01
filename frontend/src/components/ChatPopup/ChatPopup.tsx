@@ -1,10 +1,23 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MapPin, Maximize2, X, Send } from 'lucide-react';
+import { Loader2, MapPin, Maximize2, Send, X } from 'lucide-react';
 import { formatDayMonthLong, formatTimeHm } from '../../utils/date';
 import ChatErrorBoundary from '../ChatErrorBoundary/ChatErrorBoundary';
+import type { ChatListRow } from '../../types/chatList';
 import { useChatPopup } from './useChatPopup';
 import styles from './ChatPopup.module.css';
+
+function rowCreatedAt(row: ChatListRow): string {
+  return row.kind === 'confirmed' ? row.message.created_at : row.created_at;
+}
+
+function rowSenderId(row: ChatListRow): string {
+  return row.kind === 'confirmed' ? row.message.sender_id : row.sender_id;
+}
+
+function rowBody(row: ChatListRow): string {
+  return row.kind === 'confirmed' ? row.message.body : row.body;
+}
 
 interface ChatPopupProps {
   conversationId: string;
@@ -103,12 +116,15 @@ function ChatPopupContent({ conversationId }: ChatPopupProps) {
         {messages.length === 0 ? (
           <p className={styles.emptyMsg}>{t('chat_popup_empty')}</p>
         ) : (
-          messages.reduce<ReactNode[]>((acc, m, i) => {
-            const isMe = m.sender_id === user?.user_id;
-            const msgDate = new Date(m.created_at).toDateString();
-            const prevDate = i > 0 ? new Date(messages[i - 1].created_at).toDateString() : null;
+          messages.reduce<ReactNode[]>((acc, row, i) => {
+            const createdAt = rowCreatedAt(row);
+            const isMe = rowSenderId(row) === user?.user_id;
+            const isPending = row.kind === 'pending';
+            const msgDate = new Date(createdAt).toDateString();
+            const prevDate =
+              i > 0 ? new Date(rowCreatedAt(messages[i - 1])).toDateString() : null;
             if (msgDate !== prevDate) {
-              const label = formatDayMonthLong(m.created_at);
+              const label = formatDayMonthLong(createdAt);
               acc.push(
                 <div key={`day-${msgDate}-${i}`} className={styles.dayDivider}>
                   <div className={styles.dayLine} aria-hidden />
@@ -117,10 +133,32 @@ function ChatPopupContent({ conversationId }: ChatPopupProps) {
                 </div>
               );
             }
+            const bubbleKey =
+              row.kind === 'confirmed' ? row.message.message_id : `pending-${row.client_message_id}`;
+            const bubbleClass = [
+              isMe ? styles.bubbleOut : styles.bubbleIn,
+              isPending ? styles.bubblePending : '',
+            ]
+              .filter(Boolean)
+              .join(' ');
             acc.push(
-              <div key={m.message_id} className={isMe ? styles.bubbleOut : styles.bubbleIn}>
-                <div className={styles.bubbleText}>{m.body}</div>
-                <div className={styles.bubbleTime}>{formatTimeHm(m.created_at)}</div>
+              <div
+                key={bubbleKey}
+                className={bubbleClass}
+                aria-busy={isPending ? true : undefined}
+              >
+                <div className={styles.bubbleText}>{rowBody(row)}</div>
+                <div className={styles.bubbleTime}>
+                  {formatTimeHm(createdAt)}
+                  {isMe && isPending ? (
+                    <Loader2
+                      className={styles.bubblePendingSpinner}
+                      size={12}
+                      aria-hidden
+                      strokeWidth={2.5}
+                    />
+                  ) : null}
+                </div>
               </div>
             );
             return acc;

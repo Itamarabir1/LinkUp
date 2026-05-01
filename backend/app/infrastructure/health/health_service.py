@@ -56,11 +56,13 @@ async def check_readiness() -> dict[str, Any]:
             google_distance_matrix_cb,
             google_geocoding_cb,
         )
+        from app.infrastructure.notifications.circuit_breaker import brevo_email_cb
 
         results["circuit_breakers"] = {
             "google_geocoding": google_geocoding_cb.state_name,
             "google_directions": google_directions_cb.state_name,
             "google_distance_matrix": google_distance_matrix_cb.state_name,
+            "brevo_email": brevo_email_cb.state_name,
         }
     except Exception as e:
         logger.warning("Could not load circuit breaker state: %s", e)

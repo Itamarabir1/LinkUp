@@ -39,8 +39,8 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| שרת WS ייעודי ב-Go | [`chat-ws/`](../../chat-ws/) — `go.mod`, Dockerfile, לוגיקת subscribe/publish. |
-| Redis Pub/Sub לצ’אט | ה-API שומר הודעה ומפרסם לערוץ; `chat-ws` נרשם — פירוט זרימה ב-[`docs/architecture/REALTIME.md`](../architecture/REALTIME.md), ADR ב-[`docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`](../adr/ARCHITECTURE_DECISIONS_CHAT_WS.md). |
+| שרת WS ייעודי ב-Go | [`chat-ws/`](../../chat-ws/) — `go.mod`, Dockerfile, subscribe/publish; ה־hub: **`SetReadLimit(2048)`**, **`x/time/rate`** על פרסום **typing בלבד** (§7 ב-ADR). |
+| Redis Pub/Sub לצ’אט | ה-API שומר הודעה ומפרסם לערוץ; `chat-ws` נרשם — פירוט זרימה ב-[`docs/architecture/REALTIME.md`](../architecture/REALTIME.md), ADR ב-[`docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`](../adr/ARCHITECTURE_DECISIONS_CHAT_WS.md) (§7 inbound). |
 | הפרדת DB Redis | DB **0** (cache, broadcast rides, rate limit וכו’) מול DB **1** (צ’אט + `user:{id}:events`) — [`docker-compose.yml`](../../docker-compose.yml), [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md) §2. |
 
 ---
@@ -87,7 +87,7 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| Cache, rate limit, pub/sub, denylist, idempotency | שימושים: geocode cache, ride preview, OTP, auth rate limit, **JWT denylist (`denylist:{jti}`)**, **Idempotency-Key** ל־**`request-ride-from-search`** (`SET NX`, fingerprint), broadcast, צ’אט — מסוכמים ב-ADR §18–**§19** ובהיילייטס §2–3, **§7ד**, **§7ה**. |
+| Cache, rate limit, pub/sub, denylist, idempotency | שימושים: geocode cache, ride preview, OTP, auth rate limit, **JWT denylist (`denylist:{jti}`)**, **Idempotency-Key** ל־**`request-ride-from-search`** ול־**POST הודעת צ’אט** (`SET NX`, fingerprint), broadcast, צ’אט — מסוכמים ב-ADR §18–**§19**, **§25**, Frontend ADR §2, ובהיילייטס §2–3, **§7ד**, **§7ה**. **פרונט:** **`useJoinRide`** (ref); **`useMessageThread`** / **`useChatPopup`** + **`ChatListRow`** + **`applyInboundRealMessage`** / **`appendMessageDedupById`**. |
 
 ---
 
@@ -177,12 +177,12 @@
 
 ---
 
-## 19. Google Maps Platform (backend) + Circuit Breaker
+## 19. Google Maps Platform (backend) + Circuit Breaker (Maps + Brevo)
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| הגנה על תלות חיצונית (Maps APIs) | שלושה **singletons** ב־[`backend/app/infrastructure/geo/circuit_breaker.py`](../../backend/app/infrastructure/geo/circuit_breaker.py); אינטגרציה ב־[`geocoding.py`](../../backend/app/infrastructure/geo/geocoding.py) ו־[`client.py`](../../backend/app/infrastructure/geo/client.py). |
-| ניטור | מצב מעגלים ב־**`GET /api/v1/health`** תחת **`circuit_breakers`** — [`docs/architecture/API.md`](../architecture/API.md#health), ADR [**§20**](../adr/ARCHITECTURE_DECISIONS_BACKEND.md), [`ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md) (Latest architecture updates). |
+| הגנה על תלות חיצונית (Maps + Brevo) | מחלקה משותפת [`backend/app/infrastructure/circuit_breaker.py`](../../backend/app/infrastructure/circuit_breaker.py); **גיאו:** singletons ב־[`geo/circuit_breaker.py`](../../backend/app/infrastructure/geo/circuit_breaker.py) + שימוש ב־[`geocoding.py`](../../backend/app/infrastructure/geo/geocoding.py) / [`client.py`](../../backend/app/infrastructure/geo/client.py). **מייל:** [`notifications/circuit_breaker.py`](../../backend/app/infrastructure/notifications/circuit_breaker.py) + [`email/client.py`](../../backend/app/domain/notifications/channels/email/client.py). |
+| ניטור | מצב מעגלים ב־**`GET /api/v1/health`** תחת **`circuit_breakers`** (כולל **`brevo_email`**) — מדדי `geo_circuit_breaker_state` / `brevo_circuit_breaker_state` — [`docs/architecture/API.md`](../architecture/API.md#health), [`docs/operations/MONITORING.md`](../operations/MONITORING.md), ADR [**§20**](../adr/ARCHITECTURE_DECISIONS_BACKEND.md), [`ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md). |
 
 ---
 
@@ -191,7 +191,7 @@
 | נושא | מסמך |
 |------|------|
 | סיפור “מה בנינו” + דגשים | [`ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md) |
-| החלטות backend/worker | [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md) (כולל **§20** — Circuit Breaker ל-Google Maps) |
+| החלטות backend/worker | [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md) (כולל **§20** — Circuit Breaker: Maps + Brevo) |
 | WS מתי ולמה | [`docs/adr/WEBSOCKETS.md`](../adr/WEBSOCKETS.md) |
 | FCM | [`docs/adr/FCM_AND_PUSH.md`](../adr/FCM_AND_PUSH.md) |
 | סקירה כללית | [`ARCHITECTURE.md`](../ARCHITECTURE.md) |

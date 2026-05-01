@@ -25,8 +25,13 @@ export function getMessages(conversationId: string, params?: { limit?: number; b
   return api.get<PaginatedMessagesResponse>(`/chat/conversations/${conversationId}/messages`, { params });
 }
 
-export function sendMessage(conversationId: string, body: string) {
-  return api.post<MessageResponse>(`/chat/conversations/${conversationId}/messages`, { body });
+export function sendMessage(conversationId: string, body: string, idempotencyKey?: string) {
+  const key = idempotencyKey ?? crypto.randomUUID();
+  return api.post<MessageResponse>(`/chat/conversations/${conversationId}/messages`, { body }, {
+    headers: {
+      'Idempotency-Key': key,
+    },
+  });
 }
 
 export function markConversationRead(conversationId: string) {

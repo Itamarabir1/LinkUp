@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"golang.org/x/time/rate"
 
 	"linkup/chat-ws/internal/api"
 	"linkup/chat-ws/internal/auth"
@@ -69,6 +70,8 @@ func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
 			slog.Error("ws upgrade failed", "component", "hub", "op", "Upgrade", "error_code", "WS_UPGRADE_FAILED", "err", err)
 			return
 		}
+		conn.SetReadLimit(int64(maxMessageSize))
+		typingLimiter := rate.NewLimiter(rate.Limit(30), 60)
 		c := &Conn{UserID: userID, Conn: conn, Send: make(chan []byte, 256)}
 		h.Register(userID, c)
 		h.SetPresence(context.Background(), userID)
@@ -113,6 +116,9 @@ func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
 				continue
 			}
 			if in.Type == "typing_start" && in.ConversationID != "" && in.RecipientID != "" {
+				if !typingLimiter.Allow() {
+					continue
+				}
 				payload := TypingPayload{
 					Type:           "typing_start",
 					UserID:         userID,
@@ -129,6 +135,9 @@ func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
 				h.PublishTyping(context.Background(), in.ConversationID, body)
 			}
 			if in.Type == "typing_stop" && in.ConversationID != "" && in.RecipientID != "" {
+				if !typingLimiter.Allow() {
+					continue
+				}
 				payload := TypingPayload{
 					Type:           "typing_stop",
 					UserID:         userID,

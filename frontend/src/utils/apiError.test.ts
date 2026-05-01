@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { getApiErrorMessage, isTimeoutOrAbortError } from './apiError';
+import {
+  getApiErrorMessage,
+  isChatIdempotencyKeyMismatch,
+  isTimeoutOrAbortError,
+} from './apiError';
 
 function axiosLike(detail: unknown, message?: unknown) {
   return { response: { data: message !== undefined ? { message, detail } : { detail } } };
@@ -36,6 +40,34 @@ describe('getApiErrorMessage', () => {
   it('stringifies object detail', () => {
     const err = axiosLike({ code: 'X' });
     expect(getApiErrorMessage(err, 'fallback')).toBe(JSON.stringify({ code: 'X' }));
+  });
+});
+
+describe('isChatIdempotencyKeyMismatch', () => {
+  it('returns true when 422 detail.code is idempotency_key_mismatch', () => {
+    expect(
+      isChatIdempotencyKeyMismatch({
+        response: {
+          status: 422,
+          data: {
+            detail: { code: 'idempotency_key_mismatch', message: 'reuse' },
+          },
+        },
+      })
+    ).toBe(true);
+  });
+
+  it('returns false otherwise', () => {
+    expect(
+      isChatIdempotencyKeyMismatch({
+        response: { status: 422, data: { detail: { code: 'other' } } },
+      })
+    ).toBe(false);
+    expect(
+      isChatIdempotencyKeyMismatch({
+        response: { status: 409 },
+      })
+    ).toBe(false);
   });
 });
 

@@ -3,7 +3,7 @@
 מסמך זה הוא snapshot תיעודי (לא מקור אמת מחייב לקובץ-לקובץ), ועלול לפגר אחרי שינויים בריפו.  
 למצב עדכני בזמן אמת עדיף להסתמך על העץ בפועל (`git ls-files` / IDE) ועל מסמכי ארכיטקטורה בשורש (`README.md`, `ARCHITECTURE.md`).
 
-**עדכונים אחרונים בתיעוד:** **פיצול SRP ב־bookings:** קריאות צבירה ב־**`booking_reads_service.py`** (`BookingReadsService`), שידור GPS ב־**`location_service.py`** (`BookingLocationService`), מחזור חיים ב־**`service.py`** (`BookingService`) + ייצוא לאחור; עזרי **Idempotency-Key** ל־join מחיפוש ב־**`ride_join_idempotency.py`**; בפרונט הוק **`useJoinRide.ts`** לצד **`useSearchRides.ts`**. **Circuit Breaker** לקריאות Google Maps (**`backend/app/infrastructure/geo/circuit_breaker.py`**) + **`circuit_breakers`** ב־**`GET /api/v1/health`** — `docs/ENGINEERING_HIGHLIGHTS.md`, `docs/architecture/API.md`, `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §20; **`Idempotency-Key`** — `ARCHITECTURE.md`, `docs/architecture/API.md`, ADR §19, `docs/ENGINEERING_HIGHLIGHTS.md` §7ה; **JWT denylist** — ADR §18; שירות **`email-renderer/`**, **`frontend/src/i18n/`**, **`date.ts`**, **`i18nError.ts`**, פונטים ב־CSS Modules; **`EVENTS.md`** — `ride.created` לעומת `ride.created_for_passengers`; ADR §17. עץ התיקיות המפורט למטה עלול עדיין להציג קבצים שהוסרו או הוזזו — השוו לריפו.
+**עדכונים אחרונים בתיעוד:** **פיצול SRP ב־bookings:** קריאות צבירה ב־**`booking_reads_service.py`** (`BookingReadsService`), שידור GPS ב־**`location_service.py`** (`BookingLocationService`), מחזור חיים ב־**`service.py`** (`BookingService`) + ייצוא לאחור; עזרי **Idempotency-Key** ל־join מחיפוש ב־**`ride_join_idempotency.py`** ולצ’אט ב־**`backend/app/domain/chat/message_idempotency.py`** (ADR §25); בפרונט הוק **`useJoinRide.ts`** לצד **`useSearchRides.ts`**. **Circuit Breaker:** מחלקה משותפת **`backend/app/infrastructure/circuit_breaker.py`**; singletons גיאו ב־**`geo/circuit_breaker.py`**; **`brevo_email_cb`** ב־**`backend/app/infrastructure/notifications/circuit_breaker.py`**; מדדי **`geo_circuit_breaker_state`** / **`brevo_circuit_breaker_state`**; **`circuit_breakers`** ב־**`GET /api/v1/health`** — `docs/ENGINEERING_HIGHLIGHTS.md`, `docs/architecture/API.md`, `docs/architecture/NOTIFICATIONS.md`, `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §20; **`Idempotency-Key`** — `ARCHITECTURE.md`, `docs/architecture/API.md`, ADR §19 (נסיעות) + §25 (צ’אט), `docs/ENGINEERING_HIGHLIGHTS.md` §7ה; **JWT denylist** — ADR §18; שירות **`email-renderer/`**, **`frontend/src/i18n/`**, **`date.ts`**, **`i18nError.ts`**, פונטים ב־CSS Modules; **`EVENTS.md`** — `ride.created` לעומת `ride.created_for_passengers`; ADR §17. עץ התיקיות המפורט למטה עלול עדיין להציג קבצים שהוסרו או הוזזו — השוו לריפו.
 
 ---
 
@@ -60,7 +60,12 @@ backend/
 ├── .dockerignore
 ├── requirements.txt
 ├── README.md
-├── load_test.js                   # Grafana k6 — עומס register/login (ראו backend/README.md)
+├── load_test.js                   # Grafana k6 — wrapper ל-auth (מפנה ל־k6/scripts)
+├── load_test_rides.js             # wrapper ל-rides k6
+├── k6/
+│   ├── README.md
+│   ├── scripts/                   # load_test_auth.js, rides, users, groups, chat, geo, ws
+│   └── results/                   # פלטי ריצה (אופציונלי)
 ├── run-backend.bat
 ├── run-backend.sh
 ├── alembic/

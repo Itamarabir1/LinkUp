@@ -63,6 +63,7 @@ from .group import (
 # Infrastructure
 from .infrastructure import (
     CacheConnectionError,
+    EmailProviderCircuitOpenError,
     ExternalServiceError,
     GeocodingError,
     InfrastructureError,
@@ -134,6 +135,7 @@ __all__ = [
     "ChatRoomNotFound",
     "ContextBuilderError",
     "EmailAlreadyRegisteredError",
+    "EmailProviderCircuitOpenError",
     "ExternalServiceError",
     "FileTooLargeError",
     "ForbiddenRideActionError",

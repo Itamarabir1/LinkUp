@@ -277,6 +277,22 @@
   transition: stroke 0.5s ease, filter 0.5s ease;
 }
 
+.msgPending {
+  opacity: 0.88;
+}
+
+.msgPendingSpinner {
+  display: inline-block;
+  vertical-align: middle;
+  margin-inline-start: 4px;
+  animation: msgPendingSpin 0.75s linear infinite;
+}
+
+@keyframes msgPendingSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Typing indicator */
 .typingBubble {
   align-self: flex-end;

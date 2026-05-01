@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import type { MessageResponse } from '../../types/api';
+import type { ChatListRow } from '../../types/chatList';
 import { STORAGE_KEYS } from '../../config/constants';
 import { getChatWebSocketUrl } from '../../config/env';
 import type { PartnerPresence } from '../../api/presence';
@@ -15,7 +15,8 @@ export function useChatWebSocket(options: {
   userFullName: string | undefined;
   refreshUnread: () => void;
   partnerIdRef: React.MutableRefObject<string | undefined>;
-  setMessages: React.Dispatch<React.SetStateAction<MessageResponse[]>>;
+  setMessages: React.Dispatch<React.SetStateAction<ChatListRow[]>>;
+  outboundPendingRef: React.MutableRefObject<{ client_message_id: string; body: string } | null>;
   setPartnerTyping: React.Dispatch<React.SetStateAction<boolean>>;
   setPartnerTypingName: React.Dispatch<React.SetStateAction<string | null>>;
   setPartnerPresence: React.Dispatch<React.SetStateAction<PartnerPresence | null>>;
@@ -30,6 +31,7 @@ export function useChatWebSocket(options: {
     refreshUnread,
     partnerIdRef,
     setMessages,
+    outboundPendingRef,
     setPartnerTyping,
     setPartnerTypingName,
     setPartnerPresence,
@@ -84,9 +86,7 @@ export function useChatWebSocket(options: {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        if (lastMessageIdRef.current !== null) {
-          void fetchMissedMessages(lastMessageIdRef.current);
-        }
+        void fetchMissedMessages(lastMessageIdRef.current ?? 0);
       };
 
       ws.onmessage = (event) => {
@@ -110,6 +110,7 @@ export function useChatWebSocket(options: {
             setPartnerPresence,
             typingHideTimeoutRef,
             setConversationRead,
+            outboundPendingRef,
           });
         }
       };
@@ -153,6 +154,7 @@ export function useChatWebSocket(options: {
     lastMessageIdRef,
     fetchMissedMessages,
     setConversationRead,
+    outboundPendingRef,
   ]);
 
   const sendTypingIfNeeded = useCallback(

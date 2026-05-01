@@ -59,6 +59,9 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ## חיבור מהקליינט
 
+- **Inbound hardening (`internal/hub/handler.go` + `conn.go`):** אחרי `Upgrade` נקרא **`conn.SetReadLimit(int64(maxMessageSize))`** כאשר **`maxMessageSize = 2048`** ב־**`internal/hub/conn.go`** — פריים טקסט גדולים מהמכסה נחסמים (אבטחה/משאבים). **פריימי `typing_start`/`typing_stop`** עוברים **rate limit פר־חיבור** (`golang.org/x/time/rate`, ~30 פרסומות לשנייה, burst 60) לפני `PublishTyping` ל־Redis; חריגה — drop שקט. **`ping`** (עם `RefreshPresence`) **לא** מוגבל בקצב מתוך הלוגיקה הזו.
+- **מסגרות יוצאות (batching):** לפעמים מספר JSONים נארזים למחרוזת WebSocket אחת **מופרדת ב-newline**. בפרונט — **`useUserEventStream`** (וערוצים רלוונטיים) מפרקים עם **`split('\\n')`** לפני `JSON.parse`; אחרת אירועי `user:*:events` עלולים “להיעלם” כשמשורבים עם payload אחר מאותה כתיבה.
+- **`message_read`:** ה-payload שמפרסם ה-backend ל-Redis צריך לכלול **`recipient_id`** כדי ש-chat-ws ידע למי לדחוף עדכון קריאה (ראו גם **`chat-ws/ARCHITECTURE.md`**).
 - **WebSocket (פיתוח):** `ws://localhost:8081/ws?token=ACCESS_TOKEN` — תואם ל־`getChatWebSocketUrl` ב־`frontend/src/config/env.ts` ב־DEV.
 - **פרודקשן (דפדפן):** אותו host כמו האתר, נתיב `/ws` (דרך Nginx). ה־token הוא ה־Access Token מה־login (JWT). אותו SECRET_KEY ב־Python וב־Go.
 

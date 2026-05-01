@@ -69,6 +69,18 @@
 
 ---
 
+## 7. פריימים נכנסים — גודל מקסימלי ו־rate limiting לטייפינג
+
+| | |
+|--|--|
+| **בעיה** | ללא `SetReadLimit`, לקוח יכול לשלוח מסרים WebSocket גדולים מאוד ולהעמיס זיכרון/CPU על `json.Unmarshal`; ללא מגבלה על פרסום typing, מתקף יכול לייצר אלפי `PublishTyping` לשנייה ל־Redis. |
+| **החלטה** | אחרי **`Upgrade`**: **`conn.SetReadLimit(int64(maxMessageSize))`** עם **`maxMessageSize = 2048`** בתוך החבילה `hub` (מספיק לפלטפת JSON של typing + UUIDs לפי הגבלות שם בסכימת משתמש). **Limiter נפרד לכל חיבור** דרך **`golang.org/x/time/rate`**: **`NewLimiter(rate.Limit(30), 60)`** — רק נתיבים שמפרסמים **`typing_start`/`typing_stop`** בודקים **`Allow()`** לפני `Marshal`/`PublishTyping`. **`ping`** נשאר מחוץ ללימיטר. בעת חריגה מקצב הטייפינג — **drop שקט** (אין סגירת WS, אין תגובת שגיאה לפריים). |
+| **Trade-off** | פרסומות typing בשיא קיצוני עשויות להישמט; גודל 2048 בייט משאיר פריים typing לגיטימיים מתחת הגג. |
+| **בקצרה לראיון** | "ב־hub הוגבל גודל מסר מהלקוח, ומהדקתי פרסום typing לרדיס פר־חיבור — בלי לפגוע ב-ping של presence." |
+| **קוד** | [`handler.go`](../../chat-ws/internal/hub/handler.go), [`conn.go`](../../chat-ws/internal/hub/conn.go) |
+
+---
+
 ## קישורים
 
 - [../../README.md](../../README.md) — Architecture Decisions  

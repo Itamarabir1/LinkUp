@@ -3,7 +3,7 @@
 **שם הקובץ:** `docs/ENGINEERING_HIGHLIGHTS.md` (בשורש הפרויקט, תחת `docs/`).
 
 מסמך זה אוסף **במקום אחד** את הפיצ’רים, הטכנולוגיות, הדפוסים וההחלטות שמיועדות ל**סקייל, אמינות ותחזוקה** — כדי להציג את הפרויקט ברמת מומחה.  
-*זה סיכום “להצגה”, לא מיפוי כל שורה בקוד; אחרי סקירה מול ה-repo הוכנסו גם workers, AI, FCM, Brevo, Google, **חיזוק auth ועומס מקבילי**, **JWT עם `jti` + denylist ב-Redis אחרי logout**, **Idempotency-Key לבקשת הצטרפות מחיפוש (Redis, Stripe-style)**, **Circuit Breaker in-memory לכל קריאת Google Maps Platform בבקאנד (Geocoding / Directions / Distance Matrix) + חשיפת מצב המעגלים ב־`GET /api/v1/health`**, **k6**, **ריפקטור async משמעותי ב-passengers/bookings/rides**, **ריפקטור ארגון בפרונט**, **מסך אדמין פנימי (React + `/api/v1/admin`)**, **מעבר ארכיטקטוני ל-React Email renderer (Node.js/Express)**, **מדיה: S3 + CloudFront (אופציונלי) ואווטארים ב-prefix גרסתי immutable**, ו**i18n (עברית/אנגלית) + פורמט תאריכים לפי לוקאל + fallbacks לשגיאות API דרך `common:err_*` + איחוד פונטים ב־CSS Modules**.*
+*זה סיכום “להצגה”, לא מיפוי כל שורה בקוד; אחרי סקירה מול ה-repo הוכנסו גם workers, AI, FCM, Brevo, Google, **חיזוק auth ועומס מקבילי**, **JWT עם `jti` + denylist ב-Redis אחרי logout**, **Idempotency-Key לבקשת הצטרפות מחיפוש ובשליחת הודעת צ’אט (Redis, Stripe-style; בפרונט מפתח יציב ב-ref + מיזוג `message_id` מול WS + UI אופטימי לשליחה עם `ChatListRow` / `applyInboundRealMessage`)**, **Circuit Breaker in-memory משותף (`app/infrastructure/circuit_breaker.py`) — מעגלים נפרדים ל-Google Maps Platform (Geocoding / Directions / Distance Matrix) ולשליחת מייל Brevo (Transactional API) עם מדדי Prometheus ייעודיים (`geo_circuit_breaker_state`, `brevo_circuit_breaker_state`) וחשיפת מצב ב־`GET /api/v1/health`**, **k6**, **ריפקטור async משמעותי ב-passengers/bookings/rides**, **ריפקטור ארגון בפרונט**, **מסך אדמין פנימי (React + `/api/v1/admin`)**, **מעבר ארכיטקטוני ל-React Email renderer (Node.js/Express)**, **מדיה: S3 + CloudFront (אופציונלי) ואווטארים ב-prefix גרסתי immutable**, ו**i18n (עברית/אנגלית) + פורמט תאריכים לפי לוקאל + fallbacks לשגיאות API דרך `common:err_*` + איחוד פונטים ב־CSS Modules**.*
 
 **לראיון — מיפוי שורת CV ↔ איפה בקוד:** [`docs/internal/INTERVIEW_TECH_STACK_MAP.md`](internal/INTERVIEW_TECH_STACK_MAP.md).
 
@@ -36,6 +36,9 @@
   - pip (`/backend`, weekly)
   - docker (`/`, monthly)
 
+- **Chat outbound: idempotency + optimistic UI + merge (frontend):** Message list state is **`ChatListRow[]`** ([`types/chatList.ts`](../frontend/src/types/chatList.ts)) — **`confirmed`** wraps **`MessageResponse`**, **`pending`** carries **`client_message_id`** (UUID) for the in-flight bubble. **`useMessageThread`** and **`useChatPopup`** append a pending row on send, clear input, then **`consumeOrCreateKey` / `resetOutboundKey`** ([`outboundIdempotencyKey.ts`](../frontend/src/utils/outboundIdempotencyKey.ts)) with **`sendMessage`**; on success or inbound **`MessageResponse`**, **`applyInboundRealMessage`** drops the correlated pending and delegates dedupe to **`appendMessageDedupById`** ([`chatMessagesMerge.ts`](../frontend/src/utils/chatMessagesMerge.ts)); **`removePendingByClientId`** on REST failure restores text. Full thread path: **`outboundPendingRef`** in **`useMessageThread`** + **`processChatWebSocketMessage`** reconciles own messages from WS before or after REST. **`isChatIdempotencyKeyMismatch`** ([`apiError.ts`](../frontend/src/utils/apiError.ts)) unchanged. Pending bubbles: reduced opacity + **`Loader2`** spinner; read receipts only on **`confirmed`** own messages.
+- **chat-ws inbound hardening (Go):** after WebSocket **`Upgrade`**, **`conn.SetReadLimit(2048)`** caps full inbound message bytes (protects CPU/memory); per-connection **`golang.org/x/time/rate`** limiter (**limit 30/s, burst 60**) gates **`typing_start`/`typing_stop`** before Redis publish — **`ping`** (`RefreshPresence` + `pong`) is exempt; over-limit typing drops silently (connection stays open). **`chat-ws/internal/hub/handler.go`**, **`chat-ws/ARCHITECTURE.md`**, **`docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`** §7.
+
 - **XSS hardening baseline (frontend):** enforced `react/no-danger` as blocking lint rule and introduced centralized sanitizer utility `sanitizeHtml()` in `frontend/src/utils/sanitize.ts` backed by `DOMPurify` allowlist (`b`, `i`, `em`, `strong`, `a`, `br`; `href`, `target`, `rel`).
 
 - **SLOs & Error Budgets observability baseline:** metrics surface הורחב מ-backend-only ל-backend + workers (`9091/9092/9093`) עם מדדי domain/reliability (auth, rides, bookings, billing, RabbitMQ, outbox, geo cache/circuit-breaker, S3, AI). זה מאפשר להגדיר SLOs רשמיים (availability/latency/reliability) ולנהל release decisions לפי error-budget consumption במקום לפי אינטואיציה.
@@ -58,7 +61,7 @@
 - **Admin lookup flow aligned to RQ on-demand pattern:** `AdminLookup.tsx` הומר מ-manual async `useState` state-machine (`idle/loading/ready/error`) ל-`useMutation` ייעודי עבור `ride`/`booking` lookup, עם שימור מלא של UI parity והפרדת imperative trigger מה-query lifecycle.
 - **OpenAPI contract codegen (Orval):** נוסף `frontend/orval.config.ts` שמייצר client/types מ-`frontend/openapi-snapshot.json` ל-`frontend/src/api/generated`, עם mutator משותף (`apiMutator`) מעל axios instance האחיד. התוצרים נכנסים ל-git כ-source-of-truth חוזי מול backend, וב-`frontend-ci` נאכף drift gate ייעודי (`contract-codegen`: `npm run gen:api` + `git diff --exit-code -- src/api/generated/`).
 - **Google Sign-In local 403 hardening playbook:** תועד נוהל OAuth מדויק ל-local (`localhost:5173` ב-Authorized JavaScript origins + redirect URIs) יחד עם המלצה ארכיטקטונית לסביבת פיתוח נקייה: client-id ייעודי ל-local דרך `VITE_GOOGLE_CLIENT_ID`.
-- **Stage 3d — Chat RQ migration (safe subset):** בוצעה מיגרציה מדורגת לשכבות polling/fetch בלבד בלי big-bang: `useChatUnreadMessages` עבר מ-`setInterval` ל-`useQuery` (`qk.chat.unread`), `useChatNotificationsFeed` עבר מ-`setInterval` ל-`useQuery` (`qk.notifications.all`) עם invalidate refresh API, ו-`Messages.tsx` עבר מ-`useState/useEffect` ל-`useQuery` (`qk.chat.conversations`) תוך שמירה על מיון/רנדרינג קיימים. שכבות WS הקריטיות (`useConversationMessages`, `useChatPopup`, `useChatWebSocket`, `processChatWebSocketMessage`) נשארו raw ויציבות ללא שינוי.
+- **Stage 3d — Chat RQ migration (safe subset):** בוצעה מיגרציה מדורגת לשכבות polling/fetch בלבד בלי big-bang: `useChatUnreadMessages` עבר מ-`setInterval` ל-`useQuery` (`qk.chat.unread`), `useChatNotificationsFeed` עבר מ-`setInterval` ל-`useQuery` (`qk.notifications.all`) עם invalidate refresh API, ו-`Messages.tsx` עבר מ-`useState/useEffect` ל-`useQuery` (`qk.chat.conversations`) תוך שמירה על מיון/רנדרינג קיימים. שכבות WS הקריטיות (`useConversationMessages`, `useChatPopup`, `useChatWebSocket`, `processChatWebSocketMessage`) נשארו React state מקומי (לא RQ) — עם **`ChatListRow[]`** + optimistic send + reconciliation (ראו bullet “Chat outbound” למעלה); RQ מלא ל-thread/popup עדיין backlog ב־`FRONTEND_UPGRADE_ROADMAP`.
 - **S.6 — Client-side request throttle (frontend):** נוסף token-bucket throttle ב-`frontend/src/api/throttle.ts` ומשולב כ-interceptor ראשון ב-`frontend/src/api/client.ts` כדי למתן bursts מהדפדפן ולייצב latency תחת פעולות UI מקבילות.
 - **Bundle Budget B (tooling):** הוטמעו `rollup-plugin-visualizer`, `size-limit`, וחלוקת `manualChunks` ב-`vite.config.ts` (`react-vendor`, `query`, `firebase`, `sentry`, `i18n`, `forms`, `charts`) לצמצום drift בגודל bundle.
 - **Stage 3b Part 6 — SearchRides targeted RQ migration:** `useSearchRides` הוסב למודל mutations נקודתי עבור `searchRidesApi`, `loadMoreResults`, ו-`saveSearchAlert`, תוך שמירה על state-machine קיים (AI flow, geolocation, `useOperationToken` race guards) וללא שינויי JSX. כך הושגה עקביות lifecycle ברשת בלי להרחיב blast-radius ב-wizard מורכב.
@@ -76,8 +79,8 @@
 - **Backend CD rollout on single EC2 (low-downtime):** pipeline של `backend-ci` מבצע גם deploy אוטומטי ב-push ל-`main` דרך SSH (`appleboy/ssh-action`), עם image tags של `latest` + `sha`, rollout ל-backend (`docker compose up -d --no-deps backend`), ואז smoke-gate מרובה שכבות: `readyz` מה-backend, נוכחות `FIREBASE_CREDENTIALS_JSON` ב-runtime, ו-probes ציבוריים (`https://linkup.itamarabir.com/livez` + `/config.js`). במקרה כשל מתבצע rollback אוטומטי לתג קודם.
 - **Rate limiting hardening (atomic + correct-by-threat):** הוחלף fixed-window לא אטומי (`INCR + EXPIRE`) בשני Lua scripts אטומיים: `sliding_window` ל-auth (ללא burst, anti-bruteforce) ו-`token_bucket` לצ'אט (burst-tolerant API throttling). החריגה `RateLimitExceeded` הועשרה ונוספו headers סטנדרטיים `X-RateLimit-Limit/Remaining/Reset` + `Retry-After`, יחד עם metrics ייעודיים (`rate_limit_rejected_total`, `rate_limit_redis_errors_total`, `rate_limit_evaluation_seconds`).
 - **Billing (Stripe) — domain מלא עם hardening ברמת production:** דומיין חדש `billing` (model/schema/crud/service/router), endpointים `checkout/status/payments/webhook`, אינטגרציה ל-`users` (`stripe_customer_id`, `is_premium`, `premium_since`) ומיגרציה ייעודית **013**. הוקשח בסטנדרט סניור: **`PaymentStatus` enum** במקום string חופשי, **idempotency דו-שכבתי** (`stripe_event_id` + `stripe_payment_intent_id`), מיפוי **`IntegrityError` → `PaymentAlreadyExistsError`**, אימות חתימת webhook fail-closed (חסר `Stripe-Signature` → שגיאה מיידית), וקריאות Stripe עטופות `asyncio.to_thread` למניעת חסימת event loop.
-- **Google Maps — Circuit Breaker (שלושה מעגלים נפרדים):** מימוש in-memory ב־**`backend/app/infrastructure/geo/circuit_breaker.py`** — singletons **`google_geocoding_cb`**, **`google_directions_cb`**, **`google_distance_matrix_cb`** (מצבים `closed` / `open` / `half_open`; סף כשלונות + timeout התאוששות). **`GeocodingService`** ו־**`GeoClient`** בודקים **`allow_request()`** לפני קריאת HTTP; הצלחה/כשל מעדכנים את המעגל — כשהמעגל **OPEN**, אין קריאות ל-Google (fail-fast: `None` / `[]` לפי הזרימה). **`GET /api/v1/health`** מחזיר אובייקט **`circuit_breakers`** עם שמות המצבים — **אינפורמטיבי בלבד**; **`status`** (`healthy` / `unhealthy`) נקבע רק מ־**database**, **redis**, **rabbitmq** (לא ממצב Google). פירוט: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §20**, **`docs/architecture/API.md`** (Health).
-- **Idempotency-Key ל־`POST …/passengers/request-ride-from-search`:** כותרת אופציונלית; Redis **`SET NX`** + fingerprint (SHA-256) על גוף קנוני; מטמון **רק 201**; **409 + Retry-After** בזמן עיבוד; **422** על `idempotency_key_mismatch`; שגיאת דומיין → מחיקת נעילה; **fail-open** בלי Redis. **בקאנד:** עזרים ב־**`ride_join_idempotency.py`**, ראוטר דק. **פרונט:** **`useJoinRide`** מחזיק **`idempotencyKeyRef`** — מפתח יציב לכל ניסיון הצטרפות (איפוס אחרי הצלחה); נקרא מ־**`useSearchRides`**. פירוט: **§7ה**, **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §19**, `passengers.ts` + **`useJoinRide.ts`** / `useSearchRides.ts`.
+- **Circuit Breaker — Google Maps + Brevo (מחלקה משותפת + מדדים נפרדים):** המימוש הגנרי ב־**`backend/app/infrastructure/circuit_breaker.py`** (מוזן Prometheus `Gauge` לפי מופע). **גיאו:** **`backend/app/infrastructure/geo/circuit_breaker.py`** — singletons **`google_geocoding_cb`**, **`google_directions_cb`**, **`google_distance_matrix_cb`** על **`geo_circuit_breaker_state{name=…}`**. **`GeocodingService`** / **`GeoClient`** — **`allow_request()`** לפני HTTP; כש־**OPEN** — fail-fast (`None` / `[]`). **מייל:** **`backend/app/infrastructure/notifications/circuit_breaker.py`** — **`brevo_email_cb`** + **`brevo_circuit_breaker_state`**; **`EmailClient.send`** בודק מעגל לפני בלוק ה־Tenacity הפנימי (`_send_with_retry`); כש־**OPEN** — **`EmailProviderCircuitOpenError`** (503) בלי קריאה ל-Brevo; כשל לוגי אחרי ניסיונות retry — **`record_failure()`** פעם אחת. **`GET /api/v1/health`** כולל גם **`brevo_email`** תחת **`circuit_breakers`** — **אינפורמטיבי בלבד**; **`status`** נקבע רק מ־**database** / **redis** / **rabbitmq**. פירוט: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §20**, **`docs/architecture/API.md`** (Health), **`docs/architecture/NOTIFICATIONS.md`**.
+- **Idempotency-Key ל־`POST …/passengers/request-ride-from-search` ול־`POST …/chat/conversations/{id}/messages`:** כותרת אופציונלית; Redis **`SET NX`** + fingerprint (SHA-256) על גוף קנוני; מטמון **רק 201**; **409 + Retry-After** בזמן עיבוד; **422** על `idempotency_key_mismatch`; שגיאת דומיין → מחיקת נעילה; **fail-open** בלי Redis. **בקאנד:** **`ride_join_idempotency.py`** (נסיעות) + **`message_idempotency.py`** (צ’אט), ראוטרים דקים. **פרונט:** **`useJoinRide`** + **`idempotencyKeyRef`** (נסיעות; מ־**`useSearchRides`**); **`sendMessage`** + **`useMessageThread`** / **`useChatPopup`** (מפתח יציב לניסיון, **`ChatListRow`**, **`applyInboundRealMessage`** / **`appendMessageDedupById`**, **`isChatIdempotencyKeyMismatch`**). פירוט: **§7ה**, **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §19** ו-**§25**, **`docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md` §2**.
 - **JWT access-token revocation (Redis denylist):** כל access כולל **`jti`**; **`POST /auth/logout`** עם Bearer מוסיף `denylist:{jti}` עם TTL עד `exp`; HTTP dependencies וגם `get_current_user_ws` בודקים denylist בזמן handshake; **fail-open** אם Redis לא זמין. פירוט: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §18**, **`ARCHITECTURE.md`** (Key Patterns / Security), **סעיף 7ד** למטה.
 - **Prometheus + Grafana monitoring:** backend חושף `GET /metrics` דרך `prometheus-fastapi-instrumentator`; ב-Compose נוספו שירותי `prometheus` ו-`grafana` תחת profile `monitoring`, עם provisioning מוכן + dashboard בסיסי ל-HTTP (`rate`, `p95`, `5xx`, `in_progress`).
 - **Passenger match emails documented end-to-end:** Outbox publishes **`ride.created`**; `notification_tasks.handle_ride_created` runs `find_passengers_for_ride_notification`; per-match notification uses internal event **`ride.created_for_passengers`** (not a second Rabbit routing key). See §6.4 below and **`architecture/EVENTS.md`** (Ride section).
@@ -86,16 +89,51 @@
 - **Worker split completed**: `notification-worker`, `task-worker`, `ai-worker` each has dedicated runtime responsibilities and K8s HPA policies.
 - **DB pool caps per worker**: explicit `DB_POOL_SIZE` + `DB_MAX_OVERFLOW` were tuned per worker to keep total PostgreSQL connections in a safe range.
 - **Redis reconnect resilience**: reconnect retry strategy now uses exponential backoff for long-lived pub/sub channels.
-- **Google Maps resilience**: קריאות Geocoding / Directions / Distance Matrix עם **timeouts** ב־`httpx`; **Circuit Breaker** נפרד לכל API למניעת storm כשספק הרשת/Google לא יציב; ב־reverse geocode — HTTP **429** מזוהה ככשלון במעגל ונזרקת **`InfrastructureError`** (`error_code` **`GEO_SERVICE_UNAVAILABLE`**) — פורמט אחיד ב־**`docs/ERRORS.md`**.
-- **Chat reliability/UX**: missed messages are fetched after reconnect (`after=message_id`), and read receipts now use a DB-level message cursor (`last_read_message_id`) so `✓✓` renders correctly on all outgoing messages up to the partner's read position.
+- **Google Maps resilience**: קריאות Geocoding / Directions / Distance Matrix עם **timeouts** ב־`httpx`; **Circuit Breaker** נפרד לכל API (מימוש משותף ב־`infrastructure/circuit_breaker.py`) למניעת storm כשספק הרשת/Google לא יציב; ב־reverse geocode — HTTP **429** מזוהה ככשלון במעגל ונזרקת **`InfrastructureError`** (`error_code` **`GEO_SERVICE_UNAVAILABLE`**) — פורמט אחיד ב־**`docs/ERRORS.md`**.
+- **Chat reliability/UX**: on every **`chat-ws`** socket **`onopen`**, **`useChatWebSocket`** calls **`fetchMissedMessages(lastMessageIdRef.current ?? 0)`** (`GET …/messages?after=…`) so missed messages load even when there is no local **`message_id`** yet or when **`lastMessageIdRef`** is **`null`**; **`useConversationMessages`** keeps **`lastMessageIdRef`** as the max **`message_id`** over **confirmed** rows only (ignores **`pending`** tail); **`null`** when there are no confirmed messages. Reconnect gap fill uses **`fetchMissedGap`** ([`frontend/src/pages/MessageThread/fetchMissedGap.ts`](../frontend/src/pages/MessageThread/fetchMissedGap.ts)): **`after`** for the newest chunk, then **`before=next_cursor`** while **`has_more`** (aligned with **`docs/architecture/API.md`** cursor contract), capped at **50** HTTP pages (**~1500** messages), **two** retries per page, and **`shouldAbort`** when the hook’s **`conversation_id`** changes mid-run. **`fetchMissedMessages`** merges new server items by **`message_id`** and preserves any **pending** tail. Dedup for inbound reals: **`applyInboundRealMessage`** + **`appendMessageDedupById`**; **`limit: 30`** per HTTP page. Read receipts use a DB-level cursor (`last_read_message_id`) plus Redis **`message_read`** payloads including **`recipient_id`** so chat-ws routes live read-receipt updates to the sender.
+- **Chat POST idempotency:** optional **`Idempotency-Key`** on **`POST /chat/conversations/{id}/messages`** — same Redis primitives as passenger join (`message_idempotency.py`, key prefix `idempotency:chat_message:{user_id}:{key}`, fingerprint `conversation_id` + body); **[`sendMessage`](../frontend/src/api/chat.ts)** accepts an explicit key else generates UUID; **`useMessageThread`** / **`useChatPopup`** supply the stable-key lifecycle; list updates use **`applyInboundRealMessage`** / **`appendMessageDedupById`** (see **Latest architecture updates** — optimistic **`ChatListRow`**).
+- **`useUserEventStream` framing:** inbound WS text is **`split('\\n')` per frame** before JSON parse — aligned with chat-ws **batched outbound frames** (`Conn` write pump) so `user:*:events` is not dropped when multiplexed with other payloads.
+- **FCM service worker:** background handling uses **`messaging.onBackgroundMessage`** reading **`payload.data`** (matches backend data-only pushes); redundant raw **`push`** listener removed to avoid duplicate or empty notifications.
 - **Chat inbox N+1 fix + index hardening**: `list_my_conversations` הריצה `get_last_message` + `has_unread_messages` לכל שיחה בנפרד (~3N קריאות). הוחלפה ב-`get_inbox_aggregates` (`chat/crud.py`) — 3 aggregate queries + מיזוג בזיכרון, **4 קריאות קבועות**. נוסף `__table_args__` ב-`Message` model עם `Index("idx_messages_sender_id", "sender_id")` להתאמה ל-migration 012. פירוט: [FEATURE_DECISIONS.md — Chat inbox N+1](FEATURE_DECISIONS.md#chat-inbox-n1).
 - **Task scheduler safety**: `task-worker` is fixed to a single replica to prevent duplicate scheduled task publishing.
 
 ---
 
+## מפת פריטים: בסיס במאגר מול הרחבות (Portfolio / ראיון)
+
+מסמך זה לא מייחס כל שורה ל”פיצ’ר בודד”; להלן **הבחנה מכוונת** בין יכולות שכבר היו **עמודי תווך בארכיטקטורה** לבין שכבות שהודגשו או הורחבו (במיוחד צ’אט בפרונט), ונקודות שמייצגות **סקייל / אמינות / אחידות חוזים** — מעבר למה שמצופה מג’וניור בלבד.
+
+### כבר בשטח במאגר (דוגמאות מובילות)
+
+| נושא | איפה / מה |
+|------|-----------|
+| **Idempotency-Key לשליחת הודעות** | בקאנד: Redis מלא, מודול ייעודי **`message_idempotency.py`**, חתימת גוף, `SET NX`, תגובות 409/422 — מיושר Stripe-style עם הפרונט (**ADR §25**, **Frontend ADR §2**). |
+| **מיזוג רשימת הודעות (dedupe)** | פרונט: **`appendMessageDedupById`** ב־[`chatMessagesMerge.ts`](../frontend/src/utils/chatMessagesMerge.ts) — מקור אמת ל־`message_id` מול REST + WS. |
+| **מחזור מפתח יציב לניסיון שליחה** | פרונט: **`consumeOrCreateKey` / `resetOutboundKey`** ב־[`outboundIdempotencyKey.ts`](../frontend/src/utils/outboundIdempotencyKey.ts). |
+| **שגיאת אידמפוטנטיות בצ’אט** | פרונט: **`isChatIdempotencyKeyMismatch`** ב־[`apiError.ts`](../frontend/src/utils/apiError.ts) — ניתוב נקי ל־422 `idempotency_key_mismatch`. |
+| **Stripe webhooks** | אימות חתימה **fail-closed** (`Stripe-Signature`), idempotency כפולה לרמת אירוע/תשלום — ראו bullet **Billing (Stripe)** ב־**Latest architecture updates**. |
+| **אסטרטגיית ערוצי התראות** | בקאנד: **`NOTIFICATION_STRATEGY`** ב־[`backend/app/domain/notifications/config/mappings.py`](../backend/app/domain/notifications/config/mappings.py) + resolver/handler — מטריצת אירוע → ערוצים (מייל / FCM / in-app וכו’). |
+| **שידורים בזמן אמת (נסיעות / GPS)** | **Redis Pub/Sub + WS ב-FastAPI** — טבלאות **`keys.py`** / **`broadcast`**, לא SaaS realtime חיצוני לניוד מיקום. |
+| **Outbox → RabbitMQ** | **LISTEN/NOTIFY** ב-Postgres כנתיב ראשי לעידכון worker אחרי commit, עם fallback polling בטוח (**`notification-worker`**). |
+| **פיקוח על קונסומרים ארוכי טווח** | **`run_supervised`** — restart מבוקר ל-workers עם backoff / `max_retries` (יחד עם שדרוגי RabbitMQ המתועדים למעלה). |
+| **שני סוגי “ping” בצ’אט** | **אפליקציה:** הפרונט שולח JSON **`{"type":"ping"}`** כל **~30 שניות** (**`useChatWebSocket`**), כדי **לרענן נוכחות (TTL)** בצד **`chat-ws`** (handler `RefreshPresence` + pong). **פרוטוקול WebSocket:** **`chat-ws`** שולח **Ping frames** מהשרת בתדירות **`~54s`** (**`pingPeriod = (pongWait×9)/10`**, **`pongWait=60s`** ב־[`chat-ws/internal/hub/conn.go`](../chat-ws/internal/hub/conn.go)) — זיהוי חיבור מת / keep-alive שכבת Transport. זו **פרדיגמה כפולה מכוונת** (presence מול בריאות socket). |
+| **מדידות / Firebase** | FCM והגדרות edge (CSP) כולל GTM/Google Analytics/Firebase — ראו **Latest updates** (CSP) ופרקי התראות; אנליטיקס נשען על תשתית Firebase/GTM כפי שנפרס בסביבות. |
+
+### הרחבות / יישור פרונט שנוספו (צ’אט אופטימי ורשימה)
+
+| נושא | איפה / מה |
+|------|-----------|
+| **טיפוסי רשימת צ’אט** | **`ChatListRow`** — [`types/chatList.ts`](../frontend/src/types/chatList.ts): **`confirmed`** / **`pending`**. |
+| **מיזוג הודעה “אמיתית” + הסרת pending** | **`applyInboundRealMessage`**, **`removePendingByClientId`** — אותו [`chatMessagesMerge.ts`](../frontend/src/utils/chatMessagesMerge.ts); **`outboundPendingRef`** בתהליך ה-WS (**`processChatWebSocketMessage`**). |
+| **גזירת מאגר למספרי הודעה / זנב אופטימי** | **`confirmedMessages`** + **`pendingTail`** ב־[`useConversationMessages.ts`](../frontend/src/pages/MessageThread/useConversationMessages.ts) — `lastMessageIdRef` רק על **confirmed**; שימור זנב **pending** אחרי backfill (**`fetchMissedMessages`**). |
+
+**להצגה בראיון:** “לא עטפתי Idempotency בפרונט על עורק ריק — יש תאימות Redis מלא בבקאנד; בפרונט איחדתי dedupe, מפתח ניסיון, תרגום 422 למחזור מפתח, ואחר כך עטפתי רשימה בפרדיגמת union + reconcile מול WS/REST כדי שהמשתמש לא יחכה לרשת.”
+
+---
+
 ## 0א. יציבות ופרודקשן — בעיה / החלטה / trade-off (סיכום)
 
-סיכום ממוקד לראיון; פירוט טכני: **§7ד**, **§7ה**, **Latest updates**, **`ARCHITECTURE.md`**, ADR **§18–§21**.
+סיכום ממוקד לראיון; פירוט טכני: **§7ד**, **§7ה**, **Latest updates**, **`ARCHITECTURE.md`**, ADR backend **§18–§25** (כולל JWT denylist, idempotency נסיעות/צ’אט, chat plaintext, rate limit, audit, וכו’).
 
 ### Idempotency-Key — `POST …/request-ride-from-search`
 
@@ -105,13 +143,13 @@
 | **החלטה** | כותרת אופציונלית **`Idempotency-Key`** (UUID); Redis **`SET NX`** לנעילה פר-משתמש+מפתח; **SHA-256** על גוף קנוני — אי-התאמה → **422**; נשמרת רק תשובת **201** (מוסכמת Stripe); שגיאת דומיין → מחיקת נעילה; **fail-open** אם Redis למטה. בקאנד: **`ride_join_idempotency.py`**. פרונט: **`idempotencyKeyRef`** ב-**`useJoinRide`** (מ־**`useSearchRides`**). |
 | **Trade-off** | בלי Redis אין dedup; זמינות מועדפת על idempotency קשיח ברגעי תקלה קצרים. |
 
-### Circuit Breaker — Google Maps (בקאנד)
+### Circuit Breaker — Google Maps + Brevo (בקאנד)
 
 | | |
 |--|--|
-| **בעיה** | timeout ארוך (למשל 15s) × בקשות מקבילות = סיכון ל-exhaustion של workers/threads כש-Google איטי. |
-| **החלטה** | שלושה **singletons** in-memory (**Geocoding**, **Directions**, **Distance Matrix**); **CLOSED → OPEN** (אחרי סף כשלונות) → **HALF_OPEN** (אחרי ~60s) → **CLOSED**; כש-**OPEN** — ללא קריאת HTTP (התנהגות דומה ל-timeout); מצב ב-**`GET /api/v1/health`** (`circuit_breakers`) **בלי** לשנות **`status`** הכללי; **fail-open** בתוך לוגיקת המעגל. |
-| **Trade-off** | מצב לא משותף בין מופעים (restart מאפס); לא מיושם על S3 / Groq / Brevo — שם async+boto3, tenacity, או worker async. |
+| **בעיה** | timeout ארוך (למשל 15s) × בקשות מקבילות = סיכון ל-exhaustion של workers/threads כש-Google איטי; Brevo מושבת — Tenacity על ה-SDK ממשיך לנסות עד כיבוי התור. |
+| **החלטה** | מחלקה משותפת + **גיאו:** שלושה **singletons** (**Geocoding**, **Directions**, **Distance Matrix**); **מייל:** **`brevo_email_cb`** לפני שליחה. **CLOSED → OPEN** (אחרי סף כשלונות) → **HALF_OPEN** (אחרי ~60s) → **CLOSED**; כש-**OPEN** — גיאו: ללא HTTP; Brevo: **`EMAIL_CIRCUIT_OPEN`** בלי קריאה לספק. מצב ב-**`GET /api/v1/health`** (`circuit_breakers`) **בלי** לשנות **`status`** הכללי; **fail-open** בתוך לוגיקת המעגל. |
+| **Trade-off** | מצב לא משותף בין מופעים (restart מאפס); לא מיושם על S3 / Groq — שם async+boto3 או worker async. |
 
 ### Outbox — אירועים ל-RabbitMQ
 
@@ -277,7 +315,7 @@
 
 | מה רואים במוצר | מה קורה בטכנולוגיה |
 |----------------|---------------------|
-| **משתמש מקליד** | הפרונט שולח ב-WebSocket `typing_start` (בדרך כלל עם throttle). כשמפסיקים — `typing_stop` (למשל אחרי שליחה או blur). **chat-ws** מפרסם ל-Redis `chat:typing:*` והמנוי מעביר לאותו conversation לצד השני — **בלי** לגעת ב-DB. זה **אפhemeral** ומתאים למאות אלפי אירועים קצרים. |
+| **משתמש מקליד** | הפרונט שולח ב-WebSocket `typing_start` (בדרך כלל עם throttle). כשמפסיקים — `typing_stop` (למשל אחרי שליחה או blur). **chat-ws** מפרסם ל-Redis `chat:typing:*` (עם הגבלה פר־חיבור מהצד הנכנס; **`ping`** ללא הגבלה מסוג זה) והמנוי מעביר לאותו conversation לצד השני — **בלי** לגעת ב-DB. זה **אפhemeral** ומתאים למאות אלפי אירועים קצרים. |
 | **משתמש מחובר** | בפתיחת WS: Go שם `presence:{user_id}` ומפרסם **`user:online`** → **`user_online`** ב-WS. בכניסה לשיחה: **קריאה אחת** ל-`GET /presence/{partner_id}` לטעינת מצב ראשוני. |
 | **התנתקות (Disconnect)** | Go **מפרסם** `user:offline` → **`user_offline`** ב-WebSocket. במקביל debounce ל-PATCH last-seen (`last_active_at`). |
 
@@ -339,7 +377,7 @@
 
 | דפוס | למה |
 |------|-----|
-| **Circuit Breaker (Google Maps)** | שלושה מעגלים in-memory נפרדים ל־Geocoding / Directions / Distance Matrix — מגן על התלות החיצונית ועל העומס כש-Google לא זמין; מצב ב־`/api/v1/health` (**לא** משפיע על readiness). ADR **§20**. |
+| **Circuit Breaker (Google Maps + Brevo)** | מחלקה משותפת ב־`infrastructure/circuit_breaker.py` עם `Gauge` מוזרק. גיאו: שלושה singletons (Geocoding / Directions / Distance Matrix). מייל: `brevo_email_cb` — מעגל לפני שליחה ל-Brevo; Tenacity על `_send_with_retry` פנימית; `EMAIL_CIRCUIT_OPEN` כשהמעגל OPEN. מצב ב־`/api/v1/health` (**לא** משפיע על readiness). ADR **§20**. |
 | **DDD** | דומיינים מבודדים (rides, bookings, chat, …) — קל להרחבה וטסטים. |
 | **Pessimistic locking** | אישור/ביטול הזמנה תחת `SELECT FOR UPDATE` — מונע race ו”כפל” לוגיקה תחרותית על אותה נסיעה. |
 | **Async SQLAlchemy 2.0 migration** | זרימות ליבה בדומיינים passengers/bookings/rides עברו ל-`AsyncSession` + `select/execute`; פעולות sync נשמרו רק למקטעים שדורשים locking/transactional guarantees. |
@@ -362,9 +400,9 @@
 | שכבה | דוגמאות מהקוד |
 |------|----------------|
 | **עסקי / DB** | בדיקות `if not ride` / בעלות לפני פעולה; **pessimistic lock** על הזמנות; **Outbox** כדי שלא יאבדו אירועים אחרי commit. |
-| **רשת / חיצוני** | **Timeouts** ל-Google Geocoding / Directions / Distance Matrix; **Circuit Breaker** נפרד לכל API (fail-fast כשהמעגל OPEN); טיפול ב-**429** ב-reverse geocode עם הודעת דומיין; debounce **last-seen** + ביטול ב-reconnect — לא מציפים DB ולא מעדכנים “offline” בטעות. |
+| **רשת / חיצוני** | **Timeouts** ל-Google Geocoding / Directions / Distance Matrix; **Circuit Breaker** נפרד לכל API Maps + מעגל ל-Brevo ב-`EmailClient` (fail-fast כשהמעגל OPEN); טיפול ב-**429** ב-reverse geocode עם הודעת דומיין; debounce **last-seen** + ביטול ב-reconnect — לא מציפים DB ולא מעדכנים “offline” בטעות. |
 | **תשתית** | **`pool_pre_ping`**, **`pool_timeout`**, **`pool_recycle`** — מאגר DB עמיד יותר; **rate limit** על register + login/refresh; **FCM** — טוקן לא תקף מטופל (איפוס / דילוג). |
-| **chat-ws (Go)** | `if redisClient == nil` לפני פעולות; **select default** על ערוץ Send; לקוחות Redis נפרדים ל-`user:offline` ול-`user:online` שלא ייתקעו עם `PSubscribe` של הצ’אט. |
+| **chat-ws (Go)** | `if redisClient == nil` לפני פעולות; **select default** על ערוץ Send; לקוחות Redis נפרדים ל-`user:offline` ול-`user:online` שלא ייתקעו עם `PSubscribe` של הצ’אט; **`SetReadLimit(2048)`** + דילול **`typing_*`** פר־חיבור (`x/time/rate`; **`ping`** פטור). |
 | **API / HTTP** | **LinkUpError** + handlers מרוכזים; **CORS** גם על תגובות שגיאה; אימות JWT לפני WS ולפני `/presence`. |
 | **פרונט** | `try/catch` על טעינת presence / WS; **פיצול הודעות WS לפי `\n`**; `user_online` / `user_offline` עם **ref** ל-partner. |
 | **איכות** | טסטים ל-**JWT** (פג תוקף, חתימה שגויה) — מגנים על נקודות כשל אימות. |
@@ -396,7 +434,7 @@
 | **Redis** | **Rate limit** לפי IP על **`/register`**, login, refresh (וגם) — לפני עבודה כבדה. | בדיקה **מהירה**; מגנה על ה-API מפני ספאם ומפחית עומס מיותר על DB+bcrypt. |
 | **טרנזקציה מול צדדיות** | **Register:** יצירת משתמש + שורות **Outbox** (`user.registered`, `auth.email_verification`) באותה טרנזקציה; מייל נשלח דרך **worker / RabbitMQ** אחרי ה-commit. | **סינכרון:** שלמות נתונים ב-DB. **אסינכרון:** שליחת אימייל והמשך pipeline לא חוסמים את זמן התגובה הקריטי של הרישום. |
 | **הולידציית טלפון** | **`phonenumbers==8.13.48`** (נעול) — עקביות מול מטא־דאטה ישראלית. | מפחית כשלים אקראיים ב-validation תחת עומס (גרסאות 9.x שינו התנהגות). |
-| **בדיקת עומס (k6)** | סקריפט **`backend/load_test.js`** — register + login לכל איטרציה. | מאמת end-to-end את השילוב: API, DB pool, Redis (rate limit), validation. **דוגמה למדידה לוקאלית:** 10 VU למשך 30s, ~150 איטרציות, **שיעור שגיאות HTTP 0%**, p95 register ~413ms / login ~363ms (תלוי חומרה וסביבה). |
+| **בדיקת עומס (k6)** | מקור אמת: **`backend/k6/scripts/load_test_auth.js`** (register + login לכל איטרציה); **`backend/load_test.js`** — wrapper תואם לאחור. | מאמת end-to-end את השילוב: API, DB pool, Redis (rate limit), validation. **דוגמה למדידה לוקאלית:** 10 VU למשך 30s, ~150 איטרציות, **שיעור שגיאות HTTP 0%**, p95 register ~413ms / login ~363ms (תלוי חומרה וסביבה). שאר שכבות: **`backend/k6/scripts/`** (rides, users, groups, chat HTTP, geo, ws) — ראו **`backend/README.md`**. |
 
 **לסיכום בראיון:** *“ב-auth הפרדתי בין מה שחייב להיות סינכרוני בטרנזקציה לבין צדדיות שמוזזות ל-outbox/worker; bcrypt לא רץ על ה-event loop; ויש rate limit + pool מוגדר.”*
 
@@ -434,8 +472,9 @@ ADR: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §18**.
 | **שגיאת דומיין** | מחיקת המפתח — לקוח יכול לנסות שוב (מפתח חדש). |
 | **Fail-open** | Redis למטה → התנהגות כמו קודם (ללא dedup). |
 
-**פרונט:** [`requestRideFromSearch`](../../frontend/src/api/passengers.ts) מקבל מפתח אופציונלי; **[`useJoinRide`](../../frontend/src/pages/SearchRides/useJoinRide.ts)** (נקרא מ־**[`useSearchRides`](../../frontend/src/pages/SearchRides/useSearchRides.ts)**) יוצר **`crypto.randomUUID()`** פעם אחת לכל ניסיון הצטרפות (**`idempotencyKeyRef`**), מעביר ל-API, **מאפס אחרי הצלחה**, ומשאיר את המפתח אחרי שגיאה ל-retry עם אותו מפתח.  
-ADR: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §19**.
+**פרונט:** [`requestRideFromSearch`](../frontend/src/api/passengers.ts) מקבל מפתח אופציונלי; **[`useJoinRide`](../frontend/src/pages/SearchRides/useJoinRide.ts)** (נקרא מ־**[`useSearchRides`](../frontend/src/pages/SearchRides/useSearchRides.ts)**) יוצר **`crypto.randomUUID()`** פעם אחת לכל ניסיון הצטרפות (**`idempotencyKeyRef`**), מעביר ל-API, **מאפס אחרי הצלחה**, ומשאיר את המפתח אחרי שגיאה ל-retry עם אותו מפתח.
+
+**גם בשליחת הודעה:** **`Idempotency-Key`** אופציונלי על **`POST /chat/conversations/{id}/messages`** — דפוס Stripe-style עם מפתח `idempotency:chat_message:{user_id}:{key}` ו-fingerprint על `conversation_id` + תוכן; פרונט: **[`sendMessage`](../frontend/src/api/chat.ts)** + **`useMessageThread`** / **`useChatPopup`** (מפתח ב-ref לניסיון, **`ChatListRow`** + **`applyInboundRealMessage`** / **`appendMessageDedupById`**, **`isChatIdempotencyKeyMismatch`**). ADR: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §25** (נסיעות: **§19**); פרונט: **`docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md` §2**; פיצ’ר UX: [FEATURE_DECISIONS.md#chat-optimistic-outbound](FEATURE_DECISIONS.md#chat-optimistic-outbound).
 
 ---
 
@@ -462,8 +501,8 @@ ADR: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §19**.
 ### FCM + מייל (איפה בקוד)
 
 - **FCM (Backend)**: `app/domain/notifications/channels/push/client.py` — `messaging.Message` עם **`data` בלבד** (ללא `notification`), כולל `title` ו־`body` כמחרוזות + שדות metadata נוספים; `push_provider` שולח רק אם יש `fcm_token`; טיפול בטוקן לא תקף.
-- **FCM (Frontend)**: `frontend/src/services/fcm.ts` — הרשאות, רישום SW, `getToken` + `PATCH /users/fcm-token`; **`cleanupFCM()`** מבטל `onMessage`. **AuthContext** — `initFCM()` אחרי login / Google / hydrate אם הרשאה `granted`; ב־logout: `patchFcmToken(null)` (בזמן JWT תקף) → `cleanupFCM()` → `logoutSession` → `clearTokens`. Toast גלובלי ב־**`App.tsx`** (`NotificationToast`). תפריט פרופיל: הפעלת התראות דרך **`useLayoutShell`**. בחזית `onMessage` → `title`/`body` מ־**`payload.data`** → Toast + צליל; `firebase-messaging-sw.js` — **`push`** → `showNotification` ברקע. פירוט: **`docs/FCM_SYSTEM_SUMMARY.md`**.
-- **מייל**: **Brevo** דרך `EmailClient` / `email_provider`, עם רינדור HTML דרך שירות ייעודי **`email-renderer`** (Node.js + Express + React Email). ה-backend שולח `template + props` ל-`POST /render` (`EMAIL_RENDERER_URL`), מפת התבניות מנוהלת ב-PascalCase ב-`email_conf.py`, ו-registry בצד renderer כולל fail-fast validation כדי ליפול ב-startup אם תבנית חסרה.
+- **FCM (Frontend)**: `frontend/src/services/fcm.ts` — הרשאות, רישום SW, `getToken` + `PATCH /users/fcm-token`; **`cleanupFCM()`** מבטל `onMessage`. **AuthContext** — `initFCM()` אחרי login / Google / hydrate אם הרשאה `granted`; ב־logout: `patchFcmToken(null)` (בזמן JWT תקף) → `cleanupFCM()` → `logoutSession` → `clearTokens`. Toast גלובלי ב־**`App.tsx`** (`NotificationToast`). תפריט פרופיל: הפעלת התראות דרך **`useLayoutShell`**. בחזית `onMessage` → `title`/`body` מ־**`payload.data`** → Toast + צליל; ברקע `firebase-messaging-sw.js` — **`messaging.onBackgroundMessage`** עם **`payload.data`** (ללא מאזין `push` כפול). פירוט: **`docs/FCM_SYSTEM_SUMMARY.md`**.
+- **מייל**: **Brevo** דרך `EmailClient` / `email_provider` — **circuit breaker** (`brevo_email_cb`) לפני קריאת ה-SDK; רינדור HTML דרך שירות ייעודי **`email-renderer`** (Node.js + Express + React Email). ה-backend שולח `template + props` ל-`POST /render` (`EMAIL_RENDERER_URL`), מפת התבניות מנוהלת ב-PascalCase ב-`email_conf.py`, ו-registry בצד renderer כולל fail-fast validation כדי ליפול ב-startup אם תבנית חסרה.
 
 ---
 
@@ -479,7 +518,7 @@ ADR: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §19**.
 ## 10. איך להשתמש במסמך הזה בפורטפוליו
 
 - בקורות חיים / לינקדאין: “Real-time chat (מקליד / מחובר / disconnect עם debounce), Go + Redis, Outbox+RabbitMQ, סינכרון מול אסינכרון, PostGIS”.
-- בראיון: **סעיף 4** + **5** (real-time נסיעות + Zod) + **6** + **0א** (סיכום בעיה/החלטה/trade-off) + **7ג** (auth בעומס) + **7ד** (JWT denylist) + **7ה** (Idempotency-Key) + **7ב** (defensive) + **Latest architecture updates** (Circuit Breaker Google Maps) + **12** + **13** + **14** (פרונט).
+- בראיון: **סעיף 4** + **5** (real-time נסיעות + Zod) + **6** + **0א** (סיכום בעיה/החלטה/trade-off) + **7ג** (auth בעומס) + **7ד** (JWT denylist) + **7ה** (Idempotency — נסיעות + צ’אט, ADR **§19**/**§25**) + **7ב** (defensive) + **Latest architecture updates** (Circuit Breaker Google Maps, **צ’אט `onOpen` + `after`**) + **12** + **13** + **14** (פרונט).
 
 ---
 
@@ -495,10 +534,10 @@ ADR: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §19**.
 | FCM | סעיפים 1, 2, 8 + **`docs/FCM_SYSTEM_SUMMARY.md`** |
 | מייל Brevo | סעיפים 1, 2, 6, 8 |
 | כניסה עם Google | סעיפים 1, 2, 7א |
-| אבטחה + rate limit + OTP + מאגר DB + enumeration + auth בעומס + JWT denylist + Idempotency booking | סעיפים 3, 7, 7א, **0א**, **7ג**, **7ד**, **7ה**, 7ב, 12 |
+| אבטחה + rate limit + OTP + מאגר DB + enumeration + auth בעומס + JWT denylist + Idempotency (booking + צ’אט) | סעיפים 3, 7, 7א, **0א**, **7ג**, **7ד**, **7ה**, 7ב, 12 (+ **ADR §25**) |
 | ריפקטור פרונט (API, context, lazy, בדיקות) | **סעיף 14** + `frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md` |
-| Zod, WebSocket (נסיעות/מיקום/צ’אט), reconnect, `publish_ride_event` / `keys.py` | **סעיפים 1, 5, 14** + `frontend/src/types/wsEvents.ts` |
-| Google Maps (Directions + Distance Matrix + Circuit Breaker + health) | **סעיף 2** (טבלת APIs), **Latest architecture updates**, סעיף **12** (גיאו) |
+| Zod, WebSocket (נסיעות/מיקום/צ’אט), reconnect + **REST gap fill רב־עמוד על `onOpen`** (`fetchMissedGap`; צ’אט), `publish_ride_event` / `keys.py` | **סעיפים 1, 5, 14** + `frontend/src/types/wsEvents.ts` + [`FEATURE_DECISIONS.md#chat-thread-reconnect`](FEATURE_DECISIONS.md#chat-thread-reconnect) + [`fetchMissedGap.ts`](../frontend/src/pages/MessageThread/fetchMissedGap.ts) |
+| Google Maps + circuit breaker / Brevo email CB (Directions + Distance Matrix + health) | **סעיף 2** (טבלת APIs), **Latest architecture updates**, סעיף **12** (גיאו), **`docs/architecture/NOTIFICATIONS.md`** |
 | CI/CD, GHCR, S3 + CloudFront, מובייל, pytest, Vitest מקומי, k6, phonenumbers | **סעיפים 2, 9, 12** |
 | Unread WS, קבוצות, SQLAdmin, UUID, RTL, EIA | **סעיף 13** |
 | Defensive programming | **סעיף 7ב** |
@@ -540,7 +579,7 @@ ADR: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §19**.
 | **מסלולים** | **Google Directions** + **Distance Matrix** (`GeoClient`) — **`google_directions_cb`** / **`google_distance_matrix_cb`**; **Maps JS** בפרונט. |
 | **PostGIS** | שאילתות מרחביות וחיפוש נסיעות לפי מיקום. |
 | **Geocode cache 24h** | שמירת תוצאות כתובת→קואורדינטות ב-Redis ל-24 שעות (fail-open) כדי להפחית קריאות חיצוניות חוזרות ולשפר latency בחיפושים חוזרים. |
-| **Circuit breaker (Google)** | שלושה singletons ב־**`circuit_breaker.py`**; מצב **`closed` / `open` / `half_open`** נחשף ב־**`GET /api/v1/health`** תחת **`circuit_breakers`** — לא משנה את **`status`** הכללי של Health. |
+| **Circuit breaker (Maps + Brevo)** | מחלקה משותפת **`app/infrastructure/circuit_breaker.py`**; singletons גיאו ב־**`geo/circuit_breaker.py`**; **`brevo_email_cb`** ב־**`notifications/circuit_breaker.py`**. מצב **`closed` / `open` / `half_open`** ב־**`GET /api/v1/health`** תחת **`circuit_breakers`** (כולל **`brevo_email`**) — לא משנה את **`status`** הכללי של Health. |
 
 ### אבטחה HTTP מעבר ל-JWT
 
@@ -616,7 +655,7 @@ ADR: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §19**.
 
 | ציר | פירוט |
 |-----|--------|
-| **שכבת API** | כל קריאת HTTP דרך `src/api/<תחום>.ts` — לא ייבוא ישיר של `api` מ־`client` בקומפוננטות (חריגים מתועדים: `AuthContext`, `presence.ts`). **`passengers.ts` / `useJoinRide`** — **`Idempotency-Key`** יציב לפעולה דרך **ref** (ראו **§7ה**). |
+| **שכבת API** | כל קריאת HTTP דרך `src/api/<תחום>.ts` — לא ייבוא ישיר של `api` מ־`client` בקומפוננטות (חריגים מתועדים: `AuthContext`, `presence.ts`). **`passengers.ts` / `useJoinRide`** — **`Idempotency-Key`** יציב לפעולה דרך **ref** (**§7ה**); **`chat.ts` / `sendMessage`** + **`useMessageThread`** / **`useChatPopup`** — מפתח יציב לניסיון שליחה, **`types/chatList`** (`ChatListRow`), **`applyInboundRealMessage`** / **`appendMessageDedupById`** (**`chatMessagesMerge`**), **`isChatIdempotencyKeyMismatch`** (**ADR §25**, **ADR Frontend §2**). |
 | **שגיאות** | `getApiErrorMessage` / `getApiStatus` / `isTimeoutOrAbortError` ב־`utils/apiError.ts` + **Vitest** (`apiError.test.ts`). ב־hooks: fallback אחיד עם **`apiErr('err_*')`** (מפתחות ב־`common.json`) במקום מחרוזות עברית קשיחות. |
 | **i18n / טיפוגרפיה** | **`LangContext`** — `lang`, `dir`, **`--font-primary`**; קבצי תרגום תחת `src/i18n/locales/`; ב־**`*.module.css`** — `var(--font-primary)` / `var(--font-numeric)` (חריג: `LangToggle`). |
 | **Code splitting** | **`React.lazy` + `Suspense`** לדפים (טעינה עצלה), מסכי טעינה עקביים; **מסלולי `/admin/*`** נטענים עצלנית דרך מודול `features/admin`. |
@@ -625,11 +664,11 @@ ADR: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §19**.
 | **בקשות נוסע** | הוק **`useMyRequests`** — לוגיקת MyRequests מרוכזת. |
 | **הזמנות שלי (VM)** | **`useMyBookings`** — קומפוזיציה מ־`useMyBookingsPassenger` + `useMyBookingsDriver`; החזרה **מקוננת** (`passenger`, `driver`, `chat`) + יצוא **`MyBookingsViewModel`**. טעינה ב־**קריאת REST אחת לטאב** (`/bookings/driver-summary`, `/bookings/passenger-summary`) במקום N+1. כרטיס נוסע: **`PassengerBookingCard`**. |
 | **עיצוב** | **`tokens.css`**, `ThemeContext`, מצב כהה — פחות אינליין CSS בדפי auth. |
-| **איכות** | בדיקות יחידה ל־reducer ול־utils קריטיים (`chatReducer`, `apiError`, `myBookings.utils`, MessageThread WS, `ErrorBanner`) לפי [`FRONTEND_REFACTOR_AND_QUALITY.md`](../frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md). |
+| **איכות** | בדיקות יחידה ל־reducer ול־utils קריטיים (`chatReducer`, `apiError`, **`chatMessagesMerge`**, `myBookings.utils`, MessageThread WS, `ErrorBanner`) לפי [`FRONTEND_REFACTOR_AND_QUALITY.md`](../frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md). |
 | **Zod + WebSocket** | סכימות ב־**`src/types/wsEvents.ts`**; אימות בכניסה ב־hooks וב־**`processChatWebSocketMessage`** — ראו **סעיף 5**. |
 
 *בראיון:* “פרדתי שכבת API, פיצלתי דפים כבדים להוקים, ואיחדתי פילטר קבוצות ב-context כדי שלא יישבר בין מסכים.”
 
 ---
 
-*עודכן כחלק מתיעוד הפרויקט — כולל מאגר DB ניתן להגדרה, **auth בעומס** (bcrypt ב-executor, pool, rate limit, outbox), **`jti` + Redis denylist ל-access אחרי logout** (ADR §18), **Idempotency-Key לבקשת הצטרפות מחיפוש** (ADR §19, **`passengers.ts`**, **`useJoinRide.ts`** + **`useSearchRides.ts`**), **Circuit Breaker ל-Google Maps בבקאנד + `circuit_breakers` ב-`/api/v1/health`** (ADR §20, `infrastructure/geo/circuit_breaker.py`), **PgBouncer ממומש ב-Compose** (internal-only + migration isolation + asyncpg compatibility), **structlog + `X-Request-ID` / ContextVar** (`ARCHITECTURE.md` — Observability), סעיף **0א** (סיכום trade-offs), חיזוק OTP, מניעת user enumeration בלוגין (OWASP), **GitHub Actions + GHCR** (backend: **Ruff** → **Alembic upgrade head** → **pytest** עם **`DATABASE_URL` אחיד**; chat-ws: **go build** + **go vet**), **pydantic-settings** (`validation_alias` ל־`DATABASE_URL` / `REDIS_URL`), **Vitest + ריפקטור ארגון בפרונט** (`FRONTEND_REFACTOR_AND_QUALITY.md`), **Zod לאימות WebSocket** (`frontend/src/types/wsEvents.ts`), **מסך אדמין דסקטופ** (`ADMIN_DASHBOARD.md`, `/admin` + `/api/v1/admin`), **k6** עם דוגמת תוצאות, **phonenumbers==8.13.48**, **S3 + CloudFront (קריאה ציבורית) ואווטאר ב-prefix גרסתי immutable**, **i18n + לוקאליזציה + `apiErr` + פונטים ב־CSS Modules** (`docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md` §10–12), ו-**Docker Compose** (שירות **migrate**, healthcheck ל-backend, `.env` בשורש + `backend/.env`, recreate לקונטיינר אחרי שינוי env).*
+*עודכן כחלק מתיעוד הפרויקט — כולל מאגר DB ניתן להגדרה, **auth בעומס** (bcrypt ב-executor, pool, rate limit, outbox), **`jti` + Redis denylist ל-access אחרי logout** (ADR §18), **Idempotency-Key** לבקשת הצטרפות מחיפוש (ADR §19, **`passengers.ts`**, **`useJoinRide.ts`** + **`useSearchRides.ts`**) ולשליחת הודעת צ’אט (ADR §25 + Frontend ADR §2, **`message_idempotency.py`**, **`chat.ts`**, **`sendMessage`**, **`useMessageThread`**, **`useChatPopup`**, **`chatMessagesMerge`**, **`ChatListRow` / optimistic UI**), **השלמת הודעות צ’אט אחרי reconnect** (**`useChatWebSocket`** / **`useConversationMessages`**, **`FEATURE_DECISIONS`** chat-thread-reconnect), **Circuit Breaker** — מחלקה משותפת **`infrastructure/circuit_breaker.py`**, גיאו ב־**`geo/circuit_breaker.py`**, Brevo ב־**`notifications/circuit_breaker.py`** + **`circuit_breakers` ב-`/api/v1/health`** (ADR §20), **PgBouncer ממומש ב-Compose** (internal-only + migration isolation + asyncpg compatibility), **structlog + `X-Request-ID` / ContextVar** (`ARCHITECTURE.md` — Observability), סעיף **0א** (סיכום trade-offs), חיזוק OTP, מניעת user enumeration בלוגין (OWASP), **GitHub Actions + GHCR** (backend: **Ruff** → **Alembic upgrade head** → **pytest** עם **`DATABASE_URL` אחיד**; chat-ws: **go build** + **go vet**), **pydantic-settings** (`validation_alias` ל־`DATABASE_URL` / `REDIS_URL`), **Vitest + ריפקטור ארגון בפרונט** (`FRONTEND_REFACTOR_AND_QUALITY.md`), **Zod לאימות WebSocket** (`frontend/src/types/wsEvents.ts`), **מסך אדמין דסקטופ** (`ADMIN_DASHBOARD.md`, `/admin` + `/api/v1/admin`), **k6** עם דוגמת תוצאות, **phonenumbers==8.13.48**, **S3 + CloudFront (קריאה ציבורית) ואווטאר ב-prefix גרסתי immutable**, **i18n + לוקאליזציה + `apiErr` + פונטים ב־CSS Modules** (`docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md` §10–12), ו-**Docker Compose** (שירות **migrate**, healthcheck ל-backend, `.env` בשורש + `backend/.env`, recreate לקונטיינר אחרי שינוי env).*

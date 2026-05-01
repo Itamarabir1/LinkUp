@@ -112,7 +112,7 @@ This follows a senior engineering principle: avoid premature optimization, but e
 - **Current state:** Chat is WS-driven and stable in production.
 - **Why deferred:**
   - Migration risk is currently higher than practical benefit at the current scale.
-  - The existing reconnect/backfill and message-stream behavior is reliable in production.
+  - Reconnect backfill is hardened: every chat WS **`onOpen`** runs REST gap fill (**`after=`** + **`before=next_cursor`** במחזור עד **`has_more`** או מכסת לקוח) with **`lastMessageIdRef ?? 0`** and a fixed **`lastMessageIdRef`** sync (see **`ENGINEERING_HIGHLIGHTS.md`** + **[`FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#chat-thread-reconnect)** + **`fetchMissedGap.ts`**); message-stream UX remains WS-first.
   - A full shift to shared cache + infinite query + optimistic flow would increase blast radius in a high-risk domain.
 - **What was still worth shipping now (already done):**
   - `useChatUnreadMessages` moved from manual `setInterval` to React Query `refetchInterval`.

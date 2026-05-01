@@ -46,25 +46,34 @@ function makeVm(overrides: Partial<MessageThreadViewModel> = {}): MessageThreadV
     },
     messages: [
       {
-        message_id: 1,
-        conversation_id: 'conv-1',
-        sender_id: 'u-me',
-        body: 'first',
-        created_at: '2024-01-01T10:00:00Z',
+        kind: 'confirmed',
+        message: {
+          message_id: 1,
+          conversation_id: 'conv-1',
+          sender_id: 'u-me',
+          body: 'first',
+          created_at: '2024-01-01T10:00:00Z',
+        },
       },
       {
-        message_id: 2,
-        conversation_id: 'conv-1',
-        sender_id: 'u-me',
-        body: 'second',
-        created_at: '2024-01-01T10:01:00Z',
+        kind: 'confirmed',
+        message: {
+          message_id: 2,
+          conversation_id: 'conv-1',
+          sender_id: 'u-me',
+          body: 'second',
+          created_at: '2024-01-01T10:01:00Z',
+        },
       },
       {
-        message_id: 3,
-        conversation_id: 'conv-1',
-        sender_id: 'u-me',
-        body: 'third',
-        created_at: '2024-01-01T10:02:00Z',
+        kind: 'confirmed',
+        message: {
+          message_id: 3,
+          conversation_id: 'conv-1',
+          sender_id: 'u-me',
+          body: 'third',
+          created_at: '2024-01-01T10:02:00Z',
+        },
       },
     ],
     messagesHasMore: false,
@@ -112,5 +121,42 @@ describe('MessageThreadPanel', () => {
 
     expect(html).toContain('No messages yet. Send the first one.');
     expect(html).not.toContain(styles.readReceipt);
+  });
+
+  it('renders pending outbound row with busy state and spinner, without read receipt', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <MessageThreadPanel
+          vm={makeVm({
+            messages: [
+              {
+                kind: 'confirmed',
+                message: {
+                  message_id: 1,
+                  conversation_id: 'conv-1',
+                  sender_id: 'u-me',
+                  body: 'first',
+                  created_at: '2024-01-01T10:00:00Z',
+                },
+              },
+              {
+                kind: 'pending',
+                client_message_id: 'pending-cid-1',
+                conversation_id: 'conv-1',
+                sender_id: 'u-me',
+                body: 'sending…',
+                created_at: '2024-01-01T10:05:00Z',
+              },
+            ],
+            partnerReadUpToId: 5,
+          })}
+        />
+      </MemoryRouter>
+    );
+
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain(styles.msgPending);
+    expect(html).toContain(styles.msgPendingSpinner);
+    expect(html.match(/aria-label="(Read|Sent)"/g)).toHaveLength(1);
   });
 });

@@ -218,15 +218,18 @@
 
 ---
 
-## 20. Circuit Breaker — קריאות Google Maps Platform בבקאנד
+## 20. Circuit Breaker — תלויות חיצוניות (Google Maps, Brevo email)
 
 | | |
 |--|--|
-| **הקשר** | Geocoding, Directions ו-Distance Matrix הם תלות חיצונית; תקלות ברשת, בצד Google או quota יכולות ליצור **סערת retries** ולהעמיס על ה-API והספק בו-זמנית. |
-| **החלטה** | שלושה **singletons** in-memory ב־**`backend/app/infrastructure/geo/circuit_breaker.py`**: **`google_geocoding_cb`**, **`google_directions_cb`**, **`google_distance_matrix_cb`**. לפני כל קריאת HTTP מתאימה — **`allow_request()`**; הצלחה/כשל מעדכנים את המעגל (**CLOSED → OPEN** אחרי **5** כשלונות רצופים; **OPEN → HALF_OPEN** אחרי **~60 שניות** התאוששות; חזרה ל-**CLOSED** אחרי בקשה מוצלחת). כשהמעגל **OPEN** — **אין** קריאה ל-Google (fail-fast: `None` / רשימה ריקה לפי הזרימה). |
-| **חשיפת מצב** | **`GET /api/v1/health`** כולל **`circuit_breakers`** עם שמות המצבים — **מידע תפעולי בלבד**; **`status`** (`healthy` / `unhealthy`) נקבע **רק** מ־**database**, **redis**, **rabbitmq** כדי שלא יסומן ה-backend כלא-זמין רק בגלל Google. |
+| **הקשר** | Geocoding / Directions / Distance Matrix וכן שליחת מייל transactional דרך **Brevo** הן תלויות רשת; תקלות, quota או שקט של הספק יכולות ליצור **סערת retries** (במיוחד עם Tenacity על ה-SDK של Brevo) ולהעמיס על workers והספק בו-זמנית. |
+| **החלטה — מחלקה משותפת** | מימוש גנרי אחד ב־**`backend/app/infrastructure/circuit_breaker.py`**: **`CircuitBreaker`** מקבל **`state_gauge`** (Prometheus) ומעדכן לפי **`name`**. כך גיאו ו-Brevo לא משתפים מדד שגוי (`geo_*` לעומת `brevo_*`). |
+| **גיאו** | Singletons ב־**`backend/app/infrastructure/geo/circuit_breaker.py`**: **`google_geocoding_cb`**, **`google_directions_cb`**, **`google_distance_matrix_cb`** עם **`geo_circuit_breaker_state`**. לפני כל קריאת HTTP — **`allow_request()`**; כש־**OPEN** — **אין** קריאה ל-Google (fail-fast: `None` / רשימה ריקה). |
+| **Brevo** | Singleton **`brevo_email_cb`** ב־**`backend/app/infrastructure/notifications/circuit_breaker.py`** עם **`brevo_circuit_breaker_state`**. ב־**`EmailClient.send`**: אם **`allow_request()`** — מריצים את **`_send_with_retry`** (Tenacity פנימית); אם לא — **`EmailProviderCircuitOpenError`** (**503**, **`EMAIL_CIRCUIT_OPEN`**) **בלי** קריאה ל-Brevo. אחרי כל ניסיונות ה-retry — **`record_failure()`** פעם אחת לכשל לוגי; אחרי הצלחה — **`record_success()`**. **`ValueError`** על מפתח חסר — לפני המעגל (לא נספר ככשל ספק). |
+| **פרמטרים** | אותם ברירות מחדל כמו גיאו: **5** כשלונות לפתיחה, **~60s** התאוששות (ניתן לכוונן ליד ה-singleton). |
+| **חשיפת מצב** | **`GET /api/v1/health`** כולל **`circuit_breakers`** עם **`google_*`** ו־**`brevo_email`** — **מידע תפעולי בלבד**; **`status`** נקבע **רק** מ־**database**, **redis**, **rabbitmq**. |
 | **Fail-open בתוך המעגל** | שגיאות פנימיות בלוגיקת המעגל (`allow_request` וכו’) במקרה קיצון מחזירות **להמשיך** או לבלוע שגיאה — העדפה לא לחסום את האפליקציה במלואה אם לוגיקת המעגל נכשלת (ראו קוד). |
-| **בקצרה לראיון** | “עטפתי את שלוש קריאות ה-Maps בבקאנד במעגלים נפרדים — כשהספק נופל, אני נכשל מהר ולא מציף את Google; את מצב המעגל רואים ב-health בלי לשבור readiness של השרת.” |
+| **בקצרה לראיון** | “יש מחלקת circuit breaker אחת עם gauge מוזרק; גיאו ו-Brevo עם singletons ומטריקות נפרדות; Brevo עטוף מבחוץ ו-Tenacity מבפנים כדי לא לספור כשל לכל retry ביניים.” |
 
 ---
 
@@ -279,6 +282,19 @@
 | **Trade-off** | תוספת write-path לכל פעולה רגישה ונפח metadata שעלול לגדול. mitigation: metadata קומפקטי בלבד; בלי payloadים מלאים. |
 | **Fail policy** | ל-admin ול-billing נשמר best-effort pragmatic: כש-audit write נכשל — לוג warning, ולא שוברים את זרימת הדומיין הקריטית (במיוחד webhook processing). |
 | **בקצרה לראיון** | “תיעדתי פעולות רגישות בטבלת audit ייעודית, וב-billing הקפדתי על ordering נכון: audit לפני idempotency, כדי שגם retries כפולים יהיו נראים בחקירה.” |
+
+---
+
+## 25. Idempotency-Key — שליחת הודעת צ’אט (`POST …/conversations/{id}/messages`)
+
+| | |
+|--|--|
+| **הקשר** | לחיצה כפולה / retry רשת על שליחת הודעה עלולות ליצור שתי הודעות לוגיות לאותה שיחה. |
+| **החלטה** | כותרת אופציונלית **`Idempotency-Key`**; מימוש מקביל ל-§19: Redis **`SET NX`** על `idempotency:chat_message:{user_id}:{key}` לערך **`PROCESSING`**; SHA-256 של גוף קנוני ב־**`:fingerprint`** (למשל `conversation_id` + תוכן הודעה); אחרי **201** — שמירת JSON של **`MessageResponse`** (TTL ~5 דק׳); אותו מפתח + fingerprint → תשובה שמורה; בתהליך — **409** + **`Retry-After`**; fingerprint שונה — **422**; שגיאת דומיין — **`DELETE`** המפתחות. קוד: **`backend/app/domain/chat/message_idempotency.py`**, wiring ב־**`chat/router.py`**. |
+| **Stripe-style** | נשמרת רק **תשובת הצלחה** (201); שגיאות לא ננעלות כתוצאה זמינה. |
+| **Fail-open** | Redis לא זמין → אין dedup (ממשיכים כמו לפני). |
+| **פרונט** | **`sendMessage`** ב־**`frontend/src/api/chat.ts`** מוסיף **`Idempotency-Key`** (פרמטר אופציונלי; ברירת מחדל UUID אם לא הועבר). **זרימת UI:** **`useMessageThread`** / **`useChatPopup`** מעבירות מפתח יציב לניסיון שליחה (ref, כמו **`useJoinRide`**), מאפסות אחרי הצלחה, ועל **`idempotency_key_mismatch`** מנקות מפתח; רשימת הודעות מתעדכנת עם **`appendMessageDedupById`** (משותף לערוץ WS) — **`frontend/src/utils/`**. |
+| **בקצרה לראיון** | “העתקתי את דפוס ה-idempotency של Stripe לצ’אט — נעילה פר-משתמש+מפתח, fingerprint, cache של 201 בלבד, בלי לשבור את לוגיקת השמירה בדומיין.” |
 
 ---
 

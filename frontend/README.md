@@ -43,11 +43,16 @@ cp frontend/.env.example frontend/.env
 - **צ'אט WebSocket** – ב־[`src/config/env.ts`](src/config/env.ts) פונקציה `getChatWebSocketUrl`: ב־**DEV** (`import.meta.env.DEV`) חיבור **ישיר** ל־`ws://localhost:8081/ws?token=…` (שירות `chat-ws` בדוקר מפרסם 8081 ל־host). ב־**production** — `ws:` / `wss:` לפי הדף, עם `window.location.host` ונתיב `/ws`. אין משתנה `VITE_CHAT_WS_URL`. ב־Vite מוגדר גם proxy ל־`/ws` → 8081 (שימושי אם קוד אחר פונה לנתיב יחסי).
 - **WebSocket נסיעות / התראות (Backend)** – `getWsBaseUrl()` ב־**DEV**: `ws://localhost:8000/api/v1`; בפרודקשן: אותו host + `/api/v1`.
 - **Presence HTTP** – `GET /presence/...` דרך `chatWsApi`: ב־dev ה־Vite מפרוקסי `/presence` ל־`localhost:8081` (ראו `vite.config.ts`), בפרודקשן — דרך Nginx לאותו origin.
+- **REST צ’אט — Idempotency-Key + UI אופטימי:** [`src/api/chat.ts`](src/api/chat.ts) **`sendMessage`** שולח **`Idempotency-Key`** (אופציונלי מבחוץ; אחרת UUID). **`useMessageThread`** / **`useChatPopup`** מעבירים מפתח יציב לניסיון שליחה (**`utils/outboundIdempotencyKey.ts`**), מחזיקים רשימה כ־**`ChatListRow`** (**`types/chatList.ts`**) עם בועת **pending**, ומאחדים תשובות שרת/WS עם **`applyInboundRealMessage`** + **`appendMessageDedupById`** (**`utils/chatMessagesMerge.ts`**); כשל שליחה — **`removePendingByClientId`**. תואם ל־Stripe-style בבקאנד (**ADR §25**; פרונט **`docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md` §2**; היילייטס **`docs/ENGINEERING_HIGHLIGHTS.md`**).
 - `VITE_API_TIMEOUT_MS` – timeout לבקשות HTTP במילישניות (ברירת מחדל: `30000`).
 - `VITE_GOOGLE_MAPS_API_KEY` – מפתח Google Maps להצגת מפה ונתיב נסיעה (אופציונלי; חלק מהמסכים עובדים גם בלעדיו).
 - `VITE_GOOGLE_CLIENT_ID` – Client ID של Google OAuth (חובה לכניסה עם Google, בשימוש ב-`GoogleSignIn`).
 
 הקובץ `src/config/env.ts` מרכז את הקריאה למשתנים האלה ומספק fallback הגיוני לסביבת פיתוח.
+
+### צ’אט — השלמת הודעות אחרי ניתוק (REST)
+
+כל **`onOpen`** של צ’אט WS מפעיל **`fetchMissedMessages`** → **`fetchMissedGap`** ([`src/pages/MessageThread/fetchMissedGap.ts`](src/pages/MessageThread/fetchMissedGap.ts)): עמוד ראשון עם **`after=`**, המשך עם **`before=next_cursor`** עד **`has_more`** או תקרת לקוח. פירוט: [`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md).
 
 ---
 

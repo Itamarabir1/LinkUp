@@ -31,6 +31,8 @@ Authorization: Bearer <access_token>
 
 **ווב:** במסך חיפוש נוסעים, הוק **`useJoinRide`** ([`useJoinRide.ts`](../../frontend/src/pages/SearchRides/useJoinRide.ts)) מחזיק מפתח יציב ב-**`useRef`** לכל ניסיון “הצטרף לנסיעה” (לא מפתח חדש בכל רינדור), ומעביר אותו ל־**`requestRideFromSearch`**; **`useSearchRides`** משתמש בו לזרימת החיפוש.
 
+עבור **`POST /chat/conversations/{id}/messages`** ניתן (ומומלץ בלקוח) לשלוח **`Idempotency-Key`** — אופציונלי בשרת למען תאימות לאחור. אותן סמנטיקות טבלה כמו למעלה: אין כותרת → בלי Redis idempotency; מפתח + אותם `conversation_id` (בנתיב) + גוף זהה → תשובת 201 ממטמון; **409** + `Retry-After: 1` כשפעיל; **422** עם `idempotency_key_mismatch` אם המפתח שימש עם fingerprint אחר (`conversation_id` + `body`). מפתח Redis: `idempotency:chat_message:{user_id}:{client_key}`; כשל ב-Redis לפני עסקה → **fail-open**. **ווב:** [`sendMessage`](../../frontend/src/api/chat.ts) תומך במפתח אופציונלי (ברירת מחדל UUID אם לא הועבר); **[`useMessageThread`](../../frontend/src/pages/MessageThread/useMessageThread.ts)** ו-**[`useChatPopup`](../../frontend/src/components/ChatPopup/useChatPopup.ts)** מעבירים מפתח יציב לכל ניסיון שליחה (**`consumeOrCreateKey`** / **`resetOutboundKey`** ב־[**`outboundIdempotencyKey.ts`**](../../frontend/src/utils/outboundIdempotencyKey.ts)), מאחדים את תשובת ה-REST עם רשימת ההודעות דרך **`appendMessageDedupById`** כדי למנוע כפילויות עם replay או WS.
+
 ---
 
 ## Pagination
@@ -45,7 +47,7 @@ Authorization: Bearer <access_token>
 ### Cursor-based (נסיעות חיפוש, הודעות צ'אט)
 
 - **נסיעות (חיפוש נוסע)** (`GET /api/v1/passenger/passengers/search-rides`): `after` (UUID של `ride_id` אחרון בעמוד הקודם), `limit`. תגובה: `items`, `next_cursor` (= `ride_id` להמשך), `has_more`.
-- **הודעות** (`GET /chat/conversations/{id}/messages`): `before` (message_id — טעינת הודעות ישנות יותר), `after` (message_id — השלמת missed messages אחרי reconnect), `limit`. תגובה: `items`, `next_cursor`, `has_more`.
+- **הודעות** (`GET /chat/conversations/{id}/messages`): `before` (message_id — טעינת הודעות ישנות יותר), `after` (message_id — מחזיר הודעות עם **`message_id > after`**; בפרונט, אחרי **`onopen`** של צ’אט WS מתחילים ב־**`after`**; אם התשובה מחזירה **`has_more`**, ההמשך הוא **`before=next_cursor`** בדיוק כמו בגלילה לישנות יותר — ראו **`fetchMissedGap`** ב־REALTIME/HIGHLIGHTS), `limit`. תגובה: `items`, `next_cursor`, `has_more`.
 
 ### Page-based (הזמנות שלי)
 
@@ -66,7 +68,7 @@ Authorization: Bearer <access_token>
 | Method | Path | Auth | תיאור |
 |--------|------|------|--------|
 | GET | / | לא | סטטוס כללי |
-| GET | /api/v1/health | לא | בדיקת תלויות הליבה (DB, Redis, RabbitMQ) + **מצב אינפורמטיבי** של מעגלי **Circuit Breaker** ל-Google Maps |
+| GET | /api/v1/health | לא | בדיקת תלויות הליבה (DB, Redis, RabbitMQ) + **מצב אינפורמטיבי** של מעגלי **Circuit Breaker** (Google Maps + שליחת מייל Brevo) |
 
 **`GET /api/v1/health`** מחזיר JSON עם לפחות:
 
@@ -76,7 +78,7 @@ Authorization: Bearer <access_token>
 | `redis` | `ok` אחרי `PING`, אחרת `error` |
 | `rabbitmq` | `ok` כשהלקוח מחובר לברוקר, אחרת `error` |
 | `status` | **`healthy`** רק אם כל שלושת השדות למעלה הם **`ok`**; אחרת **`unhealthy`** |
-| `circuit_breakers` | אובייקט עם מפתחות **`google_geocoding`**, **`google_directions`**, **`google_distance_matrix`** — ערכים מחרוזתיים: **`closed`** / **`open`** / **`half_open`** (מצב מעגל ה-Google Maps API המתאים בבקאנד). **לא** משפיע על **`status`** — רק ניטור תפעולי. |
+| `circuit_breakers` | אובייקט עם מפתחות **`google_geocoding`**, **`google_directions`**, **`google_distance_matrix`**, **`brevo_email`** — ערכים מחרוזתיים: **`closed`** / **`open`** / **`half_open`** (מצב מעגל in-memory בבקאנד: שלושת מעגלי Google Maps + מעגל שליחת מייל Brevo). **לא** משפיע על **`status`** — רק ניטור תפעולי. |
 
 קוד התגובה: **200** כש־`status === healthy`, **503** כש־`status === unhealthy` (מוגדר ב־`main.py`). מימוש: **`app/infrastructure/health/health_service.py`**.
 
@@ -193,8 +195,8 @@ Authorization: Bearer <access_token>
 | POST | /conversations/by-booking/{booking_id} | כן | שיחה לפי booking (נהג–נוסע). |
 | GET | /conversations | כן | רשימת השיחות שלי. |
 | GET | /conversations/{conversation_id} | כן | פרטי שיחה. `ConversationDetail` כולל גם `partner_last_read_at` וגם `partner_read_up_to_message_id` (cursor מונוטוני ל-read receipts). |
-| POST | /conversations/{conversation_id}/messages | כן | body: MessageCreate (body). שליחת הודעה (201). |
-| GET | /conversations/{conversation_id}/messages | כן | הודעות. query: limit (default 30), `before` (message_id לטעינת ישנות), `after` (message_id להשלמת missed messages). **Pagination**: cursor-based. תגובה: items, next_cursor, has_more. |
+| POST | /conversations/{conversation_id}/messages | כן | body: MessageCreate (body). שליחת הודעה (**201**). אופציונלי **`Idempotency-Key`** (מומלץ בלקוח): אותו מפתח + אותה כוונה (`conversation_id` + `body`) → תגובת 201 ממטמון; **409** + `Retry-After` בתהליך; **422** `idempotency_key_mismatch` אחרת. סעיף Idempotency למעלה ו-**ADR §25**. |
+| GET | /conversations/{conversation_id}/messages | כן | הודעות. query: limit (default 30), `before` (message_id לטעינת ישנות / המשך cursor אחרי `after`), `after` (message_id להשלמת missed messages — עמוד ראשון ב־reconnect). **Pagination**: cursor-based. תגובה: items, next_cursor, has_more. |
 | POST | /conversations/{conversation_id}/read | כן | סימון שיחה כנקראה (204). |
 הערת read receipts: `POST /conversations/{conversation_id}/read` מעדכן ב־DB גם `last_read_at` וגם `last_read_message_id` עבור המשתמש הקורא. לאחר מכן מתפרסם אירוע WebSocket מסוג `message_read` עם `read_up_to_message_id`, והפרונט מסמן כ־read כל הודעה יוצאת עם `message_id <= partner_read_up_to_message_id`.
 

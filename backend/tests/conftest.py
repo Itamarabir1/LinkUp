@@ -26,6 +26,7 @@ if sys.platform == "win32":
 
 import pytest
 import pytest_asyncio
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -34,8 +35,19 @@ from app.api.dependencies.admin import get_current_admin_user
 from app.api.dependencies.auth import get_current_user
 from app.db.session import get_db
 from app.domain.rides.enum import RideStatus
-from app.main import app
 from tests.helpers.db_factories import make_ride, make_user
+
+_test_app: FastAPI | None = None
+
+
+def _get_test_app() -> FastAPI:
+    """Lazy-import FastAPI app so unit tests that do not need HTTP avoid engine/Firebase startup at collection time."""
+    global _test_app
+    if _test_app is None:
+        from app.main import app as fastapi_app
+
+        _test_app = fastapi_app
+    return _test_app
 
 
 def _require_test_db_url() -> str:
@@ -118,6 +130,7 @@ async def api_client_no_auth(
         async with e2e_session_factory() as s:
             yield s
 
+    app = _get_test_app()
     app.dependency_overrides[get_db] = _get_db_override
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
@@ -157,6 +170,7 @@ async def api_client_with_overrides(
             raise RuntimeError("Test auth context missing user")
         return user
 
+    app = _get_test_app()
     app.dependency_overrides[get_db] = _get_db_override
     app.dependency_overrides[get_current_user] = _get_current_user_override
     app.dependency_overrides[get_current_admin_user] = _get_current_user_override

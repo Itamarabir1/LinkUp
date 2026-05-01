@@ -6,7 +6,8 @@ All routes require authentication (get_current_user).
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_current_user
@@ -15,6 +16,10 @@ from app.core.exceptions.base import LinkUpError
 from app.core.exceptions.chat import ChatRoomNotFound
 from app.db.session import get_db
 from app.domain.chat import crud as chat_crud
+from app.domain.chat.message_idempotency import (
+    chat_message_redis_key,
+    message_send_fingerprint,
+)
 from app.domain.chat.schema import (
     ConversationCreate,
     ConversationDetail,
@@ -34,6 +39,7 @@ from app.domain.chat.service import (
 )
 from app.domain.users.crud import crud_user
 from app.domain.users.model import User
+from app.infrastructure.redis.client import redis_client
 
 router = APIRouter(tags=["Chat"])
 logger = logging.getLogger(__name__)
@@ -122,16 +128,83 @@ async def post_message(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     _: None = Depends(rate_limit_chat),
+    idempotency_key: str | None = Header(
+        None,
+        alias="Idempotency-Key",
+        description=(
+            "Optional UUID per send intent — dedupe double-submit / client retries "
+            "(same key + same body replays cached 201)."
+        ),
+    ),
 ):
-    """Post a message; participants only. Rate limited: 30 messages/minute per user."""
-    msg = await send_message(
-        db,
-        conversation_id=conversation_id,
-        sender_id=current_user.user_id,
-        body=data.body,
-    )
-    await crud_user.update_last_active(db, user_id=current_user.user_id)
-    return msg
+    """
+    Post a message; participants only. Rate limited: 30 messages/minute per user.
+
+    Optional Idempotency-Key: same semantics as POST request-ride-from-search (Redis TTL;
+    mismatch → 422, in-flight → 409 + Retry-After).
+    """
+    redis_key: str | None = None
+    claimed = False
+
+    if idempotency_key:
+        fingerprint = message_send_fingerprint(conversation_id, data.body)
+        redis_key = chat_message_redis_key(str(current_user.user_id), idempotency_key)
+        state = await redis_client.idempotency_try_begin(redis_key, fingerprint)
+
+        if state == "mismatch":
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "idempotency_key_mismatch",
+                    "message": "Idempotency-Key שימש בעבר עם גוף בקשה שונה",
+                },
+            )
+        if state == "in_progress":
+            return JSONResponse(
+                status_code=status.HTTP_409_CONFLICT,
+                content={"detail": "בקשה זו כבר בעיבוד — נסה שוב בעוד רגע"},
+                headers={"Retry-After": "1"},
+            )
+        if state.startswith("completed:"):
+            cached_json = state[len("completed:") :]
+            try:
+                return MessageResponse.model_validate_json(cached_json)
+            except Exception as e:
+                logger.warning(
+                    "chat message idempotency cache corrupt key=%s: %s",
+                    redis_key,
+                    e,
+                    exc_info=True,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Idempotency cache invalid",
+                ) from e
+
+        claimed = True
+
+    try:
+        msg = await send_message(
+            db,
+            conversation_id=conversation_id,
+            sender_id=current_user.user_id,
+            body=data.body,
+        )
+        await crud_user.update_last_active(db, user_id=current_user.user_id)
+        if claimed and redis_key:
+            await redis_client.idempotency_set_result(
+                redis_key,
+                MessageResponse.model_validate(msg).model_dump_json(),
+            )
+        return msg
+    except ChatRoomNotFound:
+        if claimed and redis_key:
+            await redis_client.idempotency_delete(redis_key)
+        raise
+    except Exception:
+        if claimed and redis_key:
+            await redis_client.idempotency_delete(redis_key)
+        raise
 
 
 @router.get(

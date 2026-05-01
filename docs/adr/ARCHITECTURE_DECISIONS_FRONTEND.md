@@ -24,6 +24,7 @@
 | **חריגים** | `AuthContext` (טוקנים, interceptors), ו-[`api/presence.ts`](../../frontend/src/api/presence.ts) (`chatWsApi`) — מתועדים ב-ARCHITECTURE של הפרונט. |
 | **למה** | קל לחפש endpoints, לאחד headers ו-refresh, ולשמור על גבול ברור בין UI לרשת. |
 | **בקצרה לראיון** | "מרכזים HTTP ב-client אחד; הדומיין קורא פונקציות מ-api ולא נתיבים גולמיים." |
+| **Idempotency (צ’אט outbound)** | **`POST …/messages`**: אותו דפוס מחזור חיים כמו **`useJoinRide`** — **`consumeOrCreateKey`** / **`resetOutboundKey`** ([`outboundIdempotencyKey.ts`](../../frontend/src/utils/outboundIdempotencyKey.ts)) ב־**`useMessageThread`** ו-**`useChatPopup`**; מפתח מפורש ל־[**`sendMessage`**](../../frontend/src/api/chat.ts). **רשימת הודעות:** union **`ChatListRow`** ([`types/chatList.ts`](../../frontend/src/types/chatList.ts)) — **`confirmed`** / **`pending`** (`client_message_id`); **`applyInboundRealMessage`** קורא ל־**`appendMessageDedupById`** ([`chatMessagesMerge.ts`](../../frontend/src/utils/chatMessagesMerge.ts)) אחרי הסרת pending מתואם; אותו מיזוג מ־[**`processChatWebSocketMessage`**](../../frontend/src/pages/MessageThread/processChatWebSocketMessage.ts) עם **`outboundPendingRef`** (thread בלבד) כדי ליישר WS לפני/אחרי REST בלי כפילויות. כשל REST: **`removePendingByClientId`** והחזרת טקסט. **422 mismatch:** **`isChatIdempotencyKeyMismatch`** ב־[`apiError.ts`](../../frontend/src/utils/apiError.ts). |
 
 ---
 

@@ -140,6 +140,14 @@ class ExternalServiceError(LinkUpError):
     message = "שירות חיצוני אינו זמין או החזיר שגיאה"
 
 
+class EmailProviderCircuitOpenError(LinkUpError):
+    """Email circuit breaker is OPEN; outbound send skipped (fail-fast)."""
+
+    status_code = 503
+    error_code = "EMAIL_CIRCUIT_OPEN"
+    message = "שירות האימייל אינו זמין כרגע; נסה שוב מאוחר יותר"
+
+
 class InternalServerError(LinkUpError):
     status_code = 500
     error_code = "INTERNAL_ERROR"

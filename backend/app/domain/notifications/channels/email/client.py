@@ -11,6 +11,8 @@ from tenacity import (
 )
 
 from app.core.config import settings
+from app.core.exceptions.infrastructure import EmailProviderCircuitOpenError
+from app.infrastructure.notifications.circuit_breaker import brevo_email_cb
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +23,25 @@ class EmailClient:
         self.configuration.api_key["api-key"] = settings.BREVO_API_KEY
         self.api_instance = sib_api_v3_sdk.TransactionalEmailsApi(sib_api_v3_sdk.ApiClient(self.configuration))
 
+    async def send(self, recipient: str, subject: str, body: str, recipient_name: str = "User"):
+        if not (getattr(settings, "BREVO_API_KEY", None) or "").strip():
+            raise ValueError("BREVO_API_KEY is not set in .env. Set it in backend/.env to send emails (e.g. verification, password reset).")
+        if not brevo_email_cb.allow_request():
+            raise EmailProviderCircuitOpenError()
+        try:
+            result = await self._send_with_retry(recipient, subject, body, recipient_name)
+        except (ApiException, ConnectionError):
+            brevo_email_cb.record_failure()
+            raise
+        brevo_email_cb.record_success()
+        return result
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=10),
         retry=retry_if_exception_type((ApiException, ConnectionError)),
     )
-    async def send(self, recipient: str, subject: str, body: str, recipient_name: str = "User"):
-        if not (getattr(settings, "BREVO_API_KEY", None) or "").strip():
-            raise ValueError("BREVO_API_KEY is not set in .env. Set it in backend/.env to send emails (e.g. verification, password reset).")
+    async def _send_with_retry(self, recipient: str, subject: str, body: str, recipient_name: str = "User"):
         sender = {
             "name": settings.BREVO_SENDER_NAME,
             "email": settings.BREVO_SENDER_EMAIL,

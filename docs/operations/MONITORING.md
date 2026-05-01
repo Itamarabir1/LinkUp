@@ -39,7 +39,18 @@ Interpretation:
 ## Infrastructure health
 
 - DB, Redis, RabbitMQ health from `/api/v1/health`
-- circuit breaker state visibility (informational) under `circuit_breakers`
+- circuit breaker state visibility (informational) under `circuit_breakers` (Google Maps + `brevo_email`)
+
+## Circuit breaker metrics (Prometheus)
+
+Gauge semantics are consistent: **0** = closed (normal), **1** = half_open (probe), **2** = open (failing fast).
+
+| Metric | Labels | Source module |
+|--------|--------|----------------|
+| `geo_circuit_breaker_state` | `name`: `google_geocoding`, `google_directions`, `google_distance_matrix` | `app/infrastructure/metrics.py` → geo singletons in `geo/circuit_breaker.py` |
+| `brevo_circuit_breaker_state` | `name`: `brevo_email` | `app/infrastructure/metrics.py` → `brevo_email_cb` in `notifications/circuit_breaker.py` |
+
+See **§20** in [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md) and [`docs/architecture/NOTIFICATIONS.md`](../architecture/NOTIFICATIONS.md).
 
 ## Liveness & Readiness Probes
 

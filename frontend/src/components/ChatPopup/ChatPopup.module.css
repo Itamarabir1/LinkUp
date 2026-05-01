@@ -191,6 +191,22 @@
 .bubbleOut .bubbleTime { color: rgba(255,255,255,0.65); text-align: left; }
 .bubbleIn .bubbleTime { color: var(--text-tertiary); text-align: right; }
 
+.bubblePending {
+  opacity: 0.88;
+}
+
+.bubblePendingSpinner {
+  display: inline-block;
+  vertical-align: middle;
+  margin-inline-start: 4px;
+  animation: chatPopupPendingSpin 0.75s linear infinite;
+}
+
+@keyframes chatPopupPendingSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Send area */
 .sendArea {
   padding: 10px 14px;
