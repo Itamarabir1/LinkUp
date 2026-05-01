@@ -1,17 +1,18 @@
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
 
 import pytest
 from sqlalchemy import text
 
 from app.core.exceptions.billing import IdempotencyMismatchError
 from app.domain.billing.idempotency import IdempotencyManager
+from tests.helpers.db_factories import make_user
 
 
 @pytest.mark.asyncio
 async def test_idempotency_same_key_same_fingerprint_returns_cached(db_session):
     manager = IdempotencyManager()
-    user_id = uuid4()
+    user = await make_user(db_session, "billing-idem-a")
+    user_id = user.user_id
     endpoint = "/billing/checkout"
     key = "k-123"
     fingerprint = "fp-1"
@@ -42,7 +43,8 @@ async def test_idempotency_same_key_same_fingerprint_returns_cached(db_session):
 @pytest.mark.asyncio
 async def test_idempotency_same_key_different_fingerprint_raises(db_session):
     manager = IdempotencyManager()
-    user_id = uuid4()
+    user = await make_user(db_session, "billing-idem-b")
+    user_id = user.user_id
     endpoint = "/billing/checkout"
     key = "k-123"
     await manager.store(
@@ -68,7 +70,8 @@ async def test_idempotency_same_key_different_fingerprint_raises(db_session):
 @pytest.mark.asyncio
 async def test_idempotency_expired_key_is_not_cache_hit(db_session):
     manager = IdempotencyManager()
-    user_id = uuid4()
+    user = await make_user(db_session, "billing-idem-c")
+    user_id = user.user_id
     endpoint = "/billing/checkout"
     key = "k-123"
     await manager.store(
