@@ -29,9 +29,12 @@ async def test_post_message_leader_calls_set_result(monkeypatch, db_session):
         created_at=datetime.now(timezone.utc),
     )
 
-    async def fake_send(db, *, conversation_id, sender_id, body):
-        assert conversation_id == conv_id
-        assert sender_id == dummy_user.user_id
+    async def fake_send(db, *args, **kwargs):
+        # Router passes sender_id=; older/alternate mocks used sender_sid.
+        sid = kwargs.get("sender_id", kwargs.get("sender_sid"))
+        assert kwargs["conversation_id"] == conv_id
+        assert kwargs["body"] == "hi"
+        assert sid == dummy_user.user_id
         return sent
 
     mock_redis = MagicMock()
