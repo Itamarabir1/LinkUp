@@ -62,12 +62,12 @@ Stripe SDK מבודד לחלוטין. DTOs עם `slots=True`. שאר הקוד ל
 - `GET /api/v1/admin/billing/stale-pending` — רשימת payments “תקועים” בהגדרות ה-reconciler + `last_run_at` של המ reconciler.
 - `POST /api/v1/admin/billing/reconcile/{payment_id}` — recovery ידני ל-payment בודד.
 
-### migration 015 (`015_billing_idempotency_and_indexes`)
+### migration 015 (revision `015_billing_idem`, קובץ `015_billing_idempotency_and_indexes.py`)
 
 - טבלת `idempotency_keys`.
 - partial index על `payments(status, created_at) WHERE status = 'pending'` — ביצועי reconciler בסקייל.
 
-**הערת תפעול:** במאגר עשויים להיווצר שני ראשי Alembic (`015_add_audit_log` ו־`015_billing_idempotency_and_indexes`) עד למיזוג — ראו [`docs/architecture/DATABASE.md`](architecture/DATABASE.md).
+**הערת תפעול:** שני ה־15 במאגר מתמזגים ב־**`016_merge015_heads`**; ראו [`docs/architecture/DATABASE.md`](architecture/DATABASE.md).
 
 ### טסטים
 

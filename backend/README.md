@@ -47,10 +47,10 @@ Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 
 סיכום מלא של ה-refactor (לפני/אחרי, webhooks, reconciler, השוואת Kafka): **`../docs/BILLING_REFACTOR_SUMMARY.md`**.
 
-- **Checkout idempotency:** כותרת אופציונלית **`X-Idempotency-Key`** על **`POST /api/v1/billing/checkout`** — שמירה בטבלת **`idempotency_keys`** (ראו **`app/domain/billing/idempotency.py`**, מיגרציה **`015_billing_idempotency_and_indexes`**).
+- **Checkout idempotency:** כותרת אופציונלית **`X-Idempotency-Key`** על **`POST /api/v1/billing/checkout`** — שמירה בטבלת **`idempotency_keys`** (ראו **`app/domain/billing/idempotency.py`**, מיגרציה רוויזיה **`015_billing_idem`**).
 - **Reconciler:** **`BillingReconciler`** מתוזמן מ־**`app/core/lifespan.py`** (APScheduler) כש־**`BILLING_RECONCILER_ENABLED`**; נעילת Postgres consultative, סנכרון תשלומים **`pending`** מול Stripe (**`reconciler.py`**).
 - **בדיקות יחידה (ללא DB חובה לחלקן):** **`tests/domain/test_billing_state_machine.py`**, **`tests/domain/test_billing_reconciler.py`** — מומלץ **`uv run pytest`** מתוך **`backend/`** עם venv הפרויקט.
-- **Alembic:** בשורת הקוד הנוכחית עשויים להיות **שני heads** (**`015_add_audit_log`**, **`015_billing_idempotency_and_indexes`**) — למזג לפני פריסה; פירוט **`docs/architecture/DATABASE.md`**.
+- **Alembic:** אחרי **014** שני צעדי **015** מתמזגים ב־**`016_merge015_heads`**; פירוט **`docs/architecture/DATABASE.md`**.
 
 ## Tests & CI (quality)
 

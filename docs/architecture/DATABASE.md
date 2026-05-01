@@ -327,9 +327,9 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 | 013_add_billing | טבלת `payments`, enum `payment_status_enum`, ושדות חיוב ב-`users` (`stripe_customer_id`, `is_premium`, `premium_since`) | 2026-04-23 |
 | 014_fix_billing_partial_state | תיקון סכמת billing אחרי מצבים חלקיים (enum/עמודות/indexes idempotent) | 2026-04-23 |
 | 015_add_audit_log | טבלת `audit_log` (אדמין + ניסיונות webhook billing) | 2026-04-26 |
-| 015_billing_idempotency_and_indexes | טבלת `idempotency_keys` + אינדקס חלקי `idx_payments_status_created` על `payments` | 2026-05-01 |
+| 015_billing_idem (`015_billing_idempotency_and_indexes.py`) | טבלת `idempotency_keys` + אינדקס חלקי `idx_payments_status_created` על `payments` | 2026-05-01 |
 
-**הערת Alembic:** נכון לקוד הנוכחי קיימים **שני ראשים** (`alembic heads`): **`015_add_audit_log`** ו־**`015_billing_idempotency_and_indexes`** (שניהם יורשים מ־**014**). לפני סביבת פרודקשן יש **למזג** אותם לרוויזיה אחת (**`alembic merge`**) או לאחד שרשרת, עד ש־**`upgrade head`** מפנה ל־**head** יחיד.
+**הערת Alembic:** רוויזיות **`015_add_audit_log`** ו־**`015_billing_idem`** מתפצלות מ־**014**; המיזוג הוא **`016_merge015_heads`** (מזהי רוויזיה חייבים להתאים ל־`VARCHAR(32)` בטבלת **`alembic_version`** — לכן הסט מקוצר עבור מיגרציית האידמפוטנטיות).
 
 הרצה: מתוך `backend/` — `alembic upgrade head`. downgrade: `alembic downgrade -1`.
 

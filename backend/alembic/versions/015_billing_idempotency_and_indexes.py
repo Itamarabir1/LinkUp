@@ -1,6 +1,6 @@
 """Add billing idempotency keys and pending index.
 
-Revision ID: 015_billing_idempotency_and_indexes
+Revision ID: 015_billing_idem (≤32 chars for alembic_version.version_num)
 Revises: 014_fix_billing_partial_state
 Create Date: 2026-05-01
 """
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = "015_billing_idempotency_and_indexes"
+revision = "015_billing_idem"
 down_revision = "014_fix_billing_partial_state"
 branch_labels = None
 depends_on = None
