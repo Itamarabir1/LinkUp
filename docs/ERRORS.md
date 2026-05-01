@@ -64,6 +64,8 @@
 | CHAT_MESSAGE_SEND_FAILED | 500 | backend | צ׳אט |
 | PAYMENT_NOT_FOUND | 404 | backend | Billing — תשלום לא נמצא |
 | PAYMENT_ALREADY_EXISTS | 409 | backend | Billing — ניסיון יצירה כפול (אידמפוטנטיות/ייחודיות) |
+| **ILLEGAL_PAYMENT_TRANSITION** | **409** | backend | Billing — מעבר סטטוס **`PaymentStatus`** לא מורשה (**`PaymentTransitionError`** ב־`app/core/exceptions/billing.py` / **`state_machine.py`**) |
+| **IDEMPOTENCY_MISMATCH** | **422** | backend | Billing — **`X-Idempotency-Key`** בשימוש חוזר עם fingerprint שונה מזה שנשמר (**`IdempotencyMismatchError`**) |
 | STRIPE_WEBHOOK_ERROR | 400 | backend | Billing — webhook לא תקין (חתימה/מטען) |
 | CHECKOUT_SESSION_ERROR | 502 | backend | Billing — כשל ביצירת Checkout Session מול Stripe |
 | USER_ALREADY_PREMIUM | 400 | backend | Billing — משתמש כבר מסומן כ־premium |
@@ -111,11 +113,12 @@
 
 ## 5. Sentry Integration
 
-כשמחברים Sentry:
+כשמחברים / מתחזקים Sentry:
 
 1. **Backend — `app/core/logging.py`**: הוסיפו handler של Sentry (למשל `SentryHandler`) ל-root logger, בהתאם לתיעוד Sentry ל-Python, כך שחריגות ולוגי שגיאה יישלחו עם הקשר (כולל `request_id` אם מסננים/מצרפים אותו ב-filters).
-2. **Frontend — `src/api/client.ts`**: הסירו הערה והפעילו `Sentry.captureException(err)` בתוך ה-interceptor שמטפל ב-4xx/5xx שאינם 401 (מסומן `// TODO: Sentry`).
-3. **Frontend — `src/components/RouteErrorBoundary/RouteErrorBoundary.tsx`** ו-**`src/components/ChatErrorBoundary/ChatErrorBoundary.tsx`**: הפעילו `Sentry.captureException(error)` ב-`componentDidCatch` (מסומן `// TODO`).
+2. **Frontend — `src/api/client.ts`**: interceptor שני (אחרי מסלול רענון JWT) לא לוג Sentry על **401** (צפוי לאחר כשל refresh); ב־**PROD** — **`Sentry.captureException`** על **5xx** (לא ביטול משתמש) עם **`__sentryCaptured = true`** כדי שהשכבה של React Query לא תכפיל. אחרי כשל **`refreshAccessToken`** (אין refresh / exception): **`clearTokens()`** ואז **`auth:session-expired`** דרך **`emitSessionExpired()`** עם guard נגד הפעלה כפולה.
+3. **Frontend — React Query — `src/api/queryClient.ts`**: **`captureExceptionOnce`** ב־`QueryCache` / `MutationCache` **`onError`** — מדלג על ביטול, על שגיאה שכבר **`__sentryCaptured`**, ועל **`AxiosError` עם סטטוס 401 בלבד** (**לא** על **403** — נשמר רעש לתיקוני RBAC). בסנטרי: **`Sentry.setUser(null)`** בכל ניקוי סשן מוסכם ב-[`AuthContext.tsx`](../frontend/src/context/AuthContext.tsx); פירוט זרימה: **[FEATURE_DECISIONS.md](FEATURE_DECISIONS.md#auth-session-teardown)** · **ADR Frontend §21**.
+4. **Frontend — error boundaries — `RouteErrorBoundary`** / **`ChatErrorBoundary`**: ב־PROD — **`Sentry.captureException`** ב־`componentDidCatch` לשגיאות React מקומיות (מנותק ממדיניות ה-API לעיל).
 
 ---
 

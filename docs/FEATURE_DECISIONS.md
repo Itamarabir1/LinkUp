@@ -39,6 +39,21 @@
 
 ---
 
+<a id="auth-session-teardown"></a>
+
+## Frontend — איחוד teardown לסיסמה / פג refresh / bootstrap נכשל
+
+| | |
+|--|--|
+| **בעיה** | מספר מסלולי ניקוי בפרונט (**logout**, **`refreshUser`** catch, bootstrap **`fetchCurrentUser`** catch, ו-**`refreshAccessToken`** ב-`client.ts`) שיכפלו לוגיקה; כשזרימת הרענון נכשלת ב-axios, הקוד הקודם השאיר טוקן ב-React context כ‑**authenticated** בזמן ש-**localStorage** כבר התרוקן → משתמש "תקוע" על רוט מוגן. |
+| **החלטה** | פונקציה אחת **`tearDownSession({ reason })`** ב־[`AuthContext.tsx`](../frontend/src/context/AuthContext.tsx): **`user-action`** — `patchFcmToken(null)`, `logoutSession()`, אחר כך תמיד `cleanupFCM()`, `queryClient.clear()`, **`Sentry.setUser(null)`** (PROD), `clearTokens`, `isAuthenticated=false`. **`session-expired`** / **`bootstrap-failed`** מדלגים על קריאות HTTP (JWT לא מהימן), אבל מריצים את אותו **local teardown**. **`client.ts`**: בעת **`!refresh_token`** או refresh שנכשל — **`clearTokens()`** ואז **`window.dispatchEvent('auth:session-expired')`** עם **guard רק-entry** למניעת N אירועים מקבילים; בסוף זרימת 401 לאחר כשל refresh — סימון **`__sentryCaptured`** לפני `reject`. |
+| **Sentry noise** | ב־[`queryClient.ts`](../frontend/src/api/queryClient.ts), **`captureExceptionOnce`** מדלג על **401** בלבד (לא **403** — RBAC צריך להישאר visible). |
+| **Trade-off** | בלי **`patchFcmToken(null)`** בנתיב **session-expired** (מתכוון — מונע רקורסיה 401 והטוקן ב-DB יתעדכן ב-Re-login כשFirebase מחזיר token); משתמש אחר מאותה דפדפן עם אותו install — תלוי בהתנהגות Firebase ובניקוי NotRegistered בעתיד ב-backend אם צריך. |
+| **Interview pitch (≈30s)** | *"מרכזתי teardown לסוג הודעות: logout מפורש מול הרחבת session שמתה. Axios לא משתלב בצורה הגיונית בתוך React — CustomEvent מתנתק, guard מונע storm, והמסך עובר ל-login כי ProtectedRoute רואה isAuthenticated=false."* |
+| **הפניה** | Frontend ADR §21, [`client.ts`](../frontend/src/api/client.ts), [`queryClient.ts`](../frontend/src/api/queryClient.ts), [`AuthContext.tsx`](../frontend/src/context/AuthContext.tsx) |
+
+---
+
 <a id="chat-ws"></a>
 
 ## Real-time chat + chat-ws (Go)
@@ -65,6 +80,20 @@
 | **החלטה** | **`onopen` תמיד** — **`fetchMissedMessages(lastMessageIdRef ?? 0)`**; עדכון ref — **`messages.length > 0 ? max(message_id) : null`**. ההשלמה בפועל עוברת דרך **`fetchMissedGap`** — עמוד ראשון עם **`after`**, המשך עם **`before=next_cursor`** כל עוד **`has_more`**, בהתאם לחוזה ב־[API messages](architecture/API.md) (זהה ל־pagination של גלילה לעבר הישן). |
 | **Trade-off** | הרבה יותר HTTP בפערים גדולים (עד **~50** עמודים × **`limit` 30**, עם **שני** ניסיונות חוזרים לכל עמוד); כפילויות נסגרות ע"י **`message_id`** ב־merge; אם הגענו למכסה או השיחה מתחלפת באמצע — חלק מהפער עלול להישאר (**`shouldAbort`** / **`cidRef`**). |
 | **הפניה** | [architecture/REALTIME.md](architecture/REALTIME.md), [ENGINEERING_HIGHLIGHTS.md](ENGINEERING_HIGHLIGHTS.md) (Latest updates), [`fetchMissedGap.ts`](../frontend/src/pages/MessageThread/fetchMissedGap.ts), [`fetchMissedGap.test.ts`](../frontend/src/pages/MessageThread/fetchMissedGap.test.ts), [`useChatWebSocket.ts`](../frontend/src/pages/MessageThread/useChatWebSocket.ts), [`useConversationMessages.ts`](../frontend/src/pages/MessageThread/useConversationMessages.ts) |
+
+---
+
+<a id="frontend-ws-reconnect-backoff"></a>
+
+## Frontend — WebSocket reconnect delay (backoff + jitter)
+
+| | |
+|--|--|
+| **בעיה** | עיכוב **קבוע** (~3s) בין ניסיונות חיבור מחדש ל־WebSocket **מסנכרן** לקוחות אחרי נפילה המונית (deploy, restart, blip) — **thundering herd** על chat-ws / backend / Nginx בעת התאוששות. |
+| **החלטה** | פונקציה טהורה **`computeReconnectDelayMs`** ב־[`reconnectBackoff.ts`](../frontend/src/utils/reconnectBackoff.ts): בסיס **3s**, **כפול** בכל כשל, תקרה **30s**, **±20% jitter** על הערך אחרי התקרה; מונה ניסיונות **מתאפס ב־`onopen`** ובהרצת effect חדשה כשמשנים **`cid`** / **`reconnectKey`**. מחובר ל־[`useChatWebSocket.ts`](../frontend/src/pages/MessageThread/useChatWebSocket.ts), [`useReconnectingWebSocket.ts`](../frontend/src/hooks/useReconnectingWebSocket.ts), [`useReconnectingWebSocketState.ts`](../frontend/src/hooks/useReconnectingWebSocketState.ts); **`reconnectDelayMs`** בשני ההוקים הכלליים משמש **baseMs** כברירת מחדל (**3000**). |
+| **Trade-off** | זמן עד התאוששות מלאה עלול להתארך אחרי שרידור ארוך של כשלים; לעומת זאת פחות עומס הקצפתי והתנהגות נדיבה יותר לשרת. |
+| **Interview pitch (≈30s)** | *"אותה תפיסה כמו Redis backoff בבקאנד — רק שגם ה-clients לא מציפים את השרת ברגע שהשירות חוזר: exponential backoff, cap 30s, jitter, ומונה שמתאפס ב-onopen. utility אחד לשלושת ה-hooks."* |
+| **הפניה** | [architecture/REALTIME.md](architecture/REALTIME.md), [ENGINEERING_HIGHLIGHTS.md](ENGINEERING_HIGHLIGHTS.md), [`reconnectBackoff.test.ts`](../frontend/src/utils/reconnectBackoff.test.ts) |
 
 ---
 
@@ -464,6 +493,22 @@
 
 ---
 
+<a id="browser-csp-edge"></a>
+
+## Browser CSP enforcement (Compose edge nginx)
+
+| | |
+|--|--|
+| **בעיה** | פרונט הווב הוא **SPA סטטי** (Vite → `dist/`); בלי מדיניות דפדפן, XSS או טעינת משאבים מזויפים קלים יותר; Report-Only בלבד לא חוסם. |
+| **החלטה** | **`nginx/nginx.conf`** (פרופיל prod ב־Compose) מחזיר **`Content-Security-Policy`** מאוכפת עם allowlists צרות לפי צרכי המוצר (Firebase, Sentry, GA/GTM, maps, uploads, Stripe, Google Sign-In). **`report-uri`** ממשיך ל-Sentry ingestion לוויק violation visibility. **`frame-src`** כולל `https://accounts.google.com` לצד Stripe. **בשכבת הסקריפטים:** הוסר **`'unsafe-inline'`** מ־**`script-src`**; Bootstrap לפני React (`linkup-lang` / `linkup-theme`) הועבר ל־**[`frontend/public/bootstrap.js`](../frontend/public/bootstrap.js)** והוא נטען ב־[`index.html`](../frontend/index.html) **לפני** **`/config.js`**. |
+| **אלטרנטיבות** | (1) להישאר ב-Report-Only — בטוח יותר לגלגל אבל לא מגביל exploitability. (2) CSP דרך meta tag ב-HTML — פחות שליטה מרכזית מול edge. (3) nonces בלי SSR על ה-entry module — דורש rewrite דינמי של `index.html` או שירות edge (ראו **`docs/SECURITY_HEADERS.md`**). |
+| **יתרון** | Defense-in-depth מול XSS לצד **`sanitizeHtml`**, **`react/no-danger`**, ודחיית HTML בצ'אט ב-API. |
+| **Trade-off** | **`style-src`** עדיין כולל **`'unsafe-inline'`** (Vite/CSS); כל **inline script** חדש ב־HTML ידרוש hash או העברה לקובץ תחת **`'self'`**. סנכרון ידני נדרש אם מסלול **K8s** משתמש ב־**`k8s/frontend/nginx-configmap.yaml`**. |
+| **Interview pitch (≈30s)** | *"הקשחנו XSS בשלוש שכבות: קלט טקסט בלבד בצ'אט, sanitization בפרונט, ו-CSP מאוכף ב-nginx עם דיווחים ל-Sentry — ומודעים שב-SPA בלי SSR, nonces דורשים עוד שכבה ב-edge."* |
+| **הפניה** | `nginx/nginx.conf`, **`docs/SECURITY_HEADERS.md`**, **`k8s/frontend/nginx-configmap.yaml`** |
+
+---
+
 <a id="single-ec2-cd"></a>
 
 ## Single-EC2 CD rolling deploy (no ALB)
@@ -496,6 +541,23 @@
 | **מטריקות** | `rate_limit_rejected_total{algorithm,endpoint}`, `rate_limit_redis_errors_total{endpoint}`, `rate_limit_evaluation_seconds{algorithm}` (Histogram). |
 | **Interview pitch (≈45s)** | *"זיהיתי ש-`INCR+EXPIRE` בשתי פקודות מאפשר 2x burst בגבול החלון. ההחלטה הסניורית הייתה לא רק לתקן עם Lua, אלא להפריד לשני אלגוריתמים: sliding window log ל-auth כי שם burst הוא בדיוק הבעיה (anti-bruteforce), ו-token bucket ל-chat כי שם burst רצוי. שני scripts אטומיים, נטענים פעם אחת דרך register_script של redis-py שמטפל ב-EVALSHA וב-NOSCRIPT אחרי Sentinel failover. ההחזרה היא typed result עם limit/remaining/retry_after_ms שמתורגם ל-X-RateLimit-* headers — זה מה ש-Stripe ו-GitHub עושים, וזה מונע retry storms של clients."* |
 | **הפניה** | [`../backend/app/infrastructure/redis/lua/token_bucket.lua`](../backend/app/infrastructure/redis/lua/token_bucket.lua) · [`../backend/app/infrastructure/redis/lua/sliding_window.lua`](../backend/app/infrastructure/redis/lua/sliding_window.lua) · [`../backend/app/infrastructure/rate_limiter.py`](../backend/app/infrastructure/rate_limiter.py) · [`../backend/app/api/dependencies/rate_limit.py`](../backend/app/api/dependencies/rate_limit.py) · [`../backend/app/core/exceptions/handlers.py`](../backend/app/core/exceptions/handlers.py) · ADR §23 |
+
+---
+
+<a id="billing-checkout-db-idempotency-reconciler"></a>
+
+## Billing — אידמפוטנטיות Postgres ל-checkout, reconciler, ומכונת מצבים לתשלום
+
+| | |
+|--|--|
+| **בעיה** | (1) לחיצה כפולה / retry על **יצירת Checkout Session** יוצרים מספר sessions או חוויית לקוח לא עקבית. Redis-only idempotency (כמו בצ’אט) לא נשמרת בין מחיקות cache / מופעים בלי תכנון נפרד. (2) Webhook מ-Stripe יכול להתעכב או להיעלם — תשלומים נשארים **`pending`** בלי סנכרון. (3) עדכוני סטטוס תשלום חייבים להיות דטרמיניסטיים כדי למנוע “קפיצות” לא חוקיות במסד. |
+| **החלטה** | **אידמפוטנטיות DB:** טבלה **`idempotency_keys`** (מפתח פר־משתמש+endpoint, fingerprint, גוף תשובה + status code, TTL). כותרת **`X-Idempotency-Key`** על **`POST /billing/checkout`**. **`IdempotencyMismatchError`** (**422**, `IDEMPOTENCY_MISMATCH`) אם המפתח חוזר עם fingerprint אחר. **Reconciler:** `BillingReconciler` עם **`pg_try_advisory_lock`** (מופע יחיד פעיל), רשימת **`pending`** “מיושנים” (חלון גיל מ־`BILLING_PENDING_*`), **`retrieve_session`** ב-Stripe, החלת **`handle_checkout_completed`** / **`handle_session_expired`**. ניקוי שורות idempotency שפגו. מתוזמן ב־**`lifespan`** (APScheduler) כש־`BILLING_RECONCILER_ENABLED`. **State machine:** `validate_transition` — מעברים מותרים רק מ־`pending` החוצה; מצבי סופיים ריקים (**`PaymentTransitionError`**, **`ILLEGAL_PAYMENT_TRANSITION`**). |
+| **אלטרנטיבות** | (1) Redis בלבד ל-checkout — מהיר אבל פחות עמיד למצבי “ברירת מחדל טובים” בתרחיש multi-instance + eviction. (2) ללא reconciler — פשוט יותר; סיכון לתשלומים תקועים. (3) Event-driven reconcile בלבד (SQS/worker נפרד) — כבד לפריסה הנוכחית. |
+| **יתרון** | מטמון checkout **עקבי ב-Postgres**; שחזור אחרי תקלות webhook; מדדי **`billing_reconciler_*`** + **`billing_idempotency_hits_total`**; אדמין: **`GET /admin/billing/stale-pending`**, **`POST /admin/billing/reconcile/{payment_id}`**. |
+| **Trade-off** | כתיבות DB נוספות לכל checkout עם מפתח; reconciler מוסיף עומס קריאות Stripe — מוגבל בחלון גיל ובמנעול consultative. **שימו לב:** קיימים שני ראשי Alembic (**`015_add_audit_log`**, **`015_billing_idempotency_and_indexes`**) — יש למזג לפני פריסה לוגית אחת. |
+| **Interview pitch (≈35s)** | *"ל-billing הפרדתי אידמפוטנטיות מהדפוס של צ’אט: שמרתי תשובת checkout ב-Postgres עם fingerprint, והרצתי reconciler עם advisory lock שמושך מ-Stripe תשלומים pending מיושנים אם ה-webhook איחר. מעל זה מכונת מצבים קשיחה כדי שלא יעברו succeeded חזרה ל-failed בשקט."* |
+| **הפניה** | [`../backend/app/domain/billing/idempotency.py`](../backend/app/domain/billing/idempotency.py) · [`../backend/app/domain/billing/reconciler.py`](../backend/app/domain/billing/reconciler.py) · [`../backend/app/domain/billing/state_machine.py`](../backend/app/domain/billing/state_machine.py) · [`../backend/app/domain/billing/router.py`](../backend/app/domain/billing/router.py) · [`../backend/app/core/lifespan.py`](../backend/app/core/lifespan.py) · [`../backend/app/infrastructure/metrics.py`](../backend/app/infrastructure/metrics.py) · [`docs/architecture/API.md`](architecture/API.md) · [`docs/architecture/DATABASE.md`](architecture/DATABASE.md) · [`docs/operations/MONITORING.md`](operations/MONITORING.md) |
+| **סיכום ארכיטקטורה בשמירת ניסוח מלא** | [`BILLING_REFACTOR_SUMMARY.md`](BILLING_REFACTOR_SUMMARY.md) — מה היה לפני, מה בנינו, טבלת Kafka, מה מעבר |
 
 ---
 

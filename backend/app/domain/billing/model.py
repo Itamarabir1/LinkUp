@@ -1,7 +1,8 @@
 import enum
 import uuid
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Index, Numeric, String
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Index, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -64,3 +65,26 @@ class Payment(Base):
 
     def __repr__(self):
         return f"<Payment(id={self.payment_id}, user={self.user_id}, status={self.status})>"
+
+
+class IdempotencyKey(Base):
+    __tablename__ = "idempotency_keys"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_key = Column(String(128), nullable=False)
+    user_id = Column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    endpoint = Column(String(64), nullable=False)
+    request_fingerprint = Column(String(64), nullable=False)
+    response_body = Column(JSONB, nullable=False)
+    status_code = Column(Integer, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "client_key", "endpoint", name="uq_idem_user_client_endpoint"),
+        Index("idx_idempotency_expires_at", "expires_at"),
+    )

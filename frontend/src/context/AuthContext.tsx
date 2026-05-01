@@ -52,6 +52,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: false,
   });
 
+  const tearDownSession = useCallback(
+    async (opts: { reason: 'user-action' | 'session-expired' | 'bootstrap-failed' }) => {
+      if (opts.reason === 'user-action') {
+        try {
+          await patchFcmToken(null);
+        } catch {
+          /* ignore */
+        }
+        try {
+          await logoutSession();
+        } catch {
+          /* ignore */
+        }
+      }
+      cleanupFCM();
+      queryClient.clear();
+      if (import.meta.env.PROD) {
+        Sentry.setUser(null);
+      }
+      clearTokens();
+      setState({ user: null, isAuthenticated: false, isLoading: false });
+    },
+    [queryClient]
+  );
+
   const refreshUser = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: qk.auth.me() });
     const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
@@ -74,16 +99,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: false,
       }));
     } catch {
-      queryClient.removeQueries({ queryKey: qk.auth.me() });
-      clearTokens();
-      setState((s) => ({
-        ...s,
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-      }));
+      await tearDownSession({ reason: 'bootstrap-failed' });
     }
-  }, [queryClient]);
+  }, [queryClient, tearDownSession]);
 
   useEffect(() => {
     const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
@@ -106,14 +124,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {
         if (cancelled) return;
-        queryClient.removeQueries({ queryKey: qk.auth.me() });
-        clearTokens();
-        setState({ user: null, isAuthenticated: false, isLoading: false });
+        void tearDownSession({ reason: 'bootstrap-failed' });
       });
     return () => {
       cancelled = true;
     };
-  }, [queryClient]);
+  }, [queryClient, tearDownSession]);
+
+  useEffect(() => {
+    const handler = () => {
+      void tearDownSession({ reason: 'session-expired' });
+    };
+    window.addEventListener('auth:session-expired', handler);
+    return () => window.removeEventListener('auth:session-expired', handler);
+  }, [tearDownSession]);
 
   const login = useCallback(async (email: string, password: string) => {
     const { data } = await loginWithPassword(email, password);
@@ -146,27 +170,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient]);
 
   const logout = useCallback(async () => {
-    // 1. Clear FCM token on server while JWT is still valid
-    try {
-      await patchFcmToken(null);
-    } catch {
-      // ignore
-    }
-    cleanupFCM();
-    // 2. Invalidate server session
-    try {
-      await logoutSession();
-    } catch {
-      // ignore
-    }
-    queryClient.clear();
-    if (import.meta.env.PROD) {
-      Sentry.setUser(null);
-    }
-    // 3. Clear local tokens
-    clearTokens();
-    setState({ user: null, isAuthenticated: false, isLoading: false });
-  }, [queryClient]);
+    await tearDownSession({ reason: 'user-action' });
+  }, [tearDownSession]);
 
   const value: AuthContextValue = {
     ...state,

@@ -1,12 +1,14 @@
 import logging
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Header, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_current_user
 from app.api.dependencies.services import get_billing_service
 from app.db.session import get_db
 from app.domain.billing.crud import crud_billing
+from app.domain.billing.idempotency import make_checkout_fingerprint
 from app.domain.billing.schema import CheckoutResponse, PaymentRead, PaymentStatusResponse
 from app.domain.billing.service import BillingService
 from app.domain.users.model import User
@@ -25,9 +27,22 @@ async def create_checkout(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     billing_service: BillingService = Depends(get_billing_service),
+    idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
 ):
     """Create a Stripe Checkout Session for premium upgrade."""
-    return await billing_service.create_checkout_session(db, user=current_user)
+    fingerprint = None
+    if idempotency_key:
+        fingerprint = make_checkout_fingerprint(
+            user_id=current_user.user_id,
+            currency="ils",
+        )
+    payload, status_code = await billing_service.create_checkout_session(
+        db,
+        user=current_user,
+        idempotency_key=idempotency_key,
+        request_fingerprint=fingerprint,
+    )
+    return JSONResponse(status_code=status_code, content=payload.model_dump())
 
 
 @router.get("/status", response_model=PaymentStatusResponse)

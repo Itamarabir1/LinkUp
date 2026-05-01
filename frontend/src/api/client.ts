@@ -45,9 +45,26 @@ export function clearTokens(): void {
   localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
 }
 
+let sessionExpiredEmitted = false;
+function emitSessionExpired(): void {
+  if (typeof window === 'undefined') return;
+  if (sessionExpiredEmitted) return;
+  sessionExpiredEmitted = true;
+  queueMicrotask(() => {
+    window.dispatchEvent(new Event('auth:session-expired'));
+    queueMicrotask(() => {
+      sessionExpiredEmitted = false;
+    });
+  });
+}
+
 async function refreshAccessToken(): Promise<string | null> {
   const refresh = getStoredRefreshToken();
-  if (!refresh) return null;
+  if (!refresh) {
+    clearTokens();
+    emitSessionExpired();
+    return null;
+  }
   try {
     const { data } = await axios.post<{
       access_token: string;
@@ -65,6 +82,7 @@ async function refreshAccessToken(): Promise<string | null> {
     }
   } catch {
     clearTokens();
+    emitSessionExpired();
   }
   return null;
 }
@@ -144,6 +162,9 @@ api.interceptors.response.use(
       return api(original);
     }
     processQueue(err, null);
+    if (err.response?.status === 401) {
+      (err as { __sentryCaptured?: boolean }).__sentryCaptured = true;
+    }
     return Promise.reject(err);
   }
 );

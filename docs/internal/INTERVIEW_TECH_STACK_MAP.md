@@ -22,6 +22,7 @@
 | SPA מודרנית | [`frontend/`](../../frontend/) — Vite, `src/` (דפים, hooks, features). |
 | TypeScript | קבצי `.ts` / `.tsx`; לדוגמה טיפוסי API ב-`frontend/src/types/`, סכימות WS ב-`frontend/src/types/wsEvents.ts` (עם Zod). |
 | i18n (תוספת מוצרית) | `frontend/src/i18n/` (he/en), שימוש ב-hooks כמו `useTranslation`. |
+| Auth — ניתוק סשן מאוחד (web) | **`tearDownSession`** ב-[`AuthContext.tsx`](../../frontend/src/context/AuthContext.tsx), **`emitSessionExpired` / refresh** ב-[`client.ts`](../../frontend/src/api/client.ts), סינון Sentry ל-401 ב-[`queryClient.ts`](../../frontend/src/api/queryClient.ts) — [`FEATURE_DECISIONS.md`](../FEATURE_DECISIONS.md#auth-session-teardown), **ADR §21**. |
 
 ---
 
@@ -41,6 +42,7 @@
 |-------------|---------|
 | שרת WS ייעודי ב-Go | [`chat-ws/`](../../chat-ws/) — `go.mod`, Dockerfile, subscribe/publish; ה־hub: **`SetReadLimit(2048)`**, **`x/time/rate`** על פרסום **typing בלבד** (§7 ב-ADR). |
 | Redis Pub/Sub לצ’אט | ה-API שומר הודעה ומפרסם לערוץ; `chat-ws` נרשם — פירוט זרימה ב-[`docs/architecture/REALTIME.md`](../architecture/REALTIME.md), ADR ב-[`docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`](../adr/ARCHITECTURE_DECISIONS_CHAT_WS.md) (§7 inbound). |
+| פרונט — pacing ל־reconnect | [`reconnectBackoff.ts`](../../frontend/src/utils/reconnectBackoff.ts) (`computeReconnectDelayMs`) — **`useChatWebSocket`**, **`useReconnectingWebSocket`**, **`useReconnectingWebSocketState`**; [`FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff`](../FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff). |
 | הפרדת DB Redis | DB **0** (cache, broadcast rides, rate limit וכו’) מול DB **1** (צ’אט + `user:{id}:events`) — [`docker-compose.yml`](../../docker-compose.yml), [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md) §2. |
 
 ---
@@ -172,6 +174,7 @@
 | בקורות חיים | בפרויקט |
 |-------------|---------|
 | Docker Compose (מקומי / אינטגרציה) | [`docker-compose.yml`](../../docker-compose.yml) — db, redis, rabbitmq, migrate, **email-renderer**, backend, **notification-worker**, **task-worker**, **ai-worker**, **chat-ws**; פרופיל prod עם frontend + nginx. |
+| Edge nginx — TLS, headers, **CSP מאוכף** (`script-src` ללא `'unsafe-inline'`; bootstrap ב־[`frontend/public/bootstrap.js`](../../frontend/public/bootstrap.js)), `report-uri` (Sentry CSP) | [`nginx/nginx.conf`](../../nginx/nginx.conf) — מדריך [`docs/SECURITY_HEADERS.md`](../SECURITY_HEADERS.md), החלטה [`FEATURE_DECISIONS.md`](../FEATURE_DECISIONS.md#browser-csp-edge). |
 | GitHub Actions | [`.github/workflows/`](../../.github/workflows/) — `backend-ci`, `frontend-ci`, `chat-ws-ci`, `email-renderer-ci`; פריסה: `deploy-gke.yml`. |
 | Kubernetes | [`k8s/`](../../k8s/) — base, overlays, infra (Postgres, Redis, RabbitMQ), שירותים נפרדים ל-backend, worker, chat-ws, email-renderer, frontend. |
 

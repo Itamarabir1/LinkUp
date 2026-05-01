@@ -5,6 +5,7 @@ import { getChatWebSocketUrl } from '../../config/env';
 import type { PartnerPresence } from '../../api/presence';
 import { TYPING_THROTTLE_MS } from './messageThread.constants';
 import { processChatWebSocketMessage } from './processChatWebSocketMessage';
+import { computeReconnectDelayMs } from '../../utils/reconnectBackoff';
 
 /**
  * Chat WebSocket: real-time messages, typing, unread, and presence.
@@ -60,15 +61,18 @@ export function useChatWebSocket(options: {
 
   useEffect(() => {
     if (!cid) return;
+    let attempt = 0;
     let cancelled = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
     const scheduleReconnect = () => {
       if (cancelled) return;
+      const delay = computeReconnectDelayMs(attempt);
+      attempt++;
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
         connect();
-      }, 3000);
+      }, delay);
     };
 
     const connect = () => {
@@ -86,6 +90,7 @@ export function useChatWebSocket(options: {
       wsRef.current = ws;
 
       ws.onopen = () => {
+        attempt = 0;
         void fetchMissedMessages(lastMessageIdRef.current ?? 0);
       };
 

@@ -1,9 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { getWsToken } from '../config/wsUrls';
+import { computeReconnectDelayMs } from '../utils/reconnectBackoff';
 
 interface Options {
   buildUrl: (token: string) => string;
   enabled?: boolean;
+  /** First backoff step in ms (default 3000); doubles each failure, capped at 30s with ±20% jitter. */
   reconnectDelayMs?: number;
   onMessage: (ev: MessageEvent) => void;
   /** Called after a successful connection (including reconnect). */
@@ -39,6 +41,7 @@ export function useReconnectingWebSocket({
   useEffect(() => {
     if (!enabled) return;
 
+    let attempt = 0;
     let cancelled = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let ws: WebSocket | null = null;
@@ -51,17 +54,26 @@ export function useReconnectingWebSocket({
       try {
         ws = new WebSocket(buildUrlRef.current(token));
       } catch {
-        if (!cancelled) reconnectTimer = setTimeout(connect, reconnectDelayMs);
+        if (!cancelled) {
+          const delay = computeReconnectDelayMs(attempt, { baseMs: reconnectDelayMs });
+          attempt++;
+          reconnectTimer = setTimeout(connect, delay);
+        }
         return;
       }
 
       ws.onopen = () => {
+        attempt = 0;
         onOpenRef.current?.();
       };
       ws.onmessage = (ev) => onMessageRef.current(ev);
       ws.onclose = () => {
         ws = null;
-        if (!cancelled) reconnectTimer = setTimeout(connect, reconnectDelayMs);
+        if (!cancelled) {
+          const delay = computeReconnectDelayMs(attempt, { baseMs: reconnectDelayMs });
+          attempt++;
+          reconnectTimer = setTimeout(connect, delay);
+        }
       };
       ws.onerror = () => ws?.close();
     };

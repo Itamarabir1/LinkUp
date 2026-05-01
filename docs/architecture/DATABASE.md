@@ -88,9 +88,29 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | stripe_event_id | VARCHAR(255) UNIQUE | idempotency ברמת webhook event |
 | amount | NUMERIC(10,2) NOT NULL | סכום בפורמט דצימלי |
 | currency | VARCHAR(10) NOT NULL DEFAULT `ils` | מנורמל lowercase |
-| status | `payment_status_enum` NOT NULL DEFAULT `pending` | pending/succeeded/failed/canceled; index (`idx_payments_status`) |
+| status | `payment_status_enum` NOT NULL DEFAULT `pending` | pending/succeeded/failed/canceled; index (`idx_payments_status`). מיגרציה **015** (billing): אינדקס חלקי **`idx_payments_status_created`** על `(status, created_at) WHERE status = 'pending'` — מאיץ את סריקת תשלומים תקועים ל-reconciler. |
 | created_at | TIMESTAMPTZ | |
 | updated_at | TIMESTAMPTZ | |
+
+מעברי סטטוס אסורים (למשל succeeded → failed) נחסמים בדומיין ע"י **`validate_transition`** (**`PaymentTransitionError`** / **`ILLEGAL_PAYMENT_TRANSITION`**) ב־`app/domain/billing/state_machine.py`.
+
+### idempotency_keys (billing checkout)
+
+טבלה ל**אידמפוטנטיות דרוכת DB** ל־`POST /billing/checkout` (Stripe-style בתשובת השרת השמורה, לא Redis).
+
+| שדה | טיפוס | הערות |
+|-----|--------|--------|
+| id | UUID PK | |
+| client_key | VARCHAR(128) | ערך הכותרת **`X-Idempotency-Key`** |
+| user_id | UUID FK users | |
+| endpoint | VARCHAR(64) | לדוגמה נתיב endpoint לזיהוי |
+| request_fingerprint | VARCHAR(64) | SHA-256 על פרמטרים קנוניים |
+| response_body | JSONB | גוף התשובה הממומש |
+| status_code | INTEGER | קוד HTTP שנשמר |
+| expires_at | TIMESTAMPTZ | ניקוי אוטומטי + job ב-reconciler |
+| created_at | TIMESTAMPTZ | |
+
+**אילוץ:** `UNIQUE (user_id, client_key, endpoint)`. **אינדקס:** `idx_idempotency_expires_at` על `expires_at`.
 
 ### groups
 
@@ -305,6 +325,11 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 | 008_scheduled_notifications | טבלת `scheduled_notifications` + partial index; הסרת `reminder_sent` מ-rides ו-bookings | — |
 | 012_add_missing_indexes | אינדקסים משלימים: `bookings.request_id`, `messages.sender_id` | 2026-04-21 |
 | 013_add_billing | טבלת `payments`, enum `payment_status_enum`, ושדות חיוב ב-`users` (`stripe_customer_id`, `is_premium`, `premium_since`) | 2026-04-23 |
+| 014_fix_billing_partial_state | תיקון סכמת billing אחרי מצבים חלקיים (enum/עמודות/indexes idempotent) | 2026-04-23 |
+| 015_add_audit_log | טבלת `audit_log` (אדמין + ניסיונות webhook billing) | 2026-04-26 |
+| 015_billing_idempotency_and_indexes | טבלת `idempotency_keys` + אינדקס חלקי `idx_payments_status_created` על `payments` | 2026-05-01 |
+
+**הערת Alembic:** נכון לקוד הנוכחי קיימים **שני ראשים** (`alembic heads`): **`015_add_audit_log`** ו־**`015_billing_idempotency_and_indexes`** (שניהם יורשים מ־**014**). לפני סביבת פרודקשן יש **למזג** אותם לרוויזיה אחת (**`alembic merge`**) או לאחד שרשרת, עד ש־**`upgrade head`** מפנה ל־**head** יחיד.
 
 הרצה: מתוך `backend/` — `alembic upgrade head`. downgrade: `alembic downgrade -1`.
 

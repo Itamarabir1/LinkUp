@@ -9,6 +9,7 @@
 - Read receipts are persisted with a DB-level message cursor (`conversation_participants.last_read_message_id`) and broadcast as `message_read` events with `read_up_to_message_id`.
 - Notification refresh events are unified on `chat-ws` (`user:*:events`) to reduce parallel socket usage.
 - Redis reconnect paths use exponential backoff retries for better recovery.
+- **Frontend WebSocket reconnect:** delays use **`computeReconnectDelayMs`** in **[`reconnectBackoff.ts`](../../frontend/src/utils/reconnectBackoff.ts)** — exponential backoff from **3s** (±20% jitter), doubling each attempt, **30s** cap — wired in **[`useChatWebSocket.ts`](../../frontend/src/pages/MessageThread/useChatWebSocket.ts)**, **[`useReconnectingWebSocket.ts`](../../frontend/src/hooks/useReconnectingWebSocket.ts)**, **[`useReconnectingWebSocketState.ts`](../../frontend/src/hooks/useReconnectingWebSocketState.ts)**; the attempt counter resets on **`onopen`** and when **`cid` / `reconnectKey`** changes (new effect run).
 
 ---
 
@@ -102,7 +103,7 @@ Payload של הודעה חדשה מה-WS (ללא שדה `type` של typing/prese
 - **Endpoint**: `app/domain/notifications/router.py` — `@router.websocket("/ws")` תחת prefix `/notifications` → נתיב מלא **`GET /api/v1/notifications/ws?token=JWT`**.
 - **אימות**: `get_current_user_ws` ב-`app/api/dependencies/auth.py` — **רק JWT** (`decode_access_token`), מחזיר `WsUser` עם `user_id` מה-`sub` (**ללא קריאת DB** בזמן חיבור). מניעת עומס על connection pool; trade-off: אין בדיקת `is_active` ב-handshake (מול HTTP שכן טוען `User` מ-DB).
 - **שימוש**: `notification_streamer.stream_user_notifications(websocket, user_id)` — Redis Pub/Sub דרך `broadcaster`, ערוץ פנימי `user_{user_id}` (מקביל נפרד מ-`user:{id}:events` שמשמש את chat-ws לדחיפות דומיין).
-- **פרונט (ווב):** [`useChatNotificationsWebSocket`](../../frontend/src/context/useChatNotificationsWebSocket.ts) מעל [`useReconnectingWebSocket`](../../frontend/src/hooks/useReconnectingWebSocket.ts); **`onOpen`** מרענן פיד + unread + `linkup-notifications-refresh`. גיבוי: [`useChatNotificationsFeed`](../../frontend/src/context/useChatNotificationsFeed.ts) — REST כל **~5 דקות**.
+- **פרונט (ווב):** [`useChatNotificationsWebSocket`](../../frontend/src/context/useChatNotificationsWebSocket.ts) מעל [`useReconnectingWebSocket`](../../frontend/src/hooks/useReconnectingWebSocket.ts); ב-**`onOpen`** (אחרי **exponential backoff + jitter** בין ניסיונות — ראו **Recent updates** למעלה) — רענון פיד + unread + `linkup-notifications-refresh`. גיבוי: [`useChatNotificationsFeed`](../../frontend/src/context/useChatNotificationsFeed.ts) — REST כל **~5 דקות**.
 
 ---
 

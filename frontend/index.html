@@ -13,34 +13,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preload" as="fetch" href="/locales/he/auth.json" crossorigin />
     <link rel="preload" as="fetch" href="/locales/he/rides.json" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600&family=Rubik:wght@600;700&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600&family=Rubik:wght@600;700&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <script src="/bootstrap.js"></script>
     <script src="/config.js"></script>
-    <script>
-      (function () {
-        try {
-          var lang = localStorage.getItem('linkup-lang');
-          if (lang === 'en') {
-            document.documentElement.setAttribute('lang', 'en');
-            document.documentElement.setAttribute('dir', 'ltr');
-          }
-        } catch (e) {}
-      })();
-    </script>
   </head>
   <body>
-    <script>
-      (function () {
-        try {
-          var k = 'linkup-theme';
-          var t = localStorage.getItem(k);
-          if (t === 'light' || t === 'dark') {
-            document.documentElement.setAttribute('data-theme', t);
-          } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            document.documentElement.setAttribute('data-theme', 'dark');
-          }
-        } catch (e) {}
-      })();
-    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

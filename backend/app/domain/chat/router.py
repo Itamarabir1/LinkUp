@@ -131,10 +131,7 @@ async def post_message(
     idempotency_key: str | None = Header(
         None,
         alias="Idempotency-Key",
-        description=(
-            "Optional UUID per send intent — dedupe double-submit / client retries "
-            "(same key + same body replays cached 201)."
-        ),
+        description=("Optional UUID per send intent — dedupe double-submit / client retries (same key + same body replays cached 201)."),
     ),
 ):
     """

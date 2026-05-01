@@ -16,6 +16,7 @@ For the canonical architecture documentation, use:
 - [`docs/architecture/EVENTS.md`](docs/architecture/EVENTS.md)
 - [`docs/architecture/REALTIME.md`](docs/architecture/REALTIME.md)
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — production deploy and runbook
+- [`docs/SECURITY_HEADERS.md`](docs/SECURITY_HEADERS.md) — edge CSP (enforcing) + XSS layering with the web SPA; see also [`docs/FEATURE_DECISIONS.md`](docs/FEATURE_DECISIONS.md#browser-csp-edge)
 
 Service-specific architecture docs:
 

@@ -1,28 +1,33 @@
-import asyncio
 import logging
 from decimal import Decimal
 from uuid import UUID
 
-import stripe
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions.billing import (
     CheckoutSessionError,
+    IdempotencyMismatchError,
     PaymentAlreadyExistsError,
     StripeWebhookError,
     UserAlreadyPremiumError,
 )
 from app.domain.billing.crud import crud_billing
+from app.domain.billing.idempotency import IdempotencyManager, IdempotencyCachedResponse
 from app.domain.billing.model import Payment, PaymentStatus
 from app.domain.billing.schema import CheckoutResponse, PaymentStatusResponse
+from app.domain.billing.state_machine import validate_transition
+from app.domain.billing.stripe_gateway import StripeGateway
 from app.domain.users.crud import crud_user
 from app.domain.users.model import User
 from app.infrastructure.audit.repo import audit_repo
 from app.infrastructure.metrics import (
+    billing_idempotency_hits_total,
     payments_initiated_total,
+    payments_failed_total,
     payments_succeeded_total,
+    payments_canceled_total,
     stripe_webhook_errors_total,
     stripe_webhook_received_total,
 )
@@ -31,32 +36,55 @@ logger = logging.getLogger(__name__)
 
 # Premium plan price - set in Stripe Dashboard, store ID in env
 PREMIUM_PRICE_ILS = Decimal("29.90")
-PREMIUM_AMOUNT = int(PREMIUM_PRICE_ILS * 100)  # Stripe uses agorot
 
 
 class BillingService:
-    @staticmethod
+    def __init__(
+        self,
+        *,
+        stripe_gateway: StripeGateway | None = None,
+        idempotency_manager: IdempotencyManager | None = None,
+    ) -> None:
+        self.stripe_gateway = stripe_gateway or StripeGateway()
+        self.idempotency_manager = idempotency_manager or IdempotencyManager()
+
     async def create_checkout_session(
+        self,
         db: AsyncSession,
         user: User,
-    ) -> CheckoutResponse:
+        *,
+        idempotency_key: str | None = None,
+        request_fingerprint: str | None = None,
+        endpoint: str = "/billing/checkout",
+    ) -> tuple[CheckoutResponse, int]:
         """
         Create a Stripe Checkout Session for premium upgrade.
         Creates or reuses stripe_customer_id on the user.
         """
         if user.is_premium:
             raise UserAlreadyPremiumError()
-
-        stripe.api_key = settings.STRIPE_SECRET_KEY
+        if idempotency_key and not request_fingerprint:
+            raise IdempotencyMismatchError()
+        cached: IdempotencyCachedResponse | None = None
+        if idempotency_key and request_fingerprint:
+            cached = await self.idempotency_manager.check(
+                db,
+                user_id=user.user_id,
+                client_key=idempotency_key,
+                endpoint=endpoint,
+                request_fingerprint=request_fingerprint,
+            )
+            if cached:
+                billing_idempotency_hits_total.inc()
+                return CheckoutResponse(**cached.response_body), cached.status_code
 
         try:
             # 1. Get or create Stripe customer
             if not getattr(user, "stripe_customer_id", None):
-                customer = await asyncio.to_thread(
-                    stripe.Customer.create,
+                customer = await self.stripe_gateway.create_customer(
                     email=user.email,
                     name=user.full_name,
-                    metadata={"user_id": str(user.user_id)},
+                    user_id=str(user.user_id),
                 )
                 await crud_user.update_stripe_customer_id(
                     db,
@@ -68,35 +96,9 @@ class BillingService:
                 stripe_customer_id = user.stripe_customer_id
 
             # 2. Create Checkout Session
-            session = await asyncio.to_thread(
-                stripe.checkout.Session.create,
-                customer=stripe_customer_id,
-                payment_method_types=["card"],
-                line_items=[
-                    {
-                        "price_data": {
-                            "currency": "ils",
-                            "unit_amount": PREMIUM_AMOUNT,
-                            "product_data": {
-                                "name": "LinkUp Premium",
-                                "description": "גישה מלאה לכל פיצ'רי LinkUp",
-                            },
-                        },
-                        "quantity": 1,
-                    },
-                ],
-                mode="payment",
-                phone_number_collection={"enabled": False},
-                locale="auto",
-                custom_text={
-                    "submit": {"message": "לאחר התשלום תקבל גישה מיידית לכל פיצ'רי LinkUp Premium"},
-                },
-                payment_intent_data={
-                    "description": "LinkUp Premium - גישה מלאה לכל פיצ'רי LinkUp",
-                    "metadata": {"user_id": str(user.user_id)},
-                },
-                success_url=f"{settings.FRONTEND_URL}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
-                cancel_url=f"{settings.FRONTEND_URL}/payment/cancel",
+            session = await self.stripe_gateway.create_checkout_session(
+                customer_id=stripe_customer_id,
+                amount=PREMIUM_PRICE_ILS,
                 metadata={"user_id": str(user.user_id)},
             )
 
@@ -111,77 +113,100 @@ class BillingService:
             )
             await db.commit()
             payments_initiated_total.inc()
+            payload = CheckoutResponse(checkout_url=session.url or "", session_id=session.id)
+            if idempotency_key and request_fingerprint:
+                await self.idempotency_manager.store(
+                    db,
+                    user_id=user.user_id,
+                    client_key=idempotency_key,
+                    endpoint=endpoint,
+                    request_fingerprint=request_fingerprint,
+                    response_body=payload.model_dump(),
+                    status_code=201,
+                    ttl_hours=settings.BILLING_IDEMPOTENCY_TTL_HOURS,
+                )
+                await db.commit()
 
             logger.info(
                 "Checkout session created for user=%s session=%s",
                 user.user_id,
                 session.id,
             )
-            return CheckoutResponse(checkout_url=session.url, session_id=session.id)
+            return payload, 201
 
         except IntegrityError as e:
             await db.rollback()
             logger.warning("Duplicate payment record for checkout session: %s", e)
             raise PaymentAlreadyExistsError() from e
-        except stripe.StripeError as e:
+        except CheckoutSessionError:
             await db.rollback()
-            logger.error("Stripe error creating checkout: %s", e)
+            raise
+        except Exception as e:
+            await db.rollback()
+            logger.error("Unexpected error creating checkout: %s", e)
             raise CheckoutSessionError() from e
 
-    @staticmethod
     async def handle_webhook(
+        self,
         db: AsyncSession,
         payload: bytes,
         stripe_signature: str,
     ) -> dict:
         """
-        Handle Stripe webhook.
-        Verifies signature, processes checkout.session.completed.
-        Idempotent - safe to call multiple times with same event.
+        Handle Stripe webhook: verify signature; route by event type.
+        Supported: checkout.session.completed / checkout.session.expired / payment_intent.payment_failed.
+        Idempotent — safe to replay the same event / payment intent paths.
         """
-        stripe.api_key = settings.STRIPE_SECRET_KEY
-
-        if not stripe_signature:
-            raise StripeWebhookError()
-
-        # 1. Verify signature
         try:
-            event = await asyncio.to_thread(
-                stripe.Webhook.construct_event,
-                payload,
-                stripe_signature,
-                settings.STRIPE_WEBHOOK_SECRET,
+            event = await self.stripe_gateway.construct_webhook_event(
+                payload=payload,
+                signature=stripe_signature,
             )
-            stripe_webhook_received_total.labels(event_type=event.get("type", "unknown")).inc()
-        except stripe.SignatureVerificationError as e:
-            logger.warning("Stripe webhook signature verification failed: %s", e)
+            stripe_webhook_received_total.labels(event_type=event.type).inc()
+        except StripeWebhookError:
             stripe_webhook_errors_total.inc()
-            raise StripeWebhookError() from e
-        except Exception as e:
-            logger.warning("Stripe webhook invalid payload/signature: %s", e)
-            raise StripeWebhookError() from e
+            raise
 
-        # 2. Handle event types
-        if event.get("type") == "checkout.session.completed":
-            await BillingService._handle_checkout_completed(db, event)
+        if event.type == "checkout.session.completed":
+            await self.handle_checkout_completed(
+                db,
+                stripe_session_id=event.data_object.get("id"),
+                stripe_payment_intent_id=event.data_object.get("payment_intent"),
+                stripe_event_id=event.id,
+                user_id=event.data_object.get("metadata", {}).get("user_id"),
+                amount=Decimal(str(event.data_object.get("amount_total", 0))) / Decimal("100"),
+                currency=str(event.data_object.get("currency", "ils")).lower(),
+            )
+        elif event.type == "checkout.session.expired":
+            await self.handle_session_expired(
+                db,
+                stripe_session_id=event.data_object.get("id"),
+                stripe_event_id=event.id,
+            )
+        elif event.type == "payment_intent.payment_failed":
+            await self.handle_payment_failed(
+                db,
+                stripe_payment_intent_id=event.data_object.get("id"),
+                stripe_event_id=event.id,
+            )
 
         return {"status": "ok"}
 
-    @staticmethod
-    async def _handle_checkout_completed(db: AsyncSession, event: dict) -> None:
-        """
-        Mark payment as succeeded and upgrade user to premium.
-        Idempotent at two levels:
-        - event-level: stripe_event_id
-        - payment-level: stripe_payment_intent_id
-        """
-        stripe_event_id = event.get("id")
-        session = event.get("data", {}).get("object", {})
-        stripe_session_id = session.get("id")
-        stripe_payment_intent_id = session.get("payment_intent")
-        user_id = session.get("metadata", {}).get("user_id")
+    async def handle_checkout_completed(
+        self,
+        db: AsyncSession,
+        *,
+        stripe_session_id: str | None,
+        stripe_payment_intent_id: str | None,
+        stripe_event_id: str | None,
+        user_id: str | None,
+        amount: Decimal,
+        currency: str,
+    ) -> None:
+        if not user_id or not stripe_payment_intent_id:
+            logger.warning("checkout completed missing user/payment_intent session=%s", stripe_session_id)
+            return
 
-        # Record attempt before idempotency checks so duplicate Stripe retries are auditable.
         try:
             await audit_repo.record(
                 db,
@@ -190,7 +215,7 @@ class BillingService:
                 resource_type="billing_webhook",
                 resource_id=stripe_event_id or stripe_session_id,
                 metadata={
-                    "event_type": event.get("type"),
+                    "event_type": "checkout.session.completed",
                     "stripe_event_id": stripe_event_id,
                     "stripe_session_id": stripe_session_id,
                     "stripe_payment_intent_id": stripe_payment_intent_id,
@@ -202,18 +227,12 @@ class BillingService:
             await db.rollback()
             logger.warning("Audit log write failed for Stripe webhook attempt: %s", audit_exc)
 
-        if not user_id or not stripe_payment_intent_id:
-            logger.warning("Webhook missing user_id or payment_intent: %s", session)
-            return
-
-        # Event-level idempotency
         if stripe_event_id:
             existing_event = await crud_billing.get_by_event_id(db, stripe_event_id)
             if existing_event:
                 logger.info("Webhook event already processed event_id=%s", stripe_event_id)
                 return
 
-        # Payment-level idempotency
         existing_payment = await crud_billing.get_by_payment_intent_id(
             db,
             stripe_payment_intent_id,
@@ -225,51 +244,113 @@ class BillingService:
             )
             return
 
-        try:
-            # Update payment record
-            payment = await crud_billing.get_by_session_id(db, stripe_session_id)
-            if payment:
-                await crud_billing.update_payment_status(
-                    db,
-                    payment=payment,
-                    status=PaymentStatus.SUCCEEDED,
-                    stripe_payment_intent_id=stripe_payment_intent_id,
-                    stripe_event_id=stripe_event_id,
-                )
-            else:
-                amount_decimal = Decimal(str(session.get("amount_total", 0))) / Decimal("100")
-                payment = Payment(
-                    user_id=UUID(user_id),
-                    amount=amount_decimal,
-                    currency=str(session.get("currency", "ils")).lower(),
-                    stripe_session_id=stripe_session_id,
-                    stripe_payment_intent_id=stripe_payment_intent_id,
-                    stripe_event_id=stripe_event_id,
-                    status=PaymentStatus.SUCCEEDED,
-                )
-                db.add(payment)
-                await db.flush()
+        payment = await crud_billing.get_by_session_id(db, stripe_session_id)
+        if payment:
+            await self.transition_payment_status(
+                db,
+                payment=payment,
+                new_status=PaymentStatus.SUCCEEDED,
+                stripe_payment_intent_id=stripe_payment_intent_id,
+                stripe_event_id=stripe_event_id,
+            )
+        else:
+            payment = Payment(
+                user_id=UUID(user_id),
+                amount=amount,
+                currency=currency.lower(),
+                stripe_session_id=stripe_session_id,
+                stripe_payment_intent_id=stripe_payment_intent_id,
+                stripe_event_id=stripe_event_id,
+                status=PaymentStatus.SUCCEEDED,
+            )
+            db.add(payment)
+            await db.flush()
 
-            # Mark user as premium (no-op if already premium)
-            user = await crud_user.get_by_id(db, UUID(user_id))
-            if user and not user.is_premium:
-                await crud_user.mark_as_premium(db, user=user)
+        user = await crud_user.get_by_id(db, UUID(user_id))
+        if user and not user.is_premium:
+            await crud_user.mark_as_premium(db, user=user)
 
-            await db.commit()
-            payments_succeeded_total.inc()
-            logger.info("User %s upgraded to premium", user_id)
+        await db.commit()
+        payments_succeeded_total.inc()
+        logger.info("User %s upgraded to premium", user_id)
 
-        except IntegrityError as e:
-            await db.rollback()
-            logger.warning("Duplicate Stripe identifiers while handling webhook: %s", e)
-            raise PaymentAlreadyExistsError() from e
-        except Exception as e:
-            await db.rollback()
-            logger.error("Failed to handle checkout.completed: %s", e)
-            raise
+    async def handle_session_expired(
+        self,
+        db: AsyncSession,
+        *,
+        stripe_session_id: str | None,
+        stripe_event_id: str | None,
+    ) -> None:
+        if not stripe_session_id:
+            return
+        if stripe_event_id:
+            existing_event = await crud_billing.get_by_event_id(db, stripe_event_id)
+            if existing_event:
+                return
+        payment = await crud_billing.get_by_session_id(db, stripe_session_id)
+        if not payment:
+            return
+        await self.transition_payment_status(
+            db,
+            payment=payment,
+            new_status=PaymentStatus.CANCELED,
+            stripe_event_id=stripe_event_id,
+        )
+        await db.commit()
+        payments_canceled_total.inc()
 
-    @staticmethod
+    async def handle_payment_failed(
+        self,
+        db: AsyncSession,
+        *,
+        stripe_payment_intent_id: str | None,
+        stripe_event_id: str | None,
+    ) -> None:
+        if not stripe_payment_intent_id:
+            return
+        if stripe_event_id:
+            existing_event = await crud_billing.get_by_event_id(db, stripe_event_id)
+            if existing_event:
+                return
+        payment = await crud_billing.get_by_payment_intent_id(db, stripe_payment_intent_id)
+        if not payment:
+            logger.warning(
+                "payment_failed event for unknown intent=%s, skipping",
+                stripe_payment_intent_id,
+            )
+            return
+        await self.transition_payment_status(
+            db,
+            payment=payment,
+            new_status=PaymentStatus.FAILED,
+            stripe_payment_intent_id=stripe_payment_intent_id,
+            stripe_event_id=stripe_event_id,
+        )
+        await db.commit()
+        payments_failed_total.inc()
+
+    async def transition_payment_status(
+        self,
+        db: AsyncSession,
+        *,
+        payment: Payment,
+        new_status: PaymentStatus,
+        stripe_payment_intent_id: str | None = None,
+        stripe_event_id: str | None = None,
+    ) -> Payment:
+        if payment.status == new_status:
+            return payment
+        validate_transition(payment, new_status)
+        return await crud_billing.update_payment_status(
+            db,
+            payment=payment,
+            status=new_status,
+            stripe_payment_intent_id=stripe_payment_intent_id,
+            stripe_event_id=stripe_event_id,
+        )
+
     async def get_payment_status(
+        self,
         db: AsyncSession,  # noqa: ARG004 - kept for symmetry/extensibility
         user: User,
     ) -> PaymentStatusResponse:

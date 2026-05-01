@@ -240,6 +240,11 @@ class Settings(BaseSettings):
     # --- Stripe ---
     STRIPE_SECRET_KEY: str = Field("", description="Stripe secret key (sk_test_... or sk_live_...)")
     STRIPE_WEBHOOK_SECRET: str = Field("", description="Stripe webhook signing secret (whsec_...)")
+    BILLING_RECONCILER_ENABLED: bool = Field(True)
+    BILLING_RECONCILER_INTERVAL_SECONDS: int = Field(600)
+    BILLING_PENDING_MIN_AGE_MINUTES: int = Field(10)
+    BILLING_PENDING_MAX_AGE_HOURS: int = Field(24)
+    BILLING_IDEMPOTENCY_TTL_HOURS: int = Field(24)
 
     # --- Logging ---
     LOG_LEVEL: str = Field("INFO", description="Log level: DEBUG, INFO, WARNING, ERROR")

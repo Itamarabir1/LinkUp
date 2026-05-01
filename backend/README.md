@@ -43,6 +43,15 @@ The same parser endpoint (`POST /api/v1/passenger/passengers/ai-parse-search`) i
 
 Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 
+## Billing (Stripe)
+
+סיכום מלא של ה-refactor (לפני/אחרי, webhooks, reconciler, השוואת Kafka): **`../docs/BILLING_REFACTOR_SUMMARY.md`**.
+
+- **Checkout idempotency:** כותרת אופציונלית **`X-Idempotency-Key`** על **`POST /api/v1/billing/checkout`** — שמירה בטבלת **`idempotency_keys`** (ראו **`app/domain/billing/idempotency.py`**, מיגרציה **`015_billing_idempotency_and_indexes`**).
+- **Reconciler:** **`BillingReconciler`** מתוזמן מ־**`app/core/lifespan.py`** (APScheduler) כש־**`BILLING_RECONCILER_ENABLED`**; נעילת Postgres consultative, סנכרון תשלומים **`pending`** מול Stripe (**`reconciler.py`**).
+- **בדיקות יחידה (ללא DB חובה לחלקן):** **`tests/domain/test_billing_state_machine.py`**, **`tests/domain/test_billing_reconciler.py`** — מומלץ **`uv run pytest`** מתוך **`backend/`** עם venv הפרויקט.
+- **Alembic:** בשורת הקוד הנוכחית עשויים להיות **שני heads** (**`015_add_audit_log`**, **`015_billing_idempotency_and_indexes`**) — למזג לפני פריסה; פירוט **`docs/architecture/DATABASE.md`**.
+
 ## Tests & CI (quality)
 
 - **pytest:** מתוך `backend/` — `uv run pytest tests/ -v`. טסטי אינטגרציה עם DB דורשים **PostgreSQL + PostGIS** וסכמה מעודכנת (**`alembic upgrade head`** על אותו DB). ב־`tests/conftest.py` מקור ה-DSN: **`DATABASE_URL`** (עדיפות), או **`TEST_DATABASE_URL`** (תאימות לאחור), או ברירת מחדל ל-docker-compose המקומי.

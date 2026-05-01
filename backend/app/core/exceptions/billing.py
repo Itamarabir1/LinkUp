@@ -32,3 +32,17 @@ class UserAlreadyPremiumError(LinkUpError):
     message = "המשתמש כבר פרמיום"
     status_code = 400
     error_code = "USER_ALREADY_PREMIUM"
+
+
+class PaymentTransitionError(LinkUpError):
+    status_code = 409
+    error_code = "ILLEGAL_PAYMENT_TRANSITION"
+
+    def __init__(self, from_status, to_status):
+        super().__init__(message=f"Cannot transition from {from_status} to {to_status}")
+
+
+class IdempotencyMismatchError(LinkUpError):
+    message = "Idempotency key reused with different request payload"
+    status_code = 422
+    error_code = "IDEMPOTENCY_MISMATCH"

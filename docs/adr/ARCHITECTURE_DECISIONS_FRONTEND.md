@@ -53,9 +53,10 @@
 
 | | |
 |--|--|
-| **החלטה** | [`useChatNotificationsWebSocket`](../../frontend/src/context/useChatNotificationsWebSocket.ts) מעל [`useReconnectingWebSocket`](../../frontend/src/hooks/useReconnectingWebSocket.ts); ב-**`onOpen`** (גם אחרי reconnect) — רענון פיד, unread ואירוע `linkup-notifications-refresh`. גיבוי: [`useChatNotificationsFeed`](../../frontend/src/context/useChatNotificationsFeed.ts) — polling REST כל **~5 דקות**. |
+| **החלטה** | [`useChatNotificationsWebSocket`](../../frontend/src/context/useChatNotificationsWebSocket.ts) מעל [`useReconnectingWebSocket`](../../frontend/src/hooks/useReconnectingWebSocket.ts); ב-**`onOpen`** (גם אחרי reconnect — לאחר **exponential backoff + jitter** בין ניסיונות דרך **`computeReconnectDelayMs`**, [`reconnectBackoff.ts`](../../frontend/src/utils/reconnectBackoff.ts), אותו utility כמו ב־**`useChatWebSocket`** / **`useReconnectingWebSocketState`**) — רענון פיד, unread ואירוע `linkup-notifications-refresh`. גיבוי: [`useChatNotificationsFeed`](../../frontend/src/context/useChatNotificationsFeed.ts) — polling REST כל **~5 דקות**. |
 | **למה** | אמינות מול רשת ניתקת בלי לרדוף אחרי השרת כל שנייה; איזון בין חוויית "חי" לבין עומס וסוללה. |
-| **בקצרה לראיון** | "העדפנו WS ראשי עם רענון אוטומטי אחרי חיבור מחדש, ו-polling דל כגיבוי." |
+| **למה backoff (פרונט)** | תקרה **30s** + **±20%** jitter מונעים סנכרון reconnect של כל הלקוחות באותו רגע (**thundering herd**) אחרי נפילה המונית; מקור אמת אחד לשלושת ה-WS hooks. |
+| **בקצרה לראיון** | "העדפנו WS ראשי עם רענון אחרי חיבור מחדש — עם backoff+jitter בין ניסיונות כדי לא להציף את השרת כשכולם חוזרים ביחד — ו-polling דל כגיבוי." |
 
 ---
 
@@ -136,7 +137,7 @@
 |--|--|
 | **הקשר** | שכבת רשת עשירה עם retries, שגיאות transport, ומספר דומיינים עם reads/mutations חוזרות. נדרש סטנדרט אחיד לקאשינג, retry policy ו-observability בלי double-capture ב-Sentry. |
 | **החלטה** | להוסיף `QueryClient` מרכזי ב־[`frontend/src/api/queryClient.ts`](../../frontend/src/api/queryClient.ts) עם `QueryCache`/`MutationCache`, wrapper `captureExceptionOnce`, ו-policy אחיד: `staleTime`, `gcTime`, retry רק לשגיאות retryable (network/5xx), `Retry-After` parsing (delta/date), ו-`mutations.retry=false`. |
-| **Dedup pattern (Sentry)** | ה-axios interceptor מסמן `__sentryCaptured=true` לפני capture ל-5xx; ב-React Query `onError` בודק את הסמן ולא מצלם שוב. cancellation (`ERR_CANCELED`) מדולג בשתי השכבות. |
+| **Dedup pattern (Sentry)** | ה-axios interceptor מסמן `__sentryCaptured=true` לפני capture ל-**5xx**; אחרי **401** בסוף ניסיון refresh כושל הוא מסמן לפני `reject` (**defense-in-depth** בעד **`captureExceptionOnce`** מה-React Query). ב-React Query `onError`: **401** מתעלם (`shouldSkipSentryForApiError` — לא **403**); שאר Axios errors בודקים סמן `__sentryCaptured` ולא לוכדים פעמיים. cancellation (`ERR_CANCELED`) מדולג בשתי השכבות. |
 | **Query key convention** | factories typed ב־[`frontend/src/api/queryKeys.ts`](../../frontend/src/api/queryKeys.ts): `qk` ל-queries, `mk` ל-mutations; שימוש ב-`Record<string, unknown>` לפילטרים לשיפור יציבות טיפוסית והפחתת key drift. |
 | **Error ownership** | Axios interceptor = transport/server failures; Query/Mutation cache = fallback capture עם context של request lifecycle; ErrorBoundary = render/runtime errors בלבד. |
 | **למה** | מונע פיצול policy בין hooks/קומפוננטות, משפר cache consistency, ומוריד רעש observability (no double-capture). |
@@ -180,7 +181,7 @@
 |--|--|
 | **הקשר** | ניטור שגיאות בלבד לא נותן תמונת UX מלאה. נדרש למדוד איכות חוויית משתמש בזמן אמת (Core Web Vitals) ולקשר אותה לסשן/משתמש בסביבת production. |
 | **החלטה** | להרחיב את `Sentry.init` ב-[`frontend/src/main.tsx`](../../frontend/src/main.tsx) רק תחת `import.meta.env.PROD && APP_CONFIG.sentry.dsn` עם `browserTracingIntegration` + `replayIntegration`, sampling שמרני (`replaysSessionSampleRate: 0.05`, `replaysOnErrorSampleRate: 1.0`), ודיווח `CLS`/`LCP`/`INP` דרך dynamic import של `web-vitals`. |
-| **Identity alignment** | ב-[`frontend/src/context/AuthContext.tsx`](../../frontend/src/context/AuthContext.tsx) מתבצע `Sentry.setUser` ב-bootstrap/login/google-login ו-`Sentry.setUser(null)` ב-logout כדי לשייך traces/replays למשתמש נכון לאורך מחזור האימות. |
+| **Identity alignment** | ב-[`frontend/src/context/AuthContext.tsx`](../../frontend/src/context/AuthContext.tsx) מתבצע `Sentry.setUser` ב-bootstrap/login/google-login ו-`Sentry.setUser(null)` בכל teardown מוסכם (כולל `session-expired`/`bootstrap-failed`), ראו §21 מטה. |
 | **למה** | נותן observability end-to-end של ביצועים אמיתיים אצל משתמשים בפרודקשן, תוך שמירה על פרטיות (`maskAllText`, `blockAllMedia`) ועל quota בעזרת sampling. |
 | **Trade-off** | מוסיף תלות telemetry נוספת ועלול להגדיל ingest אם sampling יעלה; לכן נשמרה הפעלה לפרודקשן בלבד ודיווח web-vitals נטען דינמית כדי לצמצם השפעה על bundle. |
 | **בקצרה לראיון** | "הוספנו RUM אמיתי: Trace + Replay + Web Vitals בפרודקשן, עם sampling זהיר ו-user context מה-auth flow, כדי למדוד UX אמיתי בלי להכביד על ה-bundle." |
@@ -234,6 +235,18 @@
 | **למה** | throttle ממתן spikes מצד הדפדפן ומשפר יציבות perceived-latency; bundle guardrails הופכים גדילה לא מבוקרת לנראית ומדידה ב-PR/CI. |
 | **Trade-off** | throttle אגרסיבי מדי יכול להאט פעולות לגיטימיות; חלוקת chunks דורשת תחזוקה תקופתית כדי לא ליצור fragmentation לא יעיל. |
 | **בקצרה לראיון** | "שילבנו token-bucket בצד הלקוח כדי למתן bursts, ובמקביל קבענו תקציב bundle מדיד עם visualizer ו-size-limit." |
+
+---
+
+## 21. Auth session teardown — מקור אמת אחד + `CustomEvent`
+
+| | |
+|--|--|
+| **בעיה** | לוגיקת ניתוק **הייתה כפולה** בין **logout**, טעינת משתמש נכשלת, ו-**axios refresh** שנכשל ב-**`client`** בלי עדכון React — **`authenticated state` בסטלה (stale)**. |
+| **החלטה** | פונקציה **`tearDownSession({ reason })`** ב-[`AuthContext.tsx`](../../frontend/src/context/AuthContext.tsx): **`user-action`** — `patchFcmToken(null)`, `logoutSession()`, אחר כך **תמיד** `cleanupFCM`, `queryClient.clear()`, **`Sentry.setUser(null)`** (ב-PROD), `clearTokens`, `setState` לא מאומת. **`session-expired`** / **`bootstrap-failed`** — ללא PATCH/logout מהשרת, אותם שלבי ניקוי מקומיים. ברמת רשת: [`client.ts`](../../frontend/src/api/client.ts) בשגיאות refresh משגר **`window.dispatchEvent(new Event('auth:session-expired'))`** אחרי `clearTokens`, עם **`emitSessionExpired`** ו-reentrancy guard; גם כשאין **refresh ב-LS** (תיקון באג orphaned access שנשאר). Listener ב-AuthContext מאזין ל-`'auth:session-expired'` וקורא `tearDownSession({ reason: 'session-expired' })`. **`ProtectedRoute`** מפנה ל-`/login?from=` כשהמשתמש **אינו מאומת** — ללא שינוי ב-router. |
+| **למה CustomEvent ולא זרימה ל-`logout()` מה-interceptor** | ה-client בשכבה נפרדת — מנותק מתלות קדימית ל-React; מאפשר teardown אחיד בלי import מעגלי ובלי stale closures. |
+| **לא נכלל** | PATCH FCM מהנתיב **session-expired** (במכוון; מונע לולאת 401; עדכון DB ב-Re-login מה-Firebase token הקיים למשתמש שחזר); ניקוי **NotRegistered** ב-push — ארוך טווח ב-backend אם צריך. |
+| **בקצרה לראיון** | "איחדתי שני מוחות: Axios מפשט tokens ומתריע ב-event חד פעם; Provider מנהל משתמש, cache ו-FCM. שורה רעה בסנטרי — 401 ב-queries מסוננת, 403 לא." |
 
 ---
 

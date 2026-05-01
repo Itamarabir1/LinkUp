@@ -29,10 +29,16 @@ const parseRetryAfter = (err: unknown): number | null => {
   return null;
 };
 
+function shouldSkipSentryForApiError(err: unknown): boolean {
+  if (!axios.isAxiosError(err)) return false;
+  return err.response?.status === 401;
+}
+
 const captureExceptionOnce = (error: unknown) => {
   const e = error as { __sentryCaptured?: boolean };
   if (e.__sentryCaptured) return;
   if (isAxiosCanceled(error)) return;
+  if (shouldSkipSentryForApiError(error)) return;
   if (import.meta.env.PROD) {
     e.__sentryCaptured = true;
     Sentry.captureException(error);

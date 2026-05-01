@@ -4,6 +4,12 @@
 
 > **הערה:** ריצת Frontend CI ב-GitHub מופעלת כשקומיט משנה `frontend/**`, `nginx/**`, או את `.github/workflows/frontend-ci.yml`.
 
+### אבטחה (XSS + CSP)
+
+- **באפליקציה:** ESLint **`react/no-danger`** (חוסם) ו־**`sanitizeHtml()`** (`src/utils/sanitize.ts`, DOMPurify).
+- **מעטפת HTML:** קובץ סטטי **`public/bootstrap.js`** (מוגש כ־**`/bootstrap.js`**) — שפה (`linkup-lang`) וערכת נושא (`linkup-theme`) לפני הידרציה; נטען ב־**`index.html` לפני `config.js`** כדי לאפשר **`script-src`** ב-CSP **בלי** **`'unsafe-inline'`** ב־nginx.
+- **בפרודקשן מאחורי Compose nginx:** כותרת **`Content-Security-Policy`** מאוכפת ב־**`nginx/nginx.conf`**; דיווח הפרות דרך **`report-uri`** ל-Sentry. מדריך: **[`docs/SECURITY_HEADERS.md`](../docs/SECURITY_HEADERS.md)**.
+
 ---
 
 ## דרישות
@@ -54,6 +60,10 @@ cp frontend/.env.example frontend/.env
 
 כל **`onOpen`** של צ’אט WS מפעיל **`fetchMissedMessages`** → **`fetchMissedGap`** ([`src/pages/MessageThread/fetchMissedGap.ts`](src/pages/MessageThread/fetchMissedGap.ts)): עמוד ראשון עם **`after=`**, המשך עם **`before=next_cursor`** עד **`has_more`** או תקרת לקוח. פירוט: [`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md).
 
+### WebSocket — ניתוק transport וניסיון חיבור מחדש
+
+עיכוב בין ניסיונות reconnect אחרי **`onclose`** / שגיאת ctor: **`computeReconnectDelayMs`** ב־[`src/utils/reconnectBackoff.ts`](src/utils/reconnectBackoff.ts) (מעריכה, תקרת 30s, ±20% jitter) — **`useChatWebSocket`**, **`useReconnectingWebSocket`**, **`useReconnectingWebSocketState`**. ראו [`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md) ו־[`docs/FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff`](../docs/FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff).
+
 ---
 
 ## סקריפטים שימושיים
@@ -96,7 +106,7 @@ cp frontend/.env.example frontend/.env
 - **RUM stack** – `BrowserTracing` + `Replay` עם הגדרות פרטיות (`maskAllText`, `blockAllMedia`).
 - **Quota-safe sampling** – `replaysSessionSampleRate: 0.05`, `replaysOnErrorSampleRate: 1.0`.
 - **Web Vitals metrics** – `CLS`, `LCP`, `INP` נשלחים ל-Sentry metrics דרך dynamic import של `web-vitals` (מונע כניסה ל-main bundle).
-- **Auth identity alignment** – `AuthContext` מעדכן `Sentry.setUser` ב-bootstrap/login/google-login ומאפס ב-logout לקבלת traces/replays מיוחסים למשתמש.
+- **Auth identity alignment** – `AuthContext` מעדכן `Sentry.setUser` ב-bootstrap/login/google-login ומאפס בכל ניתוח סשן מוסכם דרך **`tearDownSession`** (כולל **`session-expired`** / **`bootstrap-failed`**) — ראו למטה בסעיף **Auth session teardown**.
 - **Guardrail** – אין הפעלת Sentry/RUM במצב dev.
 
 ## Sentry Sourcemaps Upload
@@ -108,12 +118,21 @@ cp frontend/.env.example frontend/.env
 
 ---
 
+## Auth session teardown
+
+- **`AuthContext.tsx`:** **`tearDownSession({ reason: 'user-action' | 'session-expired' | 'bootstrap-failed' })`** — **`user-action`:** `PATCH` FCM null + **`POST /auth/logout`** (when access still valid), then **`cleanupFCM`**, **`queryClient.clear()`**, **`Sentry.setUser(null)`** (PROD), **`clearTokens`**, unauthenticated state. **`session-expired` / `bootstrap-failed`:** local cleanup only (no server PATCH/logout with dead JWT).
+- **`client.ts`:** failed or missing **`refreshAccessToken`** → **`clearTokens()`** + **`window.dispatchEvent('auth:session-expired')`** via **`emitSessionExpired`** (single-flight guard); refresh interceptor sets **`__sentryCaptured`** on final **401** before reject.
+- **`queryClient.ts`:** **`shouldSkipSentryForApiError`** — **401** only (403/5xx flow to **`captureExceptionOnce`** subject to interceptor marking).
+- **Docs:** **[`docs/FEATURE_DECISIONS.md`](../docs/FEATURE_DECISIONS.md#auth-session-teardown)** · **ADR Frontend §21**.
+
+---
+
 ## נקודות מפתח בפרונטנד
 
 - **RTL, עברית ואנגלית** – **i18next** + קבצים ב־`src/i18n/locales/{he,en}/`; **`LangContext`** מגדיר `dir` ו־`--font-primary` על `<html>`. פורמט תאריכים/שעות: **`src/utils/date.ts`** + **`getLocale()`**. Fallback לטקסטי שגיאת API ב־hooks: **`apiErr`** ב־`src/utils/i18nError.ts` (מפתחות `common:err_*`). **CSS Modules:** `font-family: var(--font-primary)` (חריג: `LangToggle`). ADR: **`docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md`** §10–12.
 - **אימות** – קומפוננטות Login/Register/VerifyEmail מבוססות `react-hook-form + zod` עם שמירת behavior parity מול הזרימה הקיימת (אותם API calls, אותם נתיבי navigation ואותן הודעות שגיאה כלליות). ב-`Register` שדה `PhoneInput` מחובר דרך `Controller`. תמיכה ב-Google Sign-In באמצעות `GoogleSignIn.tsx` ו-`VITE_GOOGLE_CLIENT_ID`. בצד השרת יש **rate limiting** על רישום והתחברות (Redis) — בבדיקות עומס או ניסיונות חוזרים מהירים אפשר לקבל 429; ראו `docs/architecture/API.md` ו-`backend/README.md`.
 - **מיילים ארכיטקטורית** – רינדור תבניות מייל עבר ל-service ייעודי `email-renderer` (Node.js/Express + React Email) בצד הבקאנד/worker; לפרונט אין תלות ישירה, אבל תכני מייל/טמפלטים מנוהלים כעת ב-`email-renderer/src/emails/templates/`.
-- **Premium / Billing UX** – הפרונט כולל אינטגרציה מלאה ל-`/api/v1/billing`: `PremiumBanner` במסך הפרופיל (badge למנוי פעיל או upgrade CTA), mutation ל-Stripe checkout, ועמודי תוצאה מוגנים `payment/success` + `payment/cancel`. מסך success מבצע polling ל-`/billing/status` כל 2 שניות עד אישור `is_premium` או timeout של 30 שניות.
+- **Premium / Billing UX** – הפרונט כולל אינטגרציה ל-`/api/v1/billing`: `PremiumBanner`, mutation ל-Stripe checkout, ועמודי `payment/success` + `payment/cancel` עם polling ל-`/billing/status`. בבקאנד: **`docs/BILLING_REFACTOR_SUMMARY.md`** (סיכום מלא); גם **`docs/FEATURE_DECISIONS.md`** (סעיף billing-checkout-db-idempotency-reconciler).
 - **Stage 3a — React Query (Geo + Notifications + Auth-shadow)** – `useGoogleMapsKey` עובד דרך `useQuery` עם `qk.geo.mapsKey` ו-cache ארוך טווח; `Notifications` עבר מ-fetch ידני ל-`qk.notifications.all` עם invalidate מאירוע `linkup-notifications-refresh`; `AuthContext` מסנכרן cache של `qk.auth.me()` אחרי login/sign-in, מנקה cache ב-logout (`queryClient.clear()`), ונוסף `useCurrentUser()` query hook לצרכנים מבוססי RQ.
 - **Stage 3b Part 2 — React Query (MyBookings Driver + Passenger)** – הוקי `useMyBookingsPassenger`/`useMyBookingsDriver` עובדים דרך `useQuery` עם keys scoped לפי משתמש (`qk.bookings.passenger(userId)`, `qk.bookings.driver(userId)`), פעולות approve/reject/cancel עברו ל-`useMutation`, ואירועי WS מבצעים invalidate/query updates במקום fetch ידני; נשמרו `driverStatus` machine, local UI state וחוזה ההחזרה ל-`useMyBookings`.
 - **Stage 3b Part 6 — React Query (SearchRides network edges)** – [`useSearchRides.ts`](src/pages/SearchRides/useSearchRides.ts) עבר ממימוש ידני ל-mutations עבור `search`, `load more`, ו-`save alert`; נשמרו `useOperationToken`, AI parse flow, geolocation flow, וחוזה ההחזרה ל-UI. [`useJoinRide.ts`](src/pages/SearchRides/useJoinRide.ts) נשאר ללא שינוי כדי לשמר `idempotencyKeyRef` request-scoped.
@@ -125,9 +144,9 @@ cp frontend/.env.example frontend/.env
 - **ניהול קבוצות** – במסכי `GroupManage` אפשר ליצור קבוצה, לשתף קישור הזמנה, להעתיק URL בלחיצה עם פידבק חזותי (העתקה מוצלחת/שגיאה) ולסגור קבוצה.
 - **צ'אט** – בפיתוח: WS ל־`chat-ws` ב־**8081** (`getChatWebSocketUrl`); בפרודקשן: `/ws` מאותו host (Nginx). **Presence:** טעינה חד־פעמית של `GET /presence/{partner}` דרך `chatWsApi` (proxy ל־8081 ב־dev); עדכון **מיידי** ב-WS: `user_online` / `user_offline`. אירועי `typing_start` / `typing_stop` מהשרת כוללים **`conversation_id`** ו־**`recipient_id`** (בנוסף ל־`user_id` ו־`type`; אופציונלי `full_name` ב־start) — כמו ב־`chat-ws` (`TypingPayload`); מסוננים בצד הלקוח מול echo של המשתמש הנוכחי. עיבוד הודעות ב־[`src/pages/MessageThread/processChatWebSocketMessage.ts`](src/pages/MessageThread/processChatWebSocketMessage.ts); בדיקות יחידה ב־[`processChatWebSocketMessage.test.ts`](src/pages/MessageThread/processChatWebSocketMessage.test.ts) משקפות את אותו חוזה. פירוט ערוצים ו-GPS: [`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md).
 - **הזמנות שלי (My Bookings)** – טעינת נתונים ב־**קריאה מאוגדת לכל טאב**: [`fetchDriverSummary`](../src/api/bookings.ts) → `GET /bookings/driver-summary`, [`fetchPassengerSummary`](../src/api/bookings.ts) → `GET /bookings/passenger-summary` (במקום N+1 של מניפסטים / נסיעה+נהג). ב־Stage 3b Part 2 ה-hooks [`useMyBookingsDriver.ts`](../src/pages/MyBookings/useMyBookingsDriver.ts), [`useMyBookingsPassenger.ts`](../src/pages/MyBookings/useMyBookingsPassenger.ts) הומרו ל-React Query (keys scoped לפי user + mutations + WS invalidate), תוך שמירה על חוזה החזרה זהה ל-[`useMyBookings.ts`](../src/pages/MyBookings/useMyBookings.ts) ול־**`MyBookingsViewModel`**. מיפוי DTO ל-UI נשאר מרוכז ב־[`myBookings.mappers.ts`](../src/pages/MyBookings/myBookings.mappers.ts). כרטיס נוסע בודד: [`PassengerBookingCard.tsx`](../src/pages/MyBookings/PassengerBookingCard.tsx).
-- **מפה חיה / GPS (My Bookings)** – שידור מיקום נהג/נוסע דרך `useLocationBroadcast` / `usePassengerLocationBroadcast` + `useLocationWatcher` (throttle ~1.5s, `maximumAge: 0` לשידור); קבלת עדכונים ב־`useDriverLocation` / `usePassengerLocations` (WebSocket ל־backend, reconnect). מודלים `LiveMapModal` / `LiveRideMapModal`: `watchPosition` נפרד לתצוגת “אני” עם `maximumAge: 1000`; סמנים דרך `useMapMarker` (יצירה חד־פעמית, עדכון `setPosition` בלבד). פירוט: [`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md).
+- **מפה חיה / GPS (My Bookings)** – שידור מיקום נהג/נוסע דרך `useLocationBroadcast` / `usePassengerLocationBroadcast` + `useLocationWatcher` (throttle ~1.5s, `maximumAge: 0` לשידור); קבלת עדכונים ב־`useDriverLocation` / `usePassengerLocations` (WebSocket ל־backend עם reconnect — **exponential backoff + jitter** דרך [`reconnectBackoff.ts`](src/utils/reconnectBackoff.ts)). מודלים `LiveMapModal` / `LiveRideMapModal`: `watchPosition` נפרד לתצוגת “אני” עם `maximumAge: 1000`; סמנים דרך `useMapMarker` (יצירה חד־פעמית, עדכון `setPosition` בלבד). פירוט: [`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md).
 - **Zod + WebSocket** – סכימות ב־[`src/types/wsEvents.ts`](src/types/wsEvents.ts): אירועי נסיעה (`RideEventSchema`), מיקום נהג/נוסעים, צ’אט (`ChatPresenceEventSchema`), **הודעה נכנסת** (`ChatMessageSchema` → מיפוי מפורש ל־`MessageResponse` ב־`processChatWebSocketMessage`). `safeParse` גם ב־`useRideWebSocket`, `useDriverLocation`, `usePassengerLocations`, `MyRides`, `useUserEventStream`. סיכום: [`docs/ENGINEERING_HIGHLIGHTS.md`](../docs/ENGINEERING_HIGHLIGHTS.md).
-- **פיד התראות in-app (מסך / באדג’ צ’אט)** – חיבור ל־**`/api/v1/notifications/ws`** דרך [`useChatNotificationsWebSocket.ts`](src/context/useChatNotificationsWebSocket.ts) + [`useReconnectingWebSocket.ts`](src/hooks/useReconnectingWebSocket.ts); ב־**`onOpen`** (גם אחרי reconnect) — רענון פיד, unread ואירוע `linkup-notifications-refresh`. גיבוי: [`useChatNotificationsFeed.ts`](src/context/useChatNotificationsFeed.ts) — polling REST כל **~5 דקות**. **FCM (דחיפה):** [`services/fcm.ts`](src/services/fcm.ts) — לוגי דיבאג עיקריים ב־**`devLog`** רק ב־`import.meta.env.DEV`; פירוט: [`docs/FCM_SYSTEM_SUMMARY.md`](../docs/FCM_SYSTEM_SUMMARY.md).
+- **פיד התראות in-app (מסך / באדג’ צ’אט)** – חיבור ל־**`/api/v1/notifications/ws`** דרך [`useChatNotificationsWebSocket.ts`](src/context/useChatNotificationsWebSocket.ts) + [`useReconnectingWebSocket.ts`](src/hooks/useReconnectingWebSocket.ts) (reconnect: exponential backoff + jitter דרך [`reconnectBackoff.ts`](src/utils/reconnectBackoff.ts)); ב־**`onOpen`** (גם אחרי reconnect) — רענון פיד, unread ואירוע `linkup-notifications-refresh`. גיבוי: [`useChatNotificationsFeed.ts`](src/context/useChatNotificationsFeed.ts) — polling REST כל **~5 דקות**. **FCM (דחיפה):** [`services/fcm.ts`](src/services/fcm.ts) — לוגי דיבאג עיקריים ב־**`devLog`** רק ב־`import.meta.env.DEV`; פירוט: [`docs/FCM_SYSTEM_SUMMARY.md`](../docs/FCM_SYSTEM_SUMMARY.md).
 - **שכבות WS שלא שונו במכוון במיגרציית Stage 3d** – [`useConversationMessages`](src/pages/MessageThread/useConversationMessages.ts), [`useChatPopup`](src/context/useChatPopup.ts), [`useChatWebSocket`](src/context/useChatWebSocket.ts), ו-[`processChatWebSocketMessage`](src/pages/MessageThread/processChatWebSocketMessage.ts) נשארו transport/message-stream raw כדי לשמור יציבות בזמן מיגרציה מדורגת.
 
 למידע רחב יותר על הארכיטקטורה וההרצה הכוללת (Docker, Kubernetes, chat-ws, mobile) ראו את ה-`README` בשורש הפרויקט.

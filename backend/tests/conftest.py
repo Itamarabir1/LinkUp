@@ -31,9 +31,6 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import app.db.models  # noqa: F401
-from app.api.dependencies.admin import get_current_admin_user
-from app.api.dependencies.auth import get_current_user
-from app.db.session import get_db
 from app.domain.rides.enum import RideStatus
 from tests.helpers.db_factories import make_ride, make_user
 
@@ -126,6 +123,8 @@ async def api_client_no_auth(
 ) -> AsyncGenerator[AsyncClient, None]:
     """HTTP client without auth (for 401 tests)."""
 
+    from app.db.session import get_db
+
     async def _get_db_override():
         async with e2e_session_factory() as s:
             yield s
@@ -158,6 +157,10 @@ async def seeded_users_and_ride(e2e_session_factory: async_sessionmaker):
 async def api_client_with_overrides(
     e2e_session_factory: async_sessionmaker,
 ) -> AsyncGenerator[tuple[AsyncClient, dict], None]:
+    from app.api.dependencies.admin import get_current_admin_user
+    from app.api.dependencies.auth import get_current_user
+    from app.db.session import get_db
+
     auth_ctx: dict[str, object] = {"user": None}
 
     async def _get_db_override():

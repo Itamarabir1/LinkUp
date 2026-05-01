@@ -13,11 +13,12 @@ from app.core.exceptions.admin import OutboxEventNotFoundError, OutboxRequeueInv
 from app.core.exceptions.booking import BookingNotFoundError
 from app.core.exceptions.ride import RideNotFoundError
 from app.core.exceptions.user import UserNotFoundError
-from app.api.dependencies.services import get_ride_service
+from app.api.dependencies.services import get_billing_reconciler, get_ride_service
 from app.db.session import get_db
 from app.domain.bookings.enum import BookingStatus
 from app.domain.bookings.model import Booking
 from app.domain.billing.model import Payment, PaymentStatus
+from app.domain.billing.reconciler import BillingReconciler
 from app.domain.groups.model import Group, GroupMember
 from app.domain.rides.crud import crud_ride
 from app.domain.rides.enum import RideStatus
@@ -551,6 +552,51 @@ async def admin_billing_payment_by_id(
         "stripe_event_id": payment.stripe_event_id,
         "created_at": payment.created_at.isoformat() if payment.created_at else None,
         "updated_at": payment.updated_at.isoformat() if payment.updated_at else None,
+    }
+
+
+@router.post("/billing/reconcile/{payment_id}")
+async def admin_billing_reconcile_payment(
+    payment_id: UUID,
+    current_user: User = Depends(get_current_admin_user),
+    billing_reconciler: BillingReconciler = Depends(get_billing_reconciler),
+):
+    _require_capability(current_user, "admin.billing.read")
+    old_status, new_status, action_taken = await billing_reconciler.reconcile_one_by_payment_id(payment_id)
+    return {
+        "payment_id": str(payment_id),
+        "old_status": old_status,
+        "new_status": new_status,
+        "action_taken": action_taken,
+    }
+
+
+@router.get("/billing/stale-pending")
+async def admin_billing_stale_pending(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user),
+    billing_reconciler: BillingReconciler = Depends(get_billing_reconciler),
+):
+    _require_capability(current_user, "admin.billing.read")
+    now = datetime.now(UTC)
+    min_age = now - timedelta(minutes=settings.BILLING_PENDING_MIN_AGE_MINUTES)
+    max_age = now - timedelta(hours=settings.BILLING_PENDING_MAX_AGE_HOURS)
+    from app.domain.billing.crud import crud_billing
+
+    stale = await crud_billing.list_stale_pending_payments(db, min_age=min_age, max_age=max_age, limit=500)
+    return {
+        "count": len(stale),
+        "last_reconciler_run": billing_reconciler.last_run_at.isoformat() if billing_reconciler.last_run_at else None,
+        "payments": [
+            {
+                "payment_id": str(p.payment_id),
+                "user_id": str(p.user_id),
+                "stripe_session_id": p.stripe_session_id,
+                "status": getattr(p.status, "value", None) or str(p.status),
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+            }
+            for p in stale
+        ],
     }
 
 

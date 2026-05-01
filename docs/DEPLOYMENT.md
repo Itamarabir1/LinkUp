@@ -108,7 +108,7 @@ Post-deploy security headers check (recommended):
 curl -I https://linkup.itamarabir.com | grep -E "HTTP|strict|x-content|x-frame|referrer|permissions|content-security-policy"
 ```
 
-For full CSP rollout and promotion policy (Report-Only -> enforcing), see [`docs/SECURITY_HEADERS.md`](SECURITY_HEADERS.md).
+For CSP policy (enforcing header, `script-src` without `'unsafe-inline'` and **`/bootstrap.js`** shell, allowlists, `report-uri`, SPA caveats, optional rollback via Report-Only), see [`docs/SECURITY_HEADERS.md`](SECURITY_HEADERS.md).
 
 ### Validate frontend runtime config
 

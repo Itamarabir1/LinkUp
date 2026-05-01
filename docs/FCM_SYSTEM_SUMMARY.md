@@ -28,7 +28,8 @@ FCM delivery has two connected paths:
 ### 2.1 Initialization trigger
 
 - **`AuthContext`** ([`frontend/src/context/AuthContext.tsx`](frontend/src/context/AuthContext.tsx)): after successful **password login**, **Google sign-in**, or **initial session hydrate** (`fetchCurrentUser`), if `Notification.permission === 'granted'`, the app calls `void initFCM()` so the backend receives a fresh token for the logged-in user.
-- **Logout order:** `PATCH /users/fcm-token` with `{ "fcm_token": null }` (while the access token is still valid), then **`cleanupFCM()`** (unsubscribes foreground `onMessage`), then server `logout` / local token clear — so push is not sent to a stale device registration after sign-out.
+- **Logout order (explicit user sign-out — `tearDownSession({ reason: 'user-action' })`):** `PATCH /users/fcm-token` with `{ "fcm_token": null }` (while the access token is still valid), then **`cleanupFCM()`** (unsubscribes foreground `onMessage`), then server `logout` / local token clear — so push is not sent to a stale device registration after sign-out.
+- **Session expiry / refresh failure (`session-expired`):** teardown clears tokens and local FCM listeners via the same **`cleanupFCM`** path but **does not** call **`PATCH …/fcm-token`** — intentional to avoid chained **401**s when JWT is already invalid; DB token can be refreshed on next successful login ([`FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#auth-session-teardown)).
 - **Profile menu:** “הפעל התראות” / enable notifications — [`useLayoutShell.ts`](frontend/src/components/Layout/useLayoutShell.ts) calls `initFCM()` on user action (permission prompt + registration).
 - **Debug:** [`frontend/src/pages/FCMCheck.tsx`](frontend/src/pages/FCMCheck.tsx) can call `initFCM()` manually.
 

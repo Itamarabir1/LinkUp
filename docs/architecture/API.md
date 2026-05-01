@@ -31,6 +31,8 @@ Authorization: Bearer <access_token>
 
 **ווב:** במסך חיפוש נוסעים, הוק **`useJoinRide`** ([`useJoinRide.ts`](../../frontend/src/pages/SearchRides/useJoinRide.ts)) מחזיק מפתח יציב ב-**`useRef`** לכל ניסיון “הצטרף לנסיעה” (לא מפתח חדש בכל רינדור), ומעביר אותו ל־**`requestRideFromSearch`**; **`useSearchRides`** משתמש בו לזרימת החיפוש.
 
+עבור **`POST /billing/checkout`** ניתן לשלוח כותרת אופציונלית **`X-Idempotency-Key`** — אידמפוטנטיות **ב-PostgreSQL** (טבלה **`idempotency_keys`**, לא Redis): fingerprint קנוני על `user_id` + נתיב + מטבע (`make_checkout_fingerprint` ב־`app/domain/billing/idempotency.py`). אם המפתח כבר קיים עם אותו fingerprint וטרם פג TTL — מוחזרת אותה תשובת JSON ואותו קוד סטטוס כמו במקור (**מטמון תשובה מלא**); fingerprint שונה על אותו מפתח → **422** — **`IDEMPOTENCY_MISMATCH`** (ראו **[ERRORS.md](../ERRORS.md)**). TTL: **`BILLING_IDEMPOTENCY_TTL_HOURS`**.
+
 עבור **`POST /chat/conversations/{id}/messages`** ניתן (ומומלץ בלקוח) לשלוח **`Idempotency-Key`** — אופציונלי בשרת למען תאימות לאחור. אותן סמנטיקות טבלה כמו למעלה: אין כותרת → בלי Redis idempotency; מפתח + אותם `conversation_id` (בנתיב) + גוף זהה → תשובת 201 ממטמון; **409** + `Retry-After: 1` כשפעיל; **422** עם `idempotency_key_mismatch` אם המפתח שימש עם fingerprint אחר (`conversation_id` + `body`). מפתח Redis: `idempotency:chat_message:{user_id}:{client_key}`; כשל ב-Redis לפני עסקה → **fail-open**. **ווב:** [`sendMessage`](../../frontend/src/api/chat.ts) תומך במפתח אופציונלי (ברירת מחדל UUID אם לא הועבר); **[`useMessageThread`](../../frontend/src/pages/MessageThread/useMessageThread.ts)** ו-**[`useChatPopup`](../../frontend/src/components/ChatPopup/useChatPopup.ts)** מעבירים מפתח יציב לכל ניסיון שליחה (**`consumeOrCreateKey`** / **`resetOutboundKey`** ב־[**`outboundIdempotencyKey.ts`**](../../frontend/src/utils/outboundIdempotencyKey.ts)), מאחדים את תשובת ה-REST עם רשימת ההודעות דרך **`appendMessageDedupById`** כדי למנוע כפילויות עם replay או WS.
 
 ---
@@ -163,10 +165,12 @@ Authorization: Bearer <access_token>
 
 | Method | Path | Auth | תיאור |
 |--------|------|------|--------|
-| POST | /checkout | כן | יצירת Stripe Checkout Session לשדרוג פרימיום. מחזיר `checkout_url` + `session_id`. |
+| POST | /checkout | כן | יצירת Stripe Checkout Session לשדרוג פרימיום. מחזיר JSON עם `checkout_url` + `session_id` (בד"כ **201**). אופציונלי: כותרת **`X-Idempotency-Key`** — מטמון תשובה ב-DB בין מופעי API; פירוט בסעיף Idempotency למעלה. |
 | GET | /status | כן | סטטוס חיוב למשתמש המחובר (`is_premium`, `premium_since`). |
 | GET | /payments | כן | היסטוריית תשלומים של המשתמש המחובר. |
-| POST | /webhook | לא | Stripe webhook endpoint. אימות חתימה חובה דרך `Stripe-Signature`. |
+| POST | /webhook | לא | Stripe webhook endpoint. אימות חתימה חובה דרך `Stripe-Signature` (**fail-closed** אם חסר). Idempotency נשמרת גם ברמת אירוע Stripe (`stripe_event_id`) וגם בייחודיות תשלום. |
+
+**רקע תפעולי:** ברקע ה-API (כש־**`BILLING_RECONCILER_ENABLED`** מופעל) רץ **`BillingReconciler`** בתדירות **`BILLING_RECONCILER_INTERVAL_SECONDS`** — נעילת **`pg_try_advisory_lock`** למניעת ריצות כפולות, סריקת תשלומים **`pending`** “מיושנים”, ושאיבת סטטוס מ-Stripe למקרה שה-webhook התעכב (**`app/domain/billing/reconciler.py`**). ראו גם Prometheus תחת **`billing_reconciler_*`** ב־[`docs/operations/MONITORING.md`](../operations/MONITORING.md).
 
 ---
 
@@ -271,5 +275,9 @@ Authorization: Bearer <access_token>
 | GET | /outbox/{event_id} | אדמין | פרטי אירוע. |
 | POST | /outbox/{event_id}/requeue | אדמין | רק אם `status=FAILED` — מחזיר ל-`PENDING` לסריקת ה-worker. |
 | GET | /bookings/{booking_id} | אדמין | פרטי הזמנה (lookup). |
+| GET | /billing/payments | אדמין + capability **`admin.billing.read`** | רשימת תשלומים (תפעול). |
+| GET | /billing/payments/{payment_id} | אדמין + **`admin.billing.read`** | פרטי תשלום לפי מזהה. |
+| GET | /billing/stale-pending | אדמין + **`admin.billing.read`** | תשלומים **`pending`** בטווח גיל לפי הגדרות ה-reconciler (`BILLING_PENDING_*`) + **`last_reconciler_run`**. |
+| POST | /billing/reconcile/{payment_id} | אדמין + **`admin.billing.read`** | ריפקוציה נקודתית מול Stripe (מחזיר `old_status` / `new_status` / `action`). |
 
 ממשק React תואם: **`ADMIN_DASHBOARD.md`** (בשורש הפרויקט).

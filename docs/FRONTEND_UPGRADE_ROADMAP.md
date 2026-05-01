@@ -34,14 +34,14 @@ Legend:
 
 - `[~]` `stage-1-types` - complete pre-migration response typing pass in `api/*`
 - `[~]` `stage-1-adr` - append RQ ADR updates in `docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md`
-- `[~]` `stage-3a-auth` - finish full auth query ownership and logout/query clear semantics
+- `[~]` `stage-3a-auth` - finish full auth query ownership — **logout / session-expired / bootstrap-failed teardown semantics shipped** (`tearDownSession`, `auth:session-expired`, RQ **`captureExceptionOnce`** + 401-only Sentry skip); remaining: deeper “auth query ownership” refactors if still desired per product scope
 - `[ ]` `stage-3b-groups` - full groups queries/mutations migration + `GroupContext` slimming
 - `[~]` `stage-3b-rides` - complete rides migration and WS invalidation alignment
 - `[~]` `stage-3b-bookings` - complete bookings summaries/manifest/mutations + event rewiring
 - `[~]` `stage-3b-passengers` - passenger requests/search/infinite/mutations + idempotency preservation
 - `[ ]` `stage-3b-uploads` - presigned upload flow migration + readiness polling query
 - `[~]` `stage-3b-createride` - migrate `useCreateRide` operation-token workflow to RQ mutations/signal
-- `[~]` `stage-3d-chat` - standalone high-risk chat migration: **optimistic outbound send + `ChatListRow` + WS/REST reconciliation shipped** (`types/chatList`, `applyInboundRealMessage`); **remaining**: React Query for thread/popup/infinite scroll + broader “WS cache sync” if still desired
+- `[~]` `stage-3d-chat` - standalone high-risk chat migration: **optimistic outbound send + `ChatListRow` + WS/REST reconciliation shipped** (`types/chatList`, `applyInboundRealMessage`); **WS reconnect hardening shipped** (`reconnectBackoff.ts` → `useChatWebSocket` / `useReconnectingWebSocket` / `useReconnectingWebSocketState`); **remaining**: React Query for thread/popup/infinite scroll + broader “WS cache sync” if still desired
 - `[ ]` `stage-4-msw` - MSW server/handlers/rqRender + test setup integration
 - `[ ]` `stage-4-tests` - migrate targeted `useAISearch.test.ts` to MSW
 - `[ ]` `stage-5-cleanup` - dead-guard cleanup + docs/FUTURE_WORK + lint sweep
@@ -125,6 +125,7 @@ Safe subset shipped (completed):
 - `useChatUnreadMessages` moved from manual `setInterval` to `useQuery` polling (`qk.chat.unread`) with invalidate-based refresh API.
 - `useChatNotificationsFeed` moved from manual `setInterval` to `useQuery` polling (`qk.notifications.all`) with invalidate-based refresh API and preserved reducer contracts.
 - `Messages.tsx` moved from manual `useState/useEffect` fetch lifecycle to `useQuery` (`qk.chat.conversations`) with preserved sort/render semantics.
+- **WebSocket reconnect hardening:** **`computeReconnectDelayMs`** ([`frontend/src/utils/reconnectBackoff.ts`](../frontend/src/utils/reconnectBackoff.ts)) wired into **`useChatWebSocket`**, **`useReconnectingWebSocket`**, **`useReconnectingWebSocketState`** — base **3s**, cap **30s**, **±20%** jitter; documented in [`docs/architecture/REALTIME.md`](architecture/REALTIME.md), [`docs/FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff).
 
 Remaining under `stage-3d-chat`:
 - shared popup/thread cache model
@@ -179,8 +180,9 @@ Additional progress (recently completed outside full-chat scope):
 ## 3) Tier-2 Senior FE Hardening - Remaining
 
 ### S.1 Security Headers + Sourcemap Hardening (finish)
-- [~] CSP/Sentry key + sourcemap upload plugin pipeline implemented; remaining: post-deploy verification and tuning.
-- [ ] Execute post-deploy HTTP/2 + WS smoke test.
+- [x] CSP: enforcing **`Content-Security-Policy`** on Compose **`nginx/nginx.conf`** (Report-Only retired for that path); **`script-src`** hardened (**ללא** `'unsafe-inline'`) עם bootstrap ב־**`frontend/public/bootstrap.js`**; `frame-src` + Google Sign-In; `report-uri` → Sentry CSP ingestion — **`docs/SECURITY_HEADERS.md`** / **`docs/ENGINEERING_HIGHLIGHTS.md`**.
+- [~] Post-deploy verification: smoke login/chat/maps/uploads/billing; watch Sentry CSP reports; tune allowlists if needed (**K8s:** keep **`k8s/frontend/nginx-configmap.yaml`** in sync when using that ingress path).
+- [ ] Execute post-deploy HTTP/2 + WS smoke test (disciplined checklist).
 
 ### S.2 Supply Chain
 - [ ] SBOM generation/release artifact flow deferred to `docs/FUTURE_WORK.md`.

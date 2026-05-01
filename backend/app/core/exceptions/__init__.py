@@ -41,8 +41,10 @@ from .booking import (
 # Billing
 from .billing import (
     CheckoutSessionError,
+    IdempotencyMismatchError,
     PaymentAlreadyExistsError,
     PaymentNotFoundError,
+    PaymentTransitionError,
     StripeWebhookError,
     UserAlreadyPremiumError,
 )
@@ -163,6 +165,7 @@ __all__ = [
     "InvalidResetCodeError",
     "InvalidRideStatusError",
     "InvalidRouteError",
+    "IdempotencyMismatchError",
     "InvalidVerificationCodeError",
     "LinkUpError",
     "MessageSendFailed",
@@ -173,6 +176,7 @@ __all__ = [
     "OutboxRequeueInvalidStatusError",
     "PaymentAlreadyExistsError",
     "PaymentNotFoundError",
+    "PaymentTransitionError",
     "PassengerRequestNotFoundError",
     "PasswordSameAsOldError",
     "PasswordTooWeakError",

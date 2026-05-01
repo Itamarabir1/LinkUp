@@ -298,6 +298,20 @@
 
 ---
 
+## 26. Billing — Postgres idempotency ל־`POST …/billing/checkout`, reconciler, ו-state machine לתשלום
+
+| | |
+|--|--|
+| **הקשר** | Stripe Checkout נפתח מהדפדפן; retries ולחיצות כפולות על יצירת session; webhooks שנמשכים או חוזרים; צורך בעקביות מצב **`payments.status`** ו-**`users.is_premium`**. |
+| **החלטה** | **`X-Idempotency-Key`** (כותרת) → טבלה **`idempotency_keys`** (משתמש+מפתח+endpoint ייחודיים, fingerprint SHA-256, **`response_body`** + **`status_code`**, **`expires_at`**). כפילות fingerprint — מחזירים תשובה שמורה; אי-התאמה — **`IDEMPOTENCY_MISMATCH`** (422). **`BillingReconciler`**: **`pg_try_advisory_lock`**, רשימת **`pending`** עם חלון גיל, **`stripe_gateway.retrieve_session`**, **`handle_checkout_completed`** / **`handle_session_expired`**, ניקוי idempotency שפג תוקף — מתוזמן ב-**`lifespan`** (APScheduler). מעברי סטטוס: **`validate_transition`** — רק ממצב התחלתי מותר החוצה; **`ILLEGAL_PAYMENT_TRANSITION`** במעבר אסור. |
+| **למה Postgres ל-checkout** | עמידות בין מופעי API וביטול תלות Redis לשכבה זו (בהשוואה לצ’אט/נסיעות — שם Redis אופטימלי ל-latency קצר ו-fail-open). |
+| **Trade-off** | write נוסף למסד לכל checkout עם מפתח; reconciler = קריאות Stripe נוספות — מוגדרות חלון זמן ו-single-runner lock. |
+| **מדדים** | **`billing_reconciler_runs_total`**, **`billing_reconciler_recovered_total`**, **`billing_reconciler_errors_total`**, **`billing_idempotency_hits_total`** — ראו **`docs/operations/MONITORING.md`**. |
+| **בקצרה לראיון** | “אידמפוטנטיות של checkout ישבה ב-Postgres כדי לאחסן את תשובת השרת המלאה בין רפליקות; reconciler עם advisory lock מתקן פערים אם webhook מאחר, ומכונת מצבים חוסמת מעברים משוגעים בין סטטוסים.” |
+| **פירוט מלא / הפניה** | [FEATURE_DECISIONS.md §billing-checkout-db-idempotency-reconciler](../FEATURE_DECISIONS.md#billing-checkout-db-idempotency-reconciler) · [API.md §Billing](../architecture/API.md) · מיגרציות ב-[DATABASE.md](../architecture/DATABASE.md) · [BILLING_REFACTOR_SUMMARY.md](../BILLING_REFACTOR_SUMMARY.md) — סיכום שמור במלואו (לפני/אחרי, טבלת Kafka) |
+
+---
+
 ## קישורים
 
 - [README — מפת ADR](README.md)  

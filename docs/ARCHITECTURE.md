@@ -9,15 +9,16 @@ Also surfaced in the repo root [`README.md`](../README.md#architecture).
 ## High-level docs
 
 - [`README.md`](../README.md) — product overview and getting started
-- [`frontend/README.md`](../frontend/README.md) — web client architecture notes (RTL/i18n, realtime, Premium UX flow, React Query migrations כולל Stage 3b Part 2 ל-MyBookings, Stage 3b Part 6 ל-SearchRides, Stage 5 cleanup ל-MyRequests/Auth bootstrap, Stage 3d safe-subset ל-Chat polling/fetch, **chat outbound: `ChatListRow` optimistic UI + `applyInboundRealMessage` / `appendMessageDedupById` + ref-scoped Idempotency-Key** — ADR Frontend §2; **chat reconnect gap:** **`fetchMissedGap`** (`after` + `before=cursor`, capped multi-page REST) על `WS onOpen`; **chat-ws inbound:** read cap + typing rate limit — ADR chat-ws §7, S.7 asset hardening, Web Vitals D: Sentry RUM + dynamic vitals metrics, Orval OpenAPI codegen + CI drift gate, A11y heading/landmarks cleanup עם `usePageTitle`, ו-XSS baseline: `react/no-danger` + centralized `sanitizeHtml`)
+- [`frontend/README.md`](../frontend/README.md) — web client architecture notes (RTL/i18n, realtime, Premium UX flow, React Query migrations כולל Stage 3b Part 2 ל-MyBookings, Stage 3b Part 6 ל-SearchRides, Stage 5 cleanup ל-MyRequests/Auth bootstrap, Stage 3d safe-subset ל-Chat polling/fetch, **auth session teardown:** **`tearDownSession` + `auth:session-expired` + Sentry/RQ 401 policy** — **FEATURE_DECISIONS `#auth-session-teardown`** / **ADR Frontend §21**; **chat outbound:** `ChatListRow` optimistic UI + `applyInboundRealMessage` / `appendMessageDedupById` + ref-scoped Idempotency-Key — ADR Frontend §2; **chat reconnect gap:** **`fetchMissedGap`** (`after` + `before=cursor`, capped multi-page REST) על `WS onOpen`; **WS transport reconnect:** **`reconnectBackoff.ts`** (exponential + jitter) ב־`useChatWebSocket` / `useReconnectingWebSocket*`; **chat-ws inbound:** read cap + typing rate limit — ADR chat-ws §7, S.7 asset hardening, Web Vitals D: Sentry RUM + dynamic vitals metrics, Orval OpenAPI codegen + CI drift gate, A11y heading/landmarks cleanup עם `usePageTitle`; **XSS:** `react/no-danger` + **`sanitizeHtml()`** + backend chat plaintext (**`SECURITY_HEADERS`** ל-CSP ב-edge nginx)
 - [`docs/DEPLOYMENT.md`](DEPLOYMENT.md) — production deployment flow and rollback
 - [`docs/ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) — senior-level feature and reliability highlights
-- [`docs/SECURITY_HEADERS.md`](SECURITY_HEADERS.md) — nginx edge hardening policy (`HTTP/2`, browser security headers, CSP rollout)
+- [`docs/BILLING_REFACTOR_SUMMARY.md`](BILLING_REFACTOR_SUMMARY.md) — סיכום מלא של Billing refactor (לפני/אחרי, רכיבים, השוואת Kafka, טסטים)
+- [`docs/SECURITY_HEADERS.md`](SECURITY_HEADERS.md) — nginx edge hardening (`HTTP/2`), browser security headers, **enforcing CSP** (`script-src` ללא **`'unsafe-inline'`**; **`frontend/public/bootstrap.js`**) + Sentry CSP `report-uri`, and how CSP complements XSS controls (plaintext chat, `sanitizeHtml`, static-SPA nonce limitations)
 - [`docs/FUTURE_WORK.md`](FUTURE_WORK.md) — deferred decisions כולל S.4 OCC ל-Profile edit עתידי ו-E.5/E.6 forms scope rationale
 
 ## Architecture deep-dive by domain
 
-- [`docs/architecture/API.md`](architecture/API.md) — FastAPI routes, auth, middleware, health contracts
+- [`docs/architecture/API.md`](architecture/API.md) — FastAPI routes, auth, middleware, health contracts (**Billing:** checkout + **`X-Idempotency-Key`**, webhook, admin reconcile/stale-pending — סעיף Billing / Admin)
 - [`docs/architecture/DATABASE.md`](architecture/DATABASE.md) — PostgreSQL/PostGIS schema, indexes, and migrations
 - [`docs/architecture/EVENTS.md`](architecture/EVENTS.md) — Outbox, RabbitMQ topology, retry/DLQ flow
 - [`docs/architecture/REALTIME.md`](architecture/REALTIME.md) — WebSocket architecture, Redis pub/sub, GPS/presence
@@ -29,7 +30,7 @@ Also surfaced in the repo root [`README.md`](../README.md#architecture).
 ## Operations docs
 
 - [`docs/operations/RUNBOOK.md`](operations/RUNBOOK.md) — incident handling for common production failures
-- [`docs/operations/MONITORING.md`](operations/MONITORING.md) — Prometheus/Grafana, SLO baseline, and probe exposure policy (`/livez` public, `/readyz` internal-only)
+- [`docs/operations/MONITORING.md`](operations/MONITORING.md) — Prometheus/Grafana, SLO baseline, probe exposure policy (`/livez` public, `/readyz` internal-only), ומטריקות **billing** (`billing_reconciler_*`, …)
 
 ## ADRs
 

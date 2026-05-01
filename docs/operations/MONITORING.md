@@ -21,6 +21,7 @@ Production observability stack for Linkup.
 
 ## Async reliability
 
+- **Billing reconciler** (ריצה מתוזמנת ב-backend): **`billing_reconciler_recovered_total`** מול **`billing_reconciler_errors_total`** — גידול מתמשך ב-errors או אפס recoveries לאורך זמן מרמז על תקלת Stripe, נעילות DB, או תור תשלומים תקועים.
 - outbox processed vs failed
 - RabbitMQ retries and DLQ depth
 - consumer restart counters
@@ -51,6 +52,25 @@ Gauge semantics are consistent: **0** = closed (normal), **1** = half_open (prob
 | `brevo_circuit_breaker_state` | `name`: `brevo_email` | `app/infrastructure/metrics.py` → `brevo_email_cb` in `notifications/circuit_breaker.py` |
 
 See **§20** in [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md) and [`docs/architecture/NOTIFICATIONS.md`](../architecture/NOTIFICATIONS.md).
+
+## Billing / Stripe (Prometheus)
+
+Counters ב־`app/infrastructure/metrics.py` — שימושי ל-SLO על זרימת תשלום ועל התאמה מול Stripe אחרי אירועים חריגים:
+
+| Metric | תיאור |
+|--------|--------|
+| `payments_initiated_total` | נוצרו Checkout Sessions |
+| `payments_succeeded_total` | תשלומים הושלמו |
+| `payments_failed_total` | תשלומים נכשלו |
+| `payments_canceled_total` | בוטלו / פגו |
+| `stripe_webhook_received_total` | webhook התקבל (label `event_type`) |
+| `stripe_webhook_errors_total` | אימות חתימה נכשל |
+| `billing_reconciler_runs_total` | ריצות reconciler |
+| `billing_reconciler_recovered_total` | תשלומים שחודשו/סונכרנו מתוך stale pending |
+| `billing_reconciler_errors_total` | כשלים פר־תשלום בתוך ריצת reconciler |
+| `billing_idempotency_hits_total` | פגיעות במטמון אידמפוטנטיות checkout |
+
+פירוט API ו-env: [`docs/architecture/API.md`](../architecture/API.md) (Billing), [`docs/architecture/DEVELOPMENT.md`](../architecture/DEVELOPMENT.md).
 
 ## Liveness & Readiness Probes
 

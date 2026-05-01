@@ -2,6 +2,10 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+from app.core.config import settings
+from app.domain.billing.reconciler import billing_reconciler
 
 # Infrastructure singletons
 from app.infrastructure.rabbitmq.client import rabbit_client
@@ -51,6 +55,20 @@ async def lifespan(app: FastAPI):
             e,
         )
 
+    scheduler: AsyncIOScheduler | None = None
+    if settings.BILLING_RECONCILER_ENABLED:
+        scheduler = AsyncIOScheduler(timezone="Asia/Jerusalem")
+        scheduler.add_job(
+            billing_reconciler.run,
+            trigger="interval",
+            seconds=settings.BILLING_RECONCILER_INTERVAL_SECONDS,
+            id="billing_reconciler",
+            max_instances=1,
+            misfire_grace_time=60,
+        )
+        scheduler.start()
+        logger.info("✅ [Lifespan] Billing reconciler scheduler started")
+
     # App serves traffic until shutdown
     yield
 
@@ -63,6 +81,8 @@ async def lifespan(app: FastAPI):
             await redis_chat_pubsub.close()
             await redis_client.close()
         await rabbit_client.close()
+        if scheduler:
+            scheduler.shutdown(wait=False)
         logger.info("👋 [Lifespan] All infrastructure connections closed safely")
     except Exception as e:
         logger.error(f"⚠️ [Lifespan] Error during shutdown cleanup: {e}")

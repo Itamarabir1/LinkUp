@@ -61,6 +61,7 @@ dependencies = [
     "structlog>=25.5.0",
     "prometheus-fastapi-instrumentator>=6.1.0",
     "stripe>=15.0.1",
+    "apscheduler>=3.10.0",
 ]
 
 [tool.setuptools.packages.find]

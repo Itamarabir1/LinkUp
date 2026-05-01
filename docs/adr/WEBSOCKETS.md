@@ -46,9 +46,17 @@
 
 | | |
 |--|--|
-| **ראשי** | `useChatNotificationsWebSocket` על גבי `useReconnectingWebSocket`; ב-`onOpen` (כולל אחרי reconnect) — רענון פיד, unread, אירוע `linkup-notifications-refresh`. |
+| **ראשי** | `useChatNotificationsWebSocket` על גבי `useReconnectingWebSocket`; ב-`onOpen` (אחרי reconnect עם exponential backoff + jitter — ראו [Reconnect (פרונט)](#frontend-ws-reconnect-doc)) — רענון פיד, unread, אירוע `linkup-notifications-refresh`. |
 | **גיבוי** | polling ל-REST כל ~**5 דקות** (`useChatNotificationsFeed`) כשה-WS לא זמין או רשת לא יציבה. |
 | **למה** | אמינות מול ניתוקים בלי לרדוף אחרי השרת כל שנייה. |
+
+---
+
+<a id="frontend-ws-reconnect-doc"></a>
+
+## Reconnect (פרונט) — exponential backoff + jitter
+
+בין ניסיונות חיבור מחדש (chat-ws, FastAPI WS דרך [`useReconnectingWebSocket`](../../frontend/src/hooks/useReconnectingWebSocket.ts) / [`useReconnectingWebSocketState`](../../frontend/src/hooks/useReconnectingWebSocketState.ts), וגם [`useChatWebSocket`](../../frontend/src/pages/MessageThread/useChatWebSocket.ts)) הפרונט משתמש ב־**[`computeReconnectDelayMs`](../../frontend/src/utils/reconnectBackoff.ts)** ב־[`reconnectBackoff.ts`](../../frontend/src/utils/reconnectBackoff.ts): **מעריכה + ±20% jitter** (בסיס **3s**, תקרה **30s**); מונה ניסיונות **פר־`useEffect`**, **מתאפס ב־`onopen`**. **למה:** outage כללי (chat-ws / FastAPI / רשת) — מצמצמים **thundering herd** ברגע ה-recovery. פירוט: [`architecture/REALTIME.md`](../architecture/REALTIME.md), [`FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff`](../FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff).
 
 ---
 

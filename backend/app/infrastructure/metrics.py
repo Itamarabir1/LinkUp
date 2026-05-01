@@ -88,6 +88,10 @@ payments_failed_total = Counter(
     "payments_failed_total",
     "Payments that failed",
 )
+payments_canceled_total = Counter(
+    "payments_canceled_total",
+    "Payments that were canceled/expired",
+)
 stripe_webhook_received_total = Counter(
     "stripe_webhook_received_total",
     "Webhooks received from Stripe",
@@ -96,6 +100,22 @@ stripe_webhook_received_total = Counter(
 stripe_webhook_errors_total = Counter(
     "stripe_webhook_errors_total",
     "Stripe webhooks that failed signature verification",
+)
+billing_reconciler_runs_total = Counter(
+    "billing_reconciler_runs_total",
+    "Billing reconciler runs",
+)
+billing_reconciler_recovered_total = Counter(
+    "billing_reconciler_recovered_total",
+    "Payments recovered by reconciler",
+)
+billing_reconciler_errors_total = Counter(
+    "billing_reconciler_errors_total",
+    "Per-payment errors while reconciler is running",
+)
+billing_idempotency_hits_total = Counter(
+    "billing_idempotency_hits_total",
+    "Idempotency cache hits for billing endpoints",
 )
 
 # =============================================================================

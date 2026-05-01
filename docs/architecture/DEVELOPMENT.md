@@ -85,6 +85,11 @@
 | STRIPE_SECRET_KEY | לחיובים | Stripe Secret Key (`sk_*` / `rk_*`) |
 | STRIPE_PUBLISHABLE_KEY | אופציונלי בבקאנד | מפתח publishable; לרוב נצרך בפרונט כ-`VITE_STRIPE_PUBLISHABLE_KEY` |
 | STRIPE_WEBHOOK_SECRET | לחתימת webhook | Stripe Webhook Signing Secret (`whsec_*`) |
+| BILLING_RECONCILER_ENABLED | — | `true` (ברירת מחדל) — מתזמן APScheduler ב־`lifespan` מריץ **`BillingReconciler.run`** |
+| BILLING_RECONCILER_INTERVAL_SECONDS | — | מרווח בין ריצות reconciler (ברירת מחדל **600**) |
+| BILLING_PENDING_MIN_AGE_MINUTES | — | תשלום **`pending`** נחשב “מיושן” רק אחרי מינימום גיל זה לפני שאלה Stripe (ברירת מחדל **10**) |
+| BILLING_PENDING_MAX_AGE_HOURS | — | חלון עליון לגיל תשלום **`pending`** בסריקה (ברירת מחדל **24**) |
+| BILLING_IDEMPOTENCY_TTL_HOURS | — | TTL לשורות **`idempotency_keys`** + מטמון תשובת checkout (ברירת מחדל **24**) |
 | GOOGLE_MAPS_API_KEY | לגיאו/מפות | |
 | GOOGLE_CLIENT_ID | ל-Google Sign-In | |
 | GOOGLE_CLIENT_SECRET | אופציונלי | |

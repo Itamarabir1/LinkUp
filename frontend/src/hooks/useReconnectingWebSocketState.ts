@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getWsToken } from '../config/wsUrls';
+import { computeReconnectDelayMs } from '../utils/reconnectBackoff';
 
 interface Options {
   buildUrl: (token: string) => string;
@@ -54,6 +55,7 @@ export function useReconnectingWebSocketState({
       return;
     }
 
+    let attempt = 0;
     let cancelled = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let ws: WebSocket | null = null;
@@ -66,19 +68,28 @@ export function useReconnectingWebSocketState({
       try {
         ws = new WebSocket(buildUrlRef.current(token));
       } catch {
-        if (!cancelled) reconnectTimer = setTimeout(connect, reconnectDelayMs);
+        if (!cancelled) {
+          const delay = computeReconnectDelayMs(attempt, { baseMs: reconnectDelayMs });
+          attempt++;
+          reconnectTimer = setTimeout(connect, delay);
+        }
         return;
       }
 
       ws.onopen = () => {
         setError(null);
         setConnected(true);
+        attempt = 0;
       };
       ws.onmessage = (ev) => onMessageRef.current(ev);
       ws.onclose = () => {
         setConnected(false);
         ws = null;
-        if (!cancelled) reconnectTimer = setTimeout(connect, reconnectDelayMs);
+        if (!cancelled) {
+          const delay = computeReconnectDelayMs(attempt, { baseMs: reconnectDelayMs });
+          attempt++;
+          reconnectTimer = setTimeout(connect, delay);
+        }
       };
       ws.onerror = () => {
         if (connectionErrorLabel) setError(connectionErrorLabel);
