@@ -119,6 +119,8 @@ infrastructure/pgbouncer/userlist.txt
 postgres_data/
 
 # --- Misc ---
+combined_docs_for_claude*.txt
+**/~$*.docx
 *.bak
 *.tmp
 .cache/
