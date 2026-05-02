@@ -7,7 +7,7 @@ Fixtures for async tests.
     DATABASE_URL=postgresql+asyncpg://USER:PASS@HOST:5432/DBNAME
     (או TEST_DATABASE_URL לתאימות לאחור)
 
-מומלץ DB ייעודי לבדיקות (לא אותו DB כמו פיתוח), עם סכמה מעודכנת (alembic upgrade head).
+מומלץ DB ייעודי לבדיקות (לא אותו DB כמו פיתוח). **סכמה:** תמיד מ־**Alembic** (`uv run alembic upgrade head`); אין יצירת טבלאות ב־conftest — זהה לשאר הטבלאות בפרויקט.
 
 הפרדת סשנים:
 - db_session — טרנזקציה אחת; commit ממופה ל-flush ואז rollback (מהיר לשירותים).

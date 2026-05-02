@@ -10,13 +10,14 @@ install:
 	pip install -r requirements.txt
 
 migrate:
-	alembic upgrade head
+	uv run alembic upgrade head
 
 migration:
-	alembic revision --autogenerate -m "$(name)"
+	uv run alembic revision --autogenerate -m "$(name)"
 
-test:
-	pytest tests/ -v
+# כמו CI: מיגרציה לפני pytest — סכמה אחידה מ־Alembic בלבד
+test: migrate
+	uv run pytest tests/ -v --tb=short
 
 lint:
 	ruff check app/
