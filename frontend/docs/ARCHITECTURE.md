@@ -1,6 +1,6 @@
 # Frontend architecture (LinkUp)
 
-רשימת ריפקטור ואיכות מלאה (מקור אמת): [`FRONTEND_REFACTOR_AND_QUALITY.md`](./FRONTEND_REFACTOR_AND_QUALITY.md). סיכום להצגה בפורטפוליו: [`../../docs/ENGINEERING_HIGHLIGHTS.md`](../../docs/ENGINEERING_HIGHLIGHTS.md) (סעיף 14).
+רשימת ריפקטור ואיכות מלאה (מקור אמת): [`FRONTEND_REFACTOR_AND_QUALITY.md`](./FRONTEND_REFACTOR_AND_QUALITY.md). **מה פתוח / checklist מעודכן:** [`../../docs/FRONTEND_UPGRADE_ROADMAP.md`](../../docs/FRONTEND_UPGRADE_ROADMAP.md). סיכום להצגה בפורטפוליו: [`../../docs/ENGINEERING_HIGHLIGHTS.md`](../../docs/ENGINEERING_HIGHLIGHTS.md) (סעיף 14).
 
 הערת אינטגרציה חשובה: רינדור מיילים עבר ל-service נפרד `email-renderer` (Node.js + Express + React Email) בצד הבקאנד/worker. לפרונט אין תלות ישירה בשירות זה, אך שינויי נוסח/תוכן מיילים מנוהלים עכשיו ב-`email-renderer/src/emails/templates/` ולא ב-Jinja בבקאנד.
 

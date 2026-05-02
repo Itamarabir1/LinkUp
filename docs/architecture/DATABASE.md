@@ -291,7 +291,7 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 | users | last_location | idx_users_location (GIST) | חיפוש מרחבי |
 | rides | origin_geom | idx_rides_origin_geom (GIST) | חיפוש מרחבי |
 | rides | destination_geom | idx_rides_destination_geom (GIST) | חיפוש מרחבי |
-| outbox_events | created_at WHERE status='PENDING' | idx_outbox_events_pending | poll של Outbox worker |
+| outbox_events | created_at WHERE status='PENDING' | idx_outbox_events_pending | סריקת **`notification-worker`** / fallback polling למסלול Outbox (`run_outbox_worker`) |
 | groups | invite_code | ix_groups_invite_code | join by invite |
 
 ### מ-004_add_missing_indexes
@@ -316,22 +316,26 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 | Revision | תיאור | תאריך |
 |----------|--------|--------|
 | 001_full_schema | סכמה מלאה: enums, users, groups, group_members, rides, passenger_requests, bookings, conversations, messages, outbox_events, chat_analysis, indexes (001) | 2025-03-09 |
-| 002_rename_avatar_url_to_avatar_key | users.avatar_url → avatar_key | 2025-03-09 |
+| 002_avatar_key (`002_rename_avatar_url_to_avatar_key.py`) | users.avatar_url → avatar_key | 2025-03-09 |
 | 003_groups_avatar_desc | groups: avatar_key, description | 2025-03-09 |
 | 004_add_missing_indexes | 11 indexes — rides (4), bookings (3), group_members (2), passenger_requests (1) | 2025-03-09 |
 | 005_add_active_ride_status | הוספת ערך 'active' ל-enum ride_status (נסיעה בתנועה — התחל/סיים נסיעה, GPS) | 2025-03-09 |
-| 006_chat_participants | טבלת `conversation_participants` (למשל `last_read_at` למשתמש בשיחה) | — |
+| 006_chat_participants (`006_add_conversation_participants.py`) | טבלת `conversation_participants` (למשל `last_read_at` למשתמש בשיחה) | — |
 | 007_last_active_at (קובץ `007_add_last_active_at.py`) | `users.last_active_at` — פעילות/צ'אט / last-seen | מזהה רוויזיה בקוד: `revision = "007_last_active_at"`; **008** מצביע אליו ב־`down_revision` |
 | 008_scheduled_notifications | טבלת `scheduled_notifications` + partial index; הסרת `reminder_sent` מ-rides ו-bookings | — |
+| 009_user_avatar_lifecycle (`009_user_avatar_lifecycle.py`) | מחזור חיים לאווטאר: `avatar_staging_key`, `avatar_status` | — |
+| 010_outbox_notify_trigger (`010_outbox_notify_trigger.py`) | טריגר PostgreSQL LISTEN/NOTIFY על הכנסות ל־outbox | — |
+| 011_chat_read_cursor (`011_chat_read_cursor.py`) | `last_read_message_id` ב־`conversation_participants` (קרסור קריאה) | — |
 | 012_add_missing_indexes | אינדקסים משלימים: `bookings.request_id`, `messages.sender_id` | 2026-04-21 |
 | 013_add_billing | טבלת `payments`, enum `payment_status_enum`, ושדות חיוב ב-`users` (`stripe_customer_id`, `is_premium`, `premium_since`) | 2026-04-23 |
 | 014_fix_billing_partial_state | תיקון סכמת billing אחרי מצבים חלקיים (enum/עמודות/indexes idempotent) | 2026-04-23 |
 | 015_add_audit_log | טבלת `audit_log` (אדמין + ניסיונות webhook billing) | 2026-04-26 |
 | 015_billing_idem (`015_billing_idempotency_and_indexes.py`) | טבלת `idempotency_keys` + אינדקס חלקי `idx_payments_status_created` על `payments` | 2026-05-01 |
+| 016_merge015_heads (`016_merge_015_audit_and_billing_heads.py`) | merge revision — מאחד את **`015_add_audit_log`** ו־**`015_billing_idem`** (אין שינוי סכמה) | 2026-05-01 |
 
-**הערת Alembic:** רוויזיות **`015_add_audit_log`** ו־**`015_billing_idem`** מתפצלות מ־**014**; המיזוג הוא **`016_merge015_heads`** (מזהי רוויזיה חייבים להתאים ל־`VARCHAR(32)` בטבלת **`alembic_version`** — לכן הסט מקוצר עבור מיגרציית האידמפוטנטיות).
+**הערת Alembic:** רוויזיות **`015_add_audit_log`** ו־**`015_billing_idem`** מתפצלות מ־**014**; המיזוג הוא **`016_merge015_heads`** בקובץ **`016_merge_015_audit_and_billing_heads.py`** (מזהי רוויזיה חייבים להתאים ל־`VARCHAR(32)` בטבלת **`alembic_version`** — לכן הסט מקוצר עבור מיגרציית האידמפוטנטיות).
 
-הרצה: מתוך `backend/` — `alembic upgrade head`. downgrade: `alembic downgrade -1`.
+**הרצה (מומלץ מקומית):** מתוך `backend/` עם **`uv`** — **`uv run alembic upgrade head`**; **`downgrade`** צעד אחד — **`uv run alembic downgrade -1`**. בשירות Docker **`migrate`**, התמונה בנויה עם **`ENTRYPOINT ["alembic"]`** — הפקודה היא **`alembic upgrade head`** (לא דרך `uv`). להקמת Postgres מקומית ומשתנה **`DATABASE_URL`**, ראו **`docs/architecture/DEVELOPMENT.md`**.
 
 ---
 

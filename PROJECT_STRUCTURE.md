@@ -16,6 +16,7 @@ LinkUp/
 │   └── workflows/                 # CI/CD
 │       ├── backend-ci.yml
 │       ├── chat-ws-ci.yml
+│       ├── email-renderer-ci.yml
 │       └── frontend-ci.yml
 ├── .vscode/
 │   └── settings.json
@@ -33,7 +34,7 @@ LinkUp/
 ├── backend/
 ├── chat-ws/
 ├── db/
-├── docs/                          # ארכיטקטורה, ADR, ENGINEERING_HIGHLIGHTS, תסריטי וידאו
+├── docs/                          # ארכיטקטורה, ADR, ENGINEERING_HIGHLIGHTS, FUTURE_WORK, FRONTEND_UPGRADE_ROADMAP, תסריטי וידאו
 ├── email-renderer/                # מיקרו-שירות Node — React Email, /render
 ├── files/                         # מדריכי מיזוג ועזר (לא מקור אמת לקוד)
 ├── frontend/
@@ -54,11 +55,10 @@ backend/
 │   ├── README.md
 │   └── v/cache/nodeids
 ├── alembic.ini
-├── celerybeat-schedule
 ├── Dockerfile
 ├── Makefile
 ├── .dockerignore
-├── requirements.txt
+├── pyproject.toml               # תלויות (מקור); **`uv.lock`** לנעילת גרסאות — אין `requirements.txt` ב-backend
 ├── README.md
 ├── load_test.js                   # Grafana k6 — wrapper ל-auth (מפנה ל־k6/scripts)
 ├── load_test_rides.js             # wrapper ל-rides k6
@@ -72,265 +72,29 @@ backend/
 │   ├── env.py
 │   ├── README.md
 │   ├── script.py.mako
-│   └── versions/
-│       ├── add_refresh_token_to_users.py
-│       ├── add_ride_distance_duration_columns.py
-│       ├── add_route_summary_to_rides.py
-│       └── normalize_ride_status_enum.py
+│   └── versions/              # רשימת רוויזיות עדכנית: **`docs/architecture/DATABASE.md`** / `uv run alembic history` (לא משבצים כאן את כל הקבצים)
 ├── app/
-│   ├── __init__.py
-│   ├── admin_config.py
-│   ├── main.py
-│   ├── admin/
-│   │   └── setup.py
+│   ├── main.py, admin_config.py, __init__.py
+│   ├── admin/setup.py                    # SQLAdmin (optional)
 │   ├── api/
-│   │   ├── dependencies/
-│   │   │   ├── auth.py
-│   │   │   ├── file.py
-│   │   │   └── rate_limit.py
-│   │   ├── v1/
-│   │   │   ├── api_router.py
-│   │   │   └── routers/
-│   │   │       ├── __init__.py
-│   │   │       ├── auth.py
-│   │   │       ├── bookings.py
-│   │   │       ├── chat.py
-│   │   │       ├── geo.py
-│   │   │       ├── passengers.py
-│   │   │       ├── rides.py
-│   │   │       └── users.py
-│   │   └── websockets/
-│   │       └── notifications.py
-│   ├── core/
-│   │   ├── config.py
-│   │   ├── lifespan.py
-│   │   ├── security.py
-│   │   ├── exceptions/
-│   │   │   ├── __init__.py
-│   │   │   ├── auth.py
-│   │   │   ├── base.py
-│   │   │   ├── base_user.py
-│   │   │   ├── booking.py
-│   │   │   ├── handlers.py
-│   │   │   ├── infrastructure.py
-│   │   │   ├── notification.py
-│   │   │   ├── passenger.py
-│   │   │   ├── ride.py
-│   │   │   ├── user.py
-│   │   │   └── validation.py
-│   │   ├── middleware/
-│   │   │   ├── __init__.py
-│   │   │   ├── https_redirect.py
-│   │   │   └── security_headers.py
-│   │   └── utils/
-│   │       └── validators.py
-│   ├── db/
-│   │   ├── base.py
-│   │   ├── models.py
-│   │   └── session.py
-│   ├── domain/
-│   │   ├── auth/
-│   │   │   ├── google_auth.py
-│   │   │   ├── schema.py
-│   │   │   ├── service.py
-│   │   │   └── verification_service.py
-│   │   ├── bookings/
-│   │   │   ├── booking_reads_service.py
-│   │   │   ├── crud.py
-│   │   │   ├── enum.py
-│   │   │   ├── location_service.py
-│   │   │   ├── manifest_mapping.py
-│   │   │   ├── model.py
-│   │   │   ├── router.py
-│   │   │   ├── schema.py
-│   │   │   └── service.py
-│   │   ├── chat/
-│   │   │   ├── __init__.py
-│   │   │   ├── ai/
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── analyzer.py
-│   │   │   │   ├── analysis.py
-│   │   │   │   ├── client.py
-│   │   │   │   ├── crud.py
-│   │   │   │   ├── prompts.py
-│   │   │   │   └── schema.py
-│   │   │   ├── calendar_export.py
-│   │   │   ├── completion/
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── detector.py
-│   │   │   │   └── service.py
-│   │   │   ├── crud.py
-│   │   │   ├── model.py
-│   │   │   ├── schema.py
-│   │   │   ├── service.py
-│   │   │   └── calendar/
-│   │   │       ├── __init__.py
-│   │   │       ├── builder.py
-│   │   │       ├── event.py
-│   │   │       ├── exporter.py
-│   │   │       └── time_parser.py
-│   │   ├── events/
-│   │   │   ├── enum.py
-│   │   │   ├── model.py
-│   │   │   ├── outbox.py
-│   │   │   ├── routing.py
-│   │   │   └── schema.py
-│   │   ├── geo/
-│   │   │   ├── processor.py
-│   │   │   ├── schema.py
-│   │   │   ├── mixins.py
-│   │   │   └── utils.py
-│   │   ├── notifications/
-│   │   │   ├── constants.py
-│   │   │   ├── manager.py
-│   │   │   ├── channels/
-│   │   │   │   ├── email/
-│   │   │   │   │   ├── __init__.py
-│   │   │   │   │   ├── client.py
-│   │   │   │   │   ├── renderer.py
-│   │   │   │   │   └── templates/
-│   │   │   │   │       ├── chat/
-│   │   │   │   │       │   └── conversation_summary.html
-│   │   │   │   │       ├── driver/
-│   │   │   │   │       │   ├── new_ride_request.html
-│   │   │   │   │       │   ├── passenger_cancelled.html
-│   │   │   │   │       │   └── ride_reminder_driver.html
-│   │   │   │   │       ├── passenger/
-│   │   │   │   │       │   ├── booking_approved.html
-│   │   │   │   │       │   ├── booking_rejected.html
-│   │   │   │   │       │   ├── ride_cancelled_by_driver.html
-│   │   │   │   │       │   ├── ride_reminder_passenger.html
-│   │   │   │   │       │   └── ride_created_for_passengers.html
-│   │   │   │   │       └── user/
-│   │   │   │   │           ├── password_reset.html
-│   │   │   │   │           ├── verify_email.html
-│   │   │   │   │           └── welcome.html
-│   │   │   │   └── push/
-│   │   │   │       ├── __init__.py
-│   │   │   │       ├── client.py
-│   │   │   │       └── render.py
-│   │   │   ├── config/
-│   │   │   │   ├── mappings.py
-│   │   │   │   └── templates_map/
-│   │   │   │       ├── __init__.py
-│   │   │   │       ├── email_conf.py
-│   │   │   │       └── push_conf.py
-│   │   │   ├── core/
-│   │   │   │   ├── facade.py
-│   │   │   │   ├── handler.py
-│   │   │   │   ├── resolver.py
-│   │   │   │   └── builders/
-│   │   │   │       ├── base.py
-│   │   │   │       ├── booking_builder.py
-│   │   │   │       ├── chat_builder.py
-│   │   │   │       ├── registry.py
-│   │   │   │       ├── ride_builder.py
-│   │   │   │       └── user_builder.py
-│   │   │   ├── providers/
-│   │   │   │   ├── __init__.py
-│   │   │   │   ├── base.py
-│   │   │   │   ├── email_provider.py
-│   │   │   │   ├── push_provider.py
-│   │   │   │   └── websocket_provider.py
-│   │   │   └── services/
-│   │   │       ├── notification_streamer.py
-│   │   │       └── reminder_scheduler.py
-│   │   ├── passengers/
-│   │   │   ├── ai_search_prompts.py
-│   │   │   ├── ai_search_schema.py
-│   │   │   ├── ai_search_service.py
-│   │   │   ├── crud.py
-│   │   │   ├── enum.py
-│   │   │   ├── model.py
-│   │   │   ├── router.py
-│   │   │   ├── ride_join_idempotency.py
-│   │   │   ├── schema.py
-│   │   │   └── service.py
-│   │   ├── rides/
-│   │   │   ├── actions.py
-│   │   │   ├── cleanup.py
-│   │   │   ├── crud.py
-│   │   │   ├── enum.py
-│   │   │   ├── logic.py
-│   │   │   ├── mapper.py
-│   │   │   ├── model.py
-│   │   │   ├── broadcast.py
-│   │   │   ├── repository.py
-│   │   │   ├── schema.py
-│   │   │   └── service.py
-│   │   ├── system/
-│   │   │   ├── maintenance_crud.py
-│   │   │   ├── maintenance_service.py
-│   │   │   └── outbox_service.py
-│   │   └── users/
-│   │       ├── __init__.py
-│   │       ├── crud.py
-│   │       ├── model.py
-│   │       ├── schema.py
-│   │       └── service.py
-│   ├── infrastructure/
-│   │   ├── __init__.py
-│   │   ├── websocket_bus.py
-│   │   ├── events/
-│   │   │   ├── dispatcher/
-│   │   │   │   ├── base.py
-│   │   │   │   ├── evaluator.py
-│   │   │   │   └── factory.py
-│   │   │   └── publishers/
-│   │   │       ├── base.py
-│   │   │       ├── rabbitmq.py
-│   │   │       ├── redis.py
-│   │   │       └── websocket.py
-│   │   ├── firebase_core/
-│   │   │   ├── firebase-credentials.example.json
-│   │   │   └── firebase.py   # production uses FIREBASE_CREDENTIALS_JSON (Model B); local may use FIREBASE_SERVICE_ACCOUNT_PATH
-│   │   ├── geo/
-│   │   │   ├── circuit_breaker.py   # Circuit Breaker singletons ל-Google Maps APIs
-│   │   │   ├── client.py            # Directions + Distance Matrix (GeoClient)
-│   │   │   ├── geocode_cache.py
-│   │   │   ├── geocoding.py         # GeocodingService (Google HTTP)
-│   │   │   └── utils.py
-│   │   ├── outbox/
-│   │   │   ├── enum.py
-│   │   │   ├── model.py
-│   │   │   └── repository.py
-│   │   ├── rabbitmq/
-│   │   │   ├── client.py
-│   │   │   ├── consumer.py
-│   │   │   ├── supervisor.py
-│   │   │   └── topology.py
-│   │   ├── redis/
-│   │   │   ├── __init__.py
-│   │   │   ├── broadcast.py
-│   │   │   ├── chat_completion_publish.py
-│   │   │   ├── client.py
-│   │   │   ├── keys.py
-│   │   │   └── pubsub.py
-│   │   └── s3/
-│   │       ├── client.py
-│   │       └── service.py
-│   ├── services/
-│   │   ├── __init__.py
-│   │   └── location/
-│   │       ├── __init__.py
-│   │       ├── geocoding.py
-│   │       ├── location_service.py
-│   │       └── routing.py
+│   │   ├── dependencies/                 # auth + service DI (`services.py`, etc.)
+│   │   └── v1/api_router.py             # include_router under `/api/v1`
+│   ├── core/                             # config, lifespan, middleware, security, exceptions
+│   ├── db/                               # models, session, base
+│   ├── domain/                           # DDD: typically router + service/crud/schema
+│   │   ├── admin, auth, billing, bookings, chat, geo, groups
+│   │   ├── notifications, passengers, rides, users
+│   │   ├── events/                       # enums, RabbitMQ routing metadata
+│   │   ├── scheduled_notifications/
+│   │   └── system/                       # outbox_service, maintenance
+│   ├── infrastructure/                   # audit, geo HTTP, firebase, RabbitMQ, Redis, S3, metrics
+│   │   # see `backend/app/infrastructure/` for dispatcher, Lua rate limits (auth/chat), DLQ tooling
 │   └── workers/
-│       ├── main_worker.py
-│       ├── outbox_worker.py
-│       └── tasks/
-│           ├── avatar_tasks.py
-│           ├── chat_summary_task.py
-│           ├── chat_timeout_task.py
-│           ├── fuel_price_task.py
-│           ├── maintenance_task.py
-│           ├── notification_tasks.py
-│           ├── ride_task.py
-│           └── scheduled_tasks.py
-└── tests/
-    ├── __init__.py
-    └── test_security.py
+│       ├── ai_worker.py, notification_worker.py, task_worker.py
+│       ├── main_worker.py               # legacy entry
+│       ├── outbox_worker.py             # run_outbox_worker (invoked by notification worker)
+│       └── tasks/                         # notifications, avatar, scheduled, chat summary/timeout, …
+└── tests/                                # api/, domain/, infrastructure/, core_flows/ (+ root tests) — `git ls-files backend/tests`
 ```
 
 ---
@@ -381,21 +145,26 @@ db/
 
 ## docs/
 
-מקור אמת לסכמת DB (טבלאות, אינדקסים, מיגרציות): **`docs/architecture/DATABASE.md`**. סקירה הנדסית (פורטפוליו): **`docs/ENGINEERING_HIGHLIGHTS.md`**. שגיאות API: **`docs/ERRORS.md`**.
+מקור אמת לסכמת DB (טבלאות, אינדקסים, מיגרציות): **`docs/architecture/DATABASE.md`**. סקירה הנדסית (פורטפוליו): **`docs/ENGINEERING_HIGHLIGHTS.md`**. שגיאות API: **`docs/ERRORS.md`**. אבחון ביצועים פרונט: **`docs/FRONTEND_PERFORMANCE_RUNBOOK.md`**. **מפת ניווט מלאה:** **`docs/DOCUMENTATION_MAP.md`**.
 
 ```
 docs/
+├── DOCUMENTATION_MAP.md       # נקודת כניסה + אימות compose/CI
+├── ARCHITECTURE.md            # כניסת ארכיטקטורה
 ├── ENGINEERING_HIGHLIGHTS.md
+├── FEATURE_DECISIONS.md
+├── DEPLOYMENT.md
 ├── ERRORS.md
 ├── FCM_SYSTEM_SUMMARY.md
+├── BILLING_REFACTOR_SUMMARY.md
+├── FUTURE_WORK.md
 ├── S3_CORS.md
-├── architecture/
-│   ├── API.md
-│   ├── DATABASE.md          # טבלאות, indexes, היסטוריית Alembic
-│   ├── DEVELOPMENT.md
-│   ├── EVENTS.md
-│   └── REALTIME.md
-└── ...
+├── SECURITY_HEADERS.md
+├── FRONTEND_PERFORMANCE_RUNBOOK.md   # טריאז' LCP/INP, צ'אנקים (מקושר גם מ-DOCUMENTATION_MAP)
+├── architecture/              # API, DATABASE, EVENTS, REALTIME, AI, STORAGE, …
+├── adr/
+├── operations/                # RUNBOOK, MONITORING
+└── internal/                  # ראיון, תסריטי וידאו
 ```
 
 ---
@@ -542,6 +311,7 @@ mobile/
 └── workflows/
     ├── backend-ci.yml
     ├── chat-ws-ci.yml
+    ├── email-renderer-ci.yml
     └── frontend-ci.yml
 ```
 
@@ -585,9 +355,9 @@ k8s/
 - **db**: סכמה (schema.sql) וסקריפטים שימושיים; מיגרציות ב-backend/alembic/.
 - **frontend**: אפליקציית ווב ב‑React + TypeScript + Vite.
 - **mobile**: אפליקציית מובייל (Expo/React Native) ב‑TypeScript.
-- **.github/workflows**: CI/CD ל‑backend (Python), chat-ws (Go), frontend (React).
+- **.github/workflows**: CI/CD — `backend-ci`, `frontend-ci`, `chat-ws-ci`, **`email-renderer-ci`** (paths לפי שירות).
 - **k8s**: הגדרות Kubernetes (base, backend, chat-ws, frontend, infra).
 - **node_modules** (ב‑frontend ו‑mobile) ו־**.venv** (בסביבות Python) לא פורטו – אלה תלויות שנוצרות בהתקנה.
 - קבצי **.env** לא נכללו בתיאור מפורש מטעמי אבטחה; הם קיימים לפי .env.example.
 
-*מסמך זה נוצר אוטומטית לפי מבנה התיקיות בפרויקט.*
+*מסמך זה snapshot תיעודי — מתעדכן ידנית; לעץ קבצים חי העדיפו הריפו / IDE.*

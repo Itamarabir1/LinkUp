@@ -89,7 +89,7 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| Cache, rate limit, pub/sub, denylist, idempotency | שימושים: geocode cache, ride preview, OTP, auth rate limit, **JWT denylist (`denylist:{jti}`)**, **Idempotency-Key** ל־**`request-ride-from-search`** ול־**POST הודעת צ’אט** (`SET NX`, fingerprint), broadcast, צ’אט — מסוכמים ב-ADR §18–**§19**, **§25**, Frontend ADR §2, ובהיילייטס §2–3, **§7ד**, **§7ה**. **פרונט:** **`useJoinRide`** (ref); **`useMessageThread`** / **`useChatPopup`** + **`ChatListRow`** + **`applyInboundRealMessage`** / **`appendMessageDedupById`**. |
+| Cache, rate limit, pub/sub, denylist, idempotency | שימושים: geocode cache (**כולל mutex/stampede** — [`cache_stampede.py`](../../backend/app/infrastructure/redis/cache_stampede.py), [`FEATURE_DECISIONS.md`](../FEATURE_DECISIONS.md#geocode-cache-stampede)), ride preview, OTP, auth rate limit, **JWT denylist (`denylist:{jti}`)**, **Idempotency-Key** ל־**`request-ride-from-search`** ול־**POST הודעת צ’אט** (`SET NX`, fingerprint), broadcast, צ’אט — מסוכמים ב-ADR §18–**§19**, **§25**, Frontend ADR §2, ובהיילייטס §2–3, **§7ד**, **§7ה**. **פרונט:** **`useJoinRide`** (ref); **`useMessageThread`** / **`useChatPopup`** + **`ChatListRow`** + **`applyInboundRealMessage`** / **`appendMessageDedupById`**. |
 
 ---
 
@@ -116,7 +116,7 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| ניתוח שיחה אחרי סגירה | מאזין Redis (`chat:completion:*`) ב-worker → קריאה ל-**Groq** → שמירה — [`ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md) §1–2א; ADR §15 ב-[`ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md). |
+| ניתוח שיחה אחרי סגירה | **`task-worker`** scheduled (idle timeout) → `handle_conversation_completion` → **Groq** → **`chat_analysis`** + Outbox; בנוסף **`ai-worker`** מאזין ל־`chat:completion:*` — ראו [`architecture/AI.md`](../architecture/AI.md), [`ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md) §8; ADR §15. |
 
 ---
 
@@ -174,8 +174,9 @@
 | בקורות חיים | בפרויקט |
 |-------------|---------|
 | Docker Compose (מקומי / אינטגרציה) | [`docker-compose.yml`](../../docker-compose.yml) — db, redis, rabbitmq, migrate, **email-renderer**, backend, **notification-worker**, **task-worker**, **ai-worker**, **chat-ws**; פרופיל prod עם frontend + nginx. |
-| Edge nginx — TLS, headers, **CSP מאוכף** (`script-src` ללא `'unsafe-inline'`; bootstrap ב־[`frontend/public/bootstrap.js`](../../frontend/public/bootstrap.js)), `report-uri` (Sentry CSP) | [`nginx/nginx.conf`](../../nginx/nginx.conf) — מדריך [`docs/SECURITY_HEADERS.md`](../SECURITY_HEADERS.md), החלטה [`FEATURE_DECISIONS.md`](../FEATURE_DECISIONS.md#browser-csp-edge). |
-| GitHub Actions | [`.github/workflows/`](../../.github/workflows/) — `backend-ci`, `frontend-ci`, `chat-ws-ci`, `email-renderer-ci`; פריסה: `deploy-gke.yml`. |
+| Edge nginx — TLS, headers, **CSP מאוכף** (`script-src` ללא `'unsafe-inline'`; bootstrap ב־[`frontend/public/bootstrap.js`](../../frontend/public/bootstrap.js) נטען ב־[`frontend/index.html`](../../frontend/index.html) **לפני** `/config.js`), `report-uri` (Sentry CSP) | [`nginx/nginx.conf`](../../nginx/nginx.conf) — **`listen 443 ssl`** (במאגר: HTTP/1.1 מעל TLS אלא אם מוסיפים `http2` ל-directive); מדריך [`docs/SECURITY_HEADERS.md`](../SECURITY_HEADERS.md), החלטה [`FEATURE_DECISIONS.md`](../FEATURE_DECISIONS.md#browser-csp-edge). |
+| GitHub Actions | [`.github/workflows/`](../../.github/workflows/) — `backend-ci` (כולל deploy ל־EC2 על `main`), `frontend-ci`, `chat-ws-ci`, `email-renderer-ci`. מניפסטים ל־GKE תחת [`k8s/`](../../k8s/) בלי **`deploy-gke.yml`** במאגר — [`docs/FUTURE_WORK.md`](../FUTURE_WORK.md). |
+| Dependabot | [`.github/dependabot.yml`](../../.github/dependabot.yml) — npm **`/frontend`**, pip **`/backend`**, Docker **`/backend`**, **`/frontend`**, **`/infrastructure/pgbouncer`**. |
 | Kubernetes | [`k8s/`](../../k8s/) — base, overlays, infra (Postgres, Redis, RabbitMQ), שירותים נפרדים ל-backend, worker, chat-ws, email-renderer, frontend. |
 
 ---
@@ -194,6 +195,7 @@
 | נושא | מסמך |
 |------|------|
 | סיפור “מה בנינו” + דגשים | [`ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md) |
+| ניטור פרודקשן (Sentry + Better Stack) | [`docs/operations/MONITORING.md`](../operations/MONITORING.md#external-dashboards-production) |
 | החלטות backend/worker | [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md) (כולל **§20** — Circuit Breaker: Maps + Brevo) |
 | WS מתי ולמה | [`docs/adr/WEBSOCKETS.md`](../adr/WEBSOCKETS.md) |
 | FCM | [`docs/adr/FCM_AND_PUSH.md`](../adr/FCM_AND_PUSH.md) |

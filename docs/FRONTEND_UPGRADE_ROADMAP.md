@@ -6,10 +6,8 @@ The original plan files under `.cursor/plans/` remain unchanged for deep referen
 
 ## Current Snapshot
 
-- Done so far: ~30%
-- Remaining: ~70%
-- Estimated remaining effort: ~95-100 hours
-- Estimated remaining PRs: ~38
+- Progress is tracked in the **checklists below**; headline percentages are approximate and not recomputed every merge.
+- Estimated remaining effort order-of-magnitude: **tens of hours** across RQ domains, a11y remediation, compiler rollout, and verification gates.
 
 ## Coverage Note (Important)
 
@@ -19,8 +17,8 @@ To avoid missing anything, the section below includes an exhaustive checklist ma
 ## Open Prerequisites (Must Be Closed Early)
 
 1. `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` are now wired for frontend sourcemap upload in `publish-image`; remaining S.1 work is post-deploy verification/tuning.
-2. `orval + FastAPI` smoke test for Tier-1 Stage A was completed as part of codegen adoption; CI gate now enforces ongoing sync.
-3. Run post-deploy verification for HTTP/2 + WebSocket stability in production.
+2. **OpenAPI → Orval codegen** is enforced in CI (`contract-codegen` job: `npm run gen:api` + `git diff --exit-code` on `frontend/src/api/generated/`).
+3. Run post-deploy verification for **TLS edge + WebSocket** stability in production (`nginx` → backend/chat-ws; if you enable **`http2`** on `listen 443 ssl`, re-verify upgrades).
 
 ---
 
@@ -32,13 +30,13 @@ Legend:
 
 ### A) RQ Migration (`rq_migration_hardened_2781db04.plan.md`)
 
-- `[~]` `stage-1-types` - complete pre-migration response typing pass in `api/*`
-- `[~]` `stage-1-adr` - append RQ ADR updates in `docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md`
+- `[x]` `stage-1-types` - API types driven by **`frontend/openapi-snapshot.json` → Orval → `src/api/generated/`** with CI drift gate; thin `api/*` wrappers consume generated types.
+- `[x]` `stage-1-adr` - RQ infrastructure and Stage 3+ migration decisions documented (**ADR Frontend §13+**, Stage 3b §15).
 - `[~]` `stage-3a-auth` - finish full auth query ownership — **logout / session-expired / bootstrap-failed teardown semantics shipped** (`tearDownSession`, `auth:session-expired`, RQ **`captureExceptionOnce`** + 401-only Sentry skip); remaining: deeper “auth query ownership” refactors if still desired per product scope
 - `[ ]` `stage-3b-groups` - full groups queries/mutations migration + `GroupContext` slimming
-- `[~]` `stage-3b-rides` - complete rides migration and WS invalidation alignment
-- `[~]` `stage-3b-bookings` - complete bookings summaries/manifest/mutations + event rewiring
-- `[~]` `stage-3b-passengers` - passenger requests/search/infinite/mutations + idempotency preservation
+- `[x]` `stage-3b-rides` - **`MyRides.tsx`**: `useQuery` (`qk.rides.list`), `useMutation` לביטול, invalidation מ־`useUserEvent` + `useRideWebSocket`.
+- `[x]` `stage-3b-bookings` - **`useMyBookingsDriver`** / **`useMyBookingsPassenger`**: `useQuery` לסיכומים, `useMutation` לאשר/לדחות/לבטל + אירועי WS/user-event.
+- `[x]` `stage-3b-passengers` - **`useMyRequests`** + **`useSearchRides`** (mutations לחיפוש/load-more/alert) + **`useJoinRide`** עם Idempotency-Key כמתועד ב־Highlights.
 - `[ ]` `stage-3b-uploads` - presigned upload flow migration + readiness polling query
 - `[~]` `stage-3b-createride` - migrate `useCreateRide` operation-token workflow to RQ mutations/signal
 - `[~]` `stage-3d-chat` - standalone high-risk chat migration: **optimistic outbound send + `ChatListRow` + WS/REST reconciliation shipped** (`types/chatList`, `applyInboundRealMessage`); **WS reconnect hardening shipped** (`reconnectBackoff.ts` → `useChatWebSocket` / `useReconnectingWebSocket` / `useReconnectingWebSocketState`); **remaining**: React Query for thread/popup/infinite scroll + broader “WS cache sync” if still desired
@@ -49,21 +47,22 @@ Legend:
 
 Notes:
 - `stage-1-deps`, `stage-1-client`, `stage-1-queryclient`, `stage-1-keys`, `stage-1-provider`, `stage-2-billing`, `stage-3a-geo`, `stage-3a-notifications` appear implemented in current working tree.
+- `stage-3b-rides`, `stage-3b-bookings`, `stage-3b-passengers` marked **`[x]`** above (verified in `MyRides.tsx`, `MyBookings/*`, `useMyRequests`, `useSearchRides`).
 
 ### B) Tier-1 Senior FE (`frontend_senior_architecture_tier_1_05d98f56.plan.md`)
 
-- `[ ]` `tier1-c-a11y-setup` - install/configure `jsx-a11y`, `axe`, Lighthouse CI baseline
+- `[~]` `tier1-c-a11y-setup` - **`eslint-plugin-jsx-a11y`** (recommended preset + progressive warn rules) and **dev-only `@axe-core/react`** are wired; **Lighthouse CI baseline** still open.
 - `[ ]` `tier1-c-a11y-auth` - auth pages remediation
 - `[ ]` `tier1-c-a11y-rides` - rides pages remediation
 - `[ ]` `tier1-c-a11y-bookings` - bookings page remediation
 - `[ ]` `tier1-c-a11y-groups` - groups pages remediation
 - `[ ]` `tier1-c-a11y-chat` - messages/chat remediation
-- `[ ]` `tier1-d-rum` - web vitals + extended Sentry RUM + dashboard + budget guardrails
+- `[~]` `tier1-d-rum` - **Prod `Sentry.init`**: Browser Tracing + Replay + **web-vitals → Sentry metrics** (`main.tsx`); remaining: **cost/dashboard guardrails** and formal threshold policy (**`docs/FUTURE_WORK.md`** — Web Vitals Thresholds).
 - `[~]` `tier1-e-form-creategroup` - implemented via `useCreateGroup` RHF+Zod migration with full `CreateGroup.tsx` contract compatibility.
 - `[~]` `tier1-e-form-createride` - deferred by architecture decision (wizard/state-machine complexity; risk > ROI at current scale).
 - `[~]` `tier1-e-form-searchrides` - intentionally no-op by architecture decision (`SearchRidesForm` is props-driven/presentational; RHF adds no practical value).
-- `[ ]` `tier1-e-form-messagethread`
-- `[ ]` `tier1-e-form-chatpopup`
+- `[~]` `tier1-e-form-messagethread` - **לא בתור משימת RHF פעילה** — Composer חד־שדותי + WS; החלטה ב־**`docs/FUTURE_WORK.md`** (E.7).
+- `[~]` `tier1-e-form-chatpopup` - כנ"ל (**E.8** ב־**`docs/FUTURE_WORK.md`**).
 - `[ ]` `tier1-f-compiler-setup`
 - `[ ]` `tier1-f-compiler-presentational`
 - `[ ]` `tier1-f-compiler-rq-hooks`
@@ -84,15 +83,13 @@ Notes:
 - `[ ]` `tier2-s4-be-version`
 - `[ ]` `tier2-s4-fe-version`
 - `[ ]` `tier2-s5-waterfall-audit`
-- `[ ]` `tier2-s7-assets`
+- `[~]` `tier2-s7-assets` - baseline S.7 בפרודקשן (ראו סעיף **S.7** למטה); נשארו שערים/קריטריונים למדידה.
 - `[ ]` `tier2-docs`
 
 ### Remaining Count (Detailed)
 
-- RQ detailed remaining: **14 items** (plus partial completion validation)
-- Tier-1 detailed remaining: **17 items**
-- Tier-2 detailed remaining: **7 items**
-- Total detailed remaining backlog: **38 checklist items**
+- Treat the **per-line legend** (`[ ]` / `[~]` / `[x]`) as source of truth; macro counts go stale quickly.
+- Several Tier-1 / Tier-2 items were **`[x]` completed** inline above (stage-1 types/ADR; Tier-2 XSS/throttle/runbook/etc. as marked).
 
 This is why the first version looked short: it grouped these into macro milestones.
 
@@ -104,10 +101,11 @@ This is why the first version looked short: it grouped these into macro mileston
 - [ ] Finish Auth migration: move Login/Register flow completely from manual fetch/context handling to RQ ownership.
 
 ### Stage 3b (domain migrations still missing)
-- [ ] Groups full migration: `useMyGroups`, invite/members/rides queries, group mutations, and slim `GroupContext`.
-- [ ] Bookings full migration: `useDriverSummary`, `usePassengerSummary`, `useRideManifest`, approve/reject/cancel mutations.
-- [ ] Passengers migration: `useMyPassengerRequests`, `useRideSearch` (infinite), `useParseRideSearchWithAI`, `useRequestRideFromSearch` with `Idempotency-Key` preservation.
-- [ ] Upload workflows migration: presigned upload URL + confirm flows (avatar/group image), and readiness polling via RQ.
+- [ ] Groups full migration: רשימת קבוצות ב־`GroupContext` כבר `useQuery`; **`useGroupManageLists`** עדיין `useEffect` + `useState` ל־members/rides — להעביר ל־RQ + מוטציות הזמנה/הרשאות לפי הצורך; לרזות `GroupContext` אם עדיין רלוונטי.
+- [x] Bookings full migration — **בוצע** (`useMyBookingsDriver` / `useMyBookingsPassenger`).
+- [x] Passengers migration (בקשות + חיפוש + join עם Idempotency-Key) — **בוצע** (`useMyRequests`, `useSearchRides`, `useJoinRide`).
+- [x] Rides list (My Rides) — **בוצע** (`MyRides.tsx`).
+- [ ] Upload workflows migration: presigned upload URL + confirm flows (avatar/group image), and readiness polling via RQ (כיום polling ידני ב־`useProfile` / זרימות דומות).
 - [ ] `CreateRide` migration: replace `useOperationToken` pattern with RQ mutation + `signal`, migrate preview/create/parse/geocode calls.
 
 ### Stage 3c
@@ -155,15 +153,15 @@ Additional progress (recently completed outside full-chat scope):
 - [ ] Apply Phase-1 budget target: main bundle <= 400KB (after Tier-2 S.7 work lands).
 
 ### Stage C - Accessibility
-- [ ] Add `jsx-a11y` and runtime `axe` checks.
-- [ ] Execute domain-level a11y remediation PRs.
+- [x] Add `jsx-a11y` (ESLint flat config) and **dev-only** runtime `axe` checks (`main.tsx`).
+- [ ] Lighthouse CI baseline (optional) and domain-level a11y remediation PRs (auth/rides/bookings/groups/chat).
 
 ### Stage D - Web Vitals + Sentry RUM
-- [ ] Extend existing Sentry setup with tracing/replay + web vitals wiring.
-- [ ] Apply cost guardrails and dashboard verification.
+- [x] Extend Sentry with **tracing + replay + web-vitals metrics** in production (`main.tsx`).
+- [ ] Cost guardrails, dashboard verification, and threshold enforcement policy (**`docs/FUTURE_WORK.md`**).
 
 ### Stage E - Forms Migration
-- [~] Migrate 9 form surfaces to `react-hook-form + zod`.
+- [~] רכיבי טפסים שנשארו ב־**RHF+zod** רלוונטיים: לא נשארו מסכים מרכזיים פתוחים; **E.5/E.6/E.7/E.8** מוגדרים כ־defer/no-op ב־**`docs/FUTURE_WORK.md`**.
 - Current status update:
   - E.1 Login: completed.
   - E.2 Register: completed.
@@ -171,6 +169,7 @@ Additional progress (recently completed outside full-chat scope):
   - E.4 CreateGroup: completed.
   - E.5 CreateRide: deferred (documented decision).
   - E.6 SearchRidesForm: no-op (documented decision).
+  - E.7 / E.8 MessageThread / ChatPopup: no-op (documented decision).
 
 ### Stage F - React Compiler
 - [ ] Enable and rollout after RQ migration stabilizes.
@@ -182,7 +181,7 @@ Additional progress (recently completed outside full-chat scope):
 ### S.1 Security Headers + Sourcemap Hardening (finish)
 - [x] CSP: enforcing **`Content-Security-Policy`** on Compose **`nginx/nginx.conf`** (Report-Only retired for that path); **`script-src`** hardened (**ללא** `'unsafe-inline'`) עם bootstrap ב־**`frontend/public/bootstrap.js`**; `frame-src` + Google Sign-In; `report-uri` → Sentry CSP ingestion — **`docs/SECURITY_HEADERS.md`** / **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 - [~] Post-deploy verification: smoke login/chat/maps/uploads/billing; watch Sentry CSP reports; tune allowlists if needed (**K8s:** keep **`k8s/frontend/nginx-configmap.yaml`** in sync when using that ingress path).
-- [ ] Execute post-deploy HTTP/2 + WS smoke test (disciplined checklist).
+- [ ] Execute post-deploy edge (TLS/nginx) + WebSocket smoke test (disciplined checklist; include HTTP/2 only if enabled in `nginx.conf`).
 
 ### S.2 Supply Chain
 - [ ] SBOM generation/release artifact flow deferred to `docs/FUTURE_WORK.md`.
@@ -197,9 +196,8 @@ Additional progress (recently completed outside full-chat scope):
 - Completed and removed from remaining scope (`tier2-s6-throttle`).
 
 ### S.7 Asset Hardening
-- [ ] Image lazy/eager strategy.
-- [ ] i18n lazy loading + FOUE mitigation.
-- [ ] Preconnect hints.
+- [x] Baseline shipped (**S.7**): targeted image `loading`/`fetchpriority`, hybrid i18n (`i18next-http-backend` + critical namespace preload), `index.html` preconnect/dns-prefetch — see **`docs/ENGINEERING_HIGHLIGHTS.md`**.
+- [ ] Formal regression gates / measurable acceptance criteria for asset + i18n behavior (per audit matrix §6.9).
 
 ### S.8 Performance Runbook
 - Completed and removed from remaining scope (`tier2-s8-runbook`).
@@ -208,7 +206,7 @@ Additional progress (recently completed outside full-chat scope):
 
 ## 4) Cross-Plan Sequencing Rules (Critical)
 
-1. Complete RQ Stage 1 foundations before adding client throttle and advanced RUM extensions.
+1. **Stage 1 foundations** (`stage-1-types`, `stage-1-adr`) are **closed** — still sequence risky refactors (`CreateRide`, chat) carefully against client throttle and RUM guardrails work.
 2. Coordinate shared-file changes (especially `CreateRide`, `client.ts`, `main.tsx`) to avoid PR collision.
 3. Ship backend optimistic concurrency primitives before frontend conflict UX.
    - Note: OCC scope deferred to `docs/FUTURE_WORK.md` for current planning window.
@@ -219,15 +217,15 @@ Additional progress (recently completed outside full-chat scope):
 
 ## 5) Recommended Execution Order
 
-1. Finish RQ Stage 3a/3b core domains (auth/groups/bookings/passengers/uploads/create-ride).
-2. Complete Tier-2 S.1/S.2/S.3 quick hardening wins.
+1. Finish RQ Stage 3a/3b remaining scope (**auth**, **groups manage** + העלאות + **CreateRide**; rides/bookings/passengers לרשימות הראשיות כבר ב־RQ).
+2. Complete Tier-2 S.1/S.2 quick hardening (**S.3 XSS** baseline already shipped — see Tier-2 section).
 3. Execute Tier-2 S.4 backend then frontend concurrency.
-4. Complete RQ Stage 3c admin.
+4. **RQ Stage 3c admin** is complete — keep guarding regressions in future PRs.
 5. Complete RQ Stage 3d chat standalone.
 6. Finish RQ Stage 4/5 verification + cleanup.
-7. Execute Tier-1 A/B/D.
-8. Execute Tier-1 C/E.
-9. Execute Tier-1 F and Tier-2 S.8.
+7. Tier-1 **A (codegen)** and **B (bundle tooling)** are shipped; prioritize **D** guardrails, then **C/E/F**.
+8. Execute Tier-1 C/E remediation (a11y + forms backlog).
+9. Execute Tier-1 F; Tier-2 **S.8 runbook** is marked complete — revisit only if perf posture changes materially.
 
 ---
 
@@ -249,37 +247,36 @@ Status keys:
   - `frontend/src/main.tsx` (`@axe-core/react` in dev)
 - Missing for FULL:
   - Close remediation across targeted domains (auth/rides/bookings/groups/chat).
-  - Add stable CI-level accessibility verification beyond local/dev checks.
+  - Lighthouse CI baseline (still open) plus stable CI-level accessibility verification beyond local/dev checks.
 
 ### 6.4 `tier1-d-rum` (Web Vitals + Sentry RUM)
 
 - Implemented in code: `Yes`
 - Completion: `PARTIAL`
 - Evidence:
-  - `frontend/src/main.tsx` (Sentry tracing/replay + `web-vitals`)
+  - `frontend/src/main.tsx` (`Sentry.browserTracingIntegration`, `replayIntegration`, dynamic `web-vitals` → Sentry distributions)
 - Missing for FULL:
-  - Deferred to `docs/FUTURE_WORK.md` (`Web Vitals Thresholds Enforcement`).
+  - Cost/dashboard guardrails and release-level threshold enforcement (**`docs/FUTURE_WORK.md`** — Web Vitals Thresholds).
 
 ### 6.9 `tier2-s7-assets`
 
 - Implemented in code: `Yes`
-- Completion: `PARTIAL`
+- Completion: `PARTIAL` (baseline shipped; gates still open)
 - Evidence:
   - `frontend/index.html` (`preconnect`/`dns-prefetch`)
   - `frontend/src/i18n/config.ts` (`i18next-http-backend`)
-  - route/image lazy loading in frontend code
+  - route/image lazy loading + `loading`/`fetchpriority` tuning (see **S.7** in `docs/ENGINEERING_HIGHLIGHTS.md`)
 - Missing for FULL:
-  - Add measurable acceptance criteria + verification gates to prevent regressions.
+  - Add measurable acceptance criteria + CI/manual verification gates to prevent regressions.
 
 ### 6.11 `stage-3b` (RQ domain migration)
 
 - Implemented in code: `Partial`
 - Completion: `PARTIAL`
 - Evidence:
-  - Multiple domain hooks migrated to RQ in frontend
+  - **`MyRides`**, **`MyBookings`** (נהג/נוסע), **`useMyRequests`**, **`useSearchRides`**, **`GroupContext`** list — RQ כמתועד בקוד; ניהול קבוצה (members/rides ב־`useGroupManageLists`) עדיין fetch ידני.
 - Missing for FULL:
-  - Complete uploads scope under RQ (`presigned + confirm + readiness polling`).
-  - Complete remaining `CreateRide` migration scope as defined in stage goals.
+  - הגירת **GroupManage** lists + מוטציות קשורות ל־RQ; **Upload** (polling readiness) תחת RQ; **CreateRide** (מכונת מצבים) לפי יעדי השלב.
 
 ### 6.12 `stage-3c` (Admin migration)
 

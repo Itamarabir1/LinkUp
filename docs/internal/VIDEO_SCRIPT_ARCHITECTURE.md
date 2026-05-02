@@ -23,17 +23,17 @@
 **מומלץ להציג:** דיאגרמה מ־[`README.md`](../../README.md) (mermaid services) או שקופית פשוטה: FE → API, FE → chat-ws, API/worker → Postgres / Redis / RabbitMQ / **email-renderer**.
 
 **תגיד:**  
-“יש הפרדה של Redis לוגית: **DB 0** לקאש, rate limit, broadcast של נסיעות; **DB 1** לצ’אט, presence, והשלמת שיחות ל-AI.”
+“יש הפרדה של Redis לוגית: **DB 0** לקאש, rate limit, broadcast של נסיעות; **DB 1** לצ’אט, presence ואירועי משתמש. **סיכום שיחה** בפועל מגיע מ־**`task-worker`** אחרי idle timeout; יש גם **מאזין** ב־**`ai-worker`** ל־`chat:completion:*` אם בעתיד יתווסף publisher — ראו **`docs/architecture/AI.md`**.”
 
 ---
 
 ## חלק ב׳ — זרימת נתונים ואמינות (1:00–2:30)
 
 **תגיד:**  
-“שינויים עסקיים נכתבים ל-PostgreSQL. כשצריך לשלוח מייל, פוש או משימה כבדה — לא סומכים על קריאה סינכרונית לברוקר. משתמשים ב-**Outbox**: באותה טרנזקציה נכתבת שורה ל-`outbox_events`, ו-**outbox-worker** מושך ומפרסם ל-**RabbitMQ**. כך מקבלים משלוח לפחות פעם אחת בלי לחסום את תשובת ה-API.”
+“שינויים עסקיים נכתבים ל-PostgreSQL. כשצריך לשלוח מייל, פוש או משימה כבדה — לא סומכים על קריאה סינכרונית לברוקר. משתמשים ב-**Outbox**: באותה טרנזקציה נכתבת שורה ל-`outbox_events`, ו-**notification-worker** מושך, מפרסם ל-**RabbitMQ** ומריץ את צינור ההתראות. כך מקבלים משלוח לפחות פעם אחת בלי לחסום את תשובת ה-API.”
 
 **תגיד:**  
-“ה-worker מריץ כמה צרכנים: תור התראות — מייל דרך **Brevo + email-renderer (React Email)** ופוש דרך FCM; תור אווטאר ל-S3; תור מתוזמנות — תזכורות, תחזוקה, ועוד. בנוסף הוא מאזין ל-Redis על סיום שיחות להרצת ניתוח AI.”
+“יש הפרדה בין תהליכים: **notification-worker** — Outbox והתראות (מייל דרך **Brevo + email-renderer** ופוש FCM); **task-worker** — אווטאר, מתוזמנות (תזכורות, תחזוקה), וגם **timeout לשיחת צ’אט idle** שמפעיל ניתוח **Groq** (`chat_analysis`); **ai-worker** — מאזין אופציונלי ל־Redis `chat:completion:*` לאותו ניתוח אם יתווסף publisher — ראו **`docs/architecture/AI.md`**.”
 
 **מפת מפתחות:** `docs/architecture/EVENTS.md`, `../ARCHITECTURE.md` (תרשים Communication Flow).
 
@@ -78,7 +78,7 @@
 - JWT access + refresh ב-DB; WebSocket מאמת JWT ב-handshake **בלי** SELECT ל-DB כדי להגן על ה-connection pool.
 - bcrypt ב-thread pool; rate limit על auth; שגיאות אחידות עם `error_code` ו-`trace_id` — `docs/ERRORS.md`.
 - אדמין: `/api/v1/admin/*` + ממשק React ב-`/admin`.
-- פריסה: Docker Compose (כולל `migrate`, `email-renderer`, `outbox-worker`); מניפסטים ל-Kubernetes ב־`k8s/` (כולל `email-renderer`).
+- פריסה: Docker Compose (כולל `migrate`, `pgbouncer`, `email-renderer`, `notification-worker`, `task-worker`, `ai-worker`, `backend`; **`outbox-worker`** רק בפרופיל **`compat`**); מניפסטים ל-Kubernetes ב־`k8s/` (כולל `email-renderer`).
 
 ---
 
@@ -143,8 +143,8 @@
 |-----------|------|-------------------|
 | +1:00–2:00 | **מסד נתונים** | PostgreSQL + **PostGIS** — איפה נכנס הגיאו; טבלאות ליבה (`rides`, `bookings`, `passenger_requests`, `outbox_events`, …); למה אינדקסים חשובים לחיפוש ולהזמנות. מקור: `docs/architecture/DATABASE.md`. |
 | +0:45–1:15 | **מיגרציות וסכימה** | Alembic כמקור שינויי סכימה; שירות **`migrate`** ב-Docker Compose לפני עליית ה-API; `db/schema.sql` כעזר. |
-| +1:00–1:45 | **פריסה מקומית מול K8s** | Compose: **db**, **redis**, **rabbitmq**, **`migrate`** (Job לפני API), **`email-renderer`**, **backend**, **outbox-worker**, **chat-ws**; `depends_on` + healthchecks; `UVICORN_WORKERS`. אז מעבר קצר ל־`k8s/` — מפת שירותים (כולל `k8s/email-renderer`), בלי לעבור כל מניפסט. |
-| +0:45–1:00 | **CI/CD** | **ארבעה** workflows ב־`.github/workflows/`: `backend-ci`, `frontend-ci`, `chat-ws-ci`, **`email-renderer-ci`** — lint/tests/build; ב־`main` דחיפת תמונות ל־GHCR (frontend ו־email-renderer). |
+| +1:00–1:45 | **פריסה מקומית מול K8s** | Compose: **db**, **redis**, **rabbitmq**, **`pgbouncer`**, **`migrate`** (לפני API), **`email-renderer`**, **backend**, **`notification-worker`**, **`task-worker`**, **`ai-worker`**, **chat-ws**; `depends_on` + healthchecks; `UVICORN_WORKERS`. (**`outbox-worker`** — alias בפרופיל **`compat`**.) אז מעבר קצר ל־`k8s/` — מפת שירותים (כולל `k8s/email-renderer`), בלי לעבור כל מניפסט. |
+| +0:45–1:00 | **CI/CD** | **ארבעה** workflows ב־`.github/workflows/`: `backend-ci`, `frontend-ci`, `chat-ws-ci`, **`email-renderer-ci`** — lint/tests/build; ב־`main`: **backend-ci** דוחף `linkup/backend` + **`worker`** + **`migrate`** + **`pgbouncer`**; **frontend-ci** — `frontend`; **chat-ws-ci** — `chat-ws`; **email-renderer-ci** — `linkup-email-renderer` — כולם GHCR לפי `paths`. |
 | +1:15–2:00 | **chat-ws לעומק** | למה **Go** ל-WS; `PSubscribe` ל-Redis; אין DB בשרת — רק forward; JWT; `presence` + debounce; קריאת `last_seen` מ-REST הבקאנד; **הגבלות נכנסות:** **`SetReadLimit`**, דילול פרסום **typing**. `chat-ws/../ARCHITECTURE.md`, `docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md` (כולל §7). |
 | +1:00–1:30 | **ערוצי התראות** | הפרדה: צ’אט (`chat:notification:*` דרך chat-ws) מול פיד האפליקציה (`/api/v1/notifications/ws` על FastAPI); Outbox → RabbitMQ → **Brevo** / **FCM**; **למה FCM רק מפת `data`** — `docs/FCM_SYSTEM_SUMMARY.md`, `docs/adr/FCM_AND_PUSH.md`. |
 | +0:45–1:00 | **אבטחה מפורטת** | rate limit על auth; **מניעת user enumeration** בלוגין; `get_current_user_ws` בלי DB ב-connect — trade-off. |

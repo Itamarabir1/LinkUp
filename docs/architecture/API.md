@@ -170,7 +170,7 @@ Authorization: Bearer <access_token>
 | GET | /payments | כן | היסטוריית תשלומים של המשתמש המחובר. |
 | POST | /webhook | לא | Stripe webhook endpoint. אימות חתימה חובה דרך `Stripe-Signature` (**fail-closed** אם חסר). Idempotency נשמרת גם ברמת אירוע Stripe (`stripe_event_id`) וגם בייחודיות תשלום. |
 
-**רקע תפעולי:** ברקע ה-API (כש־**`BILLING_RECONCILER_ENABLED`** מופעל) רץ **`BillingReconciler`** בתדירות **`BILLING_RECONCILER_INTERVAL_SECONDS`** — נעילת **`pg_try_advisory_lock`** למניעת ריצות כפולות, סריקת תשלומים **`pending`** “מיושנים”, ושאיבת סטטוס מ-Stripe למקרה שה-webhook התעכב (**`app/domain/billing/reconciler.py`**). ראו גם Prometheus תחת **`billing_reconciler_*`** ב־[`docs/operations/MONITORING.md`](../operations/MONITORING.md).
+**רקע תפעולי:** ברקע ה-API (כש־**`BILLING_RECONCILER_ENABLED`** מופעל) רץ **`BillingReconciler`** בתדירות **`BILLING_RECONCILER_INTERVAL_SECONDS`** — מתוזמן מ־**`app/core/lifespan.py`** (APScheduler, `billing_reconciler.run`) — נעילת **`pg_try_advisory_lock`** למניעת ריצות כפולות, סריקת תשלומים **`pending`** “מיושנים”, ושאיבת סטטוס מ-Stripe למקרה שה-webhook התעכב (**`app/domain/billing/reconciler.py`**). ראו גם Prometheus תחת **`billing_reconciler_*`** ב־[`docs/operations/MONITORING.md`](../operations/MONITORING.md).
 
 ---
 
@@ -257,6 +257,8 @@ Authorization: Bearer <access_token>
 
 ### Admin (`/api/v1/admin`)
 
+נתיבים בטבלה שלהלן **יחסיים** ל־**`/api/v1/admin`** (למשל **`POST /billing/reconcile/{payment_id}`** ≡ **`POST /api/v1/admin/billing/reconcile/{payment_id}`**).
+
 דורש משתמש עם **`users.is_admin`** — `get_current_admin_user`. פעולות רגישות נרשמות בלוג **`[admin_audit]`**.
 
 | Method | Path | Auth | תיאור |
@@ -266,7 +268,7 @@ Authorization: Bearer <access_token>
 | GET | /stats | אדמין | אגרגטים לדשבורד (משתמשים, נסיעות, בוקינגים, outbox, קבוצות וכו'). |
 | GET | /users | אדמין | רשימת משתמשים. query: `q` (חיפוש email/phone/name), `is_active`, `is_admin`, `is_verified`, `limit` (עד 200). |
 | PATCH | /users/{user_id}/active | אדמין | toggle `is_active` (היפוך בוליאני). |
-| PATCH | /users/{user_id}/admin | אדמין | toggle `is_admin`. |
+| PATCH | /users/{user_id}/admin | אדמין | שינוי `is_admin`: query **`action=toggle`** (ברירת מחדל), **`grant`**, או **`revoke`**; אופציונלי **`reason`** ל-audit. |
 | GET | /rides | אדמין | רשימת נסיעות אחרונות. query: `status` (`active` \| `completed` \| `cancelled` \| ריק), `limit` (עד 500). |
 | GET | /rides/{ride_id} | אדמין | פרטי נסיעה (lookup). |
 | POST | /rides/{ride_id}/cancel | אדמין | ביטול נסיעה מתפעול. |
@@ -278,6 +280,6 @@ Authorization: Bearer <access_token>
 | GET | /billing/payments | אדמין + capability **`admin.billing.read`** | רשימת תשלומים (תפעול). |
 | GET | /billing/payments/{payment_id} | אדמין + **`admin.billing.read`** | פרטי תשלום לפי מזהה. |
 | GET | /billing/stale-pending | אדמין + **`admin.billing.read`** | תשלומים **`pending`** בטווח גיל לפי הגדרות ה-reconciler (`BILLING_PENDING_*`) + **`last_reconciler_run`**. |
-| POST | /billing/reconcile/{payment_id} | אדמין + **`admin.billing.read`** | ריפקוציה נקודתית מול Stripe (מחזיר `old_status` / `new_status` / `action`). |
+| POST | /billing/reconcile/{payment_id} | אדמין + **`admin.billing.read`** | ריפקוציה נקודתית מול Stripe (מחזיר `old_status` / `new_status` / `action_taken`). |
 
 ממשק React תואם: **`ADMIN_DASHBOARD.md`** (בשורש הפרויקט).

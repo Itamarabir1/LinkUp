@@ -38,7 +38,7 @@ docker stop linkup_backend
 3. **אם אתה מעדיף להריץ ידנית** (בלי הסקריפט):
    - לפתוח CMD
    - `cd c:\Users\user\Desktop\LinkUp\backend`
-   - `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+   - `uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000` (או `uvicorn ...` אחרי `pip install`/venv)
 
 4. **לבדוק שהבקאנד עלה:**
    - אמורות להופיע שורות כמו:
@@ -85,23 +85,21 @@ docker stop linkup_backend
 
 | חלון | פקודה | כתובת |
 |------|--------|--------|
-| CMD 1 (בקאנד) | `cd c:\Users\user\Desktop\LinkUp\backend` ואז `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000` | API: http://localhost:8000 |
+| CMD 1 (בקאנד) | `cd c:\Users\user\Desktop\LinkUp\backend` ואז **`uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`** (אחרי `uv sync`; חלופה: `uvicorn ...` אם מותקן ב-venv) | API: http://localhost:8000 |
 | CMD 2 (פרונט) | `cd c:\Users\user\Desktop\LinkUp\frontend` ואז `npm run dev` | אתר: http://localhost:5173 |
 
 ---
 
 ## אם הבקאנד לא עולה
 
-- **"uvicorn לא מזוהה"** – להתקין:  
-  `pip install uvicorn`  
-  (רצוי בתוך סביבה וירטואלית: `python -m venv venv` ואז `venv\Scripts\activate` ואז `pip install -r requirements.txt`).
+- **"uvicorn לא מזוהה"** – **מומלץ** מתוך `backend/`: **`uv sync`** ואז **`uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`** (פירוט: **`backend/README.md`**).  
+  חלופה ישנה (בלי `uv`): venv פעיל ואז מתוך `backend/` **`pip install -e .`** לפי **`pyproject.toml`** (אין `requirements.txt` ב-backend), ואז `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`.
 
-- **שגיאה על חוסר מודול (module)** – מתוך `backend` להריץ:  
-  `pip install -r requirements.txt`
+- **שגיאה על חוסר מודול (module)** – מתוך `backend/`: קודם **`uv sync`**; אם אין `uv` — **`pip install -e .`** (אותה תיקיה, לפי **`pyproject.toml`**)
 
 - **שגיאה על DB / Redis / RabbitMQ / chat-ws / worker** – להריץ את התשתית (למשל עם Docker) משורש הפרויקט (`LinkUp`):  
-  `docker compose up -d` — מרים `db`, `redis`, `rabbitmq`, שירות **`migrate`** (מיגרציה אוטומטית), `chat-ws`, `outbox-worker`, `backend` וכו׳ (ללא **nginx** אלא אם מריצים `docker compose --profile prod up -d`). אם **`migrate`** נכשל — לבדוק `docker compose logs migrate`; **backend** לא יעלה עד שהמיגרציה מצליחה.  
-  אפשר גם במפורש: `docker compose up -d db redis rabbitmq chat-ws` אם צריך רק חלק מהשירותים (אז מיגרציה ידנית: `cd backend && alembic upgrade head`).
+  `docker compose up -d` — מרים `db`, `redis`, `rabbitmq`, **`migrate`** (**`alembic upgrade head`**), `chat-ws`, **`notification-worker`**, **`task-worker`**, **`ai-worker`**, **`backend`** (ללא **nginx**/frontend אלא עם `--profile prod`). שירות legacy **`outbox-worker`** עם profile **`compat`** — לא חלק מהסטאנדארד. אם **`migrate`** נכשל — `docker compose logs migrate`; **backend** לא יעלה עד הצלחה.  
+  אם מריצים רק חלק: `docker compose up -d db redis rabbitmq chat-ws` — אז מתוך `backend/` הרץ **`uv run alembic upgrade head`** לפני API מקומי.
 
 ---
 
@@ -124,4 +122,4 @@ docker stop linkup_backend
 |------|-----------|
 | צ'אט + typing + presence | **chat-ws** (למשל דרך Docker על **8081**) — ראו `chat-ws/README.md` |
 | פיד התראות חי בווב + WebSocket נסיעות/מיקום | **backend** על **8000** עם Redis; הפרונט מתחבר ל־`ws://localhost:8000/api/v1/...` — ראו `frontend/src/config/env.ts` |
-| מיגרציות DB | `cd backend && alembic upgrade head` או שירות **`migrate`** ב־Compose — `backend/alembic/README.md` |
+| מיגרציות DB | מתוך `backend/`: **`uv run alembic upgrade head`**; או שירות Compose **`migrate`** — `backend/alembic/README.md` |

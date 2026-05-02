@@ -4,6 +4,11 @@ This runbook covers high-frequency production incidents for `https://linkup.itam
 
 Primary deployment reference: [`docs/DEPLOYMENT.md`](../DEPLOYMENT.md).
 
+## Triage consoles (first look)
+
+- **Application errors / RUM / traces:** [Sentry Issues (14d)](https://itamar-abir.sentry.io/issues/?project=4511256490606592&statsPeriod=14d) — matches env DSN wiring; fuller link table in [`MONITORING.md`](MONITORING.md#external-dashboards-production).
+- **External uptime / incident history:** [Better Stack monitors](https://uptime.betterstack.com/team/t520754/monitors) — correlates with public [`GET /livez`](https://linkup.itamarabir.com/livez); sample deep-link: [incident `959204833`](https://uptime.betterstack.com/team/t520754/incidents/959204833).
+
 ## 1) Disk Full on EC2
 
 ### Symptoms
@@ -157,7 +162,7 @@ make admin-revoke EMAIL=user@example.com
 
 ### Symptoms
 
-- `/admin/ops`, `/admin/billing`, or `/admin/audit` loads but data is empty/error
+- בממשק הווב (Vite) המסלולים **`/admin/ops`**, **`/admin/billing`**, **`/admin/audit`** נטענים אבל הנתונים ריקים / שגיאה (זה לא אותו דבר כמו קידומת ה-API **`/api/v1/admin/...`**)
 - backend returns 403 with `Missing admin capability`
 
 ### Checks

@@ -54,7 +54,7 @@ Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 
 ## Tests & CI (quality)
 
-- **pytest:** מתוך `backend/` — `uv run pytest tests/ -v`. טסטי אינטגרציה עם DB דורשים **PostgreSQL + PostGIS** וסכמה מעודכנת (**`alembic upgrade head`** על אותו DB). ב־`tests/conftest.py` מקור ה-DSN: **`DATABASE_URL`** (עדיפות), או **`TEST_DATABASE_URL`** (תאימות לאחור), או ברירת מחדל ל-docker-compose המקומי.
+- **pytest:** מתוך `backend/` — **`make test`** מריץ קודם **`uv run alembic upgrade head`** ואז **`uv run pytest`** (זהה לסדר ב־CI). לחלופין: **`uv run pytest tests/ -v`** אחרי מיגרציה ידנית. טסטי אינטגרציה עם DB דורשים **PostgreSQL + PostGIS** וסכמה מ־Alembic. ב־`tests/conftest.py` מקור ה-DSN: **`DATABASE_URL`** (עדיפות), או **`TEST_DATABASE_URL`** (תאימות לאחור), או ברירת מחדל ל-docker-compose המקומי.
 - **GitHub Actions** (`.github/workflows/backend-ci.yml`): שירות Postgres, **`DATABASE_URL` ברמת ה-job** (מיפוי אחיד ל־**Alembic** ול־**pytest**), שלבי איכות בסדר בפועל: **Ruff check** → **Ruff format --check** → **`uv run alembic upgrade head`** → **`uv run pytest`**. קבצים תחת `alembic/` נכללים ב־autogenerate דרך `env.py` (ייבוא `app.db.models`); אם CI ירחיב ל־`ruff check alembic/`, ה־`per-file-ignores` ל־`alembic/env.py` מכסה F401 על ייבוא registry.
 - **Settings:** משתני סביבה **`DATABASE_URL`** / **`REDIS_URL`** נקראים ל־`DATABASE_URL_RAW` / `REDIS_URL_RAW` דרך **`validation_alias=AliasChoices(...)`** ב־`app/core/config.py` (pydantic-settings) — כך Alembic (`settings.DATABASE_URL`) והריצה ב-CI מסתנכרנים.
 
@@ -100,15 +100,12 @@ See `docs/architecture/API.md` and `docs/architecture/DATABASE.md`.
 
 ## Migrations
 
-Alembic is in `alembic/`. Run migrations with:
+Alembic lives in `alembic/`.
 
-```bash
-alembic upgrade head
-```
+- **Locally (repo + `uv`):** from **`backend/`** run **`uv run alembic upgrade head`** — same binary resolution as **`make migrate`** / CI.
+- **Docker Compose:** the **`migrate`** image uses **`ENTRYPOINT ["alembic"]`**; the service runs **`alembic upgrade head`** once before **backend** and workers (`notification-worker`, `task-worker`, `ai-worker`). The API **Dockerfile** `CMD` does **not** run migrations (`gunicorn` / `uvicorn` only). Off Compose (raw image / K8s): run migrations as a Job/init step — see **`docs/architecture/DEVELOPMENT.md`**.
 
-With **Docker Compose** at the repo root, the **`migrate`** service runs `alembic upgrade head` once before **backend** and worker services (`notification-worker`, `task-worker`, `ai-worker`) start; the production **Dockerfile** does **not** run migrations in `CMD` (only `gunicorn` / `uvicorn`). If you deploy **without** Compose (e.g. raw image or Kubernetes), run migrations as a one-off Job, init container, or CI step — do not rely on the API container entrypoint alone.
-
-**Recent:** קובץ **`007_add_last_active_at.py`** — מזהה רוויזיה ב-Alembic: **`007_last_active_at`** (`users.last_active_at`). **`008_scheduled_notifications`** — `down_revision` חייב להיות **`007_last_active_at`** (לא שם הקובץ); טבלת `scheduled_notifications`, אינדקס חלקי, הסרת `reminder_sent` מ-rides/bookings. ORM, API וטיפוסי הפרונט מיושרים (אין `reminder_sent` בתגובות / ב-`frontend` types). See `docs/architecture/DATABASE.md` and `docs/architecture/EVENTS.md`.
+Canonical migration table + merge note (**`016_merge015_heads`**, **`015_billing_idem`**): **`docs/architecture/DATABASE.md`**.
 
 ## Load testing (k6)
 

@@ -29,20 +29,18 @@
 - ✅ WebSocket ב-FastAPI לנסיעות/בוקינגים/התראות (`/api/v1/rides/...`, `/api/v1/bookings/...`, `/api/v1/notifications/ws`) — אימות ב-`get_current_user_ws`: **JWT בלבד** (`WsUser`), בלי DB בזמן connect (פרטים: `ARCHITECTURE.md` בשורש, `docs/architecture/REALTIME.md`).
 - ✅ REST API endpoints
 - ✅ Calendar export (`GET /api/v1/chat/conversations/{id}/calendar.ics`)
-- ✅ תוצאות ניתוח AI נשמרות ב-DB (`chat_analysis`); **אין כרגע** route ייעודי ב-`backend/app/domain/chat/router.py` ל-`GET …/analysis` (סקריפטי k6 ישנים עשויים להתייחס לנתיב מתוכנן)
+- ✅ תוצאות ניתוח AI ב־**`chat_analysis`**; **אין** `GET …/analysis` בראוטר הצ’אט החי — אל תסמכו על נתיב כזה עד שקיים בקוד (סקריפטים ישנים/k6 עשויים להזכיר מתוכנן)
 - ✅ Business logic
 - ✅ Database operations
 
 ## AI Analysis - איפה?
 
-**ניתוח AI רץ ב-backend worker (`ai-worker`):**
-- Backend מפרסם אירוע סיום שיחה ל-Redis DB 1 (`chat:completion:{conversation_id}`).
-- ה-`ai-worker` מאזין ל-Redis DB 1, מפעיל `handle_conversation_completion` (domain/chat/ai), שומר ל-DB ושולח ל-outbox.
+**ניתוח AI רץ ב-backend workers:**
 
-**API Endpoint** (ב-backend):
-- `GET /api/v1/chat/conversations/{id}/analysis`
-- קורא תוצאות מ-DB
-- מחזיר למשתמש
+1. **מסלול פעיל (קוד):** **`task-worker`** — משימות scheduled ( למשל `execute_chat_timeout_job`) קוראות **ישירות** ל־`handle_conversation_completion` בתוך ה-backend (DB + Groq + `chat_analysis` + Outbox). אין בהכרח פרסום Redis ל-chat-ws בנתיב הזה.
+2. **מסלול מאזין:** **`ai-worker`** — `run_chat_completion_redis_listener` נרשם ל־`chat:completion:*` על **`REDIS_CHAT_URL`**. אם מישהו מפרסם JSON עם `conversation_id` + `trigger_user_id`, אותו handler רץ.
+
+**מתואם ארכיטקטונית / עתידי:** פרסום **`chat:completion:{conversation_id}`** לטריגר מהיר — **לא** מופיע בקבצי ה-Python שסרקנו ב-backend; אל תסמכו עליו כלייציב עד יישום מפורש.
 
 ## Calendar Export - איפה?
 
@@ -58,11 +56,11 @@
 **מיקום קוד:**
 - ✅ `backend/app/domain/chat/calendar/` - לוגיקת calendar (נדרש)
 - ✅ `backend/app/domain/chat/router.py` — endpoints REST (כולל `calendar.ics` — כרגע 501)
-- ❌ אין microservice AI נפרד; ניתוח רץ ב-`ai-worker` מתוך backend image
+- ❌ אין microservice AI נפרד; הניתוח רץ מ־**workers** מתוך image ה-backend (`task-worker` כטריגיר עיקרי; `ai-worker` — מאזין Redis אופציונלי).
 
 **למה לא ב-chat-ws?**
 - ייצוא iCal וניתוח שיחה הם לוגיקת API/DB; chat-ws הוא רק real-time fan-out
-- ניתוח רץ ב-`ai-worker` אחרי `chat:completion:*`; התוצאה נשמרת ב-DB ונקראת דרך REST
+- תוצאת ניתוח ב־**`chat_analysis`**; הנגישות ב־REST — כפי שנרשם למעלה ב־«backend / מה כן» (לא מכפילים כאן)
 
 ## זרימה מומלצת
 
@@ -77,14 +75,14 @@ Client → POST /api/v1/chat/conversations/{id}/messages (backend)
        → Backend מפרסם ל-Redis (chat:conversation:{id})
        → chat-ws מקבל מ-Redis → שולח ל-WebSocket
        → לאחר שליחה: backend מעדכן גם **`users.last_active_at`**
-       → אם הודעת סיום: Backend מפרסם ל-Redis DB 1 (chat:completion:{id})
-       → ai-worker מאזין → מנתח (AI) → שומר תוצאה + outbox
+       → טריגר AI: כרגע עיקרית דרך **שעון idle ב-task-worker**, לא בשורת “הודעת סיום” אחת מתוך ה-Redis chat flow
 ```
 
 ### 2. ניתוח AI (רקע)
 ```
-ai-worker ← Redis DB1 (chat:completion:{id})
-              → ניתוח (Groq) → שמירה ל-chat_analysis ב-DB
+task-worker (scheduled) ──► handle_conversation_completion ──► Groq ──► chat_analysis + Outbox
+
+ai-worker ──► (אופציונלי) מאזין Redis chat:completion:* ──► אותו handler — רק אם קיים publisher
 ```
 (אין כרגע endpoint REST ייעודי ב-spa לקריאת JSON הניתוח — התוצאה קיימת ב-DB.)
 

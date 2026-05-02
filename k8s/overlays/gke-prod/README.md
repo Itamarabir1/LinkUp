@@ -64,6 +64,6 @@ The **`production`** target in [backend/Dockerfile](../../../backend/Dockerfile)
 
 Not included in this overlay by default; add HPA manifests under this folder and list them in `kustomization.yaml` when the cluster has metrics available.
 
-## GitHub Actions
+## GitHub Actions (GKE)
 
-Optional workflow [.github/workflows/deploy-gke.yml](../../.github/workflows/deploy-gke.yml) builds with **`--target production`** for the backend (the production stage already exists in the Dockerfile). Configure repository **Variables**: `GCP_REGION`, `GCP_ARTIFACT_REGISTRY` (e.g. `europe-west1-docker.pkg.dev/PROJECT/linkup`), `GKE_CLUSTER_NAME`; **Secrets**: `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`. Image names in Kubernetes must match your registry (patch `image:` in a fork or add an `images:` transformer in this overlay).
+There is **no** `deploy-gke.yml` in this repository today (**removed** intentionally — see **`docs/FUTURE_WORK.md`**); production rollout from CI targets **EC2 + Compose** (`backend-ci.yml`). To deploy these manifests from automation, **add your own workflow** (or reuse patterns from **`backend-ci`**) pushing images to Artifact Registry/GHCR and `kubectl apply`/GitOps against your cluster. Typical inputs: **`--target production`** on the backend image; patch `image:` in this overlay or use a Kustomize `images:` transformer; GCP **Workload Identity** secrets where applicable.

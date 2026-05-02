@@ -2,16 +2,16 @@
 
 מיגרציות מרוכזות תחת `versions/`. **`env.py`** מייבא `app.db.models` אחרי `Base` כדי ש־`target_metadata` יכלול את מודלי הדומיין שנרשמים דרך registry זה לצורך **`revision --autogenerate`**.
 
-**Docker Compose:** שירות **`migrate`** מריץ `alembic upgrade head` פעם אחת לפני עליית **backend** וכל ה-workers (`notification-worker`, `task-worker`, `ai-worker`) — ראו [`docs/architecture/DEVELOPMENT.md`](../../docs/architecture/DEVELOPMENT.md). סכמת ייחוס: [`db/schema.sql`](../../db/schema.sql) (עזר, לא מקור אמת למיגרציות).
+**Docker Compose:** שירות **`migrate`** קורא ל־**`alembic upgrade head`** דרך `ENTRYPOINT` של ה-image (**לא** `uv run`). לפני **backend** וה־workers — ראו [`docs/architecture/DEVELOPMENT.md`](../../docs/architecture/DEVELOPMENT.md). העתק העזר [`db/schema.sql`](../../db/schema.sql) הוא **לייעוץ בלבד**; מקור האמת הוא קבצי **`versions/`**.
 
-## הרצה
+## הרצה (מחשב המפתח)
 
 ```bash
 cd backend
-alembic upgrade head
+uv run alembic upgrade head
 ```
 
-פעם אחת. פועל על DB ריק (יוצר את כל הטבלאות) או על DB קיים (מוסיף רק מה שחסר – idempotent).
+אותו מהלך מתוך ה-root של הפרויקט אחרי התקנה ב־`backend/.venv`/uv. פועל על DB ריק או מתקדם בין רוויזיות (מציב head אחיד אחרי **`016_merge015_heads`**).
 
 ## אם ה-DB כבר מכיל מיגרציות ישנות
 
@@ -27,5 +27,5 @@ alembic upgrade head
   ```
   ואז:
   ```bash
-  alembic upgrade head
+  uv run alembic upgrade head
   ```

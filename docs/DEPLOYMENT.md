@@ -5,14 +5,14 @@ This document is the operational source of truth for Linkup production deploymen
 Related operations docs:
 
 - [`docs/operations/RUNBOOK.md`](operations/RUNBOOK.md)
-- [`docs/operations/MONITORING.md`](operations/MONITORING.md)
+- [`docs/operations/MONITORING.md`](operations/MONITORING.md) — כולל [קונסולות פרודקשן Sentry + Better Stack](operations/MONITORING.md#external-dashboards-production)
 
 ## Production Topology
 
 - **Host:** single EC2 instance.
 - **Runtime:** Docker Compose (`--profile prod`).
 - **Ingress:** `nginx` reverse proxy with TLS termination.
-- **Images:** pulled from GHCR (`ghcr.io/<owner>/linkup/*`).
+- **Images:** נמשכות מ-GHCR — ברירות מחדל ב־**`docker-compose.yml`**: `ghcr.io/<owner>/linkup/{backend,worker,migrate,pgbouncer,frontend,chat-ws}` וגם **`ghcr.io/<owner>/linkup-email-renderer`** (שירות נפרד בלי קידומת `linkup/`).
 - **Public URL:** `https://linkup.itamarabir.com`.
 
 ### Main runtime services
@@ -21,7 +21,9 @@ Related operations docs:
 - `chat-ws` (Go WebSocket service)
 - `frontend` (Nginx static app)
 - `nginx` (edge reverse proxy)
+- `email-renderer` (Node — React Email **`POST /render`**)
 - `notification-worker`, `task-worker`, `ai-worker`
+- `migrate` — Job חד־פעמי (`alembic upgrade head`) לפני עליית ה-API וה-workers
 - Infra: `db`, `pgbouncer`, `rabbitmq`, `redis-primary`, `redis-replica`, `redis-sentinel`
 
 ## CI/CD Flow (GitHub Actions)

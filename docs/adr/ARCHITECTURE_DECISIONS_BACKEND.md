@@ -49,6 +49,7 @@
 | **למה** | **At-least-once**; ה-API לא תלוי ב-latency או זמינות הברוקר בזמן התשובה ללקוח. |
 | **אלטרנטיבה** | Publish ישיר אחרי commit — race/crash עלולים לאבד אירוע. |
 | **בקצרה לראיון** | "אאוטבוקס מבטיח שהאירוע והנתונים ב-DB יהיו עקביים — זה דפוס מוכר במערכות event-driven." |
+| **מקביליות workers** | משיכת PENDING עם **`FOR UPDATE SKIP LOCKED`** — מספר פרוסות `notification-worker` לא נתקעות אחת על השנייה על אותה שורה; ראו [FEATURE_DECISIONS.md §outbox-skip-locked](../FEATURE_DECISIONS.md#outbox-skip-locked), [`outbox/repository.py`](../../backend/app/infrastructure/outbox/repository.py). |
 
 ---
 
@@ -57,11 +58,11 @@
 | | |
 |--|--|
 | **הקשר** | רינדור מיילים בוצע מקומית ב-Jinja2 בתוך הבקאנד; נדרש מעבר לתבניות מודרניות, רכיבים משותפים עם הפרונט ו-preview נוח. |
-| **החלטה** | מיקרו-שירות **`email-renderer`** (Node.js + TypeScript + Express + React / `@react-email/components`) מחזיר HTML; הבקאנד וה-`outbox-worker` שולחים `template + props` ל-**`POST /render`**. |
+| **החלטה** | מיקרו-שירות **`email-renderer`** (Node.js + TypeScript + Express + React / `@react-email/components`) מחזיר HTML; הבקאנד ו-**`notification-worker`** (מסלול Outbox/התראות) שולחים `template + props` ל-**`POST /render`**. |
 | **למה Node.js** | תבניות מבוססות **React Email** נרנדרות בשרת עם **`renderToStaticMarkup`** — אותו דפוס כמו SSR בדפדפן, בלי להטמיע מנוע JavaScript בתוך תהליך Python; TypeScript וכלים (`react-email`) מיושרים לצוות הפרונט. |
 | **למה (סקייל / תפעול)** | **הפרדת אחריות**: orchestration, Outbox ושליחת SMTP נשארים ב-Python; רינדור HTML מרוכז בשירות שניתן לסקייל, לגרסאות ולפריסה עצמאית. |
 | **חוזה** | `EMAIL_MAP` בבקאנד משתמש ב-template names ב-**PascalCase**; ב-renderer יש `TEMPLATE_REGISTRY` + אימות fail-fast מול `EMAIL_MAP_KEYS` בזמן startup. |
-| **Trade-off** | תלות רשת נוספת (timeout, health, סדר עלייה). ב-Docker Compose: **healthcheck** ו-**`depends_on`** מ-`email-renderer` ל-`backend` ול-`outbox-worker`. |
+| **Trade-off** | תלות רשת נוספת (timeout, health, סדר עלייה). ב-Docker Compose: **healthcheck** ו-**`depends_on`** מ-`email-renderer` ל-`backend` ול-**`notification-worker`** (פרופיל **`compat`**: alias **`outbox-worker`**). |
 | **אלטרנטיבות** | להישאר ב-Jinja2 בלבד; MJML/ HTML סטטי בלי קומפוננטות; או ספק SaaS לתבניות — פחות שליטה ושכפול לוגיקה מול המוצר. |
 | **בקצרה לראיון** | "העברנו רינדור מייל לשירות Node עם React Email כדי לשמור על תבניות מודרניות ו-SSR טבעי; Python ממשיך לנהל אירועים ואמינות דרך Outbox." |
 
@@ -82,7 +83,7 @@
 
 | | |
 |--|--|
-| **החלטה** | API ב-**FastAPI**; גישה ל-DB ב-**async** SQLAlchemy 2.0 בדומיינים ליבה (passengers, bookings, rides); workers רצים מתוך אותו codebase (`outbox-worker`). |
+| **החלטה** | API ב-**FastAPI**; גישה ל-DB ב-**async** SQLAlchemy 2.0 בדומיינים ליבה (passengers, bookings, rides); workers רצים מתוך אותו codebase (**`notification-worker`**, **`task-worker`**, **`ai-worker`**). |
 | **למה** | מהירות פיתוח, אקוסיסטם; async מתאים ל-I/O כבד (DB, HTTP חיצוני) תחת עומס. |
 | **סקייל** | אין `Session.run_sync` בזרימות אפליקציה — רק Alembic; workers עם `await db.execute(select(...))` במקום חסימות מיותרות. |
 | **בקצרה לראיון** | "Python ללוגיקה עסקית ואינטגרציות; async כדי לא לחסום את ה-event loop על DB." |
@@ -165,9 +166,9 @@
 
 | | |
 |--|--|
-| **החלטה** | אירוע סיום שיחה → Redis DB1 (`chat:completion:*`) → **אותו outbox-worker** מאזין ומריץ ניתוח, שומר ל-DB; לא microservice נפרד בפריסה הראשונית. |
-| **למה** | פחות רכיבים לפרוס ולנטר; עדיין ביצוע אסינכרוני אחרי סגירת השיחה. |
-| **בקצרה לראיון** | "שמרנו על משטח פריסה קטן — ה-worker כבר רץ ומאזין ל-Redis." |
+| **החלטה** | **טריגר עליון בפועל:** משימות scheduled ב־**`task-worker`** ( למשל timeout שיחה) קוראות ל־`handle_conversation_completion` באותו monorepo — **Groq** → **`chat_analysis`** → Outbox. **בנוסף:** **`ai-worker`** מאזין ל־**`chat:completion:*`** (Redis DB חיבור הצ’אט) — פרסום מ-backend לערוץ זה **לא** אומת בקוד הנוכחי כמקור הטריגר היחיד. |
+| **למה** | עומס הניתוח מחוץ ל-request path; פריסת workers נפרדת מ-Uvicorn; אפשרות הרחבה ל-Redis-trigger בעתיד. |
+| **בקצרה לראיון** | "הניתוח רץ מתוך workers (timeout → `task-worker`), ויש מאזין ב-**`ai-worker`** לערוץ Redis אם נרצה decouple מלא מהמתזמן." |
 
 ---
 
@@ -303,12 +304,12 @@
 | | |
 |--|--|
 | **הקשר** | Stripe Checkout נפתח מהדפדפן; retries ולחיצות כפולות על יצירת session; webhooks שנמשכים או חוזרים; צורך בעקביות מצב **`payments.status`** ו-**`users.is_premium`**. |
-| **החלטה** | **`X-Idempotency-Key`** (כותרת) → טבלה **`idempotency_keys`** (משתמש+מפתח+endpoint ייחודיים, fingerprint SHA-256, **`response_body`** + **`status_code`**, **`expires_at`**). כפילות fingerprint — מחזירים תשובה שמורה; אי-התאמה — **`IDEMPOTENCY_MISMATCH`** (422). **`BillingReconciler`**: **`pg_try_advisory_lock`**, רשימת **`pending`** עם חלון גיל, **`stripe_gateway.retrieve_session`**, **`handle_checkout_completed`** / **`handle_session_expired`**, ניקוי idempotency שפג תוקף — מתוזמן ב-**`lifespan`** (APScheduler). מעברי סטטוס: **`validate_transition`** — רק ממצב התחלתי מותר החוצה; **`ILLEGAL_PAYMENT_TRANSITION`** במעבר אסור. |
+| **החלטה** | **`X-Idempotency-Key`** (כותרת) → טבלה **`idempotency_keys`** (משתמש+מפתח+endpoint ייחודיים, fingerprint SHA-256, **`response_body`** + **`status_code`**, **`expires_at`**). כפילות fingerprint — מחזירים תשובה שמורה; אי-התאמה — **`IDEMPOTENCY_MISMATCH`** (422). **`BillingReconciler`**: **`pg_try_advisory_lock`**, רשימת **`pending`** עם חלון גיל, **`stripe_gateway.retrieve_session`**, **`handle_checkout_completed`** / **`handle_session_expired`**, ניקוי idempotency שפג תוקף — מתוזמן ב-**`app/core/lifespan.py`** (`AsyncIOScheduler`, job `billing_reconciler`; כש־**`BILLING_RECONCILER_ENABLED`**). מעברי סטטוס: **`validate_transition`** — רק ממצב התחלתי מותר החוצה; **`ILLEGAL_PAYMENT_TRANSITION`** במעבר אסור. |
 | **למה Postgres ל-checkout** | עמידות בין מופעי API וביטול תלות Redis לשכבה זו (בהשוואה לצ’אט/נסיעות — שם Redis אופטימלי ל-latency קצר ו-fail-open). |
 | **Trade-off** | write נוסף למסד לכל checkout עם מפתח; reconciler = קריאות Stripe נוספות — מוגדרות חלון זמן ו-single-runner lock. |
 | **מדדים** | **`billing_reconciler_runs_total`**, **`billing_reconciler_recovered_total`**, **`billing_reconciler_errors_total`**, **`billing_idempotency_hits_total`** — ראו **`docs/operations/MONITORING.md`**. |
 | **בקצרה לראיון** | “אידמפוטנטיות של checkout ישבה ב-Postgres כדי לאחסן את תשובת השרת המלאה בין רפליקות; reconciler עם advisory lock מתקן פערים אם webhook מאחר, ומכונת מצבים חוסמת מעברים משוגעים בין סטטוסים.” |
-| **פירוט מלא / הפניה** | [FEATURE_DECISIONS.md §billing-checkout-db-idempotency-reconciler](../FEATURE_DECISIONS.md#billing-checkout-db-idempotency-reconciler) · [API.md §Billing](../architecture/API.md) · מיגרציות ב-[DATABASE.md](../architecture/DATABASE.md) · [BILLING_REFACTOR_SUMMARY.md](../BILLING_REFACTOR_SUMMARY.md) — סיכום שמור במלואו (לפני/אחרי, טבלת Kafka) |
+| **פירוט מלא / הפניה** | [FEATURE_DECISIONS.md §billing-checkout-db-idempotency-reconciler](../FEATURE_DECISIONS.md#billing-checkout-db-idempotency-reconciler) · [API.md §Billing](../architecture/API.md) · מיגרציות ב-[DATABASE.md](../architecture/DATABASE.md) · [`backend/app/core/lifespan.py`](../../backend/app/core/lifespan.py) · [BILLING_REFACTOR_SUMMARY.md](../BILLING_REFACTOR_SUMMARY.md) — סיכום שמור במלואו (לפני/אחרי, טבלת Kafka) |
 
 ---
 

@@ -4,8 +4,8 @@ Canonical overview of how outbound notifications are produced, rendered, and del
 
 ## Pipeline (high level)
 
-1. **Domain / Outbox** — business code writes `outbox_events` in the same DB transaction as the state change; `outbox-worker` publishes to RabbitMQ (see [`EVENTS.md`](EVENTS.md)).
-2. **`notification-worker`** — consumes `notifications_queue`, runs `notification_tasks` handlers (async SQLAlchemy), resolves templates and channels.
+1. **Domain / Outbox** — business code writes `outbox_events` in the same DB transaction as the state change (see [`EVENTS.md`](EVENTS.md)).
+2. **`notification-worker`** (`python -m app.workers.notification_worker`) — dispatches **Outbox → RabbitMQ**, then consumes **`notifications_queue`**, runs `notification_tasks` handlers (async SQLAlchemy), resolves templates and channels. In Compose the legacy service name **`outbox-worker`** (profile **`compat`**) is an alias for the same process.
 3. **Channels**
    - **Email:** HTML from **`email-renderer`** (`POST /render` with React Email templates), then SMTP send via **Brevo** transactional API (`sib_api_v3_sdk`).
    - **Push:** FCM with **data-only** payloads (see [`../FCM_SYSTEM_SUMMARY.md`](../FCM_SYSTEM_SUMMARY.md), [`../adr/FCM_AND_PUSH.md`](../adr/FCM_AND_PUSH.md)).

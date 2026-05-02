@@ -36,7 +36,7 @@ frontend/src/features/admin/
 | (API)    | `GET /admin/me` — אימות מצב אדמין בשרת (מיוצא ב-`frontend/src/features/admin/api/admin.ts` כ-`fetchAdminMe`; ה-UI נשען בעיקר על `AuthContext` + `AdminRoute`) |
 | Home     | `GET /admin/stats` (אגרגציות + `users_per_day`) |
 | Health   | `GET /admin/health` (אותו `check_health` כמו בריאות ציבורית, מאחורי אדמין) |
-| Users    | `GET /admin/users` (query: `limit`, עד 200), `PATCH /admin/users/{id}/active`, `PATCH /admin/users/{id}/admin` |
+| Users    | `GET /admin/users` (query: `limit`, עד 200), `PATCH /admin/users/{id}/active`, `PATCH /admin/users/{id}/admin` (query: `action=toggle|grant|revoke`, אופציונלי `reason`) |
 | Rides    | `GET /admin/rides` (query: `status` = `active` \| `completed` \| `cancelled` או חסר לכל האחרונות; `limit` עד 500), `POST /admin/rides/{ride_id}/cancel` |
 | Groups   | `GET /admin/groups` (query: `limit` עד 500) |
 | Outbox   | `GET /admin/outbox`, `GET /admin/outbox/{event_id}`, `POST /admin/outbox/{event_id}/requeue` (רק **FAILED**) |

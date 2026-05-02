@@ -2,6 +2,19 @@
 
 Production observability stack for Linkup.
 
+## External dashboards (production)
+
+**Sentry** (`sentry.io`) and **Better Stack** (`uptime.betterstack.com`) are **two separate products** from different vendors: Sentry covers **in-app** errors, traces, replay, and Vitals (wired via DSN/SDK); Better Stack covers **synthetic / external uptime** and **incident pages** against URLs such as public **`GET /livez`**. Do not conflate them—they solve different problems.
+
+Human-facing consoles sit **next to** in-repo integrations (`SENTRY_DSN`, `VITE_SENTRY_DSN`, nginx CSP `report-uri` → Sentry ingest, etc.). Workspace URLs live here—update them if the org, project, or monitor set changes.
+
+| Tool | Role | Links |
+|------|------|--------|
+| **Sentry** (`sentry.io`) | Errors, performance traces, session replay (frontend), Web Vitals, CSP/security reports routed to ingest | [Issues (14d)](https://itamar-abir.sentry.io/issues/?project=4511256490606592&statsPeriod=14d) |
+| **Better Stack** | External uptime / synthetics against public **`GET /livez`**, alerting, incident timeline | [Monitors](https://uptime.betterstack.com/team/t520754/monitors) · [example incident](https://uptime.betterstack.com/team/t520754/incidents/959204833) |
+
+Self-hosted **Prometheus + Grafana** (`docker compose --profile monitoring`) stays the metrics path inside the repo—see [Metrics stack](#metrics-stack) below.
+
 ## Metrics Stack
 
 - **Backend:** Prometheus endpoint at `GET /metrics`
@@ -21,7 +34,7 @@ Production observability stack for Linkup.
 
 ## Async reliability
 
-- **Billing reconciler** (ריצה מתוזמנת ב-backend): **`billing_reconciler_recovered_total`** מול **`billing_reconciler_errors_total`** — גידול מתמשך ב-errors או אפס recoveries לאורך זמן מרמז על תקלת Stripe, נעילות DB, או תור תשלומים תקועים.
+- **Billing reconciler** (ריצה מתוזמנת ב-backend מ־**`app/core/lifespan.py`**, APScheduler; **`BILLING_RECONCILER_ENABLED`** ברירת מחדל **`true`** ב־config — כבה עם **`false`**): **`billing_reconciler_recovered_total`** מול **`billing_reconciler_errors_total`** — גידול מתמשך ב-errors או אפס recoveries לאורך זמן מרמז על תקלת Stripe, נעילות DB, או תור תשלומים תקועים.
 - outbox processed vs failed
 - RabbitMQ retries and DLQ depth
 - consumer restart counters
@@ -53,6 +66,32 @@ Gauge semantics are consistent: **0** = closed (normal), **1** = half_open (prob
 
 See **§20** in [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md) and [`docs/architecture/NOTIFICATIONS.md`](../architecture/NOTIFICATIONS.md).
 
+## Geocode cache & stampede (Prometheus)
+
+מסלול **`get_coordinates`** ב־[`geocode_cache.py`](../../backend/app/infrastructure/geo/geocode_cache.py) משתמש ב־**`get_or_compute`** מ־[`cache_stampede.py`](../../backend/app/infrastructure/redis/cache_stampede.py) כדי למנוע סערה של קריאות Google על אותו מפתח cache כשמתבצעות בקשות מקבילות לפני שהערך חם.
+
+| Metric | תיאור |
+|--------|--------|
+| `geo_cache_hits_total` | פגיעה בקריאת cache (מהיר לפני Google) |
+| `geo_cache_misses_total` | המשך למסלול compute (כלול Mutex אם נדרש) |
+| `cache_lock_acquired_total` | רכישת נעילה לחישוב (label `key_prefix`, למשל `geocode`) |
+| `cache_stampede_avoided_total` | עוקב שנמנע מכפילת עבודה (poll אחרי בונה) |
+| `cache_fail_open_total` | מעבר ללא mutex/coalesce בשגיאת Redis — עדיין fail-open בתור הגיאוקוד |
+
+פירוט החלטה: [`docs/FEATURE_DECISIONS.md`](../FEATURE_DECISIONS.md#geocode-cache-stampede) · Highlights: [`docs/ENGINEERING_HIGHLIGHTS.md`](../ENGINEERING_HIGHLIGHTS.md).
+
+## Rate limiting (Prometheus)
+
+Lua אטומי ב־Redis — השוואה למדדי דחיה ו-eval latency:
+
+| Metric | תיאור |
+|--------|--------|
+| `rate_limit_rejected_total` | בקשות שנחסמו (labels: `algorithm`, `endpoint`) |
+| `rate_limit_redis_errors_total` | מצבי fail-open כשאין Redis (label `endpoint`) |
+| `rate_limit_evaluation_seconds` | Histogram לזמני הרצת script (labels: `algorithm`) |
+
+פירוט: [`docs/FEATURE_DECISIONS.md`](../FEATURE_DECISIONS.md#rate-limit-token-bucket) ו־ADR backend **§23**.
+
 ## Billing / Stripe (Prometheus)
 
 Counters ב־`app/infrastructure/metrics.py` — שימושי ל-SLO על זרימת תשלום ועל התאמה מול Stripe אחרי אירועים חריגים:
@@ -69,6 +108,8 @@ Counters ב־`app/infrastructure/metrics.py` — שימושי ל-SLO על זרי
 | `billing_reconciler_recovered_total` | תשלומים שחודשו/סונכרנו מתוך stale pending |
 | `billing_reconciler_errors_total` | כשלים פר־תשלום בתוך ריצת reconciler |
 | `billing_idempotency_hits_total` | פגיעות במטמון אידמפוטנטיות checkout |
+
+**הערת מקור קוד:** ב־[`app/infrastructure/metrics.py`](../../backend/app/infrastructure/metrics.py) מוגדרים גם מדדים המסומנים **DEFERRED** (עדיין ללא call sites) — למשל Gauge **`outbox_pending_depth`** ו-Counter **`geo_requests_total`** — אל תצפו לסדרות זמן “חיות” מהם עד שיופעלו בקוד.
 
 פירוט API ו-env: [`docs/architecture/API.md`](../architecture/API.md) (Billing), [`docs/architecture/DEVELOPMENT.md`](../architecture/DEVELOPMENT.md).
 

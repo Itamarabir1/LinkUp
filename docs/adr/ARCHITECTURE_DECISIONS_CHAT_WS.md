@@ -43,7 +43,7 @@
 
 | | |
 |--|--|
-| **החלטה** | chat-ws מתחבר רק ל-**Redis logical DB 1** — אותו namespace שבו ה-backend מפרסם pub/sub לצ'אט, completion, `user:{id}:events`, presence. |
+| **החלטה** | chat-ws מתחבר רק ל-**Redis logical DB 1** — אותו namespace שבו ה-backend מפרסם pub/sub לצ’אט, **`user:{id}:events`**, presence, ויכול בתיאוריה לכלול **`chat:completion:*`** אם מתווסף publisher (כרגע יש מאזין ב־Python; פרסום מ-backend לא אומת) — ראו [`architecture/AI.md`](../architecture/AI.md). |
 | **למה** | עקביות עם [publisher ב-Python](../../backend/app/infrastructure/redis/); DB0 נשאר ל-cache ו-rate limit בלי להתנגש בערוצי צ'אט. |
 | **בקצרה לראיון** | "DB1 משותף בכוונה ל-backend — אחרת היינו צריכים תיאום מפתחות בין שני מקורות אמת." |
 

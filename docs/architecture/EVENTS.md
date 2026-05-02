@@ -7,7 +7,7 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 ## Pattern: Outbox → RabbitMQ → Worker
 
 1. **Backend** כותב אירוע ל-tבלת `outbox_events` (status=PENDING) באותה transaction עם שינוי עסקי.
-2. **notification-worker** מריץ `run_outbox_worker`, קורא רשומות PENDING ומפרסם ל-RabbitMQ לפי `get_routing_metadata(event_name)`, ואז מעדכן status ל-DONE (או retry).
+2. **notification-worker** מריץ `run_outbox_worker`, קורא רשומות PENDING ומפרסם ל-RabbitMQ לפי `get_routing_metadata(event_name)`, ואז מעדכן status ל-DONE (או retry). ה-fetch של **PENDING** משתמש ב-**`SELECT ... FOR UPDATE SKIP LOCKED`** ([`OutboxRepository.get_pending_events`](../../backend/app/infrastructure/outbox/repository.py)) — כך **כמה מופעי worker** יכולים לרוץ במקביל בלי נעילה הדדית על אותה שורה (מדלגים לשורה הבאה הזמינה).
 3. **Consumers** רצים ב-workers הייעודיים (notification/task) ומפעילים handlers (מייל, פוש, S3, וכו').
 
 יתרון: at-least-once, אין איבוד אירועים אם RabbitMQ נופל.
@@ -104,7 +104,7 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 |--------|-------|--------|
 | notification-worker | `run_outbox_worker`, `notifications_consumer.consume(handle_notification_event)`, `run_dlq_monitor` | עיבוד outbox והתראות (מייל/פוש/refresh UI) + ניטור עומק DLQ. |
 | task-worker | `avatar_upload_consumer.consume(handle_avatar_upload_event)`, `scheduled_tasks_consumer.consume(handle_scheduled_task)`, `run_scheduled_tasks_publisher` | משימות כבדות + scheduler. |
-| ai-worker | `run_chat_completion_redis_listener` | מאזין ל-Redis DB 1 (`chat:completion:*`) ומריץ ניתוח AI. |
+| ai-worker | `run_chat_completion_redis_listener` | מאזין ל־`chat:completion:*` על Redis חיבור הצ’אט; **לא** טריגיר העיקרי היום — ראו **`task-worker`** + [`AI.md`](AI.md). |
 
 ---
 

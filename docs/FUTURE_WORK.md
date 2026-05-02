@@ -14,16 +14,9 @@
 
 ## Near-Term, High-Value (Implement Next)
 
-### 1) Load Shedding at nginx (Fast, Concrete)
+_Nginx connection/request rate limiting (`limit_req` / `limit_conn`) is intentionally **not** scheduled here — it is covered under [API Gateway Load Shedding (Deferred)](#api-gateway-load-shedding-nginx-deferred) until traffic baselines justify thresholds._
 
-- **Decision:** Prioritize nginx-level load shedding next.
-- **Scope:** Add `limit_req_zone` + `limit_req` and `limit_conn_zone` + `limit_conn` in `nginx.conf`.
-- **Why now:**
-  - Small implementation effort (roughly one focused workday).
-  - Clear operational value: protects backend during bursts.
-  - Strong interview narrative: \"how we protect the server under overload\".
-
-### 2) Formal SLO Alerting (Prometheus Rules)
+### 1) Formal SLO Alerting (Prometheus Rules)
 
 - **Decision:** Prioritize formal alert rules next.
 - **Scope:** Add `monitoring/prometheus/alerts.yml` with SLO/error-budget style alerts (including burn-rate style signals).
@@ -114,9 +107,7 @@ This follows a senior engineering principle: avoid premature optimization, but e
   - Migration risk is currently higher than practical benefit at the current scale.
   - Reconnect backfill is hardened: every chat WS **`onOpen`** runs REST gap fill (**`after=`** + **`before=next_cursor`** במחזור עד **`has_more`** או מכסת לקוח) with **`lastMessageIdRef ?? 0`** and a fixed **`lastMessageIdRef`** sync (see **`ENGINEERING_HIGHLIGHTS.md`** + **[`FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#chat-thread-reconnect)** + **`fetchMissedGap.ts`**); message-stream UX remains WS-first.
   - A full shift to shared cache + infinite query + optimistic flow would increase blast radius in a high-risk domain.
-- **What was still worth shipping now (already done):**
-  - `useChatUnreadMessages` moved from manual `setInterval` to React Query `refetchInterval`.
-  - `Messages.tsx` conversations list moved from manual fetch lifecycle to `useQuery`.
+- **Safe subset already shipped** (polling/unread + שיחות + התראות; פער reconnect; אופטימי outbound — לא מיגרציית צ'אט מלאה ל־RQ cache): **`docs/ENGINEERING_HIGHLIGHTS.md`**, **`docs/FEATURE_DECISIONS.md`** (chat-thread-reconnect).
 - **When to revisit:**
   - If measurable UX issues appear (popup/thread desync, duplicate/missing messages, unread drift), or
   - If traffic/complexity justifies a dedicated, isolated chat migration program.
@@ -182,11 +173,3 @@ This follows a senior engineering principle: avoid premature optimization, but e
 - **When to revisit:**
   - After baseline vitals distributions are stable enough to define actionable thresholds.
   - Add automated regression enforcement (post-deploy check and alerting) tied to release criteria.
-
-## OpenAPI Snapshot CI Gate (Planned)
-
-- **Decision:** Add a CI gate that enforces API client regeneration from the OpenAPI snapshot.
-- **Scope:**
-  - Run `npm run gen:api` in frontend CI.
-  - Run `git diff --exit-code frontend/src/api/generated/` and fail if generated files changed.
-- **Why:** Prevent drift between backend schema and committed frontend generated client/types.

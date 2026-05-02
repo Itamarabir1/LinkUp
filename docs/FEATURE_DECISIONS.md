@@ -23,6 +23,22 @@
 
 ---
 
+<a id="outbox-skip-locked"></a>
+
+## Outbox — `FOR UPDATE SKIP LOCKED` (מקביליות workers)
+
+| | |
+|--|--|
+| **בעיה** | הרצת **יותר ממופע אחד** של `notification-worker` (או ריצות מקביליות על אותו DB) עלולה לגרום לשני workers “להתחרות” על אותה שורת `outbox_events` ב-**`SELECT ... FOR UPDATE`** — נעילות ארוכות / המתנה. |
+| **החלטה** | `OutboxRepository.get_pending_events` בוחר שורות **PENDING** עם **`with_for_update(skip_locked=True)`** — worker שנתקל בשורה שכבר נעולה על ידי גורם אחר **מדלג** ל-row הבא בלי לחסום. |
+| **אלטרנטיבות** | (1) Worker יחיד — פשוט אבל אין scale-out אופקי. (2) משיכה ללא נעילה — סיכון double-process על אירוע זהה. |
+| **יתרון** | מאפשר **scale-out** של outbox publishers בזמן שמתקן **ordering per batch** בסדר `created_at` + `LIMIT`. |
+| **Trade-off** | עדיין **at-least-once** ברמת Rabbit; צרכנים חייבים **idempotency** (כבר דרישה בדפוס Outbox). |
+| **Interview pitch (≈20s)** | *"במסלול Outbox הוספתי **SKIP LOCKED** כדי שכמה workers יוכלו למשוך batches במקביל בלי להיתקע אחד על השני על אותה שורה."* |
+| **הפניה** | [`backend/app/infrastructure/outbox/repository.py`](../backend/app/infrastructure/outbox/repository.py), ADR §4, [architecture/EVENTS.md](architecture/EVENTS.md) |
+
+---
+
 <a id="rabbitmq-pr1-pr2"></a>
 
 ## RabbitMQ reliability refactor (PR1 + PR2)
@@ -36,6 +52,19 @@
 | **Trade-off** | יותר שכבת infra וקונפיגורציה; דורש משמעת תיעוד כדי לשמור sync בין topology לקוד worker. |
 | **Interview pitch (≈30s)** | *"ב-PR1 הוספתי supervision ודראינינג כדי למנוע task death שקט. ב-PR2 פיצלתי נתיבי RabbitMQ לפי תפקידים והעברתי queue policies ל-QueueSpec מרכזי. כך צמצמתי coupling בין consumers ו-publishers בלי להוסיף תשתית ענן חדשה."* |
 | **הפניה** | `backend/app/infrastructure/rabbitmq/{client.py,consumer.py,supervisor.py,topology.py}`, `architecture/EVENTS.md`, `ENGINEERING_HIGHLIGHTS.md` |
+
+---
+
+<a id="rabbitmq-graceful-drain"></a>
+
+## RabbitMQ consumer — graceful shutdown (drain in-flight)
+
+| | |
+|--|--|
+| **בעיה** | SIGTERM / עצירת worker בזמן עיבוד הודעה עלולה לגרום ל-**אובדן** עבודה או ל-**requeue** לא עקבי אם לא מחכים לסיום tasks. |
+| **החלטה** | `ConsumerSupervisor` עוקב אחרי `asyncio.Task` של handler; ב-**draining** מפסיקים לקבל deliveries חדשים, מחכים עד **`drain_timeout_seconds`** (ברירת מחדל **30s**) לסיום inflight; אם נשארו — **cancel** + המתנה קצרה. |
+| **יתרון** | כיבוי של worker בפריסה / `docker compose stop` פחות מסוכן לכפילויות/איבוד ביניים. |
+| **הפניה** | [`backend/app/infrastructure/rabbitmq/consumer.py`](../../backend/app/infrastructure/rabbitmq/consumer.py) (`ConsumerSupervisor`, `ConsumerState`) |
 
 ---
 
@@ -155,6 +184,37 @@
 | **Trade-off** | capture ל-5xx בלבד מפחית רעש אבל עלול להחמיץ שגיאות לוגיקה שנבלעות או 4xx חריגים שתרצה לנטר בהמשך. |
 | **Interview pitch (≈30s)** | *"הפעלתי Sentry: backend init ב-`logging.py` עם guard על `SENTRY_DSN`, capture רק ל-5xx כדי להפחית רעש. פרונט: init ב-`main.tsx` + שני error boundaries. DSN ב-`.env` בלבד — לא עולה ל-git."* |
 | **הפניה** | [`../backend/app/core/logging.py`](../backend/app/core/logging.py), [`../backend/app/core/exceptions/handlers.py`](../backend/app/core/exceptions/handlers.py), [`../frontend/src/main.tsx`](../frontend/src/main.tsx) |
+
+---
+
+<a id="api-errors-linkuperror"></a>
+
+## שגיאות API אחידות (`LinkUpError`, `error_code`, `trace_id`)
+
+| | |
+|--|--|
+| **בעיה** | `HTTPException` עם `detail` שרירותי מקשה על לקוחות, i18n ו-Sentry — אין חוזה יציב לשדות שגיאה. |
+| **החלטה** | תתי־מחלקות דומיין של **`LinkUpError`** + handlers גלובליים; בתגובה: `detail` עם **`error_code`**, **`message`**, **`trace_id`** (מיושר ל־**`X-Request-ID`** מה־middleware), ו־**`payload`** אופציונלי מסוגי; validation/DB/SQLAlchemy ממופים לפורמט אחיד. |
+| **אלטרנטיבות** | (1) RFC 7807 בלבד בלי שכבת דומיין — פחות typed errors בקוד. (2) קודי שגיאה רק במספר HTTP — לא מספיק לפרונט ולניטור. |
+| **יתרון** | לקוחות ופרונט יכולים להסתמך על **`error_code`**; לוגים ו-Sentry מתיישרים לאותו מזהה בקשה. |
+| **Trade-off** | כל דומיין חדש צריך להשתמש ב־exceptions הטיפוסיים או לרשת מ־`LinkUpError` — דורש משמעת. |
+| **Interview pitch (≈25s)** | *"הקשחתי חוזה אחיד: מחלקות שגיאה לפי דומיין, `trace_id` כמו request id, ו־handlers שמפים SQLAlchemy/validation לאותו JSON — הפרונט יודע מה לתרגם בלי לנחש טקסטים."* |
+| **הפניה** | ADR §14, **[ERRORS.md](ERRORS.md)**, [`backend/app/core/exceptions/`](../backend/app/core/exceptions/), [`handlers.py`](../backend/app/core/exceptions/handlers.py) |
+
+---
+
+<a id="cursor-pagination"></a>
+
+## Cursor pagination — נסיעות וצ’אט (לא offset עמוק)
+
+| | |
+|--|--|
+| **בעיה** | `OFFSET` גדול על טבלאות שצומחות — שאילתה יקרה, ותוצאות "מדלגות" אם נכנסות רשומות חדשות בזמן גלילה. |
+| **החלטה** | **נסיעות (חיפוש נוסע):** `after` + `limit` על מזהה cursor; **הודעות צ’אט:** `before` / `after` + `limit` לפי `message_id` — ראו [API messages](architecture/API.md). |
+| **אלטרנטיבות** | Keyset מורכב יותר לכל מסך; offset בלבד — פשוט אבל לא יציב ולא סקייל בצורה טובה. |
+| **יתרון** | עומס סביר על DB בגלילה ארוכה; התאמה טבעית ל-“טען עוד” ול־reconnect (`after` אחרי WS). |
+| **Interview pitch (≈15s)** | *"ברשימות שנשארות ארוכות עברנו ל-cursor על מזהים, לא offset — פחות full scan ופחーズ חיתוך באמצע עמוד."* |
+| **הפניה** | ADR §10, [architecture/API.md](architecture/API.md) |
 
 ---
 
@@ -306,6 +366,22 @@
 
 ---
 
+<a id="passenger-search-vs-save"></a>
+
+## נוסע — חיפוש נסיעות מול שמירת בקשה והתראה (`ride.created`)
+
+| | |
+|--|--|
+| **בעיה** | נוסע רוצה לראות נסיעות זמינות בלי “לזהם” את ה-DB; וגם לקבל התראה כשנהג מפרסם נסיעה שמתאימה לפרופיל/מיקום. |
+| **החלטה** | **חיפוש בלבד** — `GET /passenger/passengers/search-rides`: שאילתה (PostGIS / פילטרים), **בלי** `INSERT` ל־`passenger_requests`. **שמירה + מנוי להתאמות** — `POST /passenger/passengers/` עם `PassengerRequestCreate` (`is_notification_active`, `group_id` אופציונלי) — אותו מודל בקשה גם ל-matching מיידי. **התראות אסינכרוניות:** אחרי יצירת נסיעה נרשם ב־Outbox **`ride.created`**; `notification-worker` מפרסם ל־RabbitMQ; **`handle_ride_created`** טוען את הנסיעה, מריץ `find_passengers_for_ride_notification` (סינון פעיל/התראות/תאריכים/`group_id`/קרבה גיאוגרפית), ולכל נוסע מתאים מפעיל את שכבת ההתראות עם אירוע פנימי **`ride.created_for_passengers`** (מייל Brevo וכו’) — **לא** אותו routing key כמו `ride.created`. |
+| **אלטרנטיבות** | (1) לשמור כל חיפוש כ־row — רעש ועומס DB. (2) התראות בלי שורת בקשה — קשה לביטול/הרשאות. |
+| **יתרון** | הפרדה ברורה בין צפייה חד־פעמית לבין מנוי אירועים; מקור אמת אחד ל־`passenger_requests` גם ל־matching וגם לתור התראות. |
+| **Trade-off** | שני מסלולי API לנוסע — דורש מוצר/תיעוד ברורים כדי שלא יבלבלו משתמשים. |
+| **Interview pitch (≈35s)** | *"חיפוש הוא read-only; רק POST יוצר בקשה שנכנסת לתזמורת התראות. כשנהג יוצר נסיעה — Outbox שולח `ride.created`, וה-worker מסנן נוסעים רלוונטיים ואז שולח מייל דרך אירוע פנימי לתבניות — בלי לערבב את שם האירוע ב-Rabbit."* |
+| **הפניה** | ADR §17, [architecture/EVENTS.md](architecture/EVENTS.md) (זרימת `ride.created` / `ride.created_for_passengers`), [`notification_tasks.py`](../backend/app/workers/tasks/notification_tasks.py) |
+
+---
+
 <a id="chat-message-idempotency"></a>
 
 ## Idempotency-Key — `POST …/chat/conversations/{id}/messages`
@@ -351,6 +427,22 @@
 | **Trade-off** | מעגל **לא** משותף בין instances — reset אחרי deploy. |
 | **Interview pitch (≈30s)** | *"מחלקה אחת, שני סוגי מדדים: גיאו — מעגל לכל API; Brevo — מעגל לפני ה-SDK. Health מציג מצב אבל status הכללי תלוי DB/Redis/Rabbit בלבד."* |
 | **הפניה** | ADR §20, HIGHLIGHTS §0א, `docs/architecture/NOTIFICATIONS.md` |
+
+---
+
+<a id="geocode-cache-stampede"></a>
+
+## Geocode cache — mutex נגד cache stampede (באקאנד)
+
+| | |
+|--|--|
+| **בעיה** | cache לפי כתובת (TTL 24h) חוסך Google — אבל ב־**cold miss** או מיד אחרי פקיעות, מאות בקשות מקבילות לאותה מחרוזת כתובת יגרמו ל־**N קריאות Geocoding** במקביל (סערה על quota/latency). |
+| **החלטה** | **`get_or_compute`** ב־[`cache_stampede.py`](../backend/app/infrastructure/redis/cache_stampede.py): נעילה פר־`cache_key`; מנצח מריץ `GeocodingService` ושומר ב־Redis; עוקבים ממתינים עם poll קצר; **fail-open** בחריג Redis — מתקדמים ישירות ל-Google בלי deadlock. Hits/misses: **`geo_cache_hits_total`** / **`geo_cache_misses_total`**; Mutex/stampede: **`cache_lock_acquired_total`**, **`cache_stampede_avoided_total`**, **`cache_fail_open_total`**. קריאות מ־[`geocode_cache.get_coordinates`](../backend/app/infrastructure/geo/geocode_cache.py). |
+| **אלטרנטיבות** | (1) רק TTL בלי סנכרון — פשוט אבל storm על miss. (2) single-flight ב-process בלבד — לא מגן בתהליכי worker/API מרובים. |
+| **יתרון** | פגיעות Google מוגבלות ל־אחד(ים) פר מפתח בזמני burst; משתלב עם **circuit breaker** ו־timeouts קיימים. |
+| **Trade-off** | latency לעוקבים = זמני המתנה + Redis; מתקבל בהחלטה בהעדפת הגנה על upstream. |
+| **Interview pitch (≈30s)** | *"לא הסתפקתי ב-TTL על גיאוקוד: בהעדר ערך, נעלתי לפי מפתח Redis ואיחדתי compute כדי שהגשם של בקשות מקביליות לא יהפוך לזליגה של quota ל-Google. יש Prometheus ל-hit/miss ולמה שנמנע."* |
+| **הפניה** | [`MONITORING.md`](operations/MONITORING.md) §Geocode · [`HIGHLIGHTS`](ENGINEERING_HIGHLIGHTS.md) (Latest updates + טבלאות גיאו) · טסט: [`backend/tests/core_flows/test_geo_cache.py`](../backend/tests/core_flows/test_geo_cache.py) |
 
 ---
 
@@ -551,9 +643,9 @@
 | | |
 |--|--|
 | **בעיה** | (1) לחיצה כפולה / retry על **יצירת Checkout Session** יוצרים מספר sessions או חוויית לקוח לא עקבית. Redis-only idempotency (כמו בצ’אט) לא נשמרת בין מחיקות cache / מופעים בלי תכנון נפרד. (2) Webhook מ-Stripe יכול להתעכב או להיעלם — תשלומים נשארים **`pending`** בלי סנכרון. (3) עדכוני סטטוס תשלום חייבים להיות דטרמיניסטיים כדי למנוע “קפיצות” לא חוקיות במסד. |
-| **החלטה** | **אידמפוטנטיות DB:** טבלה **`idempotency_keys`** (מפתח פר־משתמש+endpoint, fingerprint, גוף תשובה + status code, TTL). כותרת **`X-Idempotency-Key`** על **`POST /billing/checkout`**. **`IdempotencyMismatchError`** (**422**, `IDEMPOTENCY_MISMATCH`) אם המפתח חוזר עם fingerprint אחר. **Reconciler:** `BillingReconciler` עם **`pg_try_advisory_lock`** (מופע יחיד פעיל), רשימת **`pending`** “מיושנים” (חלון גיל מ־`BILLING_PENDING_*`), **`retrieve_session`** ב-Stripe, החלת **`handle_checkout_completed`** / **`handle_session_expired`**. ניקוי שורות idempotency שפגו. מתוזמן ב־**`lifespan`** (APScheduler) כש־`BILLING_RECONCILER_ENABLED`. **State machine:** `validate_transition` — מעברים מותרים רק מ־`pending` החוצה; מצבי סופיים ריקים (**`PaymentTransitionError`**, **`ILLEGAL_PAYMENT_TRANSITION`**). |
+| **החלטה** | **אידמפוטנטיות DB:** טבלה **`idempotency_keys`** (מפתח פר־משתמש+endpoint, fingerprint, גוף תשובה + status code, TTL). כותרת **`X-Idempotency-Key`** על **`POST /billing/checkout`**. **`IdempotencyMismatchError`** (**422**, `IDEMPOTENCY_MISMATCH`) אם המפתח חוזר עם fingerprint אחר. **Reconciler:** `BillingReconciler` עם **`pg_try_advisory_lock`** (מופע יחיד פעיל), רשימת **`pending`** “מיושנים” (חלון גיל מ־`BILLING_PENDING_*`), **`retrieve_session`** ב-Stripe, החלת **`handle_checkout_completed`** / **`handle_session_expired`**. ניקוי שורות idempotency שפגו. מתוזמן ב־**`app/core/lifespan.py`** (APScheduler; job **`billing_reconciler`**) כש־**`BILLING_RECONCILER_ENABLED`**. **State machine:** `validate_transition` — מעברים מותרים רק מ־`pending` החוצה; מצבי סופיים ריקים (**`PaymentTransitionError`**, **`ILLEGAL_PAYMENT_TRANSITION`**). |
 | **אלטרנטיבות** | (1) Redis בלבד ל-checkout — מהיר אבל פחות עמיד למצבי “ברירת מחדל טובים” בתרחיש multi-instance + eviction. (2) ללא reconciler — פשוט יותר; סיכון לתשלומים תקועים. (3) Event-driven reconcile בלבד (SQS/worker נפרד) — כבד לפריסה הנוכחית. |
-| **יתרון** | מטמון checkout **עקבי ב-Postgres**; שחזור אחרי תקלות webhook; מדדי **`billing_reconciler_*`** + **`billing_idempotency_hits_total`**; אדמין: **`GET /admin/billing/stale-pending`**, **`POST /admin/billing/reconcile/{payment_id}`**. |
+| **יתרון** | מטמון checkout **עקבי ב-Postgres**; שחזור אחרי תקלות webhook; מדדי **`billing_reconciler_*`** + **`billing_idempotency_hits_total`**; אדמין: **`GET /api/v1/admin/billing/stale-pending`**, **`POST /api/v1/admin/billing/reconcile/{payment_id}`**. |
 | **Trade-off** | כתיבות DB נוספות לכל checkout עם מפתח; reconciler מוסיף עומס קריאות Stripe — מוגבל בחלון גיל ובמנעול consultative. המיזוג (**`016_merge015_heads`**) אחרי שני ה־15; מזהה רוויזיה קצר (**`015_billing_idem`**) בשל גבול **`alembic_version.version_num`** (32 תווים). |
 | **Interview pitch (≈35s)** | *"ל-billing הפרדתי אידמפוטנטיות מהדפוס של צ’אט: שמרתי תשובת checkout ב-Postgres עם fingerprint, והרצתי reconciler עם advisory lock שמושך מ-Stripe תשלומים pending מיושנים אם ה-webhook איחר. מעל זה מכונת מצבים קשיחה כדי שלא יעברו succeeded חזרה ל-failed בשקט."* |
 | **הפניה** | [`../backend/app/domain/billing/idempotency.py`](../backend/app/domain/billing/idempotency.py) · [`../backend/app/domain/billing/reconciler.py`](../backend/app/domain/billing/reconciler.py) · [`../backend/app/domain/billing/state_machine.py`](../backend/app/domain/billing/state_machine.py) · [`../backend/app/domain/billing/router.py`](../backend/app/domain/billing/router.py) · [`../backend/app/core/lifespan.py`](../backend/app/core/lifespan.py) · [`../backend/app/infrastructure/metrics.py`](../backend/app/infrastructure/metrics.py) · [`docs/architecture/API.md`](architecture/API.md) · [`docs/architecture/DATABASE.md`](architecture/DATABASE.md) · [`docs/operations/MONITORING.md`](operations/MONITORING.md) |

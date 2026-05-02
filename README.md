@@ -8,15 +8,17 @@ Production: **[https://linkup.itamarabir.com](https://linkup.itamarabir.com)**
 
 ## What Linkup Does
 
-Linkup connects drivers and passengers for shared rides. Drivers publish trips with origin, destination, date, and available seats. Passengers search (read-only query), can **save a passenger request** to be notified when a driver publishes a matching ride (email/push via outbox and `is_notification_active`), send booking requests, and get approved or rejected by drivers. Once a booking is confirmed, driver and passenger chat in real time over WebSocket. When a conversation ends, an AI pipeline (Groq / Llama) analyzes the chat and sends an email summary. The app supports Google OAuth and email/password login, profile avatars (S3), geo routing and distance calculation, and push, email, and in-app notifications—all backed by an outbox pattern for reliable event delivery.
+Linkup connects drivers and passengers for shared rides. Drivers publish trips with origin, destination, date, and available seats. Passengers search (read-only query), can **save a passenger request** to be notified when a driver publishes a matching ride (email/push via outbox and `is_notification_active`), send booking requests, and get approved or rejected by drivers. Once a booking is confirmed, driver and passenger chat in real time over WebSocket. When a conversation ends, an AI pipeline (**Groq**) analyzes the chat and sends an email summary (see **`docs/architecture/AI.md`**). The app supports Google OAuth and email/password login, profile avatars (S3), geo routing and distance calculation, and push, email, and in-app notifications—all backed by an outbox pattern for reliable event delivery.
 
 ---
 
 ## Engineering highlights (portfolio)
 
 Single doc for **stack, scale patterns, real-time chat (disconnect / last-seen debounce), Outbox, ops, CI/CD, tests, k6 load testing, auth under concurrent load (sync vs async), phone validation, frontend refactor, i18n/locale/error fallbacks/CSS fonts**: **[docs/ENGINEERING_HIGHLIGHTS.md](docs/ENGINEERING_HIGHLIGHTS.md)**.  
+מפת תיעוד מלאה (“איפה מחפשים מה”) + הצלבה ל־Compose/CI: **[docs/DOCUMENTATION_MAP.md](docs/DOCUMENTATION_MAP.md)**.  
 **Billing refactor — סיכום מלא ושמירת ניסוח (לפני/אחרי, השוואה לפוסט Kafka, טסטים):** **[docs/BILLING_REFACTOR_SUMMARY.md](docs/BILLING_REFACTOR_SUMMARY.md)**.
-Deferred/next-step architecture decisions (including cache stampede Phase 2 early refresh rationale): **[docs/FUTURE_WORK.md](docs/FUTURE_WORK.md)**.
+Deferred/next-step architecture decisions (including cache stampede Phase 2 early refresh rationale): **[docs/FUTURE_WORK.md](docs/FUTURE_WORK.md)**.  
+Open **frontend** upgrade checklist (React Query backlog, Tier-1/2 items): **[docs/FRONTEND_UPGRADE_ROADMAP.md](docs/FRONTEND_UPGRADE_ROADMAP.md)**.
 
 ### Recent production upgrades
 
@@ -49,7 +51,7 @@ Deferred/next-step architecture decisions (including cache stampede Phase 2 earl
 - Google Sign-In local 403 playbook documented: `http://localhost:5173` must be registered in OAuth authorized origins/redirects; recommended long-term setup is a dedicated local OAuth client via `VITE_GOOGLE_CLIENT_ID`.
 - Stage 3a RQ migration shipped: `useGoogleMapsKey` moved to React Query (`qk.geo.mapsKey`), Notifications page moved from manual fetch state to `qk.notifications.all()` with event-driven invalidation, and AuthContext now syncs `qk.auth.me()` cache (plus `useCurrentUser` hook).
 - Premium frontend flow shipped: profile upsell/banner (`PremiumBanner`), checkout trigger, and protected payment result pages (`/payment/success`, `/payment/cancel`) wired to billing status polling.
-- **Billing backend reliability:** **`X-Idempotency-Key`** on **`POST /api/v1/billing/checkout`** persists canonical responses in Postgres (**`idempotency_keys`**); **`BillingReconciler`** (scheduled in API **`lifespan`**, PostgreSQL **`pg_try_advisory_lock`**) reconciles stale **`pending`** payments against Stripe; **`PaymentStatus`** transitions guarded by **`state_machine.validate_transition`**; Prometheus **`billing_reconciler_*`** / **`billing_idempotency_hits_total`**; admin **`/api/v1/admin/billing/stale-pending`** and **`/billing/reconcile/{payment_id}`**. **מסמך סיכום מלא (לפני/אחרי, webhooks, Kafka):** **[docs/BILLING_REFACTOR_SUMMARY.md](docs/BILLING_REFACTOR_SUMMARY.md)**. גם: **[docs/FEATURE_DECISIONS.md#billing-checkout-db-idempotency-reconciler](docs/FEATURE_DECISIONS.md#billing-checkout-db-idempotency-reconciler)**, **[docs/architecture/API.md](docs/architecture/API.md)**, **[docs/architecture/DATABASE.md](docs/architecture/DATABASE.md)** (note: **two Alembic heads** until merged).
+- **Billing backend reliability:** **`X-Idempotency-Key`** on **`POST /api/v1/billing/checkout`** persists canonical responses in Postgres (**`idempotency_keys`**); **`BillingReconciler`** (scheduled from **`backend/app/core/lifespan.py`** via APScheduler when **`BILLING_RECONCILER_ENABLED`**, PostgreSQL **`pg_try_advisory_lock`**) reconciles stale **`pending`** payments against Stripe; **`PaymentStatus`** transitions guarded by **`state_machine.validate_transition`**; Prometheus **`billing_reconciler_*`** / **`billing_idempotency_hits_total`**; admin **`GET /api/v1/admin/billing/stale-pending`** and **`POST /api/v1/admin/billing/reconcile/{payment_id}`**. **מסמך סיכום מלא (לפני/אחרי, webhooks, Kafka):** **[docs/BILLING_REFACTOR_SUMMARY.md](docs/BILLING_REFACTOR_SUMMARY.md)**. גם: **[docs/FEATURE_DECISIONS.md#billing-checkout-db-idempotency-reconciler](docs/FEATURE_DECISIONS.md#billing-checkout-db-idempotency-reconciler)**, **[docs/architecture/API.md](docs/architecture/API.md)**, **[docs/architecture/DATABASE.md](docs/architecture/DATABASE.md)** (שרשרת Alembic: שני צעדי **015** מ־**014** במיזוג **`016_merge015_heads`**; מזהה רוויזיה קצר **`015_billing_idem`** בגלל גבול `alembic_version`).
 - S.7 Asset hardening shipped: targeted `img` eager/lazy + `fetchpriority` tuning, locale preload + S3 preconnect hints in `index.html`, and hybrid i18n loading (`common`/`nav` bundled + feature namespaces lazy-loaded from `/public/locales` via `i18next-http-backend`).
 - Web Vitals D shipped: production-only Sentry RUM (`BrowserTracing` + `Replay` with sampled sessions), dynamic `web-vitals` reporting (CLS/LCP/INP), and `Sentry.setUser` wiring in auth flows (aligned with teardown below).
 - **Auth session teardown (web):** **`tearDownSession({ reason })`** (`frontend/src/context/AuthContext.tsx`) keeps UI/state in sync on **logout**, **bootstrap failure**, and **refresh failure**; **`client.ts`** fires **`auth:session-expired`** after **`clearTokens`** (reentrancy guard); **`queryClient`** **`captureExceptionOnce`** skips Sentry only for **401** (keeps **403** for RBAC signal). **`docs/FEATURE_DECISIONS.md#auth-session-teardown`**, **ADR Frontend §21**.
@@ -59,7 +61,7 @@ Deferred/next-step architecture decisions (including cache stampede Phase 2 earl
 - Automated JWT secret sync between backend and chat-ws during deploy.
 - OAuth popup compatibility headers in nginx (`COOP` / `COEP`).
 - Nginx probe routing hardening: exact-match `/livez` and loopback-only `/readyz` to prevent frontend fallback and readiness information exposure.
-- Edge hardening in nginx: `listen 443 ssl http2`, HSTS (`includeSubDomains`), `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, enforcing **`Content-Security-Policy`** — **`script-src`** בלי **`'unsafe-inline'`** (בוטסטרפ שפה/ערכת נושא ב־**`frontend/public/bootstrap.js`** → **`/bootstrap.js`** לפני **`/config.js`**); allowlists ל־Stripe frames, Google Sign-In, `connect-src` (Firebase/Sentry/analytics/uploads); **`report-uri`** ל-Sentry — **`docs/SECURITY_HEADERS.md`**.
+- Edge hardening in nginx: **`listen 443 ssl`** (HTTP/1.1 over TLS in committed `nginx/nginx.conf`; add `http2` to the directive if you want ALPN HTTP/2 — see **`docs/SECURITY_HEADERS.md`**), HSTS (`includeSubDomains`), `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, enforcing **`Content-Security-Policy`** — **`script-src`** בלי **`'unsafe-inline'`** (בוטסטרפ שפה/ערכת נושא ב־**`frontend/public/bootstrap.js`** → **`/bootstrap.js`** לפני **`/config.js`**); allowlists ל־Stripe frames, Google Sign-In, `connect-src` (Firebase/Sentry/analytics/uploads); **`report-uri`** ל-Sentry — **`docs/SECURITY_HEADERS.md`**.
 
 **Interview prep (navigation + per-feature why / alternatives):** **[docs/internal/INTERVIEW_PLAYBOOK.md](docs/internal/INTERVIEW_PLAYBOOK.md)**, **[docs/FEATURE_DECISIONS.md](docs/FEATURE_DECISIONS.md)**. ADR deep dives: **[docs/adr/README.md](docs/adr/README.md)**.
 פרונט — רשימת ריפקטור מפורטת: **[frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md](frontend/docs/FRONTEND_REFACTOR_AND_QUALITY.md)**.  
@@ -110,7 +112,7 @@ flowchart LR
 ```
 
 - **Frontend / Mobile** → REST to backend, WebSocket to chat-ws.  
-- **Backend / workers** → PostgreSQL (data), Redis DB=0 (cache, rate limit, ride `broadcast`), Redis DB=1 (**chat** + **`publish_user_event`** / `user:{id}:events`, chat completion), RabbitMQ (async tasks, notifications), **email-renderer** (`POST /render` for HTML generation).  
+- **Backend / workers** → PostgreSQL (data), Redis DB=0 (cache, rate limit, ride `broadcast`), Redis DB=1 (**chat** + **`publish_user_event`** / `user:{id}:events`; גם **`chat:completion:*`** למאזין ב־`ai-worker` — **אין פרסום Python מאומת** לערוץ זה; טריגיר סיכום שיחות בפועל: **`task-worker`** idle-timeout), RabbitMQ (async tasks, notifications), **email-renderer** (`POST /render` for HTML generation).  
 - **chat-ws** → Redis DB=1 only (subscribe to chat channels, presence, **`user:online` / `user:offline`**, and per-user domain events pattern **`user:*:events`**, fan out to connected clients).
 
 ---
@@ -121,8 +123,8 @@ flowchart LR
 |----------|------------------|------|
 | backend  | Python (FastAPI) | REST API, auth, rides, bookings, chat CRUD, **groups**, passengers (requests/matches), **admin JSON API** (`/api/v1/admin/*`), events via Outbox + LISTEN/NOTIFY |
 | notification-worker | Python | Outbox dispatcher + notifications consumer (email/push/user refresh events) |
-| task-worker | Python | Avatar pipeline + scheduled tasks + scheduled publisher (**single replica**) |
-| ai-worker | Python | Chat completion listener + AI conversation analysis |
+| task-worker | Python | Avatar pipeline + scheduled tasks + scheduled publisher (**single replica**) — כולל **chat idle timeout** → `handle_conversation_completion` (Groq) |
+| ai-worker | Python | **מאזין אופציונלי** ל־Redis `chat:completion:*` (אותה לוגיקת ניתוח אם מתקבל payload) |
 | chat-ws  | Go               | WebSocket server; chat + typing + presence; Redis Pub/Sub including **`user:online` / `user:offline`** and **`user:*:events`** (ride/maintenance-style JSON to the logged-in client) |
 | email-renderer | Node.js / Express / React Email | Dedicated email HTML rendering microservice (`/health`, `/render`), shared by backend notification flow |
 | frontend | React / TypeScript | Web app (Vite); Hebrew RTL |
@@ -172,7 +174,7 @@ flowchart LR
 - ✅ **Passenger requests (בקשות טרמפ):** חיפוש נסיעות (`GET …/passengers/search-rides`) בלי שמירה; **שמירת התראה** — `POST …/passengers/` עם אותם פרמטרי מסלול + `is_notification_active` / `group_id`; הצטרפות מתוצאות (`request-ride-from-search`); ביטול בקשה; התאמות; קישור אופציונלי מבוקינג לבקשה
 - ✅ **Groups:** create group, join by invite code, manage members (remove, promote to admin), group rides and search; group avatar & description (S3); leave group / close group (admin)
 - ✅ Real-time chat (WebSocket) between driver and passenger; **presence**: `users.last_active_at` + debounced PATCH on disconnect; **WS** `user_online` / `user_offline` for immediate header status; **frontend** reconnect uses **backoff+jitter** (see **`docs/architecture/REALTIME.md`**)
-- ✅ AI conversation summary (Groq / Llama) and email on chat end
+- ✅ AI conversation summary (**Groq**, מודל משפחת Llama דרך ה-API) + התראות/מייל דרך Outbox אחרי טיפול ב־`handle_conversation_completion` — [`docs/architecture/AI.md`](docs/architecture/AI.md)
 - ✅ **AI free-text assistants (rides):** both passenger search and driver CreateRide use `POST /api/v1/passenger/passengers/ai-parse-search` to prefill route fields; CreateRide keeps stricter rules (future date+time required) and never auto-submits.
 - ✅ **Billing (Stripe, production-hardened):** `/api/v1/billing/*` flow for premium checkout/status/history/webhook, with idempotent webhook processing (`stripe_event_id` + `payment_intent` guards), enum-backed payment statuses, deterministic `Decimal` amount handling, and frontend integration via React Query + profile Premium banner + payment success/cancel routes.
 - ✅ Push (**FCM**): מהשרת רק מפת **`data`** ב־FCM; בחזית Toast ב־`App.tsx` + צליל, ברקע SW (`push`); רישום טוקן ב־`AuthContext` אחרי login, ניקוי ב־logout; מייל (**Brevo**) — **`docs/FCM_SYSTEM_SUMMARY.md`**
@@ -218,7 +220,7 @@ cp frontend/.env.example frontend/.env
 - **`chat-ws/.env`** — כולל `REDIS_URL` (לדוקר: `redis://:<סיסמה>@redis:6379/1`) ו־`JWT_SECRET` זהה ל־`SECRET_KEY` ב־`backend/.env`.
 - **FCM בדוקר (Model B לפרודקשן):** אין mount של קובץ credentials. הגדר `FIREBASE_CREDENTIALS_JSON` ב־`backend/.env` (JSON בשורה אחת). `FIREBASE_SERVICE_ACCOUNT_PATH` מיועד לפיתוח מקומי בלבד.
 
-**מיגרציות:** ב־**Docker Compose** שירות **`migrate`** מריץ `alembic upgrade head` פעם אחת לפני **backend** וכל ה־workers (`notification-worker`, `task-worker`, `ai-worker`). אם המיגרציה נכשלת ה־API וה־workers לא יעלו. **לוקאלי בלי Compose:** `cd backend && alembic upgrade head` (עם `db/schema.sql` כעזר) לפני `uvicorn`.
+**מיגרציות:** ב־**Docker Compose** שירות **`migrate`** (image עם `ENTRYPOINT ["alembic"]`) מריץ **`alembic upgrade head`** פעם אחת לפני **backend** וכל ה־workers (`notification-worker`, `task-worker`, `ai-worker`). אם המיגרציה נכשלת ה־API וה־workers לא יעלו. **מקומי עם `uv`:** מתוך `backend/` → **`uv run alembic upgrade head`** ואז `uvicorn` / `make dev` (**`backend/Makefile`** תומך בכך). למפת טבלאות ובעיות merge ראשי Alembic: **[`docs/architecture/DATABASE.md`](docs/architecture/DATABASE.md)**.
 
 ### פיתוח יומיומי
 
@@ -231,6 +233,8 @@ cd frontend && make dev
 ```
 
 > חשוב: השתמשו ב־`make up` (ולא `docker compose up` ישירות), כדי להבטיח ש־Compose תמיד רץ עם `--env-file backend/.env --env-file frontend/.env`.
+
+**קיצורים נוספים מ־`Makefile` בשורש הפרויקט:** **`make migrate`** (הרצת שירות **`migrate`** — **`alembic upgrade head`**), **`make down`** / **`logs`** / **`restart`**; **`make admin-grant EMAIL=...`** / **`admin-revoke`** / **`admin-check`** לעדכון **`users.is_admin`** ישירות ב־Postgres בתוך קונטיינר ה־**`db`** (למפתחים מקומיים). פירוט תסריטים ב־**`scripts/ops/`** (כולל smoke tests ו-DLQ replay): **`docs/architecture/DEVELOPMENT.md`**.
 
 - **פרונט:** http://localhost:5173  
 - **אדמין (משתמש עם `is_admin`):** http://localhost:5173/admin — פירוט API ומבנה: [`ADMIN_DASHBOARD.md`](ADMIN_DASHBOARD.md)  
@@ -272,7 +276,7 @@ make admin-revoke EMAIL=user@example.com  # הסרת אדמין לפי אימי�
 | `backend/` | FastAPI app: API, domain logic, split workers (`notification_worker`, `task_worker`, `ai_worker`), Alembic migrations |
 | `chat-ws/` | Go WebSocket server: Redis subscribe, JWT auth, message fan-out to clients |
 | `frontend/`| React (Vite) web app; Dockerfile + `nginx.conf` לתוך image סטטי; מודול אדמין ב־`src/features/admin/` (מסלולים `/admin/*`); WebSocket — [`frontend/README.md`](frontend/README.md), חוזי JSON ב־[`docs/architecture/REALTIME.md`](docs/architecture/REALTIME.md) |
-| `nginx/`   | קונפיג Nginx ל־Compose — reverse proxy ל־API/chat-ws/frontend, TLS ב־443 עם `HTTP/2`, security headers ו־**CSP מאוכף** + `report-uri` (מתועד ב־[`docs/SECURITY_HEADERS.md`](docs/SECURITY_HEADERS.md)) |
+| `nginx/`   | קונפיג Nginx ל־Compose — reverse proxy ל־API/chat-ws/frontend, TLS ב־443 (**`listen 443 ssl`** — HTTP/1.1 אלא אם מוסיפים `http2`), security headers ו־**CSP מאוכף** + `report-uri` (מתועד ב־[`docs/SECURITY_HEADERS.md`](docs/SECURITY_HEADERS.md)) |
 | `mobile/`  | React Native (Expo) app |
 | `k8s/`     | Kubernetes base, backend, chat-ws, frontend, email-renderer (Node), workers (`notification-worker`, `task-worker`, `ai-worker`, legacy compatibility worker), infra (Postgres, Redis, RabbitMQ) |
 | `db/`      | Reference schema (`schema.sql`) and utility scripts; migrations live in `backend/alembic/` |
@@ -289,8 +293,9 @@ make admin-revoke EMAIL=user@example.com  # הסרת אדמין לפי אימי�
 - **Sentry error monitoring:** `sentry_sdk.init()` active in backend (`setup_logging()`) when `SENTRY_DSN` is set — FastAPI/SQLAlchemy/Redis integrations, `traces_sample_rate=0.1`; `capture_exception` on 5xx only (reduces noise). Frontend: `Sentry.init()` in `main.tsx` + `captureException` in axios interceptor (5xx), `ChatErrorBoundary`, `RouteErrorBoundary`. DSN kept in `.env` only — never committed.
 - **Frontend RUM + Web Vitals:** in production with DSN, frontend initializes Sentry Browser Tracing + Replay (`replaysSessionSampleRate=0.05`, `replaysOnErrorSampleRate=1.0`, `maskAllText`, `blockAllMedia`), sends Web Vitals (CLS/LCP/INP) via dynamic `web-vitals` import to avoid main-bundle inflation, and aligns identity context with `Sentry.setUser` on auth lifecycle.
 - **Frontend sourcemap upload (CI + Vite):** production builds enable Vite sourcemaps and conditionally activate `@sentry/vite-plugin` only when `SENTRY_AUTH_TOKEN` + `SENTRY_ORG` + `SENTRY_PROJECT` are present. `frontend-ci` passes these secrets only in `publish-image`; `.map` files are removed from `dist` after successful upload (`filesToDeleteAfterUpload`) so they are not copied into runtime nginx image.
-- **Edge/browser security policy:** nginx terminates TLS with `HTTP/2` and returns hardened browser headers (`HSTS`, `nosniff`, `DENY`, `Referrer-Policy`, `Permissions-Policy`, COOP/COEP). CSP is **`Content-Security-Policy`** (enforcing; **`script-src`** without **`'unsafe-inline'`**, bootstrap via **`/bootstrap.js`**) plus **`report-uri`** to Sentry; documented in [`docs/SECURITY_HEADERS.md`](docs/SECURITY_HEADERS.md) and [`docs/FEATURE_DECISIONS.md`](docs/FEATURE_DECISIONS.md#browser-csp-edge).
+- **Edge/browser security policy:** nginx terminates TLS on port 443 (see **`nginx/nginx.conf`** — committed config is HTTP/1.1 over TLS unless `http2` is added to `listen`) and returns hardened browser headers (`HSTS`, `nosniff`, `DENY`, `Referrer-Policy`, `Permissions-Policy`, COOP/COEP). CSP is **`Content-Security-Policy`** (enforcing; **`script-src`** without **`'unsafe-inline'`**, bootstrap via **`/bootstrap.js`**) plus **`report-uri`** to Sentry; documented in [`docs/SECURITY_HEADERS.md`](docs/SECURITY_HEADERS.md) and [`docs/FEATURE_DECISIONS.md`](docs/FEATURE_DECISIONS.md#browser-csp-edge).
 - **Prometheus + Grafana (monitoring profile):** backend exposes `/metrics` via `prometheus-fastapi-instrumentator`; docker-compose includes `prometheus` and `grafana` services under `--profile monitoring` with ready provisioning (`monitoring/prometheus.yml`, `monitoring/grafana/provisioning/*`) and a starter dashboard (`monitoring/grafana/dashboards/linkup.json`).
+- **External ops dashboards:** [Sentry Issues](https://itamar-abir.sentry.io/issues/?project=4511256490606592&statsPeriod=14d) (errors + RUM) and [Better Stack monitors](https://uptime.betterstack.com/team/t520754/monitors) (uptime/incidents vs public `/livez`) — link table and notes in [`docs/operations/MONITORING.md`](docs/operations/MONITORING.md#external-dashboards-production).
 - **SLOs & Error Budgets (new):** Prometheus now scrapes backend + worker metrics (`notification-worker:9091`, `task-worker:9092`, `ai-worker:9093`) to support service-level objectives (availability/latency) and error-budget based release decisions.
 - **RabbitMQ retry & DLQ:** notifications and avatar queues use broker-native retry via `retry_exchange` + `<queue>.retry` TTL queue + `x-death` counting (no manual republish loop in workers). After max retries, messages are routed to per-queue `.dlq`. See `docs/architecture/EVENTS.md`.
 - **DLQ replay ops:** `python scripts/ops/rabbitmq-dlq-replay.py --dry-run` להצגת עומק, או `python scripts/ops/rabbitmq-dlq-replay.py --queue notifications_queue --limit 50` ל-replay מבוקר.
@@ -311,35 +316,35 @@ make admin-revoke EMAIL=user@example.com  # הסרת אדמין לפי אימי�
 
 - **Single-EC2 rolling CD (senior pragmatic).** Instead of full blue/green infra, backend deploy runs as a low-downtime rolling replace on the same host: immutable GHCR tag (`sha`) is deployed via GitHub Actions SSH job, post-deploy smoke checks validate backend readiness (`/readyz`), Firebase env presence, and public nginx reachability (`/livez`, `/config.js`), then rollback to previous tag runs automatically on failure. This keeps ops robust on `t3.medium` without extra AWS cost.
 
-- **Redis completion listener + `ai-worker` for AI chat summary (not a separate service).** The AI flow is “on conversation end, analyze and persist.” The backend publishes a completion event to Redis DB=1; the `ai-worker` subscribes and runs `handle_conversation_completion`. This keeps deployment surface small while preserving async execution.
+- **AI chat summary stays inside the backend worker images (no separate AI microservice).** Primary trigger today: **`task-worker`** scheduled **idle-timeout** paths call `handle_conversation_completion` directly (Groq → `chat_analysis` → Outbox). **`ai-worker`** additionally runs a **Redis subscriber** on `chat:completion:*`, but backend Python currently has **no verified publisher** for that channel — details in [`docs/architecture/AI.md`](docs/architecture/AI.md).
 
-- **Outbox pattern.** Notifications (email, push) and other side effects are triggered by domain events. Publishing directly to RabbitMQ in the same transaction as the DB write would risk losing events on crash or broker failure. Writing the event to an `outbox_events` table in the same transaction, then having a worker poll and publish to RabbitMQ, keeps “at-least-once” delivery and keeps the API response fast and independent of broker latency.
+- **Outbox pattern.** Notifications (email, push) and other side effects are triggered by domain events. Publishing directly to RabbitMQ in the same transaction as the DB write would risk losing events on crash or broker failure. Writing the event to an `outbox_events` table in the same transaction, then having **`notification-worker`** run **`run_outbox_worker`** (LISTEN/NOTIFY + fallback polling) publish to RabbitMQ, keeps “at-least-once” delivery and keeps the API response fast and independent of broker latency.
 
 ---
 
 ## CI/CD
 
-All three services have GitHub Actions workflows that run on 
-push to `main` or `develop` (only when relevant files change).
+GitHub Actions workflows run on **`main`** / **`develop`** עם **path filters** (כל שירות/חבילה נפרדת — backend, frontend, chat-ws, email-renderer).
 
 | Service   | Workflow | Steps |
 |-----------|----------|-------|
-| backend   | `backend-ci.yml`  | lint (Ruff), format check, migrations (`alembic upgrade head`), tests (pytest), Docker build → push to GHCR (`latest` + `sha`), deploy to EC2 over SSH (`appleboy/ssh-action`), post-deploy smoke gate (`/readyz` + runtime env + public nginx probes), auto rollback |
+| backend   | `backend-ci.yml`  | lint (Ruff), format check, migrations (`uv run alembic upgrade head` on ephemeral `test_db`), `scripts/ops/check-migration-head.sh`, targeted RabbitMQ pytest, full `uv run pytest tests/`, Docker build → push to GHCR (`latest` + `sha`), deploy to EC2 over SSH (`appleboy/ssh-action`), post-deploy smoke gate (`/readyz` + runtime env + public nginx probes), auto rollback |
 | chat-ws   | `chat-ws-ci.yml`  | build, vet, Docker build → push to GHCR |
 | frontend  | `frontend-ci.yml` | `quality` (ESLint, build, bundle-size), `contract-codegen` (Orval drift gate on `src/api/generated`), `publish-image` (main push only, GHCR) |
+| email-renderer | `email-renderer-ci.yml` | Node install, lint/build, GHCR publish on `main` when `email-renderer/**` changes |
 
-Docker images are published to GitHub Container Registry on every push to `main`:
-- `ghcr.io/Itamarabir1/linkup-backend:latest`
-- `ghcr.io/Itamarabir1/linkup-chat-ws:latest`
-- `ghcr.io/Itamarabir1/linkup-frontend:latest`
+Docker images pushed from CI (tags include `latest` + commit `sha` where applicable). שמות ברירת־מחדל ב־**`docker-compose.yml`** (owner lowercase):
+- **`ghcr.io/<owner>/linkup/backend`** · **`…/linkup/worker`** · **`…/linkup/migrate`** · **`…/linkup/pgbouncer`**
+- **`ghcr.io/<owner>/linkup/chat-ws`** · **`…/linkup/frontend`**
+- **`ghcr.io/<owner>/linkup-email-renderer`** (שם repo נפרד מה־`linkup/` prefix)
 
 ### Dependency updates (Dependabot)
 
-The repo uses **Dependabot** for automated dependency update PRs:
+The repo uses **Dependabot** (see [`.github/dependabot.yml`](.github/dependabot.yml)) for scheduled update PRs:
 
-- **Frontend**: npm updates under `/frontend` (weekly)
-- **Backend**: Python updates under `/backend` (weekly)
-- **Docker**: base image updates from repo root (monthly)
+- **Frontend:** npm — `/frontend` (weekly)
+- **Backend:** pip — `/backend` (weekly; מעקב אחר **`backend/pyproject.toml`** + **`backend/uv.lock`** — אין **`requirements.txt`** ב-backend)
+- **Docker:** separate monthly entries for `/backend`, `/frontend`, and `/infrastructure/pgbouncer` (not repo root **`/`** — no `Dockerfile` there).
 
 ### Frontend XSS baseline
 

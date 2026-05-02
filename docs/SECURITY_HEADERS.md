@@ -25,7 +25,7 @@ For **nonces** on the main Vite bundle without edge rewriting, see **“CSP and 
 
 ## HTML shell: `public/bootstrap.js`
 
-The file is copied verbatim into `dist/` and nginx `html` root. It runs two IIFEs (formerly inline in `index.html`):
+The file is copied verbatim into `dist/` and nginx `html` root. **`index.html` loads scripts in this order: `/bootstrap.js` first, then `/config.js`** — language, direction, and theme must bootstrap from storage before the runtime config script runs (see **Relation to XSS mitigation** above for CSP rationale). It runs two IIFEs (formerly inline in `index.html`):
 
 1. **`linkup-lang`** → `document.documentElement` `lang`/`dir` when stored value is `en`.
 2. **`linkup-theme`** → `data-theme` from storage or `prefers-color-scheme`.
@@ -35,6 +35,10 @@ No inline `<script>` bodies remain in the shell for these concerns, so **`script
 ---
 
 ## Headers and rationale
+
+### TLS / HTTP (Compose `nginx`)
+
+Canonical config: [`nginx/nginx.conf`](../nginx/nginx.conf). The **`443`** server block uses **`listen 443 ssl`** (the `http2` keyword is **not** present in the committed file) — effectively **HTTP/1.1 over TLS** unless you add **`http2`** to the directive. After any change to ALPN/HTTP version, re-smoke **WebSockets** (`/api/v1/…` upgrade, `/ws`) and large uploads.
 
 - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
   - Forces browsers to use HTTPS after first successful secure visit.

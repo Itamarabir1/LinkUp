@@ -1,14 +1,14 @@
 # chat-ws – WebSocket server for real-time chat
 
-שרת WebSocket נפרד (Go) לצ'אט real-time. עובד יחד עם ה־API ב־Python (FastAPI). ניתוח AI של שיחות רץ ב־`ai-worker` מתוך ה-backend codebase.
+שרת WebSocket נפרד (Go) לצ'אט real-time. עובד יחד עם ה־API ב־Python (FastAPI). **סיכום שיחה (Groq)** רץ מתוך **workers** של ה-backend: טריגיר עיקרי **`task-worker`** (idle timeout); **`ai-worker`** — מאזין אופציונלי ל־`chat:completion:*` — פירוט ב־[`docs/architecture/AI.md`](../docs/architecture/AI.md).
 
 ## איך זה משתלב בפרויקט
 
 - **תיקייה נפרדת:** `chat-ws/` ברמת שורש הפרויקט (ליד `backend/` ו־`frontend/`).
 - **שני processes ל-chat:**
-  - **backend (Python):** REST API, DB, שליחת הודעות (POST) + publish ל־Redis; בסיום שיחה מפרסם אירוע ל-Redis DB 1.
+  - **backend (Python):** REST API, DB, שליחת הודעות (POST) + publish ל־Redis DB 1 (הודעות צ’אט, התראות צ’אט, `user:*:events`, presence וכו’); **אין כרגע** `publish` מאומת מ-Python ל־`chat:completion:*`.
   - **chat-ws (Go):** WebSocket, Subscribe ל־Redis, דחיפה ל־clients.
-- **ניתוח AI:** רץ ב־`ai-worker` (backend): מאזין ל-Redis DB 1 לאירועי סיום שיחה, מנתח (Groq), שומר ל-DB.
+- **ניתוח AI:** עיקרית **`task-worker`** קורא ל־`handle_conversation_completion` (Groq → `chat_analysis`); **`ai-worker`** יכול לאותה לוגיקה אם מתקבל payload על **`chat:completion:*`** ([`AI.md`](../docs/architecture/AI.md)).
 - **AI ride parsing (לא ב-chat-ws):** endpoint `POST /api/v1/passenger/passengers/ai-parse-search` מנוהל כולו ב-backend ומשמש את מסכי SearchRides/CreateRide בפרונט.
 
 ## מבנה תיקיות
@@ -75,9 +75,9 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ### זרימת ניתוח AI (מה שקיים בפועל)
 
-1. backend מפרסם אירוע completion ל-Redis DB 1 (`chat:completion:{conversation_id}`).
-2. `ai-worker` (באותו codebase backend) מאזין לערוץ completion ומריץ את ניתוח השיחה.
-3. התוצאה נשמרת ב-DB; צריכה עתידית להעברה ב-WS תתווסף בנפרד אם תוגדר.
+1. **`task-worker`** מריץ משימות scheduled ( למשל timeout שיחה) וקורא **ישירות** ל-backend `handle_conversation_completion` (Groq → `chat_analysis` → Outbox).
+2. **`ai-worker`** כולל **מאזין** אופציונלי ל־`chat:completion:*`; אין בשורות ה-Python ב-backend שזוהה **publish** לערוץ הזה — לא לבנות עליו בתור contract יציב עד שהקוד מתאים לתיעוד.
+3. תוצאה נשמרת ב־DB; פרסום ל-client דרך WS לניתוח — לא חלק מ-chat-ws היום.
 
 ## Presence ו-last seen (תקציר)
 
@@ -92,7 +92,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 - `chat:notification:*` – דחיפות **הקשורות לצ'אט** לפי נמען (עוברות ב-chat-ws)
 - **לא כאן:** פיד **התראות האפליקציה** (רשימת התראות / סנכרון עם מסך Notifications) — WebSocket ב־**backend**: `GET /api/v1/notifications/ws` (פרונט: `useChatNotificationsWebSocket`, גיבוי REST ב־`useChatNotificationsFeed`). פירוט: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md).
 - **`user:*:events`** – אירועי דומיין מה-backend (`publish_user_event` דרך **`REDIS_CHAT_URL`** / DB כמו chat-ws, לא `broadcast`/DB0); Go מנתב ל-`SendToUser` לפי מזהה מהערוץ. הקבוע בקוד: `UserEventPattern` ב-`internal/redis/subscriber.go`
-- `chat:completion:{conversation_id}` – טריגר לניתוח AI בצד worker
+- `chat:completion:{conversation_id}` – **מוכן למאזין** ב־`ai-worker`; פרסום מ-backend לא אומת בקוד הנוכחי של Python
 
 ## פיתוח
 
@@ -111,4 +111,4 @@ import (
 
 ### ניתוח AI
 
-ניתוח AI של שיחות רץ ב-backend (`ai-worker`). לבדיקה: הרץ את ה-worker והפעל סיום שיחה מהאפליקציה; התוצאות נשמרות ב-DB ונגישות ב-`GET /api/v1/chat/conversations/{id}/analysis`.
+טריגיר עיקרי בפועל: **`task-worker`** (משימת timeout לשיחה idle) קורא ל־`handle_conversation_completion`. **`ai-worker`** מנוי ל־`chat:completion:*` אם יתווסף publisher. הניתוח נשמר ב־**`chat_analysis`** ב־Postgres; **לא זוהה** endpoint REST ציבורי ל־`GET …/analysis` בראוטר הצ’אט — לאמת מול הריפו; ראו [`docs/architecture/AI.md`](../docs/architecture/AI.md).

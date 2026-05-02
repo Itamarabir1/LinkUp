@@ -31,7 +31,7 @@ Stripe SDK מבודד לחלוטין. DTOs עם `slots=True`. שאר הקוד ל
 
 ### `reconciler.py`
 
-רץ בתדירות קבועה דרך **APScheduler** ב־`lifespan` (ברירת מחדל כל **10 דקות** — `BILLING_RECONCILER_INTERVAL_SECONDS=600`, ניתן לשינוי ב-env).
+רץ בתדירות קבועה דרך **APScheduler** ב־**`backend/app/core/lifespan.py`** (FastAPI lifespan; ברירת מחדל כל **10 דקות** — `BILLING_RECONCILER_INTERVAL_SECONDS=600`, ניתן לשינוי ב-env). **`BILLING_RECONCILER_ENABLED`** ברירת מחדל **`true`** ב־`app/core/config.py`; קבע ל־`false` כדי להשבית את התזמון.
 
 - **PostgreSQL advisory lock** — cluster-safe; לא רצים פעמיים במקביל על מספר instances.
 - **session נפרד לכל payment** — כשל על payment אחד לא משפיע על השאר.
@@ -59,7 +59,7 @@ Stripe SDK מבודד לחלוטין. DTOs עם `slots=True`. שאר הקוד ל
 
 ### Admin endpoints
 
-- `GET /api/v1/admin/billing/stale-pending` — רשימת payments “תקועים” בהגדרות ה-reconciler + `last_run_at` של המ reconciler.
+- `GET /api/v1/admin/billing/stale-pending` — רשימת payments “תקועים” בהגדרות ה-reconciler + שדה JSON **`last_reconciler_run`** (מקביל ל־`BillingReconciler.last_run_at` בשרת).
 - `POST /api/v1/admin/billing/reconcile/{payment_id}` — recovery ידני ל-payment בודד.
 
 ### migration 015 (revision `015_billing_idem`, קובץ `015_billing_idempotency_and_indexes.py`)
@@ -71,8 +71,8 @@ Stripe SDK מבודד לחלוטין. DTOs עם `slots=True`. שאר הקוד ל
 
 ### טסטים
 
-**10 טסטים ירוקים** — state machine, reconciler, idempotency: כולם עברו.  
-קבצים: `backend/tests/domain/test_billing_state_machine.py`, `test_billing_reconciler.py`; בנוסף `test_billing.py`, `tests/api/test_billing_idempotency.py`.
+**22 מקרי בדיקה** (JUnit-style; איסוף `pytest --collect-only` על ארבעת הקבצים להלן) — state machine, reconciler, שירות/webhook ו-idempotency API. כל עוד ההרצה ירוקה: **`uv run pytest`** על הקבצים האלה או הסוויטה המלאה.  
+קבצים: `backend/tests/domain/test_billing_state_machine.py`, `backend/tests/domain/test_billing_reconciler.py`, `backend/tests/domain/test_billing.py`, `backend/tests/api/test_billing_idempotency.py`.
 
 ---
 

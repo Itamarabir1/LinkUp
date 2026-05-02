@@ -33,8 +33,8 @@
   - **ולידציית פרודקשן אחרי שינוי סודות:** הרץ `bash scripts/ops/firebase-modelb-smoke.sh` משורש הפרויקט כדי לאמת טעינת Firebase + Redis contracts בפועל.
 
 3. **הרצה לוקאלית (בלי Docker ל-backend / frontend)**
-  - תשתיות + workers: `docker compose up -d` (או לפחות `db`, `redis`, `rabbitmq`, `chat-ws`; אם workers כבר רצים ב־Compose — **אל** תריץ במקביל worker מקומי נוסף). אם **לא** מרימים את שירות **`migrate`** בדוקר — להריץ ידנית `alembic upgrade head` לפני הבקאנד המקומי.
-   - מתוך `backend/`: `alembic upgrade head`, ואז `uvicorn app.main:app --reload` (פורט 8000 — מתאים ל־`frontend` ב־dev, ראו `frontend/src/config/env.ts`).
+  - תשתיות + workers: `docker compose up -d` (או לפחות `db`, `redis`, `rabbitmq`, `chat-ws`; אם workers כבר רצים ב־Compose — **אל** תריץ במקביל worker מקומי נוסף). אם **לא** מרימים את שירות **`migrate`** בדוקר — מתוך `backend/` **`uv run alembic upgrade head`** לפני הבקאנד המקומי.
+   - מתוך `backend/`: `uv run alembic upgrade head`, ואז `uvicorn app.main:app --reload` (פורט 8000 — מתאים ל־`frontend` ב־dev, ראו `frontend/src/config/env.ts`).
   - Worker מקומי: רק אם **אין** workers בדוקר — הרץ entrypoint ייעודי (`python -m app.workers.notification_worker` / `task_worker` / `ai_worker`).
   - Frontend security baseline: `eslint` אוכף `react/no-danger` כ-`error`; עבור HTML דינמי יש להשתמש ב-`frontend/src/utils/sanitize.ts` (`sanitizeHtml`) ולא לגשת ישירות ל-`dangerouslySetInnerHTML` בלי סניטציה.
 
@@ -85,7 +85,7 @@
 | STRIPE_SECRET_KEY | לחיובים | Stripe Secret Key (`sk_*` / `rk_*`) |
 | STRIPE_PUBLISHABLE_KEY | אופציונלי בבקאנד | מפתח publishable; לרוב נצרך בפרונט כ-`VITE_STRIPE_PUBLISHABLE_KEY` |
 | STRIPE_WEBHOOK_SECRET | לחתימת webhook | Stripe Webhook Signing Secret (`whsec_*`) |
-| BILLING_RECONCILER_ENABLED | — | `true` (ברירת מחדל) — מתזמן APScheduler ב־`lifespan` מריץ **`BillingReconciler.run`** |
+| BILLING_RECONCILER_ENABLED | — | `true` (ברירת מחדל ב־**`app/core/config.py`**) — מתזמן APScheduler ב־**`app/core/lifespan.py`** מריץ **`billing_reconciler.run`** (`AsyncIOScheduler`, job id `billing_reconciler`); הגדר **`false`** להשבתה |
 | BILLING_RECONCILER_INTERVAL_SECONDS | — | מרווח בין ריצות reconciler (ברירת מחדל **600**) |
 | BILLING_PENDING_MIN_AGE_MINUTES | — | תשלום **`pending`** נחשב “מיושן” רק אחרי מינימום גיל זה לפני שאלה Stripe (ברירת מחדל **10**) |
 | BILLING_PENDING_MAX_AGE_HOURS | — | חלון עליון לגיל תשלום **`pending`** בסריקה (ברירת מחדל **24**) |
@@ -137,9 +137,14 @@ Recommended senior setup: use a dedicated local OAuth client ID and wire it via 
 
 ## Backend tests (pytest)
 
-- מתוך **`backend/`**: `uv run pytest tests/ -v`. דורש **PostgreSQL + PostGIS** עם סכמה מעודכנת — הרץ **`alembic upgrade head`** על אותו DB לפני הטסטים.
-- **משתני סביבה:** ב־`tests/conftest.py` — **`DATABASE_URL`** (מומלץ), או **`TEST_DATABASE_URL`** (תאימות לאחור), או ברירת מחדל ל-docker-compose המקומי.
-- **יישור עם CI:** ב-GitHub Actions הסדר בפועל הוא **Ruff check** → **Ruff format --check** → **`alembic upgrade head`** → **pytest** (עם **`DATABASE_URL` ברמת ה-job**) — ראו `.github/workflows/backend-ci.yml` ו־`backend/README.md`.
+- מתוך **`backend/`**: מומלץ **`make test`** — מריץ **`uv run alembic upgrade head`** ואז **`uv run pytest tests/ -v --tb=short`** (אותו סדר כמו CI). לחלופין: **`uv run pytest …`** אחרי **`uv run alembic upgrade head`** ידנית. דורש **PostgreSQL + PostGIS**; סכמה תמיד מ־Alembic בלבד (**אין** `create_all` ב־`conftest`).
+- **משתני סביבה:** ב־`tests/conftest.py` — **`DATABASE_URL`** (מומלץ), או **`TEST_DATABASE_URL`** (תאימות לאחור), או ברירת מחדל ל-docker-compose המקומי. CI משתמש ב־**Postgres ייעודי** `test_db` (ראו `DATABASE_URL` ב־`backend-ci.yml`); מקומית אפשר למקד DB נפרד מהפיתוח עם אותם משתני env.
+- **Fixtures (`tests/conftest.py`):**
+  - **`db_session`** — טרנזקציה אחת; **`commit`** ממופה ל־**`flush`** (**`monkeypatch`**) ואז **rollback** בסוף — בדיקות שירות מהירות בלי ללכלך DB.
+  - **`e2e_session_factory`** — session factory **בלי** monkeypatch על commit; מתאים לזרימות “כמו HTTP” עם גבול commit אמיתי בין קריאות.
+  - **`_get_test_app` / `_test_app`** — lazy import של **`app.main:app`** כדי שטסטים שלא טוענים את האפליקציה לא יפעילו מנוע/ Firebase בזמן **collection**.
+  - **Windows:** `asyncio.WindowsSelectorEventLoopPolicy` בפלטפורמת win32 לתאימות pytest-asyncio.
+- **יישור עם CI:** **Ruff check** → **Ruff format --check** → **`uv run alembic upgrade head`** → **`check-migration-head.sh`** → **pytest RabbitMQ חלקי** → **`uv run pytest` מלא — `.github/workflows/backend-ci.yml`, `backend/README.md`.
 
 ---
 
@@ -177,23 +182,37 @@ cd backend && k6 run k6/scripts/load_test_auth.js
 
 ---
 
+## Operational helper scripts (`scripts/ops/`)
+
+מאגר השורש מכיל כלים צמודים ל CI / תפעול (יש להריץ בהתאם לכותרת כל סקריפט — רוב הבדיקות מניחות **`backend/`** ל־`alembic`):
+
+| Script | תפקיד |
+|--------|--------|
+| [`scripts/ops/check-migration-head.sh`](../../scripts/ops/check-migration-head.sh) | מאמת ש־**`uv run alembic current`** מסתיים ב־**`(head)`** — משמש **`backend-ci.yml`** אחרי upgrade. |
+| [`scripts/ops/rabbitmq-dlq-replay.py`](../../scripts/ops/rabbitmq-dlq-replay.py) | replay מבוקד מ DLQ חזרה לתור ראשי (`--dry-run`, `--limit`) — מתועד ב־[**`EVENTS.md`**](EVENTS.md#dlq-replay-tooling). |
+| [`scripts/ops/pgbouncer-smoke.sh`](../../scripts/ops/pgbouncer-smoke.sh) | מחכה ש־קונטיינר **`linkup_pgbouncer`** יסומן **`healthy`**, ואז מריץ **`SHOW POOLS`** דרך admin (דרוש **`PGB_ADMIN_PASSWORD`**). |
+| [`scripts/ops/redis-sentinel-smoke.sh`](../../scripts/ops/redis-sentinel-smoke.sh) | בודק פרוסת **Redis + Sentinel** (חיבורים/מצב) לפי הפריסה המקומית/CI. |
+| [`scripts/ops/firebase-modelb-smoke.sh`](../../scripts/ops/firebase-modelb-smoke.sh) | מוודא **`FIREBASE_CREDENTIALS_JSON`** ב־**`backend/.env`**, recreation של שירותים תלויי Firebase, טעינת **firebase_admin**, **`/readyz`**, והתאמת **`REDIS_URL`** ל־**chat-ws** — לפני/אחרי deploys Model B. |
+
+---
+
 ## Running Migrations
 
 ```bash
 cd backend
-alembic upgrade head
+uv run alembic upgrade head
 ```
 
 חזרה לאחור (צעד אחד):
 
 ```bash
-alembic downgrade -1
+uv run alembic downgrade -1
 ```
 
 יצירת migration חדש (לאחר שינוי מודלים):
 
 ```bash
-alembic revision --autogenerate -m "description"
+uv run alembic revision --autogenerate -m "description"
 ```
 
 **Autogenerate ו-metadata:** ב־[`alembic/env.py`](../../backend/alembic/env.py) מיובא `app.db.models` אחרי `Base` כדי שכל טבלאות הדומיין יירשמו ב־`target_metadata` לפני השוואת סכמה. ב־API, אותו רישום מתחיל ב־[`app/api/v1/api_router.py`](../../backend/app/api/v1/api_router.py) (שורה ראשונה של ייבוא אפליקטיבי). Ruff: `per-file-ignores` ל־F401 על קבצי side-effect — [`backend/pyproject.toml`](../../backend/pyproject.toml).
@@ -202,13 +221,13 @@ alembic revision --autogenerate -m "description"
 
 ## How To Recover From Partial Migration State
 
-אם `alembic upgrade head` נכשל באמצע (למשל enum כבר קיים / עמודות חסרות), עובדים לפי סדר קבוע:
+אם **`uv run alembic upgrade head`** (או ריצת מיגרציה מתוך image **`migrate`**) נכשל באמצע (למשל enum כבר קיים / עמודות חסרות), עובדים לפי סדר קבוע:
 
 1. **בדיקת מצב נוכחי**
-   - מתוך `backend/`: `alembic current`
-   - ודא מה הרוויזיה בפועל מול `alembic heads`
+   - מתוך `backend/`: `uv run alembic current`
+   - השוואה ל־`uv run alembic heads` (אמור **`head`** יחיד אחרי מיזוג **`016_merge015_heads`**)
 2. **הרצת forward-only repair**
-   - יש להריץ שוב `alembic upgrade head` (כולל migration תיקון forward-only, לא משכתבים migration ישן בסביבה משותפת)
+   - יש להריץ שוב `uv run alembic upgrade head` (כולל migration תיקון forward-only, לא משכתבים migration ישן בסביבה משותפת)
 3. **אימות סופי**
    - הרץ `bash ../scripts/ops/check-migration-head.sh` מתוך `backend/`
    - אם הסקריפט לא מחזיר `(head)` — לא ממשיכים להריץ טסטים/דיפלוי
@@ -231,9 +250,9 @@ LinkUp/
 │   │   ├── db/              # session, base, models (imports domain)
 │   │   ├── domain/          # Domain-Driven: users, rides, bookings, passengers, chat, groups, auth, events, admin
 │   │   ├── infrastructure/  # redis, rabbitmq, outbox, events publishers, S3
-│   │   ├── workers/         # main_worker, outbox_worker, tasks (notification, avatar, scheduled, chat_summary)
+│   │   ├── workers/         # notification_worker, task_worker, ai_worker (+ tasks/: notifications, avatar, scheduled, chat_summary, …); `run_outbox_worker` מאותה חבילה — שירות Compose **`outbox-worker`** הוא alias compat ל-**`notification-worker`**
 │   │   └── admin/           # SQLAdmin setup
-│   ├── alembic/versions/    # 001–004
+│   ├── alembic/versions/    # מיגרציות ממוספרות (כולל billing idempotency + merge heads)
 │   ├── k6/                  # k6 load tests (scripts + shared helpers)
 │   ├── load_test.js         # wrapper תואם לאחור ל-auth k6
 │   ├── load_test_rides.js   # wrapper תואם לאחור ל-rides k6

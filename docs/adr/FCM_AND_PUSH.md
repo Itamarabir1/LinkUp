@@ -44,7 +44,7 @@
 sequenceDiagram
   participant API as Backend API
   participant DB as Postgres
-  participant OB as Outbox Worker
+  participant OB as notification-worker (Outbox)
   participant FCM as Firebase
   participant SW as ServiceWorker
   participant App as React App
