@@ -1,20 +1,47 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
-
 .shell {
-  --adm-bg:      #080b11;
+  --adm-bg: #080b11;
   --adm-surface: #0d1117;
-  --adm-raised:  #141924;
-  --adm-border:  #1e2535;
+  --adm-raised: #141924;
+  --adm-border: #1e2535;
   --adm-border2: #2a3444;
-  --adm-accent:  #4f6ef7;
+  --adm-accent: #4f6ef7;
   --adm-accent2: #818cf8;
-  --adm-muted:   #475569;
-  --adm-sub:     #64748b;
-  --adm-text:    #e2e8f0;
-  --adm-green:   #22c55e;
-  --adm-amber:   #f59e0b;
-  --adm-red:     #ef4444;
-  --adm-cyan:    #06b6d4;
+  --adm-muted: #475569;
+  --adm-sub: #64748b;
+  --adm-text: #e2e8f0;
+  --adm-text-strong: #f1f5f9;
+  --adm-text-secondary: #94a3b8;
+  --adm-faint: #334155;
+  --adm-text-inverse: #ffffff;
+  --adm-green: #22c55e;
+  --adm-amber: #f59e0b;
+  --adm-red: #ef4444;
+  --adm-cyan: #06b6d4;
+
+  --adm-overlay-subtle: rgba(255, 255, 255, 0.04);
+  --adm-overlay-row-hover: rgba(255, 255, 255, 0.015);
+  --adm-row-selected: rgba(79, 110, 247, 0.07);
+  --adm-nav-active-bg: rgba(79, 110, 247, 0.12);
+  --adm-nav-active-border: rgba(79, 110, 247, 0.2);
+  --adm-accent-border-card: rgba(79, 110, 247, 0.25);
+  --adm-accent-bg-subtle: rgba(79, 110, 247, 0.12);
+  --adm-accent-bg-medium: rgba(79, 110, 247, 0.15);
+  --adm-accent-bg-hover: rgba(79, 110, 247, 0.2);
+  --adm-btn-primary-border: rgba(79, 110, 247, 0.4);
+  --adm-border-amber-strong: rgba(245, 158, 11, 0.3);
+  --adm-border-red-strong: rgba(239, 68, 68, 0.3);
+  --adm-green-bg: rgba(34, 197, 94, 0.08);
+  --adm-green-border: rgba(34, 197, 94, 0.2);
+  --adm-green-bg-strong: rgba(34, 197, 94, 0.1);
+  --adm-amber-bg: rgba(245, 158, 11, 0.08);
+  --adm-amber-border: rgba(245, 158, 11, 0.2);
+  --adm-amber-bg-strong: rgba(245, 158, 11, 0.1);
+  --adm-red-bg: rgba(239, 68, 68, 0.08);
+  --adm-red-border: rgba(239, 68, 68, 0.25);
+  --adm-red-bg-hover: rgba(239, 68, 68, 0.15);
+  --adm-red-bg-strong: rgba(239, 68, 68, 0.1);
+  --adm-gray-badge-bg: rgba(100, 116, 139, 0.1);
+  --adm-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
   min-height: 100vh;
   display: flex;
@@ -39,16 +66,16 @@
 }
 
 .sidebarBrand {
-  padding: 20px 16px;
+  padding: 16px;
   font-size: 13px;
   font-weight: 600;
-  color: #f8fafc;
+  color: var(--adm-text-inverse);
   letter-spacing: 0.02em;
   border-bottom: 1px solid var(--adm-border);
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: var(--font-primary);
 }
 
 .sidebarBrand::before {
@@ -72,7 +99,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border-radius: 8px;
   color: var(--adm-sub);
   text-decoration: none;
@@ -83,14 +110,14 @@
 }
 
 .navLink:hover {
-  background: rgba(255,255,255,0.04);
-  color: #94a3b8;
+  background: var(--adm-overlay-subtle);
+  color: var(--adm-text-secondary);
 }
 
 .navLinkActive {
-  background: rgba(79,110,247,0.12);
+  background: var(--adm-nav-active-bg);
   color: var(--adm-accent2);
-  border-color: rgba(79,110,247,0.2);
+  border-color: var(--adm-nav-active-border);
 }
 
 .navIcon {
@@ -110,9 +137,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 16px;
   padding: 0 24px;
-  height: 52px;
+  min-height: 52px;
   background: var(--adm-surface);
   border-bottom: 1px solid var(--adm-border);
   flex-wrap: wrap;
@@ -129,10 +156,11 @@
 
 .topbarTitle {
   margin: 0;
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 600;
-  color: var(--adm-text);
-  letter-spacing: -0.01em;
+  color: var(--adm-text-strong);
+  letter-spacing: -0.02em;
+  font-family: var(--font-primary);
 }
 
 .topbarMeta {
@@ -151,8 +179,8 @@
 .logoutBtn {
   background: none;
   border: 1px solid var(--adm-border);
-  border-radius: 6px;
-  padding: 4px 10px;
+  border-radius: 8px;
+  padding: 8px 12px;
   font-size: 12px;
   cursor: pointer;
   color: var(--adm-sub);
@@ -160,7 +188,7 @@
   transition: border-color 0.12s, color 0.12s;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
 }
 
 .logoutBtn:hover {
@@ -180,4 +208,3 @@
   margin-inline: auto;
   box-sizing: border-box;
 }
-
