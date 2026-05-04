@@ -41,5 +41,5 @@ if [[ -z "${PGBOUNCER_ADMIN_PASSWORD:-}" ]]; then
 fi
 
 envsubst < "$TEMPLATE" > "$OUT"
-chmod 600 "$OUT"
+chmod 644 "$OUT"
 echo "Rendered $OUT (from backend/.env)"
