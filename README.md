@@ -209,15 +209,16 @@ cd Linkup
 ### הכנה חד-פעמית
 
 ```bash
-cp .env.example .env
 cp backend/.env.example backend/.env
 cp chat-ws/.env.example chat-ws/.env
 cp frontend/.env.example frontend/.env
-# ערוך כל קובץ והכנס סודות אמיתיים
+# אופציונלי: העתקת .env בשורש להגדרות Compose לא-סודיות — ראו .env.example (הסודות רק ב-backend/.env)
+# cp .env.example .env
+# ערוך והכנס סודות אמיתיים ב-backend/.env ובשאר הקבצים לפי הצורך
 ```
 
-- **`.env` בשורש** — רק משתנים ש־`docker-compose` צורך להקמת Postgres / Redis / RabbitMQ; יישור עם `POSTGRES_*`, `REDIS_PASSWORD`, `RABBITMQ_*` ב־`backend/.env`.
-- **`chat-ws/.env`** — כולל `REDIS_URL` (לדוקר: `redis://:<סיסמה>@redis:6379/1`) ו־`JWT_SECRET` זהה ל־`SECRET_KEY` ב־`backend/.env`.
+- **מקור אמת לסיסמאות ול־Postgres/Redis/RabbitMQ (ב־Docker):** רק **`backend/.env`**. אין לשכפל סיסמאות ב־`.env` בשורש.
+- **`chat-ws/.env`** — כולל `JWT_SECRET` זהה ל־`SECRET_KEY` ב־`backend/.env`. בקונטיינר, `REDIS_URL` מוזרק מ־Compose (`REDIS_PASSWORD` מ־**`backend/.env`** דרך `--env-file`).
 - **FCM בדוקר (Model B לפרודקשן):** אין mount של קובץ credentials. הגדר `FIREBASE_CREDENTIALS_JSON` ב־`backend/.env` (JSON בשורה אחת). `FIREBASE_SERVICE_ACCOUNT_PATH` מיועד לפיתוח מקומי בלבד.
 
 **מיגרציות:** ב־**Docker Compose** שירות **`migrate`** (image עם `ENTRYPOINT ["alembic"]`) מריץ **`alembic upgrade head`** פעם אחת לפני **backend** וכל ה־workers (`notification-worker`, `task-worker`, `ai-worker`). אם המיגרציה נכשלת ה־API וה־workers לא יעלו. **מקומי עם `uv`:** מתוך `backend/` → **`uv run alembic upgrade head`** ואז `uvicorn` / `make dev` (**`backend/Makefile`** תומך בכך). למפת טבלאות ובעיות merge ראשי Alembic: **[`docs/architecture/DATABASE.md`](docs/architecture/DATABASE.md)**.
@@ -232,7 +233,10 @@ make up
 cd frontend && make dev
 ```
 
-> חשוב: השתמשו ב־`make up` (ולא `docker compose up` ישירות), כדי להבטיח ש־Compose תמיד רץ עם `--env-file backend/.env --env-file frontend/.env`.
+> חשוב: **כל** פקודת `docker compose` מקומית חייבת לכלול **`--env-file backend/.env`** (או להשתמש ב־`make up` / `make down` / `make restart` / `make logs` — ראו **`Makefile`** בשורש). בלי זה, Redis/Postgres/RabbitMQ בעצמם יקבלו משתנים שגויים מההחלפת ה־YAML.
+>
+> **פרופיל `prod` עם build ל־frontend ב־Compose:** הוסיפו גם **`--env-file frontend/.env`** (משתני `VITE_*`, `FRONTEND_IMAGE` וכו’), למשל:  
+> `docker compose --env-file backend/.env --env-file frontend/.env --profile prod up -d --build`
 
 **קיצורים נוספים מ־`Makefile` בשורש הפרויקט:** **`make migrate`** (הרצת שירות **`migrate`** — **`alembic upgrade head`**), **`make down`** / **`logs`** / **`restart`**; **`make admin-grant EMAIL=...`** / **`admin-revoke`** / **`admin-check`** לעדכון **`users.is_admin`** ישירות ב־Postgres בתוך קונטיינר ה־**`db`** (למפתחים מקומיים). פירוט תסריטים ב־**`scripts/ops/`** (כולל smoke tests ו-DLQ replay): **`docs/architecture/DEVELOPMENT.md`**.
 
@@ -243,12 +247,12 @@ cd frontend && make dev
 - **Backend בדוקר:** `backend/entrypoint.sh` מריץ `uvicorn` (בלי `alembic` באותה שורה); מספר workers לפי **`UVICORN_WORKERS`** ב-`backend/.env` (`.env.example`: **4**; אם חסר — **1**). **Healthcheck** על המיכל בודק `GET /api/v1/health` דרך `python` (מופיע כ־`healthy` ב־`docker compose ps` אחרי `start_period`).  
 - צ׳אט בפיתוח: WebSocket ל־`localhost:8081`; WS נסיעות/התראות ל־`localhost:8000/api/v1` — ראו [`frontend/src/config/env.ts`](frontend/src/config/env.ts).
 
-ב־[`docker-compose.yml`](docker-compose.yml) שירותי **`frontend`** ו־**`nginx`** מוגדרים עם `profiles: ["prod"]` — לא עולים ב־`docker compose up -d` ללא הפרופיל. בפרופיל prod, **nginx** תלוי ב־**backend** במצב **`service_healthy`** (לא רק `started`).
+ב־[`docker-compose.yml`](docker-compose.yml) שירותי **`frontend`** ו־**`nginx`** מוגדרים עם `profiles: ["prod"]` — לא עולים ב־`docker compose --env-file backend/.env up -d` ללא הפרופיל. בפרופיל prod, **nginx** תלוי ב־**backend** במצב **`service_healthy`** (לא רק `started`).
 
 ### בדיקת פרודקשן
 
 ```bash
-docker compose --profile prod up -d --build
+docker compose --env-file backend/.env --env-file frontend/.env --profile prod up -d --build
 ```
 
 הכל מאחורי Nginx: http://localhost:80
@@ -257,10 +261,10 @@ docker compose --profile prod up -d --build
 
 ```bash
 make down                    # עצור
-docker compose down -v       # עצור + איפוס volumes (DB וכו׳)
+docker compose --env-file backend/.env down -v   # עצור + איפוס volumes (DB וכו׳)
 make logs                    # לוגים לכל השירותים (follow)
-docker compose logs migrate  # לוג מיגרציה (אם נכשל — לבדוק כאן)
-docker compose logs backend  # לוגים לבקאנד בלבד
+docker compose --env-file backend/.env logs migrate  # לוג מיגרציה (אם נכשל — לבדוק כאן)
+docker compose --env-file backend/.env logs backend  # לוגים לבקאנד בלבד
 make ps                      # סטטוס כל השירותים
 make admin-check EMAIL=user@example.com   # בדיקת הרשאת אדמין לפי אימייל
 make admin-grant EMAIL=user@example.com   # הענקת אדמין לפי אימייל (ops)
@@ -302,9 +306,9 @@ make admin-revoke EMAIL=user@example.com  # הסרת אדמין לפי אימי�
 - **Pessimistic locking:** booking approve/cancel use `SELECT ... FOR UPDATE` on the ride to avoid race conditions.
 - **Connection pooling:** async SQLAlchemy pool — `pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle`, `pool_pre_ping` מ-`settings` / `.env` (`DB_POOL_*`); indexes on rides/bookings/group_members/passenger_requests/chat message access (including `bookings.request_id`, `messages.sender_id`) — see `docs/architecture/DATABASE.md`.
 - **DB pooling architecture (senior pattern):** two-layer pooling — small SQLAlchemy pool per service + central PgBouncer transaction pool. This reduces Postgres backend process pressure during spikes/redeploys and keeps migrations isolated (direct `db` path only).
-- **PgBouncer secrets flow (deploy-safe):** `infrastructure/pgbouncer/userlist.txt.template` is committed, while real `userlist.txt` is generated during EC2 deploy after **`export PGBOUNCER_ADMIN_PASSWORD`** from **`backend/.env`** (with SSH secret fallback), `envsubst`, and **`chmod 600`** (not committed to git). **Edge CSP:** same deploy renders **`nginx/nginx.conf`** from **`nginx/nginx.conf.template`** using **`SENTRY_REPORT_URI`** from **`backend/.env`**; locally run **`bash scripts/ops/render-nginx-conf.sh`** before `docker compose --profile prod`.
+- **PgBouncer secrets flow (deploy-safe):** `infrastructure/pgbouncer/userlist.txt.template` is committed, while real `userlist.txt` is generated during EC2 deploy after **`export PGBOUNCER_ADMIN_PASSWORD`** from **`backend/.env`** (with SSH secret fallback), `envsubst`, and **`chmod 600`** (not committed to git). **Edge CSP:** same deploy renders **`nginx/nginx.conf`** from **`nginx/nginx.conf.template`** using **`SENTRY_REPORT_URI`** from **`backend/.env`**; locally run **`bash scripts/ops/render-nginx-conf.sh`** before `docker compose --env-file backend/.env --env-file frontend/.env --profile prod up -d` (או מקביל עם `make` + פרופיל).
 - **Auth hardening:** bcrypt hashing/verify רץ ב-**thread pool** (`asyncio.run_in_executor`) כדי לא לחסום את event loop; **rate limit** על `/register` ועל login/refresh (Redis), ובצ'אט על `POST /chat/conversations/{conversation_id}/messages` פר-משתמש (30 הודעות/דקה, fail-open אם Redis לא זמין); OTP: `secrets`, `hmac.compare_digest`, מונה ניסיונות + איפוס בקוד חדש; **מניעת username enumeration בלוגין** (אותה תגובת שגיאה לאימייל לא קיים ולסיסמה שגויה — OWASP) — ראו `docs/ENGINEERING_HIGHLIGHTS.md` ו-`ARCHITECTURE.md` (Security).
-- **Load testing (optional, Grafana k6):** scripts are organized under [`backend/k6/scripts/`](backend/k6/scripts/) (auth, rides core flows, users, groups, chat, geo, ws). Legacy wrappers remain at [`backend/load_test.js`](backend/load_test.js) and [`backend/load_test_rides.js`](backend/load_test_rides.js). דורש הכנת `backend/.env` (זמנית `DEBUG=True`, `RATE_LIMIT_AUTH_MAX_REQUESTS` גבוה) ו־**`docker compose up -d --force-recreate backend`**. פירוט: [`backend/README.md`](backend/README.md) ו־[`docs/ENGINEERING_HIGHLIGHTS.md`](docs/ENGINEERING_HIGHLIGHTS.md) (סעיף 12).
+- **Load testing (optional, Grafana k6):** scripts are organized under [`backend/k6/scripts/`](backend/k6/scripts/) (auth, rides core flows, users, groups, chat, geo, ws). Legacy wrappers remain at [`backend/load_test.js`](backend/load_test.js) and [`backend/load_test_rides.js`](backend/load_test_rides.js). דורש הכנת `backend/.env` (זמנית `DEBUG=True`, `RATE_LIMIT_AUTH_MAX_REQUESTS` גבוה) ו־**`docker compose --env-file backend/.env up -d --force-recreate backend`**. פירוט: [`backend/README.md`](backend/README.md) ו־[`docs/ENGINEERING_HIGHLIGHTS.md`](docs/ENGINEERING_HIGHLIGHTS.md) (סעיף 12).
 
 ---
 

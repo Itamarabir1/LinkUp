@@ -1,6 +1,7 @@
 .PHONY: up down build logs ps restart migrate admin-check admin-grant admin-revoke
 
-COMPOSE=docker compose --env-file backend/.env --env-file frontend/.env
+# Secrets and DB/Redis/RabbitMQ passwords: single source of truth — backend/.env
+COMPOSE=docker compose --env-file backend/.env
 
 up: ## Start all services
 	$(COMPOSE) up -d

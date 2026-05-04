@@ -1,3 +1,11 @@
+# -----------------------------------------------------------------------------
+# IMPORTANT: Compose variable substitution (${POSTGRES_PASSWORD}, etc.) uses the
+# host environment. Always run Compose with:
+#   docker compose --env-file backend/.env <command>
+# (or use `make up`, `make down`, … — see Makefile). Single source of truth for
+# secrets: backend/.env. Do not rely on a separate root .env for passwords.
+# -----------------------------------------------------------------------------
+
 services:
   # --- Database: PostgreSQL + PostGIS ---
   db:
