@@ -1,4 +1,6 @@
 # --- Environment & secrets ---
+# Root .env only — must never be committed (override local secrets; same rules as backend/.env).
+/.env
 .env
 *.env
 backend/.env
