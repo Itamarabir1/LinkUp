@@ -43,20 +43,20 @@
 | | |
 |--|--|
 | **הקשר** | צ'אט, נסיעות, מיקום, התראות in-app, אירועי משתמש (`user:*:events`). |
-| **החלטה** | **צ'אט** דרך **chat-ws** (Go); **נסיעות / מיקום / פיד התראות** דרך **WebSocket של FastAPI** (ראו [WEBSOCKETS.md](WEBSOCKETS.md)). פריימים נכנסים עוברים **Zod** (`safeParse`) ב-[`wsEvents.ts`](../../frontend/src/types/wsEvents.ts) ובעיבוד הודעות צ'אט ב-[`processChatWebSocketMessage.ts`](../../frontend/src/pages/MessageThread/processChatWebSocketMessage.ts). |
+| **החלטה** | **צ'אט** + אירועי **`user:{id}:events`** (כולל רענון התראות) דרך **chat-ws** (Go); **נסיעות / מיקום** דרך **WebSocket של FastAPI** (ראו [WEBSOCKETS.md](WEBSOCKETS.md)). רשימת התראות — **REST** (`fetchMyNotifications`). פריימים נכנסים עוברים **Zod** (`safeParse`) ב-[`wsEvents.ts`](../../frontend/src/types/wsEvents.ts) ובעיבוד הודעות צ'אט ב-[`processChatWebSocketMessage.ts`](../../frontend/src/pages/MessageThread/processChatWebSocketMessage.ts). |
 | **למה Zod** | חוזה בזמן ריצה מול JSON מהרשת; פחות `as` לא בטוחים; בדיקות יחידה על סכמות. |
 | **בקצרה לראיון** | "לא סומכים על צורת JSON מה-WS — מאמתים עם Zod לפני שמעדכנים state." |
 
 ---
 
-## 5. פיד התראות in-app — WS + reconnect + polling גיבוי
+## 5. פיד התראות in-app — REST + `user:{id}:events` על chat-ws + polling גיבוי
 
 | | |
 |--|--|
-| **החלטה** | [`useChatNotificationsWebSocket`](../../frontend/src/context/useChatNotificationsWebSocket.ts) מעל [`useReconnectingWebSocket`](../../frontend/src/hooks/useReconnectingWebSocket.ts); ב-**`onOpen`** (גם אחרי reconnect — לאחר **exponential backoff + jitter** בין ניסיונות דרך **`computeReconnectDelayMs`**, [`reconnectBackoff.ts`](../../frontend/src/utils/reconnectBackoff.ts), אותו utility כמו ב־**`useChatWebSocket`** / **`useReconnectingWebSocketState`**) — רענון פיד, unread ואירוע `linkup-notifications-refresh`. גיבוי: [`useChatNotificationsFeed`](../../frontend/src/context/useChatNotificationsFeed.ts) — polling REST כל **~5 דקות**. |
-| **למה** | אמינות מול רשת ניתקת בלי לרדוף אחרי השרת כל שנייה; איזון בין חוויית "חי" לבין עומס וסוללה. |
-| **למה backoff (פרונט)** | תקרה **30s** + **±20%** jitter מונעים סנכרון reconnect של כל הלקוחות באותו רגע (**thundering herd**) אחרי נפילה המונית; מקור אמת אחד לשלושת ה-WS hooks. |
-| **בקצרה לראיון** | "העדפנו WS ראשי עם רענון אחרי חיבור מחדש — עם backoff+jitter בין ניסיונות כדי לא להציף את השרת כשכולם חוזרים ביחד — ו-polling דל כגיבוי." |
+| **החלטה** | [`useChatNotificationsFeed`](../../frontend/src/context/useChatNotificationsFeed.ts) — React Query על **`GET /api/v1/users/me/notifications`** + **polling** כל **~5 דקות**. רענון חי: **`useUserEvent` / `useUserEventStream`** ב-[`ChatContext.tsx`](../../frontend/src/context/ChatContext.tsx) על פריים **`user:{id}:events`** מאותו חיבור chat-ws (אין `useChatNotificationsWebSocket` נפרד). |
+| **למה** | מקור אמת לרשימה ב-REST; דחיפת UI על אותו WS כמו הצ'אט; polling דל כשהאירועים לא מגיעים. |
+| **למה backoff (פרונט)** | לצ'אט ול-WS של FastAPI — **exponential backoff + jitter** ב-[`reconnectBackoff.ts`](../../frontend/src/utils/reconnectBackoff.ts) (`useChatWebSocket`, `useReconnectingWebSocketState`) כדי להפחית thundering herd אחרי נפילה המונית. |
+| **בקצרה לראיון** | "רשימת התראות מ-REST עם polling דל; רענון חי דרך אירועי משתמש על chat-ws — בלי WS נוסף לפיד." |
 
 ---
 

@@ -9,7 +9,7 @@ Canonical overview of how outbound notifications are produced, rendered, and del
 3. **Channels**
    - **Email:** HTML from **`email-renderer`** (`POST /render` with React Email templates), then SMTP send via **Brevo** transactional API (`sib_api_v3_sdk`).
    - **Push:** FCM with **data-only** payloads (see [`../FCM_SYSTEM_SUMMARY.md`](../FCM_SYSTEM_SUMMARY.md), [`../adr/FCM_AND_PUSH.md`](../adr/FCM_AND_PUSH.md)).
-   - **In-app:** WebSocket feed on **`GET /api/v1/notifications/ws`** (FastAPI) — separate from chat-ws; see [`REALTIME.md`](REALTIME.md).
+   - **In-app (רשימה):** **`GET /api/v1/users/me/notifications`** — מקור האמת לרשימת התראות; בפרונט polling כל **~5 דקות** (`useChatNotificationsFeed`). **רענון חי:** פרסום לערוץ Redis **`user:{user_id}:events`** (משותף עם chat-ws) מ־[`WebSocketProvider`](../../backend/app/domain/notifications/providers/websocket_provider.py); הלקוח מקבל על **אותו חיבור chat-ws** ומזניק רענון דרך **`useUserEvent`** — ראו [`REALTIME.md`](REALTIME.md). אין כרגע WS נפרד **`/api/v1/notifications/ws`** ב-FastAPI.
 
 ## Email — Brevo + circuit breaker
 

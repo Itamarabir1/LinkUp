@@ -243,15 +243,11 @@ Authorization: Bearer <access_token>
 
 ---
 
-### Notifications (WebSocket)
+### Notifications (in-app)
 
-| Method | Path | Auth | תיאור |
-|--------|------|------|--------|
-| WS | /api/v1/notifications/ws | query token=JWT | WebSocket לפיד **התראות האפליקציה** (מסך Notifications / סנכרון עם `ChatContext`). אימות: JWT בלבד (`get_current_user_ws` → `WsUser`, ללא DB ב-connect). Redis Pub/Sub — `docs/architecture/REALTIME.md`. **פרונט (ווב):** `useChatNotificationsWebSocket` + **`onOpen`** אחרי reconnect; גיבוי polling ~5 דקות ב־`useChatNotificationsFeed`. |
+**רשימת התראות:** ראו **`GET /me/notifications`** בטבלת **Users** למעלה (נתיב מלא **`GET /api/v1/users/me/notifications`** — אין רואטר נפרד תחת **`/notifications`**).
 
-רשימת התראות ב-REST: **`GET /api/v1/users/me/notifications`**.
-
-(ראוטר: `app/domain/notifications/router.py`, נרשם ב-`api/v1/api_router.py` תחת prefix `/notifications`.)
+**דחיפת רענון בזמן אמת:** אין כרגע endpoint נפרד **`/api/v1/notifications/ws`** ב-FastAPI — `app/domain/notifications/router.py` ריק ולא נכלל ב־[`api_router.py`](../../backend/app/api/v1/api_router.py). עדכוני UI מתקבלים דרך **chat-ws**: אירועי **`user:{id}:events`** (פרסום מ־`WebSocketProvider` ב-backend לערוץ Redis המשותף עם chat-ws); בפרונט **`useUserEvent` / `useUserEventStream`** מזניקים רענון פיד אחרי אירועי דומיין רלוונטיים. פירוט: [`REALTIME.md`](REALTIME.md), [`NOTIFICATIONS.md`](NOTIFICATIONS.md).
 
 ---
 

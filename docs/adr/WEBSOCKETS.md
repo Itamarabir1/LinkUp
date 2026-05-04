@@ -24,7 +24,7 @@
 | **סטטוס נסיעה** (למשל התחל/סיים נסיעה) | **FastAPI** | `/api/v1/rides/ws/{ride_id}?token=JWT` | מסכים שמציגים נסיעה פעילה / רשימה דינמית | עדכון מיידי לכל המחוברים לערוץ Redis `ride_{id}`. |
 | **מיקום נהג → נוסעים** | **FastAPI** | `/api/v1/bookings/ws/{booking_id}/location?token=JWT` | נסיעה active, נוסע מאושר | דיווחי מיקום תכופים; WS מפיץ מ-Redis בלי לקרוא DB לכל שידור. |
 | **מיקום נוסעים → נהג** | **FastAPI** | `/api/v1/rides/ws/{ride_id}/passengers?token=JWT` | נהג בנסיעה active | אותו עיקרון — ערוץ נפרד ממיקום הנהג. |
-| **פיד התראות in-app** (רשימת התראות / סנכרון UI) | **FastAPI** | `/api/v1/notifications/ws?token=JWT` | משתמש מחובר באפליקציית הווב | Redis Pub/Sub פנימי ל-`user_{id}`; עדכון מיידי כשמגיעה התראה. |
+| **התראות in-app** (רשימה + רענון UI) | **REST + chat-ws** | רשימה: **`GET /api/v1/users/me/notifications`**; דחיפת רענון: **`user:{id}:events`** על חיבור **`ws://…/ws`** (chat-ws), לא FastAPI נפרד | משתמש מחובר בווב | הרשימה נמשכת ב-REST (וגיבוי polling ~5 דקות); עדכון מיידי דרך אותו Redis Pub/Sub כמו אירועי דומיין בצ’אט — ראו [`REALTIME.md`](../architecture/REALTIME.md). |
 
 ---
 
@@ -37,18 +37,18 @@
 
 ### FastAPI WebSocket
 
-- **מטרה:** WS שצמוד לדומיין ה-API (נסיעות, הזמנות, התראות) ולכבר קיים **אותו Redis publisher** מה-backend (למשל `publish_ride_event`, notification streamer).
+- **מטרה:** WS שצמוד לדומיין ה-API (נסיעות, הזמנות) עם **אותו Redis publisher** מה-backend (למשל `publish_ride_event`). התראות in-app ברמת רשימה נשענות על REST; דחיפת רענון UI דרך chat-ws (`user:{id}:events`) — ראו למעלה.
 - **למה לא לדחוף הכל ל-Go:** פחות כפילות לוגיקת authz דרך שירות שכבר מכיר את הדומיין; חלק מהזרימות פשוטות יותר להשאיר ב-Python לצד ה-REST.
 
 ---
 
-## התראות in-app: WS + גיבוי REST
+## התראות in-app: REST + אירועי `user:*:events` על chat-ws
 
 | | |
 |--|--|
-| **ראשי** | `useChatNotificationsWebSocket` על גבי `useReconnectingWebSocket`; ב-`onOpen` (אחרי reconnect עם exponential backoff + jitter — ראו [Reconnect (פרונט)](#frontend-ws-reconnect-doc)) — רענון פיד, unread, אירוע `linkup-notifications-refresh`. |
-| **גיבוי** | polling ל-REST כל ~**5 דקות** (`useChatNotificationsFeed`) כשה-WS לא זמין או רשת לא יציבה. |
-| **למה** | אמינות מול ניתוקים בלי לרדוף אחרי השרת כל שנייה. |
+| **מקור הרשימה** | **`GET /api/v1/users/me/notifications`** — React Query ב־`useChatNotificationsFeed`, כולל **polling** כל ~**5 דקות** כגיבוי כשאין עדכון חי. |
+| **רענון חי** | אין WS ייעודי ל־`/api/v1/notifications/ws` ב-FastAPI כרגע. עדכוני UI מגיעים דרך **chat-ws**: פריים על **`user:{id}:events`** (`useUserEventStream` / `useUserEvent` ב־`ChatContext`) אחרי פרסום מ־`WebSocketProvider` ב-backend. |
+| **למה** | חיבור WS אחד לצ’אט + אירועי דומיין; REST נשאר מקור האמת לרשימה. |
 
 ---
 
@@ -56,7 +56,7 @@
 
 ## Reconnect (פרונט) — exponential backoff + jitter
 
-בין ניסיונות חיבור מחדש (chat-ws, FastAPI WS דרך [`useReconnectingWebSocket`](../../frontend/src/hooks/useReconnectingWebSocket.ts) / [`useReconnectingWebSocketState`](../../frontend/src/hooks/useReconnectingWebSocketState.ts), וגם [`useChatWebSocket`](../../frontend/src/pages/MessageThread/useChatWebSocket.ts)) הפרונט משתמש ב־**[`computeReconnectDelayMs`](../../frontend/src/utils/reconnectBackoff.ts)** ב־[`reconnectBackoff.ts`](../../frontend/src/utils/reconnectBackoff.ts): **מעריכה + ±20% jitter** (בסיס **3s**, תקרה **30s**); מונה ניסיונות **פר־`useEffect`**, **מתאפס ב־`onopen`**. **למה:** outage כללי (chat-ws / FastAPI / רשת) — מצמצמים **thundering herd** ברגע ה-recovery. פירוט: [`architecture/REALTIME.md`](../architecture/REALTIME.md), [`FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff`](../FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff).
+בין ניסיונות חיבור מחדש (**chat-ws:** [`useChatWebSocket`](../../frontend/src/pages/MessageThread/useChatWebSocket.ts), [`useUserEventStream`](../../frontend/src/hooks/useUserEventStream.ts) שעוטף [`useReconnectingWebSocket`](../../frontend/src/hooks/useReconnectingWebSocket.ts); **FastAPI rides:** [`useRideWebSocket`](../../frontend/src/hooks/useRideWebSocket.ts) → אותו `useReconnectingWebSocket`; **GPS:** [`useReconnectingWebSocketState`](../../frontend/src/hooks/useReconnectingWebSocketState.ts)) הפרונט משתמש ב־**[`computeReconnectDelayMs`](../../frontend/src/utils/reconnectBackoff.ts)** ב־[`reconnectBackoff.ts`](../../frontend/src/utils/reconnectBackoff.ts): **מעריכה + ±20% jitter** (בסיס **3s**, תקרה **30s**); מונה ניסיונות **פר־`useEffect`**, **מתאפס ב־`onopen`**. **למה:** outage כללי (chat-ws / FastAPI / רשת) — מצמצמים **thundering herd** ברגע ה-recovery. פירוט: [`architecture/REALTIME.md`](../architecture/REALTIME.md), [`FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff`](../FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff).
 
 ---
 

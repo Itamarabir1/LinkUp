@@ -1,7 +1,11 @@
 """
 publisher.py — entry point for publishing domain events over Redis Pub/Sub.
-- ride: broadcast (REDIS_URL / DB0) — aligns with FastAPI WS on ride_*.
-- user (chat-ws): redis_chat_pubsub (REDIS_CHAT_URL) — same DB as chat-ws.
+
+- ride / booking-style channels: ``RedisBroadcast`` → ``REDIS_CHAT_DB`` via
+  ``settings.REDIS_CHAT_URL`` (see ``broadcast.py``). Aligns with FastAPI WebSocket
+  subscribers on ``ride_*`` / ``booking_*`` channels — same logical DB as chat-ws.
+- per-user fan-out (chat-ws): ``redis_chat_pubsub`` → same ``REDIS_CHAT_URL`` /
+  ``REDIS_CHAT_DB``.
 """
 
 import json
@@ -32,7 +36,7 @@ async def publish_user_event(
     event: str,
     extra: dict | None = None,
 ) -> None:
-    """Pub/Sub on REDIS_CHAT_URL (same DB as chat-ws) — not broadcast/DB 0."""
+    """Pub/Sub on REDIS_CHAT_URL / REDIS_CHAT_DB — same logical DB as broadcast and chat-ws."""
     payload = {"event": event, "user_id": str(user_id), **(extra or {})}
     try:
         n = await redis_chat_pubsub.publish(get_user_channel(user_id), json.dumps(payload))

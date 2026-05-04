@@ -52,7 +52,6 @@ Optional environment overrides:
 
 - `BASE_URL` (default `http://localhost:8000/api/v1`)
 - `WS_URL` (default `ws://localhost:8081/ws`)
-- `NOTIFY_WS_URL` (default `ws://localhost:8000/api/v1/notifications/ws`) — **FastAPI** in-app notification stream, not chat-ws (`docs/architecture/REALTIME.md`)
 - `PRESENCE_URL` (default `http://localhost:8081/presence`)
 - `USER_PUBLIC_PATH` (default `/users/{id}`)
 

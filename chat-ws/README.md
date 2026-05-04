@@ -90,7 +90,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 - `chat:conversation:{conversation_id}` – הודעות צ'אט (נשלח מ-backend, נשמע ע"י Go WS)
 - `chat:typing:*` – אינדיקציית הקלדה
 - `chat:notification:*` – דחיפות **הקשורות לצ'אט** לפי נמען (עוברות ב-chat-ws)
-- **לא כאן:** פיד **התראות האפליקציה** (רשימת התראות / סנכרון עם מסך Notifications) — WebSocket ב־**backend**: `GET /api/v1/notifications/ws` (פרונט: `useChatNotificationsWebSocket`, גיבוי REST ב־`useChatNotificationsFeed`). פירוט: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md).
+- **כאן גם רענון פיד התראות:** הרשימה עצמה מגיעה מ-REST (**`GET /api/v1/users/me/notifications`**) ובפרונט polling ב־`useChatNotificationsFeed`; עדכוני UI מגיעים מפרסום ל־**`user:{id}:events`** ש-chat-ws מעביר על `/ws`. אין כרגע WS נפרד ב-FastAPI ל־`/notifications/ws`. פירוט: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md).
 - **`user:*:events`** – אירועי דומיין מה-backend (`publish_user_event` דרך **`REDIS_CHAT_URL`** / DB כמו chat-ws, לא `broadcast`/DB0); Go מנתב ל-`SendToUser` לפי מזהה מהערוץ. הקבוע בקוד: `UserEventPattern` ב-`internal/redis/subscriber.go`
 - `chat:completion:{conversation_id}` – **מוכן למאזין** ב־`ai-worker`; פרסום מ-backend לא אומת בקוד הנוכחי של Python
 

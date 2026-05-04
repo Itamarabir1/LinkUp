@@ -100,12 +100,11 @@ Payload של הודעה חדשה מה-WS (ללא שדה `type` של typing/prese
 
 ---
 
-## Notifications WebSocket (Backend)
+## התראות in-app (רשימה + רענון בזמן אמת)
 
-- **Endpoint**: `app/domain/notifications/router.py` — `@router.websocket("/ws")` תחת prefix `/notifications` → נתיב מלא **`GET /api/v1/notifications/ws?token=JWT`**.
-- **אימות**: `get_current_user_ws` ב-`app/api/dependencies/auth.py` — **רק JWT** (`decode_access_token`), מחזיר `WsUser` עם `user_id` מה-`sub` (**ללא קריאת DB** בזמן חיבור). מניעת עומס על connection pool; trade-off: אין בדיקת `is_active` ב-handshake (מול HTTP שכן טוען `User` מ-DB).
-- **שימוש**: `notification_streamer.stream_user_notifications(websocket, user_id)` — Redis Pub/Sub דרך `broadcaster`, ערוץ פנימי `user_{user_id}` (מקביל נפרד מ-`user:{id}:events` שמשמש את chat-ws לדחיפות דומיין).
-- **פרונט (ווב):** [`useChatNotificationsWebSocket`](../../frontend/src/context/useChatNotificationsWebSocket.ts) מעל [`useReconnectingWebSocket`](../../frontend/src/hooks/useReconnectingWebSocket.ts); ב-**`onOpen`** (אחרי **exponential backoff + jitter** בין ניסיונות — ראו **Recent updates** למעלה) — רענון פיד + unread + `linkup-notifications-refresh`. גיבוי: [`useChatNotificationsFeed`](../../frontend/src/context/useChatNotificationsFeed.ts) — REST כל **~5 דקות**.
+- **REST — מקור הרשימה:** **`GET /api/v1/users/me/notifications`** (ראו [`API.md`](API.md)). בפרונט — **`useChatNotificationsFeed`** עם React Query ו־**refetch** כל **~5 דקות**.
+- **אין** כרגע WebSocket ייעודי ב-FastAPI ל־`/api/v1/notifications/ws` — הקובץ [`app/domain/notifications/router.py`](../../backend/app/domain/notifications/router.py) ריק ולא נרשם ב־[`api_router.py`](../../backend/app/api/v1/api_router.py).
+- **דחיפת רענון:** ערוץ Redis **`user:{user_id}:events`** (אותו DB/pub/sub כמו chat-ws). ה-backend מפרסם JSON דרך **`WebSocketProvider`** ב־[`notifications/providers/websocket_provider.py`](../../backend/app/domain/notifications/providers/websocket_provider.py) לאחר שליחת התראה (אירועי `notifications_refresh` לאירועים נבחרים). הלקוח מקבל את הפריים על **אותו חיבור chat-ws** (`useUserEventStream`); **`useUserEvent`** ב־[`ChatContext.tsx`](../../frontend/src/context/ChatContext.tsx) קורא ל־`refreshUnreadNotifications` כשמתקבלות התאמות דומיין (join/approve/reject/cancel וכו').
 
 ---
 
@@ -124,8 +123,8 @@ Payload של הודעה חדשה מה-WS (ללא שדה `type` של typing/prese
 
 מיקום נהג ונוסעים בזמן אמת במהלך נסיעה פעילה (סטטוס ACTIVE).
 
-- **נהג → נוסעים**: נהג מדווח מיקום ב־POST /bookings/{booking_id}/location (body: lat, lng, heading?, speed?). **לוגיקת הרשאות וסטטוס נסיעה** ב־`BookingLocationService.broadcast_driver_location` ב־[`location_service.py`](../../backend/app/domain/bookings/location_service.py) (הראוטר רק מעביר לשירות). Backend מפרסם לערוץ `booking_{booking_id}` לכל הבוקינגים המאושרים. נוסע מתחבר ל־WS `/bookings/ws/{booking_id}/location?token=JWT` ומקבל עדכונים.
-- **נוסעים → נהג**: נוסע מדווח מיקום ב־POST /bookings/{booking_id}/passenger-location. **אימות בעלות על ההזמנה** ב־`BookingLocationService.broadcast_passenger_location` באותו קובץ. Backend מפרסם לערוץ `ride_{ride_id}:passenger_locations`. נהג מתחבר ל־WS `/rides/ws/{ride_id}/passengers?token=JWT` ומקבל עדכונים.
+- **נהג → נוסעים**: נהג מדווח מיקום ב־POST /bookings/{booking_id}/location (body: lat, lng, heading?, speed?). **לוגיקת הרשאות וסטטוס נסיעה** ב־`BookingLocationService.broadcast_driver_location` ב־[`location_service.py`](../../backend/app/domain/bookings/location_service.py) (הראוטר רק מעביר לשירות). Backend מפרסם לערוץ `booking_{booking_id}` לכל הבוקינגים המאושרים. נוסע מתחבר ל־WS **`GET /api/v1/bookings/ws/{booking_id}/location?token=JWT`** ומקבל עדכונים.
+- **נוסעים → נהג**: נוסע מדווח מיקום ב־POST /bookings/{booking_id}/passenger-location. **אימות בעלות על ההזמנה** ב־`BookingLocationService.broadcast_passenger_location` באותו קובץ. Backend מפרסם לערוץ `ride_{ride_id}:passenger_locations`. נהג מתחבר ל־WS **`GET /api/v1/rides/ws/{ride_id}/passengers?token=JWT`** ומקבל עדכונים.
 - **אימות WebSocket**: `get_current_user_ws` ב־`app/api/dependencies/auth.py` — טוקן מ־query string, מאמת JWT, מחזיר `WsUser` או `None` (**ללא DB** בזמן connect).
 
 ### פרונט (ביצועים ו-UX)

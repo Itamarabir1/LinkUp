@@ -26,7 +26,7 @@
 **תפקיד:** כל ה-API endpoints והלוגיקה העסקית
 
 **מה כן:**
-- ✅ WebSocket ב-FastAPI לנסיעות/בוקינגים/התראות (`/api/v1/rides/...`, `/api/v1/bookings/...`, `/api/v1/notifications/ws`) — אימות ב-`get_current_user_ws`: **JWT בלבד** (`WsUser`), בלי DB בזמן connect (פרטים: `ARCHITECTURE.md` בשורש, `docs/architecture/REALTIME.md`).
+- ✅ WebSocket ב-FastAPI לנסיעות/בוקינגים (`/api/v1/rides/...`, `/api/v1/bookings/...`) — אימות ב-`get_current_user_ws`: **JWT בלבד** (`WsUser`), בלי DB בזמן connect (פרטים: `ARCHITECTURE.md` בשורש, `docs/architecture/REALTIME.md`). **אין** כרגע `/api/v1/notifications/ws`; התראות in-app משתמשות ב-REST + אירועי `user:{id}:events` דרך chat-ws.
 - ✅ REST API endpoints
 - ✅ Calendar export (`GET /api/v1/chat/conversations/{id}/calendar.ics`)
 - ✅ תוצאות ניתוח AI ב־**`chat_analysis`**; **אין** `GET …/analysis` בראוטר הצ’אט החי — אל תסמכו על נתיב כזה עד שקיים בקוד (סקריפטים ישנים/k6 עשויים להזכיר מתוכנן)
@@ -95,10 +95,10 @@ Client → GET /api/v1/chat/conversations/{id}/calendar.ics (backend)
        → מחזיר קובץ .ics
 ```
 
-## התראות: שני ערוצים (חשוב)
+## התראות: צ'אט מול פיד in-app
 
 - **`chat:notification:*` (Redis → chat-ws)** — דחיפות הקשורות ל**צ'אט**; chat-ws מנתב ללקוח על אותו חיבור WS של הצ'אט (`/ws`).
-- **פיד התראות האפליקציה (מסך / באדג')** — **לא** עובר ב-chat-ws. הלקוח (ווב) מתחבר ל־**FastAPI** — **`GET /api/v1/notifications/ws?token=JWT`** — Redis Pub/Sub פנימי (`user_{user_id}`). בפרונט: `useChatNotificationsWebSocket` + גיבוי polling ב־`useChatNotificationsFeed` — ראו [`ARCHITECTURE.md`](../ARCHITECTURE.md) בשורש ו־[`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md).
+- **פיד התראות האפליקציה (מסך / באדג'):** הרשימה מ־**`GET /api/v1/users/me/notifications`** + polling ב־`useChatNotificationsFeed`. רענון חי דרך **`user:{user_id}:events`** על **אותו חיבור chat-ws** (פרסום backend → Redis משותף). אין WS נפרד ב-FastAPI ל־`/notifications/ws` — ראו [`ARCHITECTURE.md`](../ARCHITECTURE.md) ו־[`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md).
 
 ## סיכום
 
@@ -106,7 +106,7 @@ Client → GET /api/v1/chat/conversations/{id}/calendar.ics (backend)
 |---------|----------|--------|
 | WebSocket connections | chat-ws (Go) | Real-time, performance |
 | REST API endpoints | backend (Python) | Standard API pattern |
-| In-app notification **feed** WS (app bell / list) | backend (FastAPI `/notifications/ws`) | אותו מחזור חיים כמו WS נסיעות; Redis נפרד מערוצי הצ'אט |
+| In-app notification **feed** (REST + refresh events) | backend REST + **chat-ws** (`user:{id}:events`) | רשימה ב-REST; דחיפת רענון על אותו WS כמו צ'אט |
 | Chat-related notification fan-out | chat-ws (via `chat:notification:*`) | חיבור WS יחיד לשיחה |
 | Calendar export | backend (Python) | API endpoint |
 | AI analysis | backend worker (`ai-worker`) | Async, Redis DB 1 listener |

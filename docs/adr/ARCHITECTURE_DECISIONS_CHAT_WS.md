@@ -60,12 +60,12 @@
 
 ---
 
-## 6. פיד התראות האפליקציה — לא ב-chat-ws
+## 6. פיד התראות in-app — REST + אירועי `user:{id}:events` על chat-ws
 
 | | |
 |--|--|
-| **הערה** | מסך הפעמון / רשימת התראות in-app בווב מתחבר ל-**`/api/v1/notifications/ws`** ב-FastAPI, לא ל-chat-ws (ראו [WEBSOCKETS.md](WEBSOCKETS.md)). |
-| **למה** | הפרדת מחזור חיים: ערוצי צ'אט מול ערוץ per-user להתראות אפליקציה; אותו דפוס אימות ו-Redis פנימי כמו WS אחרים ב-backend. |
+| **הערה** | הרשימה נטענת מ-**`GET /api/v1/users/me/notifications`** (polling ~5 דקות ב־`useChatNotificationsFeed`). דחיפת רענון UI מגיעה דרך **`user:{user_id}:events`** על **אותו חיבור chat-ws** (לא FastAPI WS נפרד — ראו [WEBSOCKETS.md](WEBSOCKETS.md), [REALTIME.md](../architecture/REALTIME.md)). |
+| **למה** | חיבור WS אחד למשתמש; פרסום מ־`WebSocketProvider` ב-backend ל-Redis המשותף עם chat-ws. |
 
 ---
 
