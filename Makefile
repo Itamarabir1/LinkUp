@@ -1,15 +1,18 @@
-.PHONY: up down build logs ps restart migrate admin-check admin-grant admin-revoke
+.PHONY: render-pgbouncer-userlist up down build logs ps restart migrate admin-check admin-grant admin-revoke
 
 # Secrets and DB/Redis/RabbitMQ passwords: single source of truth — backend/.env
 COMPOSE=docker compose --env-file backend/.env
 
-up: ## Start all services
+render-pgbouncer-userlist: ## Regenerate infrastructure/pgbouncer/userlist.txt from backend/.env
+	bash "$(CURDIR)/scripts/ops/render-pgbouncer-userlist.sh"
+
+up: render-pgbouncer-userlist ## Start all services (refreshes pgbouncer userlist first)
 	$(COMPOSE) up -d
 
 down: ## Stop all services
 	$(COMPOSE) down
 
-build: ## Rebuild and start all services
+build: render-pgbouncer-userlist ## Rebuild and start all services
 	$(COMPOSE) up -d --build
 
 logs: ## Follow logs for all services
@@ -18,7 +21,8 @@ logs: ## Follow logs for all services
 ps: ## Show status of all services
 	$(COMPOSE) ps
 
-restart: ## Restart all services
+restart: render-pgbouncer-userlist ## Recreate pgbouncer (fresh env + userlist), then restart stack
+	$(COMPOSE) up -d --no-deps --force-recreate pgbouncer
 	$(COMPOSE) restart
 
 migrate: ## Run database migrations

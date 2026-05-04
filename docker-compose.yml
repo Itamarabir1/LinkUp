@@ -29,6 +29,9 @@ services:
       - linkup_network
 
   # --- Connection Pooler: PgBouncer (internal only) ---
+  # Note: never use `docker compose restart pgbouncer` alone after password edits —
+  # it keeps the old container/env. Prefer `make up`/`make restart` (recreates via
+  # Makefile) or `docker compose … up -d --no-deps --force-recreate pgbouncer`.
   pgbouncer:
     image: ${PGBOUNCER_IMAGE:-ghcr.io/itamarabir1/linkup/pgbouncer:latest}
     build:
