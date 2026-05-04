@@ -19,7 +19,7 @@ For the canonical architecture documentation, use:
 - [`docs/architecture/REALTIME.md`](docs/architecture/REALTIME.md)
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — production deploy and runbook
 - [`.github/dependabot.yml`](.github/dependabot.yml) — npm / pip / Docker (**per-directory** updates: **`/frontend`**, **`/backend`**, **`/infrastructure/pgbouncer`** — matches the file). Backend Python manifest: **`backend/pyproject.toml`** (+ **`backend/uv.lock`**); there is no backend `requirements.txt` at repo root.
-- [`docs/SECURITY_HEADERS.md`](docs/SECURITY_HEADERS.md) — edge CSP (enforcing) + XSS layering with the web SPA; see also [`docs/FEATURE_DECISIONS.md`](docs/FEATURE_DECISIONS.md#browser-csp-edge)
+- [`docs/SECURITY_HEADERS.md`](docs/SECURITY_HEADERS.md) — edge CSP (enforcing) + XSS layering with the web SPA (**`nginx/nginx.conf.template`** → `nginx/nginx.conf`, **`SENTRY_REPORT_URI`**, [`scripts/ops/render-nginx-conf.sh`](scripts/ops/render-nginx-conf.sh)); see also [`docs/FEATURE_DECISIONS.md`](docs/FEATURE_DECISIONS.md#browser-csp-edge)
 
 Service-specific architecture docs:
 

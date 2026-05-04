@@ -101,6 +101,8 @@ docker stop linkup_backend
   `docker compose up -d` — מרים `db`, `redis`, `rabbitmq`, **`migrate`** (**`alembic upgrade head`**), `chat-ws`, **`notification-worker`**, **`task-worker`**, **`ai-worker`**, **`backend`** (ללא **nginx**/frontend אלא עם `--profile prod`). שירות legacy **`outbox-worker`** עם profile **`compat`** — לא חלק מהסטאנדארד. אם **`migrate`** נכשל — `docker compose logs migrate`; **backend** לא יעלה עד הצלחה.  
   אם מריצים רק חלק: `docker compose up -d db redis rabbitmq chat-ws` — אז מתוך `backend/` הרץ **`uv run alembic upgrade head`** לפני API מקומי.
 
+- **פרופיל prod (nginx + frontend על פורט 80):** לפני `docker compose --profile prod up` — **`SENTRY_REPORT_URI`** ב־`backend/.env` ואז **`bash scripts/ops/render-nginx-conf.sh`** (יוצר `nginx/nginx.conf` מה־template). פירוט: **`docs/architecture/DEVELOPMENT.md`**, **`docs/SECURITY_HEADERS.md`**.
+
 ---
 
 ## אחרי שהכל רץ

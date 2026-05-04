@@ -10,7 +10,7 @@
 | ארכיטקטורה רחבה (קישורים לכל התחומים) | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | הרצה מקומית (CMD/Windows), Docker | [`RUN.md`](../RUN.md), [`docs/architecture/DEVELOPMENT.md`](architecture/DEVELOPMENT.md) |
 | פריסת production, rollback | [`docs/DEPLOYMENT.md`](DEPLOYMENT.md), [`docs/operations/RUNBOOK.md`](operations/RUNBOOK.md) |
-| ניתור, Prometheus, בריאות, Sentry, Better Stack | [`docs/operations/MONITORING.md`](operations/MONITORING.md), [`docs/architecture/API.md`](architecture/API.md) (Health) |
+| ניתור, Prometheus, בריאות, Sentry, Better Stack | [`docs/operations/MONITORING.md`](operations/MONITORING.md) (כולל טבלאות מטריקות והערות **wired vs reserved**), [`docs/architecture/API.md`](architecture/API.md) (Health) |
 | API endpoints | [`docs/architecture/API.md`](architecture/API.md) |
 | סכימת DB, Alembic | [`docs/architecture/DATABASE.md`](architecture/DATABASE.md), [`backend/alembic/README.md`](../backend/alembic/README.md) |
 | Outbox, RabbitMQ, DLQ | [`docs/architecture/EVENTS.md`](architecture/EVENTS.md) |
@@ -28,7 +28,8 @@
 ## 2. אימות מול הריפו (מקור אמת “חי”)
 
 - **Compose — שירותים ופרופילים:** [`docker-compose.yml`](../docker-compose.yml) (`prod`, `compat` ל־`outbox-worker`, וכו’).
-- **CI backend — סדר שלבים:** [`.github/workflows/backend-ci.yml`](../.github/workflows/backend-ci.yml) (Ruff → Alembic → `check-migration-head` → pytest RabbitMQ נקודתי → pytest מלא; push ל־`main` בונה תמונות `linkup/backend`, `worker`, `migrate`, `pgbouncer`).
+- **CI backend — סדר שלבים:** [`.github/workflows/backend-ci.yml`](../.github/workflows/backend-ci.yml) (Ruff → Alembic → `check-migration-head` → pytest RabbitMQ נקודתי → pytest מלא; push ל־`main` בונה תמונות `linkup/backend`, `worker`, `migrate`, `pgbouncer`; בלוק ה-deploy על EC2 מריץ `envsubst` ל־**`nginx/nginx.conf`** מ־**`SENTRY_REPORT_URI`** ב־`backend/.env` ול־**`userlist.txt`** מ־**`PGBOUNCER_ADMIN_PASSWORD`** + `POSTGRES_*`).
+- **Nginx CSP + PgBouncer secrets (מקור אמת):** [`nginx/nginx.conf.template`](../nginx/nginx.conf.template), [`scripts/ops/render-nginx-conf.sh`](../scripts/ops/render-nginx-conf.sh), [`docs/SECURITY_HEADERS.md`](SECURITY_HEADERS.md), [`infrastructure/pgbouncer/userlist.txt.template`](../infrastructure/pgbouncer/userlist.txt.template), סעיף **PgBouncer** ב־[`docs/FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#pgbouncer).
 - **תמונות GHCR בשורש הפרויקט:** [`README.md`](../README.md) (טבלת CI + רשימת repositories).
 - **רואטרים בפועל:** [`backend/app/api/v1/api_router.py`](../backend/app/api/v1/api_router.py) (prefix **`/api/v1`**).
 - **CI frontend — חוזה OpenAPI:** [`frontend-ci.yml`](../.github/workflows/frontend-ci.yml) → job **`contract-codegen`** (`npm run gen:api` + בדיקת `git diff` על [`frontend/src/api/generated/`](../frontend/src/api/generated/)).
@@ -64,3 +65,17 @@
 6. תסריטים: [`docs/internal/VIDEO_SCRIPT_ARCHITECTURE.md`](internal/VIDEO_SCRIPT_ARCHITECTURE.md)
 
 *כשמתעדכנת ארכיטקטורה שחוצה צוותים (למשל workers, compose, GHCR), מומלץ לעדכן גם טבלה §1 במסמך זה.*
+
+---
+
+## 7. רשימת בדיקה — תאימות תיעוד מול קוד (סריקה תקופתית)
+
+לפני merge של שינוי בדומיין או ב-realtime, כדאי לעבור על:
+
+| צעד | מקור אמת |
+|-----|----------|
+| אילו רואטרים באמת מחוברים | [`backend/app/api/v1/api_router.py`](../backend/app/api/v1/api_router.py) |
+| טבלאות HTTP לפי דומיין | [`docs/architecture/API.md`](architecture/API.md) |
+| WS ב-FastAPI (נסיעות / מיקום) + נתיבי chat-ws | [`docs/adr/WEBSOCKETS.md`](adr/WEBSOCKETS.md), [`docs/architecture/REALTIME.md`](architecture/REALTIME.md) |
+| התראות in-app (REST + `user:{id}:events`, לא רואטר `/notifications`) | [`docs/architecture/NOTIFICATIONS.md`](architecture/NOTIFICATIONS.md) |
+| איזה hook בפרונט יושב על איזה WS | [`frontend/src/hooks/`](../frontend/src/hooks/) (`useUserEventStream`, `useRideWebSocket`, `useReconnectingWebSocketState`, …) מול [`docs/ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) |

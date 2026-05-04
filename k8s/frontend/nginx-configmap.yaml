@@ -1,4 +1,4 @@
-# Edge routing aligned with nginx/nginx.conf: API + WS + presence proxy; SPA static from this pod.
+# Edge routing aligned with Compose edge nginx (nginx/nginx.conf.template → rendered nginx.conf): API + WS + presence proxy; SPA static from this pod.
 # (Docker Compose uses a separate nginx service + frontend container; here one image often bundles static + nginx.)
 apiVersion: v1
 kind: ConfigMap

@@ -119,9 +119,9 @@
 | | |
 |--|--|
 | **בעיה** | עיכוב **קבוע** (~3s) בין ניסיונות חיבור מחדש ל־WebSocket **מסנכרן** לקוחות אחרי נפילה המונית (deploy, restart, blip) — **thundering herd** על chat-ws / backend / Nginx בעת התאוששות. |
-| **החלטה** | פונקציה טהורה **`computeReconnectDelayMs`** ב־[`reconnectBackoff.ts`](../frontend/src/utils/reconnectBackoff.ts): בסיס **3s**, **כפול** בכל כשל, תקרה **30s**, **±20% jitter** על הערך אחרי התקרה; מונה ניסיונות **מתאפס ב־`onopen`** ובהרצת effect חדשה כשמשנים **`cid`** / **`reconnectKey`**. מחובר ל־[`useChatWebSocket.ts`](../frontend/src/pages/MessageThread/useChatWebSocket.ts), [`useReconnectingWebSocket.ts`](../frontend/src/hooks/useReconnectingWebSocket.ts), [`useReconnectingWebSocketState.ts`](../frontend/src/hooks/useReconnectingWebSocketState.ts); **`reconnectDelayMs`** בשני ההוקים הכלליים משמש **baseMs** כברירת מחדל (**3000**). |
+| **החלטה** | פונקציה טהורה **`computeReconnectDelayMs`** ב־[`reconnectBackoff.ts`](../frontend/src/utils/reconnectBackoff.ts): בסיס **3s**, **כפול** בכל כשל, תקרה **30s**, **±20% jitter** על הערך אחרי התקרה; מונה ניסיונות **מתאפס ב־`onopen`** ובהרצת effect חדשה כשמשנים **`cid`** / **`reconnectKey`**. מחובר ל־[`useChatWebSocket.ts`](../frontend/src/pages/MessageThread/useChatWebSocket.ts), [`useUserEventStream.ts`](../frontend/src/hooks/useUserEventStream.ts) (עוטף [`useReconnectingWebSocket.ts`](../frontend/src/hooks/useReconnectingWebSocket.ts) לערוץ **`user:{id}:events`**), [`useRideWebSocket.ts`](../frontend/src/hooks/useRideWebSocket.ts), [`useReconnectingWebSocketState.ts`](../frontend/src/hooks/useReconnectingWebSocketState.ts); **`reconnectDelayMs`** בשני ההוקים הכלליים משמש **baseMs** כברירת מחדל (**3000**). |
 | **Trade-off** | זמן עד התאוששות מלאה עלול להתארך אחרי שרידור ארוך של כשלים; לעומת זאת פחות עומס הקצפתי והתנהגות נדיבה יותר לשרת. |
-| **Interview pitch (≈30s)** | *"אותה תפיסה כמו Redis backoff בבקאנד — רק שגם ה-clients לא מציפים את השרת ברגע שהשירות חוזר: exponential backoff, cap 30s, jitter, ומונה שמתאפס ב-onopen. utility אחד לשלושת ה-hooks."* |
+| **Interview pitch (≈30s)** | *"אותה תפיסה כמו Redis backoff בבקאנד — רק שגם ה-clients לא מציפים את השרת ברגע שהשירות חוזר: exponential backoff, cap 30s, jitter, ומונה שמתאפס ב-onopen. **`computeReconnectDelayMs` אחד** משותף לצ’אט, לאירועי `user:*` על chat-ws, ל-WS נסיעות ב-FastAPI ול-GPS."* |
 | **הפניה** | [architecture/REALTIME.md](architecture/REALTIME.md), [ENGINEERING_HIGHLIGHTS.md](ENGINEERING_HIGHLIGHTS.md), [`reconnectBackoff.test.ts`](../frontend/src/utils/reconnectBackoff.test.ts) |
 
 ---
@@ -496,11 +496,11 @@
 | **בעיה** | כמה services (backend + workers) עם pools נפרדים יוצרים fan-out לחיבורי Postgres תחת עומס/redeploy. ב-EC2 בינוני זה פוגע בזיכרון/latency לפני CPU saturation. |
 | **החלטה** | להוסיף `pgbouncer` כ-service פנימי ב-Compose (transaction mode), ולהעביר runtime services ל-`POSTGRES_HOST=pgbouncer`. |
 | **אלטרנטיבות** | (1) להגדיל רק `max_connections` ב-Postgres — מטפל סימפטום ולא שורש. (2) בלי pooler, רק להקטין `DB_POOL_*` — עוזר חלקית. (3) RDS Proxy/managed pooler — עדיף בענן מנוהל אבל לא quickest win ב-EC2 קיים. |
-| **מה סניור עושה (לא טריוויאלי)** | (1) `migrate` נשאר direct ל-`db` ולא דרך pooler. (2) asyncpg statement cache מנוטרל (`statement_cache_size=0`) לתאימות transaction pooling. (3) PgBouncer internal-only בלי פתיחת `6432` לציבור. (4) right-size ל-SQLAlchemy pools כדי להימנע מ-double-pooling אגרסיבי. (5) אם images ציבוריים דורסים config דרך entrypoint — עוברים ל-custom image מבוקר במקום workaround שביר. (6) `userlist.txt` אמיתי לא נכנס ל-git: יוצרים בזמן deploy מ-template עם `envsubst` ו-`chmod 600`. |
+| **מה סניור עושה (לא טריוויאלי)** | (1) `migrate` נשאר direct ל-`db` ולא דרך pooler. (2) asyncpg statement cache מנוטרל (`statement_cache_size=0`) לתאימות transaction pooling. (3) PgBouncer internal-only בלי פתיחת `6432` לציבור. (4) right-size ל-SQLAlchemy pools כדי להימנע מ-double-pooling אגרסיבי. (5) אם images ציבוריים דורסים config דרך entrypoint — עוברים ל-custom image מבוקר במקום workaround שביר. (6) `userlist.txt` אמיתי לא נכנס ל-git: יוצרים בזמן deploy מ-template עם `envsubst` אחרי **`export PGBOUNCER_ADMIN_PASSWORD`** מ־**`backend/.env`** (עם fallback ל־SSH env), ו-`chmod 600`. |
 | **יתרון** | connection storms נבלמים מוקדם, יותר יציבות בזמן deploys, ו-headroom להמשך scaling בלי שינוי לוגיקה דומיינית. |
 | **Trade-off** | עוד רכיב תפעולי לנטר (health/config/auth), וצריך משמעת סביב סודות `userlist` + smoke checks בפריסה. |
 | **Interview pitch (≈30s)** | *"במקום שכל service יפציץ את Postgres בחיבורים, הוספתי PgBouncer כ-layer פנימי. השארתי migrations direct ל-db, כיביתי statement cache ב-asyncpg, והקטנתי pools אפליקטיביים — זה בדיוק ההבדל בין 'להוסיף container' לבין rollout יציב ברמת production."* |
-| **הפניה** | `docker-compose.yml`, `backend/app/db/session.py`, `infrastructure/pgbouncer/{Dockerfile,pgbouncer.ini,userlist.txt.template}`, `.github/workflows/backend-ci.yml`, `scripts/ops/pgbouncer-smoke.sh` |
+| **הפניה** | `docker-compose.yml`, `backend/app/db/session.py`, `infrastructure/pgbouncer/{Dockerfile,pgbouncer.ini,userlist.txt.template}`, `.github/workflows/backend-ci.yml`, `scripts/ops/pgbouncer-smoke.sh`, `backend/.env.example` (שדות `PGBOUNCER_ADMIN_PASSWORD`, `SENTRY_REPORT_URI`) |
 
 ---
 
@@ -581,7 +581,7 @@
 | **יתרון** | תיקון יציב ל-flow OAuth הקיים בלי לשנות לוגיקת auth בפרונט/בקאנד. |
 | **Trade-off** | מדיניות COOP/COEP פחות קשיחה לטובת תאימות OAuth popup. |
 | **Interview pitch (≈30s)** | *"שגיאת popup postMessage נפתרה בשכבת ה-edge, לא ב-workaround בפרונט. הוספנו COOP/COEP תואם ל-Google popup תוך שמירה על HTTPS flow מלא."* |
-| **הפניה** | `nginx/nginx.conf` |
+| **הפניה** | `nginx/nginx.conf.template`, `scripts/ops/render-nginx-conf.sh` |
 
 ---
 
@@ -592,12 +592,12 @@
 | | |
 |--|--|
 | **בעיה** | פרונט הווב הוא **SPA סטטי** (Vite → `dist/`); בלי מדיניות דפדפן, XSS או טעינת משאבים מזויפים קלים יותר; Report-Only בלבד לא חוסם. |
-| **החלטה** | **`nginx/nginx.conf`** (פרופיל prod ב־Compose) מחזיר **`Content-Security-Policy`** מאוכפת עם allowlists צרות לפי צרכי המוצר (Firebase, Sentry, GA/GTM, maps, uploads, Stripe, Google Sign-In). **`report-uri`** ממשיך ל-Sentry ingestion לוויק violation visibility. **`frame-src`** כולל `https://accounts.google.com` לצד Stripe. **בשכבת הסקריפטים:** הוסר **`'unsafe-inline'`** מ־**`script-src`**; Bootstrap לפני React (`linkup-lang` / `linkup-theme`) הועבר ל־**[`frontend/public/bootstrap.js`](../frontend/public/bootstrap.js)** והוא נטען ב־[`index.html`](../frontend/index.html) **לפני** **`/config.js`**. |
+| **החלטה** | **`nginx/nginx.conf.template`** (במאגר) + **`nginx/nginx.conf`** שנוצר בזמן ריצה (`gitignore`; פרופיל prod ב־Compose) מחזירים **`Content-Security-Policy`** מאוכפת עם allowlists צרות לפי צרכי המוצר (Firebase, Sentry, GA/GTM, maps, uploads, Stripe, Google Sign-In). **`report-uri`** מוזן מ־**`SENTRY_REPORT_URI`** ב־**`backend/.env`** (לא URL קשיח ב־Git). **`frame-src`** כולל `https://accounts.google.com` לצד Stripe. **בשכבת הסקריפטים:** הוסר **`'unsafe-inline'`** מ־**`script-src`**; Bootstrap לפני React (`linkup-lang` / `linkup-theme`) הועבר ל־**[`frontend/public/bootstrap.js`](../frontend/public/bootstrap.js)** והוא נטען ב־[`index.html`](../frontend/index.html) **לפני** **`/config.js`**. |
 | **אלטרנטיבות** | (1) להישאר ב-Report-Only — בטוח יותר לגלגל אבל לא מגביל exploitability. (2) CSP דרך meta tag ב-HTML — פחות שליטה מרכזית מול edge. (3) nonces בלי SSR על ה-entry module — דורש rewrite דינמי של `index.html` או שירות edge (ראו **`docs/SECURITY_HEADERS.md`**). |
 | **יתרון** | Defense-in-depth מול XSS לצד **`sanitizeHtml`**, **`react/no-danger`**, ודחיית HTML בצ'אט ב-API. |
 | **Trade-off** | **`style-src`** עדיין כולל **`'unsafe-inline'`** (Vite/CSS); כל **inline script** חדש ב־HTML ידרוש hash או העברה לקובץ תחת **`'self'`**. סנכרון ידני נדרש אם מסלול **K8s** משתמש ב־**`k8s/frontend/nginx-configmap.yaml`**. |
 | **Interview pitch (≈30s)** | *"הקשחנו XSS בשלוש שכבות: קלט טקסט בלבד בצ'אט, sanitization בפרונט, ו-CSP מאוכף ב-nginx עם דיווחים ל-Sentry — ומודעים שב-SPA בלי SSR, nonces דורשים עוד שכבה ב-edge."* |
-| **הפניה** | `nginx/nginx.conf`, **`docs/SECURITY_HEADERS.md`**, **`k8s/frontend/nginx-configmap.yaml`** |
+| **הפניה** | `nginx/nginx.conf.template`, **`scripts/ops/render-nginx-conf.sh`**, **`docs/SECURITY_HEADERS.md`**, **`k8s/frontend/nginx-configmap.yaml`** |
 
 ---
 
@@ -614,7 +614,7 @@
 | **יתרון** | תהליך פריסה אוטומטי, עקבי ומהיר, שמתאים לתקציב קטן ולשרת יחיד בלי לבנות פלטפורמה כבדה. |
 | **Trade-off** | זה low-downtime ולא zero-downtime מוחלט, כי backend רץ כרגע בעותק יחיד בזמן ההחלפה. |
 | **Interview pitch (≈30s)** | *"בחרתי CD פרגמטי לשרת יחיד: SHA-tag deploy + health gate + auto rollback. זה נותן אמינות תפעולית גבוהה בלי לשלם על ALB/תשתית כפולה, ומתאים לשלב הסקייל הנוכחי."* |
-| **הפניה** | `.github/workflows/backend-ci.yml`, `docker-compose.yml`, `nginx/nginx.conf`, `docs/architecture/DEVELOPMENT.md` |
+| **הפניה** | `.github/workflows/backend-ci.yml`, `docker-compose.yml`, `nginx/nginx.conf.template`, `scripts/ops/render-nginx-conf.sh`, `docs/architecture/DEVELOPMENT.md` |
 
 ---
 

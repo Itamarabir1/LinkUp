@@ -124,7 +124,7 @@ Two probe endpoints live at FastAPI **root** (not under `/api/v1/`) on purpose: 
 
 ### Why `/readyz` is not public
 
-`/readyz` enumerates the internal dependency stack (Postgres, Redis, RabbitMQ, Google API circuit-breaker state). Exposing that publicly is free reconnaissance for an attacker (port-scan targets, CVE matching). The exposure policy is enforced in [`nginx/nginx.conf`](../../nginx/nginx.conf):
+`/readyz` enumerates the internal dependency stack (Postgres, Redis, RabbitMQ, Google API circuit-breaker state). Exposing that publicly is free reconnaissance for an attacker (port-scan targets, CVE matching). The exposure policy is enforced in the rendered edge config (from [`nginx/nginx.conf.template`](../../nginx/nginx.conf.template) → `nginx/nginx.conf`; see [`scripts/ops/render-nginx-conf.sh`](../../scripts/ops/render-nginx-conf.sh) / [`docs/SECURITY_HEADERS.md`](../SECURITY_HEADERS.md)):
 
 ```nginx
 location = /readyz {
@@ -170,6 +170,18 @@ curl -ks https://localhost/readyz
 ### Future work
 
 If external readiness monitoring becomes a requirement (e.g. dependency-aware status page), the path is to add Basic-Auth or an `allow` for the monitor's static IP — *not* to drop the loopback restriction. See [`docs/FUTURE_WORK.md`](../FUTURE_WORK.md).
+
+## Prometheus — רישום מטריקות (מחוברות מול שמורות)
+
+מקור האמת לשמות והטיפוסים: [`backend/app/infrastructure/metrics.py`](../../backend/app/infrastructure/metrics.py).
+
+הטבלאות למעלה (Billing, Rate limit, Geocode, Circuit breaker, RabbitMQ וכו’) מתארות מטריקות ש**בפועל מתעדכנות מהקוד** בזרימות הרלוונטיות.
+
+**מוגדרים ב־`metrics.py` אך כרגע לא מוזנים מקריאות בקוד** (אל תבנו עליהם dashboards/SLO עד wiring):  
+`rabbitmq_consumer_restarts_total`, `notifications_sent_total`, `notifications_failed_total`,  
+`outbox_pending_depth`, `geo_requests_total`, ו־Histogram **`noop_latency_histogram`** (שמור לעתיד).
+
+**עומק DLQ:** [`run_dlq_monitor`](../../backend/app/infrastructure/rabbitmq/dlq_monitor.py) כותב **לוגים** (warning/critical לפי סף). ה־Gauge **`rabbitmq_dlq_depth`** אינו מתעדכן מהמוניטור הנוכחי — ניטור עומק דרך לוגים / ממשק RabbitMQ, או הרחבת הקוד אם תרצו ייצוא ל־Prometheus.
 
 ## Alerting Baseline
 

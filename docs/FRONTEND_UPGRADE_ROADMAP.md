@@ -179,9 +179,9 @@ Additional progress (recently completed outside full-chat scope):
 ## 3) Tier-2 Senior FE Hardening - Remaining
 
 ### S.1 Security Headers + Sourcemap Hardening (finish)
-- [x] CSP: enforcing **`Content-Security-Policy`** on Compose **`nginx/nginx.conf`** (Report-Only retired for that path); **`script-src`** hardened (**ללא** `'unsafe-inline'`) עם bootstrap ב־**`frontend/public/bootstrap.js`**; `frame-src` + Google Sign-In; `report-uri` → Sentry CSP ingestion — **`docs/SECURITY_HEADERS.md`** / **`docs/ENGINEERING_HIGHLIGHTS.md`**.
+- [x] CSP: enforcing **`Content-Security-Policy`** on Compose edge nginx (**`nginx/nginx.conf.template`** → `nginx/nginx.conf` via **`scripts/ops/render-nginx-conf.sh`** / CI; **`SENTRY_REPORT_URI`** in **`backend/.env`**); **`script-src`** hardened (**ללא** `'unsafe-inline'`) עם bootstrap ב־**`frontend/public/bootstrap.js`**; `frame-src` + Google Sign-In; `report-uri` from env — **`docs/SECURITY_HEADERS.md`** / **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 - [~] Post-deploy verification: smoke login/chat/maps/uploads/billing; watch Sentry CSP reports; tune allowlists if needed (**K8s:** keep **`k8s/frontend/nginx-configmap.yaml`** in sync when using that ingress path).
-- [ ] Execute post-deploy edge (TLS/nginx) + WebSocket smoke test (disciplined checklist; include HTTP/2 only if enabled in `nginx.conf`).
+- [ ] Execute post-deploy edge (TLS/nginx) + WebSocket smoke test (disciplined checklist; include HTTP/2 only if enabled in **`nginx/nginx.conf.template`**).
 
 ### S.2 Supply Chain
 - [ ] SBOM generation/release artifact flow deferred to `docs/FUTURE_WORK.md`.
