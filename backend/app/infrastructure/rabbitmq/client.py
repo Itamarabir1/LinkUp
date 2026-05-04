@@ -24,7 +24,7 @@ class RabbitMQClient:
         async with self._lock:
             if self._connection is None or self._connection.is_closed:
                 try:
-                    self._connection = await aio_pika.connect_robust(settings.RABBITMQ_URL, timeout=10)
+                    self._connection = await aio_pika.connect_robust(settings.RABBITMQ_URL, timeout=10, heartbeat=60)
                     self._publish_channel = await self._connection.channel()
                     logger.info("✅ RabbitMQ Client connected role=%s", self.role)
                 except Exception as e:
