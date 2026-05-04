@@ -42,7 +42,7 @@ http {
     add_header X-Frame-Options "DENY" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "geolocation=(self), microphone=(), camera=(), payment=(self)" always;
-    # CSP: enforcing; CSP reports → Sentry security endpoint (key is ingestion-side, still avoid committing real values — prefer templating).
+    # CSP: enforcing; report-uri value from backend/.env → SENTRY_REPORT_URI (scripts/ops/render-nginx-conf.sh or CI deploy envsubst '${SENTRY_REPORT_URI}')
     add_header Content-Security-Policy "
       default-src 'self';
       script-src 'self' https://www.gstatic.com https://*.googleapis.com https://browser.sentry-cdn.com https://www.googletagmanager.com https://accounts.google.com;
@@ -54,7 +54,7 @@ http {
       frame-ancestors 'none';
       base-uri 'self';
       form-action 'self' https://checkout.stripe.com;
-      report-uri https://o4511127275503616.ingest.us.sentry.io/api/4511256496504832/security/?sentry_key=e39e0e1fef1d9b90e1c51dc8e8d44cca;
+      report-uri ${SENTRY_REPORT_URI};
     " always;
 
     # Liveness probe — public. Innocuous payload, safe for external uptime

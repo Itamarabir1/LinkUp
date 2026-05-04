@@ -73,6 +73,7 @@ Notes:
 - `frontend/.env` provides `VITE_*` + `APP_ENV` for frontend runtime rendering.
 - `chat-ws/.env` contains chat-ws specific env values.
 - Deploy script enforces backend/frontend env presence and fails fast when missing.
+- **Edge nginx:** CI renders **`nginx/nginx.conf`** from **`nginx/nginx.conf.template`** with `envsubst '${SENTRY_REPORT_URI}'`, reading **`SENTRY_REPORT_URI`** from **`backend/.env`** (same as local: **`bash scripts/ops/render-nginx-conf.sh`**). **PgBouncer:** `export` of **`PGBOUNCER_ADMIN_PASSWORD`** from **`backend/.env`** (with SSH env fallback), then **`userlist.txt`** and **`chmod 600`**.
 
 ## Frontend Runtime Config (No build-time secrets)
 

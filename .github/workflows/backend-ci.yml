@@ -6,6 +6,7 @@ on:
     paths:
       - 'backend/**'
       - 'infrastructure/**'
+      - 'nginx/**'
       - 'docker-compose.yml'
       - '.github/workflows/backend-ci.yml'
   pull_request:
@@ -13,6 +14,7 @@ on:
     paths:
       - 'backend/**'
       - 'infrastructure/**'
+      - 'nginx/**'
       - 'docker-compose.yml'
       - '.github/workflows/backend-ci.yml'
 
@@ -193,14 +195,25 @@ jobs:
             POSTGRES_DB="$(grep -E '^POSTGRES_DB=' backend/.env | head -1 | cut -d= -f2-)"
             export POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB
 
-            [ -n "${POSTGRES_USER:-}" ]            || { echo "ERROR: POSTGRES_USER missing";          exit 1; }
-            [ -n "${POSTGRES_PASSWORD:-}" ]        || { echo "ERROR: POSTGRES_PASSWORD missing";      exit 1; }
+            _pgb_from_file="$(grep -E '^PGBOUNCER_ADMIN_PASSWORD=' backend/.env | head -1 | cut -d= -f2-)"
+            export PGBOUNCER_ADMIN_PASSWORD="${_pgb_from_file:-$PGBOUNCER_ADMIN_PASSWORD}"
+
+            [ -n "${POSTGRES_USER:-}" ]             || { echo "ERROR: POSTGRES_USER missing";          exit 1; }
+            [ -n "${POSTGRES_PASSWORD:-}" ]         || { echo "ERROR: POSTGRES_PASSWORD missing";      exit 1; }
             [ -n "${PGBOUNCER_ADMIN_PASSWORD:-}" ] || { echo "ERROR: PGBOUNCER_ADMIN_PASSWORD missing"; exit 1; }
+
+            _sentry_report="$(grep -E '^SENTRY_REPORT_URI=' backend/.env | head -1 | cut -d= -f2-)"
+            export SENTRY_REPORT_URI="${_sentry_report:-$SENTRY_REPORT_URI}"
+            [ -n "${SENTRY_REPORT_URI:-}" ] || { echo "ERROR: SENTRY_REPORT_URI missing in backend/.env (CSP report-uri for nginx)"; exit 1; }
 
             command -v envsubst >/dev/null 2>&1 || { echo "ERROR: envsubst missing"; exit 1; }
             envsubst < "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt.template" \
                    > "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
-            chmod 644 "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
+            chmod 600 "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
+
+            envsubst '${SENTRY_REPORT_URI}' < "$DEPLOY_DIR/nginx/nginx.conf.template" \
+                   > "$DEPLOY_DIR/nginx/nginx.conf"
+            chmod 600 "$DEPLOY_DIR/nginx/nginx.conf"
 
             OWNER_LOWER="$(echo "$IMAGE_OWNER" | tr '[:upper:]' '[:lower:]')"
             GHCR_BASE="ghcr.io/$OWNER_LOWER/linkup"
@@ -211,7 +224,7 @@ jobs:
             NGINX_INPUTS_CHANGED=0
             while IFS= read -r changed_file; do
               case "$changed_file" in
-                nginx/nginx.conf|docker-compose.yml|frontend/Dockerfile|frontend/nginx.conf)
+                nginx/nginx.conf.template|nginx/nginx.conf|docker-compose.yml|frontend/Dockerfile|frontend/nginx.conf)
                   NGINX_INPUTS_CHANGED=1
                   ;;
               esac

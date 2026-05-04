@@ -1,8 +1,15 @@
 # Security Headers & CSP (`nginx`/edge)
 
-This document describes the edge hardening policy for Compose **`nginx/nginx.conf`** and how CSP fits with broader **XSS defense-in-depth** (browser policy + app hygiene + API input policy).
+This document describes the edge hardening policy for Compose **edge nginx** and how CSP fits with broader **XSS defense-in-depth** (browser policy + app hygiene + API input policy).
 
-Compose source of truth: **[`nginx/nginx.conf`](../nginx/nginx.conf)**.  
+**Template:** [`nginx/nginx.conf.template`](../nginx/nginx.conf.template) (committed). The CSP `report-uri` line uses **`${SENTRY_REPORT_URI}`** — substituted at deploy time only (never commit the ingestion URL).
+
+**Rendered file:** `nginx/nginx.conf` is **generated** (`gitignored`). Set **`SENTRY_REPORT_URI`** in **`backend/.env`** (same key EC2 deploy reads), then run:
+
+```bash
+bash scripts/ops/render-nginx-conf.sh
+```
+
 If you deploy the **Kubernetes** frontend bundle, keep **[`k8s/frontend/nginx-configmap.yaml`](../k8s/frontend/nginx-configmap.yaml)** aligned with the same CSP/connect/frame rules (currently easy to drift).
 
 ---
@@ -38,7 +45,7 @@ No inline `<script>` bodies remain in the shell for these concerns, so **`script
 
 ### TLS / HTTP (Compose `nginx`)
 
-Canonical config: [`nginx/nginx.conf`](../nginx/nginx.conf). The **`443`** server block uses **`listen 443 ssl`** (the `http2` keyword is **not** present in the committed file) — effectively **HTTP/1.1 over TLS** unless you add **`http2`** to the directive. After any change to ALPN/HTTP version, re-smoke **WebSockets** (`/api/v1/…` upgrade, `/ws`) and large uploads.
+Canonical template: [`nginx/nginx.conf.template`](../nginx/nginx.conf.template) → rendered `nginx/nginx.conf` locally via [`scripts/ops/render-nginx-conf.sh`](../scripts/ops/render-nginx-conf.sh). The **`443`** server block uses **`listen 443 ssl`** (the `http2` keyword is **not** present in the template) — effectively **HTTP/1.1 over TLS** unless you add **`http2`** to the directive. After any change to ALPN/HTTP version, re-smoke **WebSockets** (`/api/v1/…` upgrade, `/ws`) and large uploads.
 
 - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
   - Forces browsers to use HTTPS after first successful secure visit.
@@ -75,7 +82,7 @@ Canonical config: [`nginx/nginx.conf`](../nginx/nginx.conf). The **`443`** serve
 ## CSP origins: how to add a new third-party
 
 1. Identify exact endpoint(s) used by runtime (`script-src`, `connect-src`, `img-src`, `frame-src`, etc.).
-2. Add the minimal required origin to the correct directive in **`nginx/nginx.conf`** (and **`k8s/frontend/nginx-configmap.yaml`** if applicable).
+2. Add the minimal required origin to the correct directive in **`nginx/nginx.conf.template`**, rerun **`scripts/ops/render-nginx-conf.sh`**, then retest Compose edge (and **`k8s/frontend/nginx-configmap.yaml`** if applicable).
 3. After a policy change: smoke **login**, **maps**, **chat**, **uploads**, **billing/Stripe**, **push/analytics**.
 4. Verify no wildcard can be replaced by a specific host where practical.
 5. Document why this origin is required and who owns it.

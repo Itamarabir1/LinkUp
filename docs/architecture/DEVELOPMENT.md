@@ -27,7 +27,7 @@
   - **PgBouncer image:** נבנה מקומית מ-`infrastructure/pgbouncer/Dockerfile` (ולא image ציבורי), כדי להבטיח שקובץ `pgbouncer.ini` הממופה ב-volume נשאר מקור אמת.
   - **פיתוח:** `docker compose up -d` → תשתית + **migrate** + 3 workers + backend (**8000**) + chat-ws (**8081**). פרונט: **`npm run dev`** בתיקיית `frontend`, לא קונטיינר.
    - **WebSocket בפיתוח:** צ'אט — `ws://localhost:8081/ws` (chat-ws); נסיעות / מיקום / **פיד התראות in-app** — `ws://localhost:8000/api/v1/...` (backend). מרוכז ב־[`frontend/src/config/env.ts`](../../frontend/src/config/env.ts).
-   - **סטאק מלא מאחורי Nginx (פורט 80):** `docker compose --profile prod up -d --build`.
+   - **סטאק מלא מאחורי Nginx (פורט 80):** לפני `docker compose --profile prod` הגדר **`SENTRY_REPORT_URI`** ב־`backend/.env` (endpoint של CSP reports מ־Sentry) והפעל **`bash scripts/ops/render-nginx-conf.sh`** כדי לייצר `nginx/nginx.conf` מה־template. אחר כך: `docker compose --profile prod up -d --build`.
   - **FCM (Model B לפרודקשן):** אין mount של קובץ credentials לקונטיינרים. בפרודקשן מגדירים `FIREBASE_CREDENTIALS_JSON` ב־`backend/.env` (JSON בשורה אחת). `FIREBASE_SERVICE_ACCOUNT_PATH` נשאר fallback לפיתוח לוקאלי בלבד.
    - **שינוי `backend/.env`:** משתני הסביבה של מיכל ה-backend נטענים בעת **יצירת** הקונטיינר. אחרי עריכת הקובץ הרץ `docker compose up -d --force-recreate backend` (לא מספיק `docker compose restart backend`).
   - **ולידציית פרודקשן אחרי שינוי סודות:** הרץ `bash scripts/ops/firebase-modelb-smoke.sh` משורש הפרויקט כדי לאמת טעינת Firebase + Redis contracts בפועל.
@@ -317,6 +317,7 @@ LinkUp/
   - `task-worker:9092/metrics`
   - `ai-worker:9093/metrics`
 - Prometheus scrape מוגדר ב-`monitoring/prometheus.yml`.
+- מטריקות **שמורות לעומת מחוברות** (לא לבנות התראות על Counter/Gauge שלא מוזנים): [`docs/operations/MONITORING.md`](../operations/MONITORING.md) § Prometheus — רישום מטריקות.
 
 ---
 
@@ -324,7 +325,7 @@ LinkUp/
 
 - **Async refactor (passengers/bookings/rides):** רוב זרימות הליבה עברו ל-SQLAlchemy async (`AsyncSession`, `select/execute`) כדי לשפר throughput ולשמור שרשרת async נקייה בין router -> service -> crud. **מסך “הזמנות שלי” (ווב):** endpoints מאוגדים `GET /bookings/driver-summary` ו־`GET /bookings/passenger-summary` עם `joinedload` / `with_loader_criteria` — ראו `docs/architecture/DATABASE.md` ו־`API.md`.
 - **Async end-to-end (API + workers):** **Bookings** וזרימות ליבה async-only; workers (למשל `app/workers/tasks/notification_tasks.py`) משתמשים ב־`await db.execute(select(...))` — אין `Session.run_sync` בקוד האפליקציה. `run_sync` נשאר רק ב־Alembic (`alembic/env.py`) עבור מיגרציות.
-- **Geocode cache (24h):** כתובות שחוזרות על עצמן נשמרות ב-Redis ל-24 שעות כדי לחסוך קריאות **Google Geocoding** ולשפר latency.
+- **Geocode cache (24h) + stampede:** כתובות נשמרות ב-Redis ל-24 שעות; על **cold miss** או פרץ בקשות מקבילות לאותו מפתח — **`get_or_compute`** (`cache_stampede.py`) מאחד קריאות ל-Google. פירוט: [`FEATURE_DECISIONS.md`](../FEATURE_DECISIONS.md#geocode-cache-stampede), [`MONITORING.md`](../operations/MONITORING.md).
 - **Admin API + מסך אדמין:** `GET/PATCH … /api/v1/admin/*` דרך `get_current_admin_user`; ממשק React ב־`frontend/src/features/admin/` (`/admin`, lazy). פירוט: **`ADMIN_DASHBOARD.md`** בשורש ה-repo.
 - **RabbitMQ reliability refactor (PR1+PR2):** נוספו `run_supervised` + `ConsumerSupervisor` עם draining states ו-`max_retries`; ה-messaging path פוצל ל-clients לפי תפקיד (`rabbit_client`/`outbox_rabbit_client`/`worker_rabbit_client`) עם channel isolation ל-consumers. Queue config מרוכז ב-`backend/app/infrastructure/rabbitmq/topology.py` (`QueueSpec`).
 - **RabbitMQ PR3/PR4/PR5:** retry עבר ל-broker-native DLX/TTL + `x-death`; נוסף `run_dlq_monitor` לניטור עומק DLQ; ונוסף כלי תפעולי `scripts/ops/rabbitmq-dlq-replay.py` ל-replay מבוקר מתורי DLQ.
