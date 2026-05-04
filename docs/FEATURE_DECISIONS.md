@@ -549,7 +549,7 @@
 | **יתרון** | image agnostic לסביבה; שינוי קונפיג = restart, לא rebuild/pipeline. |
 | **Trade-off** | עוד שכבת bootstrap בפרונט (template + entrypoint) וחובה לנהל env files בשרת בצורה עקבית. |
 | **Interview pitch (≈30s)** | *"הוצאתי קונפיג פרונט מזמן build לזמן runtime. אותו image רץ בכל סביבה, וה-entrypoint מייצר config.js מה-env. זה 12-factor נקי ומונע drift בין builds."* |
-| **הפניה** | `frontend/docker/40-render-config.sh`, `frontend/src/config/runtime.ts`, `docker-compose.yml` |
+| **הפניה** | `frontend/docker/40-render-config.sh` (**fail-fast** על מפתחות Firebase חובה; **defaults** לערכים אופציונליים), `frontend/src/config/runtime.ts`, `docker-compose.yml` (**`frontend`** עם **`env_file: ./frontend/.env`** בפרופיל prod) |
 
 ---
 

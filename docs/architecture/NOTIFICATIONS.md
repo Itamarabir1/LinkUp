@@ -11,6 +11,12 @@ Canonical overview of how outbound notifications are produced, rendered, and del
    - **Push:** FCM with **data-only** payloads (see [`../FCM_SYSTEM_SUMMARY.md`](../FCM_SYSTEM_SUMMARY.md), [`../adr/FCM_AND_PUSH.md`](../adr/FCM_AND_PUSH.md)).
    - **In-app (רשימה):** **`GET /api/v1/users/me/notifications`** — מקור האמת לרשימת התראות; בפרונט polling כל **~5 דקות** (`useChatNotificationsFeed`). **רענון חי:** פרסום לערוץ Redis **`user:{user_id}:events`** (משותף עם chat-ws) מ־[`WebSocketProvider`](../../backend/app/domain/notifications/providers/websocket_provider.py); הלקוח מקבל על **אותו חיבור chat-ws** ומזניק רענון דרך **`useUserEvent`** — ראו [`REALTIME.md`](REALTIME.md). אין כרגע WS נפרד **`/api/v1/notifications/ws`** ב-FastAPI.
 
+## Providers and DB session
+
+- [`BaseNotificationProvider`](../../backend/app/domain/notifications/providers/base.py) defines **`send(user, template_name, context, db=None)`** where **`db`** is an optional SQLAlchemy **`AsyncSession`**.
+- [`NotificationCommand`](../../backend/app/domain/notifications/manager.py) carries **`db`** from [`NotificationHandler._dispatch`](../../backend/app/domain/notifications/core/handler.py) (same session as the worker/handler transaction). [`notification_manager`](../../backend/app/domain/notifications/manager.py) passes **`db=cmd.db`** into every provider **`send`**.
+- **Email** and **WebSocket** providers ignore **`db`**. **Push** uses it when Firebase returns **`UnregisteredError`** or **`SenderIdMismatchError`**: [`PushProvider`](../../backend/app/domain/notifications/providers/push_provider.py) calls **`crud_user.update_fcm_token(..., token=None)`** to clear **`users.fcm_token`** before re-raising, so stale device registrations do not accumulate server-side.
+
 ## Email — Brevo + circuit breaker
 
 - **Implementation:** [`backend/app/domain/notifications/channels/email/client.py`](../../backend/app/domain/notifications/channels/email/client.py) — `EmailClient.send` checks **`brevo_email_cb.allow_request()`** before any SDK call. The retried Brevo call lives on **`_send_with_retry`** (Tenacity: up to 3 attempts with exponential backoff for `ApiException` / `ConnectionError`). On success → **`record_success()`** once; after all retries fail on those types → **`record_failure()`** once per logical `send()`. Missing **`BREVO_API_KEY`** raises **`ValueError`** before the circuit breaker (misconfiguration, not counted as provider failure).

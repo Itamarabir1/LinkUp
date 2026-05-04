@@ -239,6 +239,7 @@ class NotificationHandler:
                         **context,
                         "user_name": getattr(user1, "full_name", "") or getattr(user1, "first_name", ""),
                     },
+                    db=db,
                 )
                 await notification_manager.process_and_send(command1)
 
@@ -281,6 +282,7 @@ class NotificationHandler:
             template=template_path,
             channels=strategy.get("channels", ["email"]),
             context=context,
+            db=db,
         )
         logger.info(
             "[NOTIF] Handler: dispatching to manager event=%s user_id=%s",

@@ -2,6 +2,8 @@ import json
 import logging
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.domain.notifications.providers.base import BaseNotificationProvider
 from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 
@@ -23,6 +25,7 @@ class WebSocketProvider(BaseNotificationProvider):
         user: Any,
         template: str | dict[str, Any],
         context: dict[str, Any],
+        db: AsyncSession | None = None,
     ) -> None:
         user_id = getattr(user, "user_id", None) or getattr(user, "id", None)
         if not user_id:

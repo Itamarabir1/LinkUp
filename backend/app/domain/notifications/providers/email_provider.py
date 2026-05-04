@@ -1,6 +1,8 @@
 import logging
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.domain.notifications.channels.email.client import email_client
 from app.domain.notifications.channels.email.renderer import render_email_template
 from app.domain.notifications.providers.base import BaseNotificationProvider
@@ -21,7 +23,13 @@ class EmailProvider(BaseNotificationProvider):
         # Leave placeholders not in context as-is (if a value is missing)
         return result
 
-    async def send(self, user: User, template_name: str, context: dict[str, Any]):
+    async def send(
+        self,
+        user: User,
+        template_name: str,
+        context: dict[str, Any],
+        db: AsyncSession | None = None,
+    ):
         try:
             # Subject may come from context (builder prepared it) — substitute placeholders
             raw_subject = context.get("subject", "Update from LinkUp")

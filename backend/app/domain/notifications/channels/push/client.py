@@ -2,6 +2,13 @@ import asyncio
 import logging
 
 from firebase_admin import messaging
+from firebase_admin.exceptions import (
+    UnavailableError,
+    InternalError,
+    DeadlineExceededError,
+    UnknownError,
+)
+from firebase_admin.messaging import UnregisteredError, SenderIdMismatchError
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -20,9 +27,15 @@ class FCMClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=60),
-        # Do not retry on invalid token (Firebase 400/404)
-        retry=retry_if_exception_type(Exception),
-        before_sleep=lambda retry_state: logger.info(f"⏳ Push failed, retrying... (Attempt {retry_state.attempt_number})"),
+        retry=retry_if_exception_type((
+            UnavailableError,
+            InternalError,
+            DeadlineExceededError,
+            UnknownError,
+        )),
+        before_sleep=lambda retry_state: logger.info(
+            f"⏳ Push failed, retrying... (Attempt {retry_state.attempt_number})"
+        ),
     )
     async def send(self, token: str, title: str, body: str, data: dict | None = None):
         """
@@ -42,15 +55,18 @@ class FCMClient:
             token=token,
         )
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         try:
             # Run in executor to avoid blocking the event loop
             response = await loop.run_in_executor(None, lambda: messaging.send(message))
             logger.info(f"✅ Push sent successfully: {response}")
             return response
+        except (UnregisteredError, SenderIdMismatchError) as e:
+            logger.warning(f"⚠️ FCM token invalid (not retrying): {e}")
+            raise
         except Exception as e:
             logger.error(f"❌ FCM Send Error: {e}")
-            raise e
+            raise
 
 
 # Singleton

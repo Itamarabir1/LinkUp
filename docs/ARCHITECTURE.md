@@ -25,7 +25,7 @@ Also surfaced in the repo root [`README.md`](../README.md#architecture).
 - [`docs/architecture/DATABASE.md`](architecture/DATABASE.md) — PostgreSQL/PostGIS schema, indexes, and migrations
 - [`docs/architecture/EVENTS.md`](architecture/EVENTS.md) — Outbox, RabbitMQ topology, retry/DLQ flow
 - [`docs/architecture/REALTIME.md`](architecture/REALTIME.md) — WebSocket architecture, Redis pub/sub, GPS/presence
-- [`docs/architecture/NOTIFICATIONS.md`](architecture/NOTIFICATIONS.md) — Outbox → workers, email (Brevo + **circuit breaker**), push (FCM), in-app (**REST** רשימה + רענון חי דרך **`user:{id}:events`** על chat-ws)
+- [`docs/architecture/NOTIFICATIONS.md`](architecture/NOTIFICATIONS.md) — Outbox → workers, email (Brevo + **circuit breaker**), push (FCM + DB ניקוי טוקן על רישום לא תקף), in-app (**REST** רשימה + רענון חי דרך **`user:{id}:events`** על chat-ws); **`AsyncSession`** מוזרם ל־`provider.send(..., db)` מה־handler
 - [`docs/architecture/AI.md`](architecture/AI.md) — AI chat-summary pipeline (**`ai-worker`**, Groq, Redis completion)
 - [`docs/architecture/STORAGE.md`](architecture/STORAGE.md) — S3 presigned uploads, avatar versioning, CloudFront קריאה
 - [`docs/architecture/DEVELOPMENT.md`](architecture/DEVELOPMENT.md) — local/dev architecture and setup conventions

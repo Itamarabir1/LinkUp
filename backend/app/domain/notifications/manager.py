@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.domain.notifications.providers.email_provider import EmailProvider
 from app.domain.notifications.providers.push_provider import PushProvider
@@ -13,11 +13,14 @@ logger = logging.getLogger(__name__)
 
 # Command object — contract between Handler and Manager
 class NotificationCommand(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     user: Any  # User object from Resolver
     template: str
     channels: list[str]
     context: dict[str, Any]
     event_key: str
+    db: Any | None = None  # AsyncSession — Any to avoid Pydantic complexity
 
 
 class NotificationManager:
@@ -67,7 +70,7 @@ class NotificationManager:
     async def _safe_send(self, provider, channel_name, cmd: NotificationCommand):
         try:
             ctx = {**cmd.context, "event_key": cmd.event_key}
-            await provider.send(cmd.user, cmd.template, ctx)
+            await provider.send(cmd.user, cmd.template, ctx, db=cmd.db)
             logger.info(f"✅ {channel_name} sent to user_id={getattr(cmd.user, 'user_id', getattr(cmd.user, 'id', 'N/A'))}")
         except Exception as e:
             # Do not re-raise — other channels should still complete

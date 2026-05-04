@@ -70,7 +70,7 @@ docker compose --env-file backend/.env --env-file frontend/.env
 Notes:
 
 - `backend/.env` drives backend + infrastructure variables (Postgres/Redis/RabbitMQ/etc.).
-- `frontend/.env` provides `VITE_*` + `APP_ENV` for frontend runtime rendering.
+- `frontend/.env` provides `VITE_*` + `APP_ENV` for frontend runtime rendering. In **`docker-compose.yml`**, the **`frontend`** service (profile **`prod`**) lists **`env_file: ./frontend/.env`** so the static container receives the same contract as local/EC2 deploys that use **`--env-file frontend/.env`**; without a file at that path, Compose may fail to start the service — keep a file (even a stub) or adjust paths for your environment.
 - `chat-ws/.env` contains chat-ws specific env values.
 - Deploy script enforces backend/frontend env presence and fails fast when missing.
 - **Edge nginx:** CI renders **`nginx/nginx.conf`** from **`nginx/nginx.conf.template`** with `envsubst '${SENTRY_REPORT_URI}'`, reading **`SENTRY_REPORT_URI`** from **`backend/.env`** (same as local: **`bash scripts/ops/render-nginx-conf.sh`**). **PgBouncer:** `export` of **`PGBOUNCER_ADMIN_PASSWORD`** from **`backend/.env`** (with SSH env fallback), then **`userlist.txt`** and **`chmod 600`**.
@@ -82,7 +82,7 @@ Frontend is environment-agnostic at image build time.
 ### How it works
 
 1. Frontend image is built without `VITE_*` injection.
-2. At container startup, `frontend/docker/40-render-config.sh` runs.
+2. At container startup, `frontend/docker/40-render-config.sh` runs (`#!/bin/sh`, `set -e`). **Fail-fast:** the script exits non-zero if any of these are unset or empty: `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_VAPID_KEY`. **Defaults for optional vars:** `APP_ENV` defaults to `production`, `VITE_API_TIMEOUT_MS` to `30000`, `VITE_GOOGLE_MAPS_MAP_ID` to empty — see the script for the full substitution list.
 3. Script uses `envsubst` to render:
    - `/usr/share/nginx/html/config.js` from `frontend/docker/config.template.js`
    - `/usr/share/nginx/html/firebase-messaging-sw.js` from `frontend/docker/firebase-messaging-sw.template.js`

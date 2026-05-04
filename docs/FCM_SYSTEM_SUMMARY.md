@@ -91,10 +91,12 @@ FCM delivery has two connected paths:
 - Mappings: [`backend/app/domain/notifications/config/mappings.py`](../backend/app/domain/notifications/config/mappings.py)
 - Worker entrypoint: [`backend/app/workers/notification_worker.py`](../backend/app/workers/notification_worker.py) (+ [`backend/app/workers/tasks/notification_tasks.py`](../backend/app/workers/tasks/notification_tasks.py)); legacy monolith shim remains as [`backend/app/workers/main_worker.py`](../backend/app/workers/main_worker.py)
 - Orchestration: [`backend/app/domain/notifications/core/handler.py`](../backend/app/domain/notifications/core/handler.py) (`NotificationHandler.handle_event` — אורקסטרציה קצרה + שלבי pipeline פרטיים `_resolve_*` / `_dispatch`), [`manager.py`](../backend/app/domain/notifications/manager.py)
+- **Session into providers:** [`NotificationCommand`](../backend/app/domain/notifications/manager.py) includes optional **`db`**; the handler sets it from the active **`AsyncSession`**. All providers implement **`send(..., db=None)`**; only push uses **`db`** for persistence side effects (see §3.4).
 
 ### 3.3 FCM client (server: `data` map only)
 
 - File: [`backend/app/domain/notifications/channels/push/client.py`](../backend/app/domain/notifications/channels/push/client.py)
+- Sends via **`asyncio.get_running_loop().run_in_executor`** (non-blocking Firebase SDK call). **Retries (Tenacity):** only transient Firebase Admin errors (**`UnavailableError`**, **`InternalError`**, **`DeadlineExceededError`**, **`UnknownError`**); **`UnregisteredError`** / **`SenderIdMismatchError`** are **not** retried (invalid registration).
 - Builds `firebase_admin.messaging.Message` with **`data` only** (all values must be strings per FCM):
 
 ```python
@@ -110,12 +112,17 @@ messaging.Message(
 
 - No top-level `notification` field — intentional for the web behavior described above.
 
-### 3.4 Firebase Admin init
+### 3.4 Push provider — invalid token cleanup
+
+- File: [`backend/app/domain/notifications/providers/push_provider.py`](../backend/app/domain/notifications/providers/push_provider.py)
+- On **`UnregisteredError`** or **`SenderIdMismatchError`**, if **`db`** is present, calls **`crud_user.update_fcm_token(db, user=user, token=None)`** (commits via CRUD), then **re-raises** so the notification manager still logs the channel failure.
+
+### 3.5 Firebase Admin init
 
 - [`backend/app/infrastructure/firebase_core/firebase.py`](../backend/app/infrastructure/firebase_core/firebase.py) — production source of truth is `FIREBASE_CREDENTIALS_JSON` (Model B). `FIREBASE_SERVICE_ACCOUNT_PATH` is local-dev fallback only.
 - Workers load the same module and therefore must receive the same env contract.
 
-### 3.5 Docker Compose — production secret contract
+### 3.6 Docker Compose — production secret contract
 
 - Firebase credentials are not baked into the image and are not mounted as credential files in production.
 - Runtime source is `backend/.env` via `env_file` for backend/worker services, with:
@@ -140,7 +147,7 @@ messaging.Message(
 
 1. **Dev:** seeing `http://localhost:5173/api/v1/...` in the network tab is normal — Vite proxies `/api` to the backend.
 2. **Token saved ≠ delivery:** token must be valid and permission granted.
-3. **Skip push:** missing/invalid `fcm_token` — provider skips or logs.
+3. **Skip push:** missing `fcm_token` — provider skips. **Invalid registration** from FCM (`UnregisteredError` / `SenderIdMismatchError`) — **`PushProvider`** clears **`users.fcm_token`** in DB when **`db`** is passed (see §3.4).
 4. **Duplicate notifications:** if both raw `push` and `onBackgroundMessage` run for the same message, you could see double system notifications; current design prioritizes **`push`** for data-only; trim `onBackgroundMessage` if duplicates appear.
 5. **Permissions:** site notifications must be **Allow** for token + SW display.
 
@@ -148,7 +155,7 @@ messaging.Message(
 
 | Area | Files |
 |------|--------|
-| Frontend FCM | `frontend/src/services/fcm.ts` (`initFCM`, **`cleanupFCM`**), `frontend/src/config/firebase.ts`, `frontend/public/firebase-messaging-sw.js` |
+| Frontend FCM | `frontend/src/services/fcm.ts` (`initFCM`, **`cleanupFCM`**), `frontend/src/config/firebase.ts`, `frontend/public/firebase-messaging-sw.js` (production image: rendered from `frontend/docker/firebase-messaging-sw.template.js`; **`importScripts`** Firebase compat SDK version aligned with **`firebase` npm** in `frontend/package.json`, e.g. **11.10.0**) |
 | Toast UI | `NotificationToast.tsx`, `.module.css`, **`App.tsx`** (mount), `notificationToast.utils.ts` |
 | Auth + token lifecycle | `frontend/src/context/AuthContext.tsx`, `frontend/src/api/users.ts` (`patchFcmToken`) |
 | Profile “enable notifications” | `frontend/src/components/Layout/useLayoutShell.ts` |

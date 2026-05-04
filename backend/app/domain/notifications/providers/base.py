@@ -1,18 +1,19 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 class BaseNotificationProvider(ABC):
-    """
-    Interface defining what a notification provider looks like in LinkUp.
-    Architectural contract, not a thin wrapper.
-    """
-
     @abstractmethod
-    async def send(self, user: Any, channel_config: dict[str, Any], context: dict[str, Any]) -> None:
-        """Subclasses must implement async send logic."""
+    async def send(
+        self,
+        user: Any,
+        template_name: str,
+        context: dict[str, Any],
+        db: AsyncSession | None = None,
+    ) -> None:
         pass
 
     def can_send(self, user: Any) -> bool:
-        """Default: always allow send. Specific providers may override."""
         return True

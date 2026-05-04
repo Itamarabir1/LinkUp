@@ -107,8 +107,8 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| Firebase Admin / FCM | אינטגרציה מה-worker והתראות; **שליחה ב-`data` בלבד** (בלי `notification` של FCM) — [`docs/adr/FCM_AND_PUSH.md`](../adr/FCM_AND_PUSH.md), [`docs/FCM_SYSTEM_SUMMARY.md`](../FCM_SYSTEM_SUMMARY.md). |
-| פרונט | Service Worker + Toast בחזית — מפורט ב-FCM_AND_PUSH ובהיילייטס §1–2. |
+| Firebase Admin / FCM | אינטגרציה מה-worker והתראות; **שליחה ב-`data` בלבד** (בלי `notification` של FCM); retry על transient בלבד; ניקוי **`fcm_token`** ב-DB כשהרישום לא תקף (**`UnregisteredError`** / **`SenderIdMismatchError`**) — [`docs/adr/FCM_AND_PUSH.md`](../adr/FCM_AND_PUSH.md), [`docs/FCM_SYSTEM_SUMMARY.md`](../FCM_SYSTEM_SUMMARY.md), [`docs/architecture/NOTIFICATIONS.md`](../architecture/NOTIFICATIONS.md). |
+| פרונט | Service Worker + Toast בחזית; גרסת compat ב-SW מיושרת ל-**`firebase` npm** — מפורט ב-FCM_SYSTEM_SUMMARY ובהיילייטס §8. |
 
 ---
 

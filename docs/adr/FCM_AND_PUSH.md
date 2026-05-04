@@ -33,6 +33,7 @@
 | **אחרי login / Google / hydrate** | אם `Notification.permission === 'granted'` — קוראים `initFCM()` ו-`PATCH /users/fcm-token` עם הטוקן. |
 | **לפני logout** | קודם `PATCH` עם `fcm_token: null` (בעוד ה-access token תקף), אחר כך `cleanupFCM()`, ורק אז logout — כדי שלא יישלח push לרישום ישן. |
 | **הפעלה ידנית** | תפריט פרופיל / מסך FCM check. |
+| **כשהשרת שולח push לטוקן שפג/לא תקף** | Firebase Admin מעלה **`UnregisteredError`** / **`SenderIdMismatchError`**. ה־**`PushProvider`** (עם **`AsyncSession`** מאותו אירוע worker) מבצע **`update_fcm_token(..., token=None)`** — בנוסף לניקוי מצד הלקוח ב-logout. |
 
 **למה זה חשוב בראיון:** מראה חשיבה על **ניקוי רישום** ועל סדר פעולות נגד race עם ביטול סשן.
 
