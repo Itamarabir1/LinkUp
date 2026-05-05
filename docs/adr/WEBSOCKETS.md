@@ -47,7 +47,7 @@
 | | |
 |--|--|
 | **מקור הרשימה** | **`GET /api/v1/users/me/notifications`** — React Query ב־`useChatNotificationsFeed`, כולל **polling** כל ~**5 דקות** כגיבוי כשאין עדכון חי. |
-| **רענון חי** | אין WS ייעודי ל־`/api/v1/notifications/ws` ב-FastAPI כרגע. עדכוני UI מגיעים דרך **chat-ws**: פריים על **`user:{id}:events`** (`useUserEventStream` / `useUserEvent` ב־`ChatContext`) אחרי פרסום מ־`WebSocketProvider` ב-backend. |
+| **רענון חי** | אין WS ייעודי ל־`/api/v1/notifications/ws` ב-FastAPI כרגע. עדכוני UI מגיעים דרך **chat-ws**: פריים **`invalidate`** על **`user:{id}:events`** — ב־**`ChatContext`**: `refreshUnreadNotifications` + **`NOTIFICATIONS_REFRESH_EVENT`** + לפי צורך **`linkup:user-event`**; מסכים ישנים עדיין יכולים להאזין ל־**`useUserEvent`**. מקור: **`WebSocketProvider`** ב-backend אחרי outbox. |
 | **למה** | חיבור WS אחד לצ’אט + אירועי דומיין; REST נשאר מקור האמת לרשימה. |
 
 ---

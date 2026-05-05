@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from fastapi import Query
@@ -96,13 +96,37 @@ class RideSearchRequest(BaseModel):
     pickup_name: str = Field(..., min_length=2)
     destination_name: str = Field(..., min_length=2)
     search_radius: float = Field(default=1.0, ge=0.1, le=50, description="רדיוס חיפוש בקילומטרים (אחיד)")
+    departure_date: date | None = Field(
+        None,
+        description="יום יציאה בלוח השנה Asia/Jerusalem (00:00–24:00 מקומי). הדדי ל־departure_time.",
+    )
     departure_time: datetime | None = Field(
         None,
-        description="מתי הנוסע צריך לצאת (אם ריק – יחפש מעכשיו)",
+        description="נקודת זמן: עם departure_time_to — טווח כולל; לבד — חיפוש ±2 שעות סביב הערך.",
+    )
+    departure_time_to: datetime | None = Field(
+        None,
+        description="יחד עם departure_time — מסיים טווח כולל [departure_time, departure_time_to]. דורש departure_time.",
     )
     limit: int = Field(default=20, ge=1, le=50)
     after: UUID | None = Field(None, description="cursor: ride_id אחרייו להמשיך")
     group_id: UUID | None = Field(None, description="אם קיים — מסנן רק נסיעות של הקבוצה")
+
+    @model_validator(mode="after")
+    def departure_filters_consistent(self) -> "RideSearchRequest":
+        if self.departure_date is not None and (
+            self.departure_time is not None or self.departure_time_to is not None
+        ):
+            raise ValueError("departure_date is mutually exclusive with departure_time and departure_time_to")
+        if self.departure_time_to is not None and self.departure_time is None:
+            raise ValueError("departure_time_to requires departure_time")
+        if (
+            self.departure_time is not None
+            and self.departure_time_to is not None
+            and self.departure_time_to < self.departure_time
+        ):
+            raise ValueError("departure_time_to must not be before departure_time")
+        return self
 
 
 class RideSearchResponse(BaseModel):

@@ -48,7 +48,7 @@ Authorization: Bearer <access_token>
 
 ### Cursor-based (נסיעות חיפוש, הודעות צ'אט)
 
-- **נסיעות (חיפוש נוסע)** (`GET /api/v1/passenger/passengers/search-rides`): `after` (UUID של `ride_id` אחרון בעמוד הקודם), `limit`. תגובה: `items`, `next_cursor` (= `ride_id` להמשך), `has_more`.
+- **נסיעות (חיפוש נוסע)** (`GET /api/v1/passenger/passengers/search-rides`): query נוסף לסינון זמן — **`departure_date`** (תאריך בלבד, יום מלא **Asia/Jerusalem**), או **`departure_time`** (נקודת זמן → חלון **±2 שעות** ב־DB), או **`departure_time`** + **`departure_time_to`** (טווח כולל). **אסור לשלב** `departure_date` עם `departure_time` / `departure_time_to` — **422**. בנוסף: `after` (cursor), `limit`, `pickup_name`, `destination_name`, `search_radius`, `group_id?`. תגובה: `items`, `next_cursor`, `has_more`.
 - **הודעות** (`GET /chat/conversations/{id}/messages`): `before` (message_id — טעינת הודעות ישנות יותר), `after` (message_id — מחזיר הודעות עם **`message_id > after`**; בפרונט, אחרי **`onopen`** של צ’אט WS מתחילים ב־**`after`**; אם התשובה מחזירה **`has_more`**, ההמשך הוא **`before=next_cursor`** בדיוק כמו בגלילה לישנות יותר — ראו **`fetchMissedGap`** ב־REALTIME/HIGHLIGHTS), `limit`. תגובה: `items`, `next_cursor`, `has_more`.
 
 ### Page-based (הזמנות שלי)
@@ -134,7 +134,7 @@ Authorization: Bearer <access_token>
 | POST | /passengers/ | כן | יצירת בקשה קבועה — body: `PassengerRequestCreate` (pickup/destination, `num_passengers`, `search_radius`, `requested_departure_time` אופציונלי, `pickup_lat`/`pickup_lon` זוגיים, **`is_notification_active`** — האם לכלול את הבקשה בהתאמות אימייל/פוש כשנהג יוצר נסיעה מתאימה, **`group_id`** אופציונלי — התאמה רק לנסיעות באותה קבוצה, `is_auto_generated`). מחזיר `PassengerRequestWithMatches` (201) כולל `matching_rides` מיידי. **זהו גם מסלול “שמירת התראה”** אחרי חיפוש: אותם פרמטרי מסלול כמו בחיפוש, בלי תלות ב-`GET search-rides` (החיפוש עצמו **לא** יוצר שורה ב-DB). |
 | GET | /rides/{ride_id}/driver-info | כן | פרטי נהג לנסיעה (מנותב תחת `/api/v1/passenger/rides/...`). |
 | POST | /passengers/request-ride-from-search | כן | body: `RequestRideFromSearch` (`ride_id`, `request_id?`, `num_seats`, כתובות). אם אין `request_id` — יוצר בקשה זמנית לחיפוש; אז `BookingService.request_to_join` + אירועי outbox (התראה לנהג). **כותרת אופציונלית `Idempotency-Key`** — מניע כפילות (Redis; fingerprint ב־`ride_join_idempotency.py`); ראו סעיף Idempotency-Key למעלה. |
-| GET | /passengers/search-rides | אופציונלי | חיפוש נסיעות **ללא שמירה** ב-DB. query: `pickup_name`, `destination_name`, `search_radius` (ברירת מחדל 1000 מ׳), `departure_time?`, `limit` (ברירת מחדל 20, עד 50), `after` (cursor), **`group_id?`** — רק אם המשתמש מחובר וחבר בקבוצה (dependency `require_group_member`). **Pagination**: cursor-based — `items`, `next_cursor`, `has_more`. |
+| GET | /passengers/search-rides | אופציונלי | חיפוש נסיעות **ללא שמירה** ב-DB. query: `pickup_name`, `destination_name`, `search_radius` (ק״מ, ברירת מחדל 1), **`departure_date?`** (יום מלא Asia/Jerusalem), **`departure_time?`** (±2 שעות או תחילת טווח עם `departure_time_to`), **`departure_time_to?`**, `limit` (ברירת מחדל 20, עד 50), `after` (cursor), **`group_id?`** — רק אם המשתמש מחובר וחבר בקבוצה. **הדדיות** בין `departure_date` לבין זוג הזמנים → **422**. **Pagination**: `items`, `next_cursor`, `has_more`. |
 | DELETE | /passengers/{request_id}/cancel | כן | ביטול בקשת נסיעה ושחרור שריונים (204). |
 | GET | /passengers/{request_id}/matches | כן | התאמות עדכניות לבקשה קיימת. |
 | GET | /passengers/all | כן | כל הנסיעות במערכת — **רק `is_admin`**; query: `filter_status`. |

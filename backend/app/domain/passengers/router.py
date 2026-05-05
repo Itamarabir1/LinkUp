@@ -1,10 +1,11 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from functools import partial
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from pydantic import ValidationError
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -272,7 +273,12 @@ async def search_available_rides(
     pickup_name: str,
     destination_name: str,
     search_radius: float = Query(1.0, ge=0.1, le=50, description="רדיוס חיפוש בקילומטרים (אחיד עם יצירת בקשה)"),
-    departure_time: datetime | None = Query(None, description="אם ריק – יחפש מעכשיו"),
+    departure_date: date | None = Query(
+        None,
+        description="יום מלא Asia/Jerusalem — הדדי ל־departure_time / departure_time_to",
+    ),
+    departure_time: datetime | None = Query(None, description="±2 שעות; או תחילת טווח עם departure_time_to"),
+    departure_time_to: datetime | None = Query(None, description="סוף טווח כולל (דורש departure_time)"),
     limit: int = Query(20, ge=1, le=50, description="כמות תוצאות"),
     after: UUID | None = Query(None, description="cursor: ride_id להמשך"),
     group_id: UUID | None = Depends(require_group_member),
@@ -280,18 +286,27 @@ async def search_available_rides(
     current_user: User | None = Depends(get_current_user_optional),
 ):
     try:
-        search_data = RideSearchRequest(
-            passenger_id=current_user.user_id if current_user else None,
-            pickup_name=pickup_name,
-            destination_name=destination_name,
-            search_radius=search_radius,
-            departure_time=departure_time,
-            limit=limit,
-            after=after,
-            group_id=group_id,
+        search_data = RideSearchRequest.model_validate(
+            {
+                "passenger_id": current_user.user_id if current_user else None,
+                "pickup_name": pickup_name,
+                "destination_name": destination_name,
+                "search_radius": search_radius,
+                "departure_date": departure_date,
+                "departure_time": departure_time,
+                "departure_time_to": departure_time_to,
+                "limit": limit,
+                "after": after,
+                "group_id": group_id,
+            }
         )
         result = await PassengerService.search_rides_for_passenger(db, search_data)
         return result
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=e.errors(),
+        ) from e
     except HTTPException:
         raise
     except Exception as e:

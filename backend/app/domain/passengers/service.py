@@ -1,5 +1,7 @@
 import logging
+from datetime import UTC, date, datetime, time, timedelta
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from geoalchemy2.shape import to_shape
 from sqlalchemy import select
@@ -30,6 +32,14 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_SEARCH_RADIUS_KM = 1.0
 _DEFAULT_SEARCH_RADIUS_M = 1000
+_JERUSALEM = ZoneInfo("Asia/Jerusalem")
+
+
+def jerusalem_calendar_day_utc_window(d: date) -> tuple[datetime, datetime]:
+    """Start (inclusive) and end (exclusive) of calendar day `d` in Asia/Jerusalem, as UTC."""
+    start_local = datetime.combine(d, time.min, tzinfo=_JERUSALEM)
+    end_exclusive_local = start_local + timedelta(days=1)
+    return start_local.astimezone(UTC), end_exclusive_local.astimezone(UTC)
 
 
 def _radius_km_to_meters(radius_km: float | int | None) -> int:
@@ -165,6 +175,15 @@ class PassengerService:
 
             radius = _radius_km_to_meters(getattr(search_data, "search_radius", None) or getattr(search_data, "radius", _DEFAULT_SEARCH_RADIUS_KM))
 
+            day_s = day_e = None
+            range_s = range_e = None
+            if search_data.departure_date is not None:
+                day_s, day_e = jerusalem_calendar_day_utc_window(search_data.departure_date)
+            elif search_data.departure_time is not None and search_data.departure_time_to is not None:
+                range_s, range_e = search_data.departure_time, search_data.departure_time_to
+            elif search_data.departure_time is not None:
+                range_s = search_data.departure_time
+
             matches, has_more = await crud_passenger.find_rides_by_coordinates(
                 db,
                 p_lat,
@@ -174,7 +193,10 @@ class PassengerService:
                 radius,
                 limit=search_data.limit,
                 after_ride_id=search_data.after,
-                min_departure_time=search_data.departure_time,
+                departure_day_start_utc=day_s,
+                departure_day_end_exclusive_utc=day_e,
+                departure_range_start=range_s,
+                departure_range_end_inclusive=range_e,
                 passenger_id=search_data.passenger_id,
                 group_id=search_data.group_id,
             )

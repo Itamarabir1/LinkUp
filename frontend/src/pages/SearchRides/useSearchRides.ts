@@ -26,6 +26,46 @@ export type AIParsedSearch = AISearchResult & {
 export type SearchMode = 'datetime' | 'date_only' | 'time_range';
 type SearchParams = Record<string, string | number | undefined>;
 
+/** YYYY-MM-DD in the user's local calendar (not UTC) — matches server Asia/Jerusalem day semantics for date-only search. */
+export function formatLocalCalendarYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Manual search / load-more GET params reflecting searchMode (date-only uses departure_date only). */
+export function buildManualRideSearchParams(input: {
+  pickup: string;
+  destination: string;
+  searchRadius: number;
+  searchMode: SearchMode;
+  selectedDate: Date;
+  departureDateOnly: Date | null;
+  selectedDateTo: Date | null;
+  groupId?: string | null;
+}): SearchParams {
+  const params: SearchParams = {
+    pickup_name: input.pickup.trim(),
+    destination_name: input.destination.trim(),
+    search_radius: input.searchRadius,
+    limit: 20,
+  };
+  if (input.groupId) params.group_id = input.groupId;
+
+  if (input.searchMode === 'date_only') {
+    const d = input.departureDateOnly ?? input.selectedDate;
+    params.departure_date = formatLocalCalendarYmd(d);
+  } else if (input.searchMode === 'time_range' && input.selectedDateTo) {
+    params.departure_time = input.selectedDate.toISOString();
+    params.departure_time_to = input.selectedDateTo.toISOString();
+  } else {
+    params.departure_time = input.selectedDate.toISOString();
+  }
+
+  return params;
+}
+
 /**
  * Build GET /search-rides params only from AI output + groupId (no React state timing issues).
  * Returns null when auto-search must not run.
@@ -56,18 +96,17 @@ export function buildParamsFromAiResult(
   };
   if (ctx.groupId) params.group_id = ctx.groupId;
 
-  if (ai.departure_time) {
-    const t = new Date(ai.departure_time);
-    if (!Number.isNaN(t.getTime())) params.departure_time = t.toISOString();
-  }
-  if (ai.departure_time_to) {
-    const t2 = new Date(ai.departure_time_to);
-    if (!Number.isNaN(t2.getTime())) params.departure_time_to = t2.toISOString();
-  }
   if (ai.departure_date && !ai.departure_time) {
     params.departure_date = ai.departure_date;
-    const d0 = new Date(`${ai.departure_date}T00:00:00`);
-    if (!Number.isNaN(d0.getTime())) params.departure_time = d0.toISOString();
+  } else {
+    if (ai.departure_time) {
+      const t = new Date(ai.departure_time);
+      if (!Number.isNaN(t.getTime())) params.departure_time = t.toISOString();
+    }
+    if (ai.departure_time_to) {
+      const t2 = new Date(ai.departure_time_to);
+      if (!Number.isNaN(t2.getTime())) params.departure_time_to = t2.toISOString();
+    }
   }
   if (ai.destination_radius != null && !Number.isNaN(Number(ai.destination_radius))) {
     params.destination_radius = Math.min(50, Math.max(0.1, Number(ai.destination_radius)));
@@ -349,16 +388,26 @@ export function useSearchRides() {
   ]);
 
   const buildSearchParams = useCallback((): SearchParams => {
-    const params: SearchParams = {
-      pickup_name: pickup.trim(),
-      destination_name: destination.trim(),
-      search_radius: searchRadius,
-      limit: 20,
-    };
-    if (selectedDate) params.departure_time = selectedDate.toISOString();
-    if (groupId) params.group_id = groupId;
-    return params;
-  }, [pickup, destination, searchRadius, selectedDate, groupId]);
+    return buildManualRideSearchParams({
+      pickup,
+      destination,
+      searchRadius,
+      searchMode,
+      selectedDate,
+      departureDateOnly,
+      selectedDateTo,
+      groupId,
+    });
+  }, [
+    pickup,
+    destination,
+    searchRadius,
+    searchMode,
+    selectedDate,
+    departureDateOnly,
+    selectedDateTo,
+    groupId,
+  ]);
 
   const search = useCallback(
     (e: React.FormEvent) => {

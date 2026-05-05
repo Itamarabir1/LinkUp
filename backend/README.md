@@ -31,6 +31,8 @@ Copy `.env.example` to `.env` and set your values. See root README for full setu
 **Groq (optional):** for chat summaries (`ai-worker`) and passenger AI ride search parsing, set **`GROQ_API_KEY`** or **`GROK_API_KEY`** in `backend/.env` (see `app/domain/chat/ai/client.py`). Docker Compose already loads `backend/.env` into the backend and worker containers — no duplicate key in `docker-compose.yml`.
 The same parser endpoint (`POST /api/v1/passenger/passengers/ai-parse-search`) is shared by both passenger search and driver CreateRide in the frontend; business rule differences are enforced client-side per flow.
 
+**`GET /api/v1/passenger/passengers/search-rides`** supports optional **`departure_date`** (Jerusalem calendar day bounds in UTC), **`departure_time`** (±2h window), or **`departure_time` + `departure_time_to`** (closed range); mixing date with timestamps returns **422** — see **`docs/architecture/API.md`** and **`app/domain/passengers/schema.py`** (`RideSearchRequest`).
+
 **Database connection pool** (optional tuning): `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT`, `DB_POOL_RECYCLE` — documented in `.env.example` and `docs/architecture/DEVELOPMENT.md`.
 
 ## Security & auth (backend)

@@ -115,7 +115,11 @@ class CRUDPassenger:
         radius: int,
         limit: int | None = None,
         after_ride_id: UUID | None = None,
-        min_departure_time: datetime | None = None,
+        *,
+        departure_day_start_utc: datetime | None = None,
+        departure_day_end_exclusive_utc: datetime | None = None,
+        departure_range_start: datetime | None = None,
+        departure_range_end_inclusive: datetime | None = None,
         passenger_id: UUID | None = None,
         group_id: UUID | None = None,
     ) -> tuple[list[tuple[Ride, str | None]], bool]:
@@ -142,9 +146,21 @@ class CRUDPassenger:
             func.ST_LineLocatePoint(cast(Ride.route_coords, Geometry), cast(pickup_geo, Geometry))
             < func.ST_LineLocatePoint(cast(Ride.route_coords, Geometry), cast(dest_geo, Geometry)),
         )
-        if min_departure_time is not None:
-            earliest = min_departure_time - timedelta(hours=_DEPARTURE_FLEXIBILITY_HOURS)
-            latest = min_departure_time + timedelta(hours=_DEPARTURE_FLEXIBILITY_HOURS)
+        if departure_day_start_utc is not None and departure_day_end_exclusive_utc is not None:
+            filters = and_(
+                filters,
+                Ride.departure_time >= departure_day_start_utc,
+                Ride.departure_time < departure_day_end_exclusive_utc,
+            )
+        elif departure_range_start is not None and departure_range_end_inclusive is not None:
+            filters = and_(
+                filters,
+                Ride.departure_time >= departure_range_start,
+                Ride.departure_time <= departure_range_end_inclusive,
+            )
+        elif departure_range_start is not None:
+            earliest = departure_range_start - timedelta(hours=_DEPARTURE_FLEXIBILITY_HOURS)
+            latest = departure_range_start + timedelta(hours=_DEPARTURE_FLEXIBILITY_HOURS)
             filters = and_(
                 filters,
                 Ride.departure_time >= earliest,
