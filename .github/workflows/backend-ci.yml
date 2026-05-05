@@ -209,7 +209,8 @@ jobs:
             command -v envsubst >/dev/null 2>&1 || { echo "ERROR: envsubst missing"; exit 1; }
             envsubst < "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt.template" \
                    > "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
-            chmod 600 "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
+            chown 10001:10001 "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
+            chmod 640 "$DEPLOY_DIR/infrastructure/pgbouncer/userlist.txt"
 
             envsubst '${SENTRY_REPORT_URI}' < "$DEPLOY_DIR/nginx/nginx.conf.template" \
                    > "$DEPLOY_DIR/nginx/nginx.conf"
