@@ -49,7 +49,6 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - ./infrastructure/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
-      - ./infrastructure/pgbouncer/userlist.txt:/etc/pgbouncer/userlist.txt:ro
     healthcheck:
       test:
         [

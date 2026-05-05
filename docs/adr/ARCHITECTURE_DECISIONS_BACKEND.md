@@ -240,9 +240,9 @@
 |--|--|
 | **הקשר** | עומסי burst/redeploy עם כמה services (backend + workers) יוצרים fan-out של חיבורים ל-Postgres. ב-EC2 בינוני זה מייצר לחץ מוקדם על memory/connection slots. |
 | **החלטה** | להפעיל PgBouncer כ-layer פנימי ב-Compose במצב `transaction`, ולהעביר runtime services ל-`POSTGRES_HOST=pgbouncer` בעוד `migrate` נשאר direct ל-`db`. |
-| **מימוש חשוב (ops)** | בגלל entrypoint overrides ב-images ציבוריים, ה-service משתמש ב-custom image (`infrastructure/pgbouncer/Dockerfile`) כדי לשמור שליטה מלאה על `pgbouncer.ini`. קובץ `userlist.txt` לא נשמר ב-git; נוצר בזמן deploy מ-`userlist.txt.template` עם `envsubst` אחרי **`export PGBOUNCER_ADMIN_PASSWORD`** מ־**`backend/.env`** (עם fallback ל־SSH env) + **`chmod 600`**. |
+| **מימוש חשוב (ops)** | בגלל entrypoint overrides ב-images ציבוריים, ה-service משתמש ב-custom image (`infrastructure/pgbouncer/Dockerfile`) כדי לשמור שליטה מלאה על `pgbouncer.ini`. קובץ `userlist.txt` לא נשמר ב-git ולא נוצר על host/CI; הוא נוצר בתוך הקונטיינר בזמן startup מ־`userlist.txt.template` + env vars (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `PGBOUNCER_ADMIN_PASSWORD`) דרך `entrypoint.sh`. |
 | **Trade-off** | עוד רכיב תפעולי ב-runtime (health/build/deploy ordering), אבל יציבות טובה יותר תחת עומס ו-rollout. |
-| **בקצרה לראיון** | “לא הסתפקתי בלהוסיף PgBouncer — בניתי image מבוקר כדי למנוע entrypoint overrides, והקשחתי secrets flow כך ש-userlist אמיתי נוצר רק בזמן deploy.” |
+| **בקצרה לראיון** | “לא הסתפקתי בלהוסיף PgBouncer — בניתי image מבוקר כדי למנוע entrypoint overrides, והקשחתי secrets flow כך שה-userlist נוצר בתוך הקונטיינר בזמן startup ולא תלוי בהרשאות host.” |
 
 ---
 

@@ -195,7 +195,7 @@
 | **החלטה** | PgBouncer במצב `transaction` כשירות פנימי ב-Compose; runtime services מתחברים אליו, migration path נשאר direct ל-DB. |
 | **מה שג׳וניור בד״כ מפספס** | (1) להשאיר `migrate` מחוץ ל-pooler. (2) לכבות `statement_cache_size` ל-asyncpg. (3) לא לחשוף `6432` החוצה בשלב ראשון. (4) להקטין pool אפליקטיבי כדי לא ליצור double-pooling לא מבוקר. |
 | **מצב נוכחי** | פעיל ב-Compose: `docker-compose.yml`, `infrastructure/pgbouncer/pgbouncer.ini`, `backend/app/db/session.py`, smoke script ב-`scripts/ops/pgbouncer-smoke.sh`. |
-| **ops hardening (חדש)** | `userlist.txt` לא נשמר ב-repo: מייצרים מ-`userlist.txt.template` בזמן deploy אחרי **`export PGBOUNCER_ADMIN_PASSWORD`** מ־**`backend/.env`** (עם fallback ל־SSH secret), `envsubst` + **`chmod 600`**, rebuild/restart ל-`pgbouncer` לפני rollout של backend, ו-wait health מפורש ל-`linkup_pgbouncer`. |
+| **ops hardening (חדש)** | `userlist.txt` לא נשמר ב-repo וגם לא נוצר על host/CI: PgBouncer יוצר אותו בתוך הקונטיינר בזמן startup מ־`userlist.txt.template` ו־`POSTGRES_*` + `PGBOUNCER_ADMIN_PASSWORD` (entrypoint), עם הרשאות פנימיות ובלי תלות UID/GID מול host. |
 
 ### Structured logging + correlation ID
 

@@ -24,7 +24,7 @@
 2. **הרצה עם Docker**
   - מומלץ להשתמש ב־`Makefile` בשורש כ-entrypoint אחיד: `make up`, `make down`, `make build`, `make logs`, `make ps`, `make restart`, `make migrate` (כולם מריצים Compose עם `--env-file backend/.env --env-file frontend/.env`).
   - `docker-compose.yml`: ל־`db`, **`pgbouncer`**, `redis`, `rabbitmq`, **`migrate`**, `notification-worker`, `task-worker`, `ai-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **`migrate`** מריץ `alembic upgrade head` פעם אחת ויוצא (`restart: "no"`) ונשאר direct ל-`db`; **backend** וה־workers תלויים ב־`service_completed_successfully:migrate` וגם ב־`pgbouncer:service_healthy`. **backend** עם **`8000:8000`** ל־host, **healthcheck** על `/api/v1/health` (גוף התשובה כולל גם **`circuit_breakers`** למעגלי Google Maps — מידע תפעולי; **`status`** נקבע רק מ־DB/Redis/RabbitMQ — ראו **`docs/architecture/API.md`**). **`frontend`** ו־**`nginx`** מוגדרים באותו קובץ עם `profiles: ["prod"]` — עולים רק עם `docker compose --profile prod`; **nginx** תלוי ב־**backend** ב־`service_healthy`. שירות **`frontend`** (פרופיל prod) מגדיר **`env_file: ./frontend/.env`** — משתני `VITE_*` / `APP_ENV` נטענים לקונטיינר בזמן **יצירה** (גם אם הקובץ מינימלי), ואז entrypoint **`frontend/docker/40-render-config.sh`** מריץ **fail-fast** על מפתחות Firebase חובה + **`envsubst`** ל־`config.js` ו־`firebase-messaging-sw.js` (ראו **`docs/DEPLOYMENT.md`**, **`docs/FEATURE_DECISIONS.md#frontend-runtime-config`**).
-  - **PgBouncer image:** נבנה מקומית מ-`infrastructure/pgbouncer/Dockerfile` (ולא image ציבורי), כדי להבטיח שקובץ `pgbouncer.ini` הממופה ב-volume נשאר מקור אמת.
+  - **PgBouncer image:** נבנה מ-`infrastructure/pgbouncer/Dockerfile`; הקונטיינר מייצר בזמן startup את `/var/lib/pgbouncer/userlist.txt` מ־`POSTGRES_USER`/`POSTGRES_PASSWORD`/`PGBOUNCER_ADMIN_PASSWORD` (אין bind-mount ל-`userlist.txt` מה-host).
   - **פיתוח:** `docker compose up -d` → תשתית + **migrate** + 3 workers + backend (**8000**) + chat-ws (**8081**). פרונט: **`npm run dev`** בתיקיית `frontend`, לא קונטיינר.
    - **WebSocket בפיתוח:** צ'אט — `ws://localhost:8081/ws` (chat-ws); נסיעות / מיקום / **פיד התראות in-app** — `ws://localhost:8000/api/v1/...` (backend). מרוכז ב־[`frontend/src/config/env.ts`](../../frontend/src/config/env.ts).
    - **סטאק מלא מאחורי Nginx (פורט 80):** לפני `docker compose --profile prod` הגדר **`SENTRY_REPORT_URI`** ב־`backend/.env` (endpoint של CSP reports מ־Sentry) והפעל **`bash scripts/ops/render-nginx-conf.sh`** כדי לייצר `nginx/nginx.conf` מה־template. אחר כך: `docker compose --profile prod up -d --build`.
@@ -286,7 +286,7 @@ LinkUp/
 - **Cursor-based vs Page-based Pagination**: נסיעות והודעות — זרימה אינסופית ויציבות עם cursor; הזמנות — מספור עמודים ו-total לממשק "הזמנות שלי".
 - **למה PgBouncer עכשיו**: connection storms ב-EC2 קטן קורים לפני שנגמר CPU; pooler פנימי נותן שיפור מהיר בלי שינוי קוד דומיין.
 - **מה לא טריוויאלי (senior)**: `migrate` נשאר direct ל-`db`, `statement_cache_size=0` ל-asyncpg, ו-PgBouncer נשאר internal-only בלי פתיחת פורט ציבורי.
-- **Secrets ל-PgBouncer בפריסה**: `userlist.txt` לא נשמר ב-git; ה-CI deploy מייצר אותו מ-`userlist.txt.template` עם `envsubst`, מקשיח הרשאות (`chmod 600`), עושה build+up ל-`pgbouncer`, ממתין ל-health, ורק אז עושה rollout ל-backend.
+- **Secrets ל-PgBouncer בפריסה**: אין יצירת `userlist.txt` על host/CI. ה-deploy רק מוודא ש־`POSTGRES_*` ו־`PGBOUNCER_ADMIN_PASSWORD` קיימים ב-`backend/.env`; הקובץ נוצר בתוך קונטיינר PgBouncer בזמן startup עם הרשאות פנימיות.
 
 ---
 

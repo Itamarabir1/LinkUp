@@ -73,7 +73,7 @@ Notes:
 - `frontend/.env` provides `VITE_*` + `APP_ENV` for frontend runtime rendering. In **`docker-compose.yml`**, the **`frontend`** service (profile **`prod`**) lists **`env_file: ./frontend/.env`** so the static container receives the same contract as local/EC2 deploys that use **`--env-file frontend/.env`**; without a file at that path, Compose may fail to start the service — keep a file (even a stub) or adjust paths for your environment.
 - `chat-ws/.env` contains chat-ws specific env values.
 - Deploy script enforces backend/frontend env presence and fails fast when missing.
-- **Edge nginx:** CI renders **`nginx/nginx.conf`** from **`nginx/nginx.conf.template`** with `envsubst '${SENTRY_REPORT_URI}'`, reading **`SENTRY_REPORT_URI`** from **`backend/.env`** (same as local: **`bash scripts/ops/render-nginx-conf.sh`**). **PgBouncer:** `export` of **`PGBOUNCER_ADMIN_PASSWORD`** from **`backend/.env`** (with SSH env fallback), then **`userlist.txt`** and **`chmod 600`**.
+- **Edge nginx:** CI renders **`nginx/nginx.conf`** from **`nginx/nginx.conf.template`** with `envsubst '${SENTRY_REPORT_URI}'`, reading **`SENTRY_REPORT_URI`** from **`backend/.env`** (same as local: **`bash scripts/ops/render-nginx-conf.sh`**). **PgBouncer:** no host-side `userlist.txt` generation; container startup renders `/var/lib/pgbouncer/userlist.txt` from `POSTGRES_USER` / `POSTGRES_PASSWORD` / `PGBOUNCER_ADMIN_PASSWORD`.
 
 ## Frontend Runtime Config (No build-time secrets)
 
