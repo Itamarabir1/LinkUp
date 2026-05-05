@@ -28,9 +28,14 @@ Related operations docs:
 
 ## CI/CD Flow (GitHub Actions)
 
-Deploy pipeline lives in `.github/workflows/backend-ci.yml`.
+Production deploy is split into **two** paths:
 
-### High-level flow
+| Workflow | When it runs | What it does on EC2 |
+|----------|----------------|---------------------|
+| [`backend-ci.yml`](../.github/workflows/backend-ci.yml) | Push to `main` when paths include `backend/**`, `infrastructure/**`, `nginx/**`, `docker-compose.yml`, or that workflow file | Full stack: pull git, env sync, pull multiple GHCR images, infra + workers + backend health gate + rollback on failure. |
+| [`deploy-frontend-ec2.yml`](../.github/workflows/deploy-frontend-ec2.yml) | After **Frontend CI** completes successfully on `main` (`workflow_run`) | Pull `frontend:latest`, recreate `frontend` + `nginx`, smoke `https://linkup.itamarabir.com/config.js`. Does **not** replace the backend deploy job. |
+
+### Backend deploy (`backend-ci.yml`) — high-level flow
 
 1. Run lint + tests + migrations.
 2. Build and push images to GHCR.
@@ -41,7 +46,11 @@ Deploy pipeline lives in `.github/workflows/backend-ci.yml`.
 7. Health-gated backend rollout (`docker compose ... up --wait`).
 8. Roll back backend image on health failure.
 
-### Rollback behavior
+### Frontend-only deploy (`deploy-frontend-ec2.yml`)
+
+Triggered only when **[`frontend-ci.yml`](../.github/workflows/frontend-ci.yml)** finishes with **success** on `main`. On EC2: `git fetch`/`reset`, copy `*.env.production` → `*.env`, render **`nginx/nginx.conf`** from **`nginx/nginx.conf.template`**, `docker login` to GHCR, `docker pull` **`…/linkup/frontend:latest`**, `docker compose --profile prod up -d --no-deps frontend`, then **`--force-recreate nginx`**, finally curl smoke on **`/config.js`**.
+
+### Rollback behavior (backend deploy)
 
 - Previous backend image tag is stored in `.deploy_state/backend_prev_tag`.
 - If new backend fails health gate, deploy re-runs backend with previous image.
@@ -95,7 +104,8 @@ This allows the same frontend image to run in all environments.
 
 ### Standard deploy
 
-Triggered by push to `main` (backend workflow path filters apply).
+- **Backend / stack:** triggered by push to `main` when **backend-ci** path filters apply.
+- **Frontend image only:** after **Frontend CI** succeeds on `main`, **`deploy-frontend-ec2.yml`** rolls **`frontend` + `nginx`** on EC2 (see table above).
 
 After deploy:
 

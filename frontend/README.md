@@ -2,7 +2,7 @@
 
 אפליקציית ווב ב-React + TypeScript (Vite) ל-LinkUp: ניהול נסיעות, קבוצות, צ'אט בזמן אמת, התחברות עם Google ואימייל/סיסמה, תמונות פרופיל (S3), **תמיכה ב-RTL ובאנגלית (i18next)** עם מעבר שפה, ופורמט תאריכים לפי לוקאל.
 
-> **הערה:** ריצת Frontend CI ב-GitHub מופעלת כשקומיט משנה `frontend/**`, `nginx/**`, או את `.github/workflows/frontend-ci.yml`.
+> **הערה:** ריצת Frontend CI ב-GitHub מופעלת כשקומיט משנה `frontend/**`, `nginx/**`, או את `.github/workflows/frontend-ci.yml`. בפרודקשן (EC2), אחרי ש־**Frontend CI** מסתיים בהצלחה על **`main`**, ה-workflow **[`deploy-frontend-ec2.yml`](../.github/workflows/deploy-frontend-ec2.yml)** מושך את תמונת **`frontend:latest`** מ־GHCR ומחדש את שירותי **`frontend`** ו־**`nginx`** ב־Compose (פרטים: **[`docs/DEPLOYMENT.md`](../docs/DEPLOYMENT.md)**).
 
 ### אבטחה (XSS + CSP)
 

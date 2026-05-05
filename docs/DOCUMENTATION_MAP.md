@@ -32,7 +32,8 @@
 - **Nginx CSP + PgBouncer secrets (מקור אמת):** [`nginx/nginx.conf.template`](../nginx/nginx.conf.template), [`scripts/ops/render-nginx-conf.sh`](../scripts/ops/render-nginx-conf.sh), [`docs/SECURITY_HEADERS.md`](SECURITY_HEADERS.md), [`infrastructure/pgbouncer/userlist.txt.template`](../infrastructure/pgbouncer/userlist.txt.template), [`infrastructure/pgbouncer/entrypoint.sh`](../infrastructure/pgbouncer/entrypoint.sh), סעיף **PgBouncer** ב־[`docs/FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#pgbouncer).
 - **תמונות GHCR בשורש הפרויקט:** [`README.md`](../README.md) (טבלת CI + רשימת repositories).
 - **רואטרים בפועל:** [`backend/app/api/v1/api_router.py`](../backend/app/api/v1/api_router.py) (prefix **`/api/v1`**).
-- **CI frontend — חוזה OpenAPI:** [`frontend-ci.yml`](../.github/workflows/frontend-ci.yml) → job **`contract-codegen`** (`npm run gen:api` + בדיקת `git diff` על [`frontend/src/api/generated/`](../frontend/src/api/generated/)).
+- **CI frontend — חוזה OpenAPI:** [`frontend-ci.yml`](../.github/workflows/frontend-ci.yml) → job **`contract-codegen`** (`npm run gen:api` + בדיקת `git diff` על [`frontend/src/api/generated/`](../frontend/src/api/generated/)); **`publish-image`** דוחף **`ghcr.io/.../linkup/frontend:latest`**.
+- **Deploy פרונט ל־EC2 (אחרי Frontend CI):** [`deploy-frontend-ec2.yml`](../.github/workflows/deploy-frontend-ec2.yml) — טריגר **`workflow_run`** כש־**Frontend CI** על **`main`** מסתיים ב־**success**; SSH ל־EC2, `docker pull` ל־frontend, **`compose up`** ל־`frontend` + **`nginx --force-recreate`**, smoke ל־`/config.js`.
 
 ## 3. מסמכים קצרים / הרחבה
 
