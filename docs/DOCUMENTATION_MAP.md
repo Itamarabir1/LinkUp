@@ -33,7 +33,7 @@
 - **תמונות GHCR בשורש הפרויקט:** [`README.md`](../README.md) (טבלת CI + רשימת repositories).
 - **רואטרים בפועל:** [`backend/app/api/v1/api_router.py`](../backend/app/api/v1/api_router.py) (prefix **`/api/v1`**).
 - **CI frontend — חוזה OpenAPI:** [`frontend-ci.yml`](../.github/workflows/frontend-ci.yml) → job **`contract-codegen`** (`npm run gen:api` + בדיקת `git diff` על [`frontend/src/api/generated/`](../frontend/src/api/generated/)); **`publish-image`** דוחף **`ghcr.io/.../linkup/frontend:latest`**.
-- **Deploy פרונט ל־EC2 (אחרי Frontend CI):** [`deploy-frontend-ec2.yml`](../.github/workflows/deploy-frontend-ec2.yml) — טריגר **`workflow_run`** כש־**Frontend CI** על **`main`** מסתיים ב־**success**; SSH ל־EC2, `docker pull` ל־frontend, **`compose up`** ל־`frontend` + **`nginx --force-recreate`**, smoke ל־`/config.js`.
+- **Deploy פרונט ל־EC2 (אחרי Frontend CI):** [`deploy-frontend-ec2.yml`](../.github/workflows/deploy-frontend-ec2.yml) — טריגר **`workflow_run`** כש־**Frontend CI** על **`main`** מסתיים ב־**success**; SSH ל־EC2, `docker pull` ל־frontend, **`compose up`** ל־`frontend` + **`nginx --force-recreate`**, smoke פנימי: **`docker exec linkup_frontend wget`** → **`localhost:80/config.js`**.
 
 ## 3. מסמכים קצרים / הרחבה
 

@@ -67,6 +67,6 @@ jobs:
             $COMPOSE --profile prod up -d --no-deps frontend
             $COMPOSE --profile prod up -d --no-deps --force-recreate nginx
 
-            curl -sf --http1.1 --max-time 10 https://linkup.itamarabir.com/config.js > /dev/null \
+            docker exec linkup_frontend wget -qO- http://localhost:80/config.js > /dev/null \
               && echo "Frontend deploy succeeded" \
               || { echo "Frontend smoke check failed"; exit 1; }

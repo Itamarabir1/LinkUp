@@ -33,7 +33,7 @@ Production deploy is split into **two** paths:
 | Workflow | When it runs | What it does on EC2 |
 |----------|----------------|---------------------|
 | [`backend-ci.yml`](../.github/workflows/backend-ci.yml) | Push to `main` when paths include `backend/**`, `infrastructure/**`, `nginx/**`, `docker-compose.yml`, or that workflow file | Full stack: pull git, env sync, pull multiple GHCR images, infra + workers + backend health gate + rollback on failure. |
-| [`deploy-frontend-ec2.yml`](../.github/workflows/deploy-frontend-ec2.yml) | After **Frontend CI** completes successfully on `main` (`workflow_run`) | Pull `frontend:latest`, recreate `frontend` + `nginx`, smoke `https://linkup.itamarabir.com/config.js`. Does **not** replace the backend deploy job. |
+| [`deploy-frontend-ec2.yml`](../.github/workflows/deploy-frontend-ec2.yml) | After **Frontend CI** completes successfully on `main` (`workflow_run`) | Pull `frontend:latest`, recreate `frontend` + `nginx`, smoke **`config.js` inside `linkup_frontend`** (`docker exec … wget http://localhost:80/config.js`) — no dependency on public DNS from the Actions runner. Does **not** replace the backend deploy job. |
 
 ### Backend deploy (`backend-ci.yml`) — high-level flow
 
@@ -48,7 +48,7 @@ Production deploy is split into **two** paths:
 
 ### Frontend-only deploy (`deploy-frontend-ec2.yml`)
 
-Triggered only when **[`frontend-ci.yml`](../.github/workflows/frontend-ci.yml)** finishes with **success** on `main`. On EC2: `git fetch`/`reset`, copy `*.env.production` → `*.env`, render **`nginx/nginx.conf`** from **`nginx/nginx.conf.template`**, `docker login` to GHCR, `docker pull` **`…/linkup/frontend:latest`**, `docker compose --profile prod up -d --no-deps frontend`, then **`--force-recreate nginx`**, finally curl smoke on **`/config.js`**.
+Triggered only when **[`frontend-ci.yml`](../.github/workflows/frontend-ci.yml)** finishes with **success** on `main`. On EC2: `git fetch`/`reset`, copy `*.env.production` → `*.env`, render **`nginx/nginx.conf`** from **`nginx/nginx.conf.template`**, `docker login` to GHCR, `docker pull` **`…/linkup/frontend:latest`**, `docker compose --profile prod up -d --no-deps frontend`, then **`--force-recreate nginx`**, finally smoke **`http://localhost:80/config.js`** from inside container **`linkup_frontend`** (avoids outbound HTTPS/DNS flakiness from GitHub-hosted runners).
 
 ### Rollback behavior (backend deploy)
 

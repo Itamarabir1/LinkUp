@@ -338,7 +338,7 @@ GitHub Actions workflows run on **`main`** / **`develop`** עם **path filters**
 | backend   | `backend-ci.yml`  | lint (Ruff), format check, migrations (`uv run alembic upgrade head` on ephemeral `test_db`), `scripts/ops/check-migration-head.sh`, targeted RabbitMQ pytest, full `uv run pytest tests/`, Docker build → push to GHCR (`latest` + `sha`), deploy to EC2 over SSH (`appleboy/ssh-action`), post-deploy smoke gate (`/readyz` + runtime env + public nginx probes), auto rollback |
 | chat-ws   | `chat-ws-ci.yml`  | build, vet, Docker build → push to GHCR |
 | frontend  | `frontend-ci.yml` | `quality` (ESLint, build, bundle-size), `contract-codegen` (Orval drift gate on `src/api/generated`), `publish-image` (main push only, GHCR) |
-| (deploy hook) | `deploy-frontend-ec2.yml` | Runs **after** successful **Frontend CI** on `main` (`workflow_run`): SSH to EC2, `docker pull` `…/frontend:latest`, `compose up` `frontend` + `force-recreate` `nginx`, smoke `https://linkup.itamarabir.com/config.js` — see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) |
+| (deploy hook) | `deploy-frontend-ec2.yml` | Runs **after** successful **Frontend CI** on `main` (`workflow_run`): SSH to EC2, `docker pull` `…/frontend:latest`, `compose up` `frontend` + `force-recreate` `nginx`, smoke `config.js` **inside** `linkup_frontend` (`wget` to localhost:80) — see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) |
 | email-renderer | `email-renderer-ci.yml` | Node install, lint/build, GHCR publish on `main` when `email-renderer/**` changes |
 
 Docker images pushed from CI (tags include `latest` + commit `sha` where applicable). שמות ברירת־מחדל ב־**`docker-compose.yml`** (owner lowercase):
