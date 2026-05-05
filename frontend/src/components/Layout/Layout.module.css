@@ -215,3 +215,9 @@
   min-width: 0;
   min-height: 0;
 }
+
+.iconBtnUnread {
+  color: var(--primary);
+  border-color: var(--primary-soft-border);
+  background: var(--primary-light);
+}

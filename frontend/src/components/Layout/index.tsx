@@ -55,7 +55,11 @@ export default function Layout() {
 
         <div className={styles.navActions}>
           <div className={styles.iconBtnWrapper}>
-            <Link to="/messages" className={styles.iconBtn} aria-label={t('messages')}>
+            <Link
+              to="/messages"
+              className={`${styles.iconBtn}${messagesBadge ? ` ${styles.iconBtnUnread}` : ''}`}
+              aria-label={t('messages')}
+            >
               <MessageCircle size={16} />
               {messagesBadge && (
                 <span className={styles.badge} aria-hidden>
@@ -65,7 +69,12 @@ export default function Layout() {
             </Link>
           </div>
           <div className={styles.iconBtnWrapper}>
-            <Link to="/notifications" className={styles.iconBtn} aria-label={t('notifications')} title={t('notifications')}>
+            <Link
+              to="/notifications"
+              className={`${styles.iconBtn}${notificationsBadge ? ` ${styles.iconBtnUnread}` : ''}`}
+              aria-label={t('notifications')}
+              title={t('notifications')}
+            >
               <Bell size={16} />
               {notificationsBadge && (
                 <span className={styles.badge} aria-hidden>
