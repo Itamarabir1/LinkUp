@@ -114,17 +114,11 @@ class RideSearchRequest(BaseModel):
 
     @model_validator(mode="after")
     def departure_filters_consistent(self) -> "RideSearchRequest":
-        if self.departure_date is not None and (
-            self.departure_time is not None or self.departure_time_to is not None
-        ):
+        if self.departure_date is not None and (self.departure_time is not None or self.departure_time_to is not None):
             raise ValueError("departure_date is mutually exclusive with departure_time and departure_time_to")
         if self.departure_time_to is not None and self.departure_time is None:
             raise ValueError("departure_time_to requires departure_time")
-        if (
-            self.departure_time is not None
-            and self.departure_time_to is not None
-            and self.departure_time_to < self.departure_time
-        ):
+        if self.departure_time is not None and self.departure_time_to is not None and self.departure_time_to < self.departure_time:
             raise ValueError("departure_time_to must not be before departure_time")
         return self
 

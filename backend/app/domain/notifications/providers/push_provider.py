@@ -37,11 +37,7 @@ class PushProvider(BaseNotificationProvider):
                 **context,
             )
 
-            data = {
-                key: str(context[key])
-                for key in ("ride_id", "booking_id", "event_key")
-                if context.get(key) is not None
-            }
+            data = {key: str(context[key]) for key in ("ride_id", "booking_id", "event_key") if context.get(key) is not None}
 
             await fcm_client.send(user.fcm_token, title, body, data or None)
             logger.info("✅ Push sent to user_id=%s", getattr(user, "user_id", "N/A"))

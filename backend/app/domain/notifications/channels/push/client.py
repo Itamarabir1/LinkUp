@@ -27,15 +27,15 @@ class FCMClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=60),
-        retry=retry_if_exception_type((
-            UnavailableError,
-            InternalError,
-            DeadlineExceededError,
-            UnknownError,
-        )),
-        before_sleep=lambda retry_state: logger.info(
-            f"⏳ Push failed, retrying... (Attempt {retry_state.attempt_number})"
+        retry=retry_if_exception_type(
+            (
+                UnavailableError,
+                InternalError,
+                DeadlineExceededError,
+                UnknownError,
+            )
         ),
+        before_sleep=lambda retry_state: logger.info(f"⏳ Push failed, retrying... (Attempt {retry_state.attempt_number})"),
     )
     async def send(self, token: str, title: str, body: str, data: dict | None = None):
         """
