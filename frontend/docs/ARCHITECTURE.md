@@ -45,7 +45,7 @@
 ## Security (XSS + browser CSP)
 
 - **In-app:** avoid raw HTML; **`react/no-danger`** is enforced; use **`sanitizeHtml()`** from [`utils/sanitize.ts`](../src/utils/sanitize.ts) when rich text is required.
-- **Edge (production Compose):** enforcing **`Content-Security-Policy`** is defined in **`nginx/nginx.conf.template`** and rendered to **`nginx/nginx.conf`** via **`scripts/ops/render-nginx-conf.sh`** (local) or CI deploy (**`SENTRY_REPORT_URI`** in **`backend/.env`**); not in Vite. The build is a **static SPA** (no SSR), so future **nonce**-based CSP tightening needs edge HTML rewriting or hashes — see **[`docs/SECURITY_HEADERS.md`](../../docs/SECURITY_HEADERS.md)** and **[`docs/FEATURE_DECISIONS.md`](../../docs/FEATURE_DECISIONS.md#browser-csp-edge)**.
+- **Edge (production Compose):** enforcing **`Content-Security-Policy`** is defined in **`nginx/nginx.conf.template`** and rendered to **`nginx/nginx.conf`** via **`scripts/ops/render-nginx-conf.sh`** (local) or the EC2 deploy script in **[`deploy-ec2.yml`](../../.github/workflows/deploy-ec2.yml)** (**`SENTRY_REPORT_URI`** in **`backend/.env`**); not in Vite. The build is a **static SPA** (no SSR), so future **nonce**-based CSP tightening needs edge HTML rewriting or hashes — see **[`docs/SECURITY_HEADERS.md`](../../docs/SECURITY_HEADERS.md)** and **[`docs/FEATURE_DECISIONS.md`](../../docs/FEATURE_DECISIONS.md#browser-csp-edge)**.
 - **API:** chat messages are **plaintext-only** with server-side HTML rejection — **[`docs/FEATURE_DECISIONS.md`](../../docs/FEATURE_DECISIONS.md#chat-plaintext)**.
 
 ## Conventions

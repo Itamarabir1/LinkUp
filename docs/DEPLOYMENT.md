@@ -28,33 +28,30 @@ Related operations docs:
 
 ## CI/CD Flow (GitHub Actions)
 
-Production deploy is split into **two** paths:
+Service workflows (**Backend CI**, **Frontend CI**, **Chat-WS CI**, **Email renderer CI**) lint, test, and **push images to GHCR** when their path filters match and the run is on `main`.
 
-| Workflow | When it runs | What it does on EC2 |
-|----------|----------------|---------------------|
-| [`backend-ci.yml`](../.github/workflows/backend-ci.yml) | Push to `main` when paths include `backend/**`, `infrastructure/**`, `nginx/**`, `docker-compose.yml`, or that workflow file | Full stack: pull git, env sync, pull multiple GHCR images, infra + workers + backend health gate + rollback on failure. |
-| [`deploy-frontend-ec2.yml`](../.github/workflows/deploy-frontend-ec2.yml) | After **Frontend CI** completes successfully on `main` (`workflow_run`) | Pull `frontend:latest`, recreate `frontend` + `nginx`, smoke **`config.js` inside `linkup_frontend`** (`docker exec … wget http://localhost:80/config.js`) — no dependency on public DNS from the Actions runner. Does **not** replace the backend deploy job. |
+Production deploy is centralized in **`deploy-ec2.yml`**, triggered by **`workflow_run`** after **any** of those four workflows completes **successfully** on `main` (same commit). **Concurrency** group `ec2-deploy-production` with **`cancel-in-progress: false`** queues overlapping runs so only one deploy executes at a time.
 
-### Backend deploy (`backend-ci.yml`) — high-level flow
+| Workflow | When it runs | What it does |
+|----------|----------------|--------------|
+| [`backend-ci.yml`](../.github/workflows/backend-ci.yml) | Push/PR with path filters for backend, infra, nginx, compose, or this workflow file | Lint, tests, migrations, Docker build → push **`backend`**, **`worker`**, **`migrate`**, **`pgbouncer`** to GHCR on push to `main` (does **not** deploy by itself). |
+| [`deploy-ec2.yml`](../.github/workflows/deploy-ec2.yml) | After **Backend CI**, **Frontend CI**, **Chat-WS CI**, or **Email renderer CI** completes successfully on `main` (`workflow_run`) | Full stack on EC2: git sync, env sync, `envsubst` for edge **`nginx/nginx.conf`**, pull GHCR images, bring up infra → migrate → app services → **`frontend` + `nginx`**, **smokes** (`config.js` in **`linkup_frontend`**, `/health` in **`linkup_email_renderer`**) **before** backend rollout gate, health-gated backend deploy (`/readyz`, Firebase env, public `/livez` + `/config.js`), write resolved backend tag to **`.deploy_state/backend_prev_tag`**, rollback on failure. |
 
-1. Run lint + tests + migrations.
-2. Build and push images to GHCR.
-3. SSH to EC2 (`appleboy/ssh-action`).
-4. Pull latest git + sync env files.
-5. Pull images from GHCR.
-6. Bring up infra, then app services in order.
-7. Health-gated backend rollout (`docker compose ... up --wait`).
-8. Roll back backend image on health failure.
+### Deploy (`deploy-ec2.yml`) — high-level flow
 
-### Frontend-only deploy (`deploy-frontend-ec2.yml`)
+1. SSH to EC2 (`appleboy/ssh-action`); image tag = triggering workflow’s **`head_sha`** (fallback to **`backend:latest`** if that tag is missing from GHCR).
+2. Pull latest git + sync `*.env.production` → compose env files; sync **`JWT_SECRET`** in **`chat-ws/.env`** from **`SECRET_KEY`**. Render **`nginx/nginx.conf`** from template using **`SENTRY_REPORT_URI`** from **`backend/.env`**.
+3. Pull images from GHCR (backend prefers the workflow commit SHA tag, then **`…/backend:latest`** if that tag is absent).
+4. Bring up infra (`db`, Redis Sentinel topology, RabbitMQ), **`pgbouncer`**, run **`migrate`**, then **`email-renderer`**, workers, **`chat-ws`**, **`frontend` + `nginx`** (force-recreate **`nginx`** when nginx/frontend-related files changed in `HEAD`).
+5. **Smoke** from inside containers: **`linkup_frontend`** → **`http://localhost:80/config.js`**, **`linkup_email_renderer`** → **`http://localhost:3001/health`**.
+6. Roll out **`backend`** with **`--wait`**, then run mandatory checks (Firebase, Redis URL in **`chat-ws`**, **`/readyz`**, public **`/livez`** and **`/config.js`** through TLS).
+7. On failure: roll back **`backend`** to the previous tag from **`.deploy_state/backend_prev_tag`**; if **`docker pull`** for that image fails (e.g. old digest removed), fall back to **`…/backend:latest`**.
 
-Triggered only when **[`frontend-ci.yml`](../.github/workflows/frontend-ci.yml)** finishes with **success** on `main`. On EC2: `git fetch`/`reset`, copy `*.env.production` → `*.env`, render **`nginx/nginx.conf`** from **`nginx/nginx.conf.template`**, `docker login` to GHCR, `docker pull` **`…/linkup/frontend:latest`**, `docker compose --profile prod up -d --no-deps frontend`, then **`--force-recreate nginx`**, finally smoke **`http://localhost:80/config.js`** from inside container **`linkup_frontend`** (avoids outbound HTTPS/DNS flakiness from GitHub-hosted runners).
+### Rollback behavior
 
-### Rollback behavior (backend deploy)
-
-- Previous backend image tag is stored in `.deploy_state/backend_prev_tag`.
-- If new backend fails health gate, deploy re-runs backend with previous image.
-- If rollback also fails, workflow exits with manual intervention required.
+- After a successful deploy, the resolved backend image **tag** (commit SHA or `latest`) is stored in **`.deploy_state/backend_prev_tag`**.
+- If the new backend fails the post-rollout gate, the script switches **`backend`** back to the previous image; if **`docker pull`** for that ref fails, it pulls the **`backend:latest`** image for the same GHCR repository instead.
+- If rollback **`compose up`** for **`backend`** still fails, the workflow exits for manual intervention.
 
 ## Environment Files (.env.production)
 
@@ -104,8 +101,7 @@ This allows the same frontend image to run in all environments.
 
 ### Standard deploy
 
-- **Backend / stack:** triggered by push to `main` when **backend-ci** path filters apply.
-- **Frontend image only:** after **Frontend CI** succeeds on `main`, **`deploy-frontend-ec2.yml`** rolls **`frontend` + `nginx`** on EC2 (see table above).
+- **Full stack:** after **Backend CI**, **Frontend CI**, **Chat-WS CI**, or **Email renderer CI** succeeds on **`main`**, **`deploy-ec2.yml`** runs (queued if another deploy is in flight). Any green service CI on `main` can drive a full compose rollout so frontend-only or chat-only changes still refresh EC2 without relying on **backend-ci** path filters.
 
 After deploy:
 

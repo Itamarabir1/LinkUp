@@ -1,0 +1,188 @@
+name: Deploy to EC2
+
+on:
+  workflow_run:
+    workflows:
+      - Backend CI
+      - Frontend CI
+      - Chat-WS CI
+      - Email renderer CI
+    branches: [main]
+    types: [completed]
+
+concurrency:
+  group: ec2-deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Deploy stack on EC2 (rolling single-instance)
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_OWNER: ${{ github.repository_owner }}
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+          PGBOUNCER_ADMIN_PASSWORD: ${{ secrets.PGBOUNCER_ADMIN_PASSWORD }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          envs: GHCR_USER,GHCR_TOKEN,IMAGE_OWNER,IMAGE_TAG,PGBOUNCER_ADMIN_PASSWORD
+          script: |
+            set -euo pipefail
+
+            DEPLOY_DIR="${DEPLOY_DIR:-$HOME/LinkUp}"
+            STATE_DIR="$DEPLOY_DIR/.deploy_state"
+            PREV_TAG_FILE="$STATE_DIR/backend_prev_tag"
+            mkdir -p "$STATE_DIR"
+
+            cd "$DEPLOY_DIR"
+            git fetch origin main
+            git reset --hard origin/main
+
+            cp backend/.env.production backend/.env
+            cp chat-ws/.env.production chat-ws/.env
+            BACKEND_SECRET="$(grep -E '^SECRET_KEY=' backend/.env | head -1 | cut -d= -f2-)"
+            sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$BACKEND_SECRET|" chat-ws/.env
+            [ -n "$BACKEND_SECRET" ] || { echo "ERROR: SECRET_KEY missing in backend/.env"; exit 1; }
+            cp frontend/.env.production frontend/.env
+
+            [ -f backend/.env ]  || { echo "ERROR: backend/.env missing on EC2";  exit 1; }
+            [ -f frontend/.env ] || { echo "ERROR: frontend/.env missing on EC2 (need frontend/.env.production)"; exit 1; }
+
+            COMPOSE="docker compose --env-file backend/.env --env-file frontend/.env"
+
+            POSTGRES_USER="$(grep -E '^POSTGRES_USER=' backend/.env | head -1 | cut -d= -f2-)"
+            POSTGRES_PASSWORD="$(grep -E '^POSTGRES_PASSWORD=' backend/.env | head -1 | cut -d= -f2-)"
+            POSTGRES_DB="$(grep -E '^POSTGRES_DB=' backend/.env | head -1 | cut -d= -f2-)"
+            export POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB
+
+            _pgb_from_file="$(grep -E '^PGBOUNCER_ADMIN_PASSWORD=' backend/.env | head -1 | cut -d= -f2-)"
+            export PGBOUNCER_ADMIN_PASSWORD="${_pgb_from_file:-$PGBOUNCER_ADMIN_PASSWORD}"
+
+            [ -n "${POSTGRES_USER:-}" ]             || { echo "ERROR: POSTGRES_USER missing";          exit 1; }
+            [ -n "${POSTGRES_PASSWORD:-}" ]         || { echo "ERROR: POSTGRES_PASSWORD missing";      exit 1; }
+            [ -n "${PGBOUNCER_ADMIN_PASSWORD:-}" ] || { echo "ERROR: PGBOUNCER_ADMIN_PASSWORD missing"; exit 1; }
+
+            _sentry_report="$(grep -E '^SENTRY_REPORT_URI=' backend/.env | head -1 | cut -d= -f2-)"
+            export SENTRY_REPORT_URI="${_sentry_report:-$SENTRY_REPORT_URI}"
+            [ -n "${SENTRY_REPORT_URI:-}" ] || { echo "ERROR: SENTRY_REPORT_URI missing in backend/.env (CSP report-uri for nginx)"; exit 1; }
+
+            command -v envsubst >/dev/null 2>&1 || { echo "ERROR: envsubst missing"; exit 1; }
+            envsubst '${SENTRY_REPORT_URI}' < "$DEPLOY_DIR/nginx/nginx.conf.template" \
+                   > "$DEPLOY_DIR/nginx/nginx.conf"
+            chmod 600 "$DEPLOY_DIR/nginx/nginx.conf"
+
+            OWNER_LOWER="$(echo "$IMAGE_OWNER" | tr '[:upper:]' '[:lower:]')"
+            GHCR_BASE="ghcr.io/$OWNER_LOWER/linkup"
+
+            HEAD_SHA="$IMAGE_TAG"
+            NEW_IMAGE="$GHCR_BASE/backend:$HEAD_SHA"
+
+            PREV_TAG="latest"
+            [ -f "$PREV_TAG_FILE" ] && PREV_TAG="$(cat "$PREV_TAG_FILE")"
+            PREV_IMAGE="$GHCR_BASE/backend:$PREV_TAG"
+
+            NGINX_INPUTS_CHANGED=0
+            while IFS= read -r changed_file; do
+              case "$changed_file" in
+                nginx/nginx.conf.template|nginx/nginx.conf|docker-compose.yml|frontend/Dockerfile|frontend/nginx.conf)
+                  NGINX_INPUTS_CHANGED=1
+                  ;;
+              esac
+            done <<EOF
+            $(git diff-tree --no-commit-id --name-only -r HEAD)
+            EOF
+
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+            docker image prune -af
+
+            if ! docker pull "$NEW_IMAGE"; then
+              echo "WARN: pull failed for $NEW_IMAGE, falling back to ${GHCR_BASE}/backend:latest"
+              NEW_IMAGE="$GHCR_BASE/backend:latest"
+              docker pull "$NEW_IMAGE"
+            fi
+
+            docker pull "$PREV_IMAGE"                                || true
+            docker pull "$GHCR_BASE/pgbouncer:latest"
+            docker pull "$GHCR_BASE/worker:latest"
+            docker pull "$GHCR_BASE/migrate:latest"
+            docker pull "$GHCR_BASE/chat-ws:latest"                  || true
+            docker pull "$GHCR_BASE/frontend:latest"                 || true
+            docker pull "ghcr.io/$OWNER_LOWER/linkup-email-renderer:latest" || true
+
+            export PGBOUNCER_IMAGE="$GHCR_BASE/pgbouncer:latest"
+            export WORKER_IMAGE="$GHCR_BASE/worker:latest"
+            export MIGRATE_IMAGE="$GHCR_BASE/migrate:latest"
+            export CHAT_WS_IMAGE="$GHCR_BASE/chat-ws:latest"
+            export FRONTEND_IMAGE="$GHCR_BASE/frontend:latest"
+            export EMAIL_RENDERER_IMAGE="ghcr.io/$OWNER_LOWER/linkup-email-renderer:latest"
+
+            $COMPOSE --profile prod up -d --wait --wait-timeout 120 \
+              db redis-primary redis-replica redis-sentinel rabbitmq
+
+            $COMPOSE up -d --wait --wait-timeout 60 --no-deps pgbouncer
+
+            $COMPOSE run --rm migrate
+
+            $COMPOSE up -d --no-deps email-renderer
+            $COMPOSE up -d --no-deps notification-worker task-worker ai-worker
+            $COMPOSE up -d --no-deps chat-ws
+            $COMPOSE --profile prod up -d --no-deps frontend nginx
+            if [ "$NGINX_INPUTS_CHANGED" -eq 1 ]; then
+              echo "Detected nginx-related changes in HEAD; forcing nginx recreate."
+              $COMPOSE --profile prod up -d --no-deps --force-recreate nginx
+            else
+              echo "No nginx-related changes in HEAD; skipping forced nginx recreate."
+            fi
+
+            docker exec linkup_frontend wget -qO- http://localhost:80/config.js > /dev/null \
+              && echo "Frontend smoke OK" \
+              || { echo "Frontend smoke FAILED"; exit 1; }
+
+            docker exec linkup_email_renderer wget -qO- http://localhost:3001/health > /dev/null \
+              && echo "Email-renderer smoke OK" \
+              || { echo "Email-renderer smoke FAILED"; exit 1; }
+
+            if BACKEND_IMAGE="$NEW_IMAGE" $COMPOSE up -d --no-deps --wait --wait-timeout 90 backend; then
+              if grep -E '^FIREBASE_CREDENTIALS_JSON=' backend/.env >/dev/null \
+                && $COMPOSE exec -T chat-ws sh -c "printenv | grep -E '^REDIS_URL='" | grep -q 'redis://:.*@redis:6379/1' \
+                && $COMPOSE exec -T backend sh -c "printenv | grep -E '^FIREBASE_CREDENTIALS_JSON='" >/dev/null \
+                && $COMPOSE exec -T backend sh -c "python -c \"import urllib.request;print(urllib.request.urlopen('http://localhost:8000/readyz').read().decode())\"" | grep -q '"status":"healthy"' \
+                && $COMPOSE exec -T backend sh -c "python3 -c \"import os; assert os.getenv('FIREBASE_CREDENTIALS_JSON'), 'missing'\"" \
+                && curl -sf --http1.1 --max-time 10 https://linkup.itamarabir.com/livez > /dev/null \
+                && curl -sf --http1.1 --max-time 10 https://linkup.itamarabir.com/config.js > /dev/null; then
+                mkdir -p "$STATE_DIR"
+                echo "${NEW_IMAGE##*:}" > "$PREV_TAG_FILE"
+                echo "Deploy succeeded: $NEW_IMAGE"
+                exit 0
+              fi
+              echo "Smoke checks failed after backend rollout"
+            fi
+
+            echo "Health check failed, rolling back to previous backend"
+            ROLLBACK_IMAGE="$PREV_IMAGE"
+            if ! docker pull "$ROLLBACK_IMAGE"; then
+              echo "WARN: rollback pull failed for $ROLLBACK_IMAGE, falling back to $GHCR_BASE/backend:latest"
+              ROLLBACK_IMAGE="$GHCR_BASE/backend:latest"
+              docker pull "$ROLLBACK_IMAGE" || { echo "Rollback pull of latest also failed"; exit 1; }
+            fi
+
+            if BACKEND_IMAGE="$ROLLBACK_IMAGE" $COMPOSE up -d --no-deps --wait --wait-timeout 90 backend; then
+              echo "Rollback succeeded (rolled back to $ROLLBACK_IMAGE)"
+              exit 1
+            fi
+
+            echo "Rollback failed - manual intervention required"
+            exit 1

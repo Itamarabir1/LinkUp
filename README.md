@@ -321,7 +321,7 @@ make admin-revoke EMAIL=user@example.com  # הסרת אדמין לפי אימי�
 
 - **Redis HA + DB separation.** Runtime Redis is deployed as Sentinel topology (`redis-primary` + `redis-replica` + `redis-sentinel`). Logical DB split still applies: DB=0 for cache/rate-limit/idempotency/denylist and DB=1 for chat/pub-sub, so failover improves availability without changing domain contracts.
 
-- **Single-EC2 rolling CD (senior pragmatic).** Instead of full blue/green infra, backend deploy runs as a low-downtime rolling replace on the same host: immutable GHCR tag (`sha`) is deployed via GitHub Actions SSH job, post-deploy smoke checks validate backend readiness (`/readyz`), Firebase env presence, and public nginx reachability (`/livez`, `/config.js`), then rollback to previous tag runs automatically on failure. This keeps ops robust on `t3.medium` without extra AWS cost.
+- **Single-EC2 rolling CD (senior pragmatic).** Instead of full blue/green infra, production deploy runs on the same host via **[`deploy-ec2.yml`](.github/workflows/deploy-ec2.yml)** (`workflow_run` after green **Backend / Frontend / Chat-WS / Email renderer** CI on `main`): prefer immutable GHCR tag (`sha`, with fallback to `latest` if missing), internal smokes for `frontend` and `email-renderer` before the backend gate, then post-deploy checks for backend readiness (`/readyz`), Firebase env presence, and public nginx reachability (`/livez`, `/config.js`); rollback to the previous tag, with pull fallback to `backend:latest` when the old digest is gone. This keeps ops robust on `t3.medium` without extra AWS cost.
 
 - **AI chat summary stays inside the backend worker images (no separate AI microservice).** Primary trigger today: **`task-worker`** scheduled **idle-timeout** paths call `handle_conversation_completion` directly (Groq → `chat_analysis` → Outbox). **`ai-worker`** additionally runs a **Redis subscriber** on `chat:completion:*`, but backend Python currently has **no verified publisher** for that channel — details in [`docs/architecture/AI.md`](docs/architecture/AI.md).
 
@@ -335,10 +335,10 @@ GitHub Actions workflows run on **`main`** / **`develop`** עם **path filters**
 
 | Service   | Workflow | Steps |
 |-----------|----------|-------|
-| backend   | `backend-ci.yml`  | lint (Ruff), format check, migrations (`uv run alembic upgrade head` on ephemeral `test_db`), `scripts/ops/check-migration-head.sh`, targeted RabbitMQ pytest, full `uv run pytest tests/`, Docker build → push to GHCR (`latest` + `sha`), deploy to EC2 over SSH (`appleboy/ssh-action`), post-deploy smoke gate (`/readyz` + runtime env + public nginx probes), auto rollback |
+| backend   | `backend-ci.yml`  | lint (Ruff), format check, migrations (`uv run alembic upgrade head` on ephemeral `test_db`), `scripts/ops/check-migration-head.sh`, targeted RabbitMQ pytest, full `uv run pytest tests/`, Docker build → push to GHCR (`latest` + `sha`) |
 | chat-ws   | `chat-ws-ci.yml`  | build, vet, Docker build → push to GHCR |
 | frontend  | `frontend-ci.yml` | `quality` (ESLint, build, bundle-size), `contract-codegen` (Orval drift gate on `src/api/generated`), `publish-image` (main push only, GHCR) |
-| (deploy hook) | `deploy-frontend-ec2.yml` | Runs **after** successful **Frontend CI** on `main` (`workflow_run`): SSH to EC2, `docker pull` `…/frontend:latest`, `compose up` `frontend` + `force-recreate` `nginx`, smoke `config.js` **inside** `linkup_frontend` (`wget` to localhost:80) — see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) |
+| (deploy hook) | `deploy-ec2.yml` | Runs **after** successful **Backend CI**, **Frontend CI**, **Chat-WS CI**, or **Email renderer CI** on `main` (`workflow_run`; concurrency queue): SSH to EC2, full Docker Compose prod profile, internal smokes (`config.js` in `linkup_frontend`, `/health` in `linkup_email_renderer`) **before** backend rollout, post-deploy gate (`/readyz`, public `/livez` + `/config.js`), rollback with **`backend:latest`** fallback if the previous image tag is gone — see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) |
 | email-renderer | `email-renderer-ci.yml` | Node install, lint/build, GHCR publish on `main` when `email-renderer/**` changes |
 
 Docker images pushed from CI (tags include `latest` + commit `sha` where applicable). שמות ברירת־מחדל ב־**`docker-compose.yml`** (owner lowercase):

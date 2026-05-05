@@ -11,7 +11,7 @@
 - **Billing (Stripe):** flow מלא עם webhook idempotency ו-payment integrity.
 - **RabbitMQ reliability:** DLQ broker-native + consumer self-healing + metrics (`rabbitmq_consumer_iterator_restarts_total`).
 - **PgBouncer + Redis Sentinel HA:** backend/workers דרך pooler ו-failover ל-Redis.
-- **Single-EC2 rolling deploy:** health-gated deploy + rollback אוטומטי ב-`backend-ci.yml`.
+- **Single-EC2 rolling deploy:** health-gated deploy + rollback אוטומטי ב-**`deploy-ec2.yml`** (אחרי CI מוצלח על `main`).
 - **Frontend runtime config (12-factor):** `config.js` ו-`firebase-messaging-sw.js` נוצרים ב-startup עם `envsubst`.
 - **Ops hardening:** multi `--env-file`, JWT sync backend/chat-ws, ו-fail-fast guards בסקריפט deploy.
 
@@ -143,7 +143,7 @@
 | +1:00–2:00 | **מסד נתונים** | PostgreSQL + **PostGIS** — איפה נכנס הגיאו; טבלאות ליבה (`rides`, `bookings`, `passenger_requests`, `outbox_events`, …); למה אינדקסים חשובים לחיפוש ולהזמנות. מקור: `docs/architecture/DATABASE.md`. |
 | +0:45–1:15 | **מיגרציות וסכימה** | Alembic כמקור שינויי סכימה; שירות **`migrate`** ב-Docker Compose לפני עליית ה-API; `db/schema.sql` כעזר. |
 | +1:00–1:45 | **פריסה מקומית מול K8s** | Compose: **db**, **redis**, **rabbitmq**, **`pgbouncer`**, **`migrate`** (לפני API), **`email-renderer`**, **backend**, **`notification-worker`**, **`task-worker`**, **`ai-worker`**, **chat-ws**; `depends_on` + healthchecks; `UVICORN_WORKERS`. (**`outbox-worker`** — alias בפרופיל **`compat`**.) אז מעבר קצר ל־`k8s/` — מפת שירותים (כולל `k8s/email-renderer`), בלי לעבור כל מניפסט. |
-| +0:45–1:00 | **CI/CD** | **ארבעה** workflows ב־`.github/workflows/`: `backend-ci`, `frontend-ci`, `chat-ws-ci`, **`email-renderer-ci`** — lint/tests/build; ב־`main`: **backend-ci** דוחף `linkup/backend` + **`worker`** + **`migrate`** + **`pgbouncer`**; **frontend-ci** — `frontend`; **chat-ws-ci** — `chat-ws`; **email-renderer-ci** — `linkup-email-renderer` — כולם GHCR לפי `paths`. |
+| +0:45–1:00 | **CI/CD** | **ארבעה** workflows שירות: `backend-ci`, `frontend-ci`, `chat-ws-ci`, **`email-renderer-ci`** — lint/tests/build; ב־`main` דוחפים ל-GHCR לפי `paths`. בנוסף **`deploy-ec2.yml`** — אחרי CI ירוק על `main`, פריסת Compose מלאה ל-EC2 (כולל smokes ו-rollback). |
 | +1:15–2:00 | **chat-ws לעומק** | למה **Go** ל-WS; `PSubscribe` ל-Redis; אין DB בשרת — רק forward; JWT; `presence` + debounce; קריאת `last_seen` מ-REST הבקאנד; **הגבלות נכנסות:** **`SetReadLimit`**, דילול פרסום **typing**. `chat-ws/../ARCHITECTURE.md`, `docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md` (כולל §7). |
 | +1:00–1:30 | **ערוצי התראות** | צ’אט על `chat:conversation:*`; **מאוחד** ל-unread והתראות על **`user:{id}:events`** (`invalidate` + `UserEvent`); רשימת התראות in-app ב-**REST** + רענון חי דרך chat-ws (`ChatContext`); Outbox → RabbitMQ → **Brevo** / **FCM**; **למה FCM רק מפת `data`** — `docs/FCM_SYSTEM_SUMMARY.md`, `docs/adr/FCM_AND_PUSH.md`. |
 | +0:45–1:00 | **אבטחה מפורטת** | rate limit על auth; **מניעת user enumeration** בלוגין; `get_current_user_ws` בלי DB ב-connect — trade-off. |

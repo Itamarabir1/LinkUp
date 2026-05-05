@@ -16,6 +16,7 @@ LinkUp/
 │   └── workflows/                 # CI/CD
 │       ├── backend-ci.yml
 │       ├── chat-ws-ci.yml
+│       ├── deploy-ec2.yml         # פריסת EC2 אחרי workflow_run (CI ירוק על main)
 │       ├── email-renderer-ci.yml
 │       └── frontend-ci.yml
 ├── .vscode/
@@ -311,6 +312,7 @@ mobile/
 └── workflows/
     ├── backend-ci.yml
     ├── chat-ws-ci.yml
+    ├── deploy-ec2.yml
     ├── email-renderer-ci.yml
     └── frontend-ci.yml
 ```
@@ -355,7 +357,7 @@ k8s/
 - **db**: סכמה (schema.sql) וסקריפטים שימושיים; מיגרציות ב-backend/alembic/.
 - **frontend**: אפליקציית ווב ב‑React + TypeScript + Vite.
 - **mobile**: אפליקציית מובייל (Expo/React Native) ב‑TypeScript.
-- **.github/workflows**: CI/CD — `backend-ci`, `frontend-ci`, `chat-ws-ci`, **`email-renderer-ci`** (paths לפי שירות).
+- **.github/workflows**: CI — `backend-ci`, `frontend-ci`, `chat-ws-ci`, **`email-renderer-ci`** (paths לפי שירות); **`deploy-ec2.yml`** — פריסה ל-EC2 (`workflow_run`).
 - **k8s**: הגדרות Kubernetes (base, backend, chat-ws, frontend, infra).
 - **node_modules** (ב‑frontend ו‑mobile) ו־**.venv** (בסביבות Python) לא פורטו – אלה תלויות שנוצרות בהתקנה.
 - קבצי **.env** לא נכללו בתיאור מפורש מטעמי אבטחה; הם קיימים לפי .env.example.

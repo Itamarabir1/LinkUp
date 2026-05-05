@@ -80,7 +80,7 @@ Values must match.
 
 ### Prevention
 
-Deploy script syncs `JWT_SECRET` from backend `SECRET_KEY` automatically in `backend-ci.yml`.
+Deploy script on EC2 syncs `JWT_SECRET` from backend `SECRET_KEY` automatically (see **[`deploy-ec2.yml`](../../.github/workflows/deploy-ec2.yml)**).
 
 ## 4) Backend Healthcheck Fails During Deploy
 

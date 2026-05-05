@@ -608,13 +608,13 @@
 | | |
 |--|--|
 | **בעיה** | Deploy ידני ב-SSH יוצר אי-עקביות וסיכון לטעות אנוש; Blue/Green מלא מכפיל משאבים ויקר מדי ל-`t3.medium`. |
-| **החלטה** | ליישם CD פרגמטי ב-GitHub Actions: build+push (`latest` + `sha`) ואז deploy ל-EC2 ב-SSH, rollout ל-backend יחיד עם `docker compose up -d --no-deps backend`, health gate, ו-rollback אוטומטי לתג קודם. |
+| **החלטה** | ליישם CD פרגמטי: ה-workflows של השירותים עושים build+push ל-GHCR; **[`deploy-ec2.yml`](../.github/workflows/deploy-ec2.yml)** (אחרי CI ירוק על `main`) מבצע deploy ל-EC2 ב-SSH, rollout ל-backend עם `docker compose up -d --no-deps backend`, health gate, rollback לתג קודם או ל-**`backend:latest`** אם התג הארכיון נעלם מהרישום. |
 | **אלטרנטיבות** | (1) ALB + target groups + שני סטאקים — הכי נקי תיאורטית אבל תוספת עלות/מורכבות. (2) Blue/Green מקומי עם שני compose projects — כמעט פי 2 footprint בזמן rollout. (3) להישאר manual deploy — פשוט אך לא אמין לאורך זמן. |
 | **מה סניור עושה (לא טריוויאלי)** | (1) משתמש ב-immutable `sha` ל-deterministic rollback. (2) שומר `previous tag` בצד השרת ולא מסתמך על `latest`. (3) deploy נחשב נכשל אם health לא עולה בזמן מוגדר. (4) מוסיף `stop_grace_period` ו-tuning בסיסי ב-nginx כדי לצמצם impact בזמן החלפה. |
 | **יתרון** | תהליך פריסה אוטומטי, עקבי ומהיר, שמתאים לתקציב קטן ולשרת יחיד בלי לבנות פלטפורמה כבדה. |
 | **Trade-off** | זה low-downtime ולא zero-downtime מוחלט, כי backend רץ כרגע בעותק יחיד בזמן ההחלפה. |
 | **Interview pitch (≈30s)** | *"בחרתי CD פרגמטי לשרת יחיד: SHA-tag deploy + health gate + auto rollback. זה נותן אמינות תפעולית גבוהה בלי לשלם על ALB/תשתית כפולה, ומתאים לשלב הסקייל הנוכחי."* |
-| **הפניה** | `.github/workflows/backend-ci.yml`, `docker-compose.yml`, `nginx/nginx.conf.template`, `scripts/ops/render-nginx-conf.sh`, `docs/architecture/DEVELOPMENT.md` |
+| **הפניה** | `.github/workflows/deploy-ec2.yml`, `.github/workflows/backend-ci.yml` (בנייה בלבד), `docker-compose.yml`, `nginx/nginx.conf.template`, `scripts/ops/render-nginx-conf.sh`, `docs/architecture/DEVELOPMENT.md` |
 
 ---
 
