@@ -29,38 +29,22 @@ class WebSocketProvider(BaseNotificationProvider):
     ) -> None:
         user_id = getattr(user, "user_id", None) or getattr(user, "id", None)
         if not user_id:
-            logger.error("❌ [WS Provider] User object has no ID")
+            logger.error("[WS Provider] User object has no ID")
             return
 
         event_key = context.get("event_key") or ""
 
-        REFRESH_EVENTS = {
-            "booking.passenger_join_request",
-            "booking.approved_by_driver",
-            "booking.rejected_by_driver",
-            "ride.cancelled_by_driver",
+        payload = {
+            "type": "invalidate",
+            "resource": "notifications",
+            "event": event_key,
+            "user_id": str(user_id),
         }
-
-        if event_key in REFRESH_EVENTS:
-            payload = {
-                "type": "notifications_refresh",
-                "event": event_key,
-                "user_id": str(user_id),
-            }
-        else:
-            payload = {
-                "type": "UI_UPDATE",
-                "event": event_key,
-                "user_id": str(user_id),
-            }
 
         channel = f"user:{user_id}:events"
 
         try:
-            message_json = json.dumps(payload, ensure_ascii=False, default=str)
-            await redis_chat_pubsub.publish(channel, message_json)
-            logger.debug(f"📡 [WS Provider] Published to {channel}")
-
+            await redis_chat_pubsub.publish(channel, json.dumps(payload, ensure_ascii=False, default=str))
+            logger.debug("[WS Provider] Published to %s", channel)
         except Exception as e:
-            logger.error(f"❌ [WS Provider] Redis Publish Failed: {e!s}")
-            # Swallow errors so WS failure does not break email or push
+            logger.error("[WS Provider] Redis Publish Failed: %s", e, exc_info=False)

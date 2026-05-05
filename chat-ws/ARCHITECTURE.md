@@ -8,7 +8,7 @@
 **מה כן:**
 - ✅ WebSocket connections management
 - ✅ JWT authentication (WS + HTTP presence)
-- ✅ Subscribe ל-Redis (`chat:conversation:*`, `chat:typing:*`, `chat:notification:*`, **`user:*:events`**, … + **`user:offline`** + **`user:online`**) — בחיבור: `PUBLISH user:online` → WS `user_online`; בניתוק: `user:offline` → `user_offline` (עדכון מיידי ב-UI). הודעות מ-`user:*:events` מועברות ללקוח כפי שהן (JSON) אחרי זיהוי `user_id` מהערוץ. לקוחות Redis נפרדים ל-subscribe כדי לא לחסום עם `PSubscribe` של הצ'אט
+- ✅ Subscribe ל-Redis (**`chat:conversation:*`**, **`chat:typing:*`**, **`user:*:events`**, … + **`user:offline`** + **`user:online`**) — בחיבור: `PUBLISH user:online` → WS `user_online`; בניתוק: `user:offline` → `user_offline` (עדכון מיידי ב-UI). פריימים מ-`user:*:events` נשלחים ללקוח דרך **`SendToUser`**. **אין** `chat:notification:*` — אותו זרם נבלע תחת **`user:*:events`**. לקוחות Redis נפרדים ל-subscribe כדי לא לחסום עם `PSubscribe` של הצ'אט.
 - ✅ Forward messages ל-clients
 - ✅ Typing events (`typing_start` / `typing_stop`) דרך Redis (`chat:typing:*`)
 - ✅ **HTTP `GET /presence/{user_id}`** — `online` מ-Redis; `last_seen` מ-backend (`GET /api/v1/users/{id}/last-seen`) כשצריך
@@ -97,8 +97,8 @@ Client → GET /api/v1/chat/conversations/{id}/calendar.ics (backend)
 
 ## התראות: צ'אט מול פיד in-app
 
-- **`chat:notification:*` (Redis → chat-ws)** — דחיפות הקשורות ל**צ'אט**; chat-ws מנתב ללקוח על אותו חיבור WS של הצ'אט (`/ws`).
-- **פיד התראות האפליקציה (מסך / באדג'):** הרשימה מ־**`GET /api/v1/users/me/notifications`** + polling ב־`useChatNotificationsFeed`. רענון חי דרך **`user:{user_id}:events`** על **אותו חיבור chat-ws** (פרסום backend → Redis משותף). אין WS נפרד ב-FastAPI ל־`/notifications/ws` — ראו [`ARCHITECTURE.md`](../ARCHITECTURE.md) ו־[`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md).
+- **עדכון unread / פיד:** הכל עובר ב־**`user:{id}:events`** — `invalidate` (unread או notifications) או **UserEvent** מ־`publish_user_event`. chat-ws מנתב ל־**`/ws`** בלי ערוץ נפרד `chat:notification:*`.
+- **פיד התראות האפליקציה (מסך / באדג'):** הרשימה מ־**`GET /api/v1/users/me/notifications`** + polling ב־`useChatNotificationsFeed`. רענון חי ב־**`ChatContext`** + **`useUserEventStream`**. אין WS נפרד ב-FastAPI ל־`/notifications/ws` — ראו [`ARCHITECTURE.md`](../ARCHITECTURE.md) ו־[`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md).
 
 ## סיכום
 
@@ -107,7 +107,7 @@ Client → GET /api/v1/chat/conversations/{id}/calendar.ics (backend)
 | WebSocket connections | chat-ws (Go) | Real-time, performance |
 | REST API endpoints | backend (Python) | Standard API pattern |
 | In-app notification **feed** (REST + refresh events) | backend REST + **chat-ws** (`user:{id}:events`) | רשימה ב-REST; דחיפת רענון על אותו WS כמו צ'אט |
-| Chat-related notification fan-out | chat-ws (via `chat:notification:*`) | חיבור WS יחיד לשיחה |
+| Per-user invalidate + domain events | chat-ws (`user:*:events` → `SendToUser`) | חיבור WS יחיד |
 | Calendar export | backend (Python) | API endpoint |
 | AI analysis | backend worker (`ai-worker`) | Async, Redis DB 1 listener |
 | AI analysis persistence | backend DB (`chat_analysis`) | worker אחרי completion |

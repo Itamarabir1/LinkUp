@@ -43,7 +43,7 @@
 | | |
 |--|--|
 | **הקשר** | צ'אט, נסיעות, מיקום, התראות in-app, אירועי משתמש (`user:*:events`). |
-| **החלטה** | **צ'אט** + אירועי **`user:{id}:events`** (כולל רענון התראות) דרך **chat-ws** (Go); **נסיעות / מיקום** דרך **WebSocket של FastAPI** (ראו [WEBSOCKETS.md](WEBSOCKETS.md)). רשימת התראות — **REST** (`fetchMyNotifications`). פריימים נכנסים עוברים **Zod** (`safeParse`) ב-[`wsEvents.ts`](../../frontend/src/types/wsEvents.ts) ובעיבוד הודעות צ'אט ב-[`processChatWebSocketMessage.ts`](../../frontend/src/pages/MessageThread/processChatWebSocketMessage.ts). |
+| **החלטה** | **צ'אט** + אירועי **`user:{id}:events`** (כולל **`invalidate`** ל-unread והתראות + **`UserEvent`**) דרך **chat-ws** (Go); **נסיעות / מיקום** דרך **WebSocket של FastAPI** (ראו [WEBSOCKETS.md](WEBSOCKETS.md)). רשימת התראות — **REST** (`fetchMyNotifications`). פריימים נכנסים עוברים **Zod** (`safeParse`) ב-[`wsEvents.ts`](../../frontend/src/types/wsEvents.ts) ובעיבוד הודעות צ'אט ב-[`processChatWebSocketMessage.ts`](../../frontend/src/pages/MessageThread/processChatWebSocketMessage.ts). |
 | **למה Zod** | חוזה בזמן ריצה מול JSON מהרשת; פחות `as` לא בטוחים; בדיקות יחידה על סכמות. |
 | **בקצרה לראיון** | "לא סומכים על צורת JSON מה-WS — מאמתים עם Zod לפני שמעדכנים state." |
 
@@ -53,7 +53,7 @@
 
 | | |
 |--|--|
-| **החלטה** | [`useChatNotificationsFeed`](../../frontend/src/context/useChatNotificationsFeed.ts) — React Query על **`GET /api/v1/users/me/notifications`** + **polling** כל **~5 דקות**. רענון חי: **`useUserEvent` / `useUserEventStream`** ב-[`ChatContext.tsx`](../../frontend/src/context/ChatContext.tsx) על פריים **`user:{id}:events`** מאותו חיבור chat-ws (אין `useChatNotificationsWebSocket` נפרד). |
+| **החלטה** | [`useChatNotificationsFeed`](../../frontend/src/context/useChatNotificationsFeed.ts) — React Query על **`GET /api/v1/users/me/notifications`** + **polling** כל **~5 דקות**. רענון חי: **`useUserEventStream`** ב-[`ChatContext.tsx`](../../frontend/src/context/ChatContext.tsx) (סדר פרסור: Invalidate → UserEvent); לתאימות מסכים — **`linkup:user-event`** בענף התראות. מסכים אחרים עדיין יכולים להשתמש ב־**`useUserEvent`** על ה-custom event. אין WS נפרד לפיד. |
 | **למה** | מקור אמת לרשימה ב-REST; דחיפת UI על אותו WS כמו הצ'אט; polling דל כשהאירועים לא מגיעים. |
 | **למה backoff (פרונט)** | לצ'אט ול-WS של FastAPI — **exponential backoff + jitter** ב-[`reconnectBackoff.ts`](../../frontend/src/utils/reconnectBackoff.ts) (`useChatWebSocket`, `useReconnectingWebSocketState`) כדי להפחית thundering herd אחרי נפילה המונית. |
 | **בקצרה לראיון** | "רשימת התראות מ-REST עם polling דל; רענון חי דרך אירועי משתמש על chat-ws — בלי WS נוסף לפיד." |

@@ -17,7 +17,7 @@
 | בקשות נוסע | `api/passengers.ts` ← `MyRequests.tsx`, `useSearchRides.ts` | ✅ |
 | חיפוש נסיעות | `passengers` + `rides` + `geo` ב־`useSearchRides`; join מחיפוש + idempotency ב־`useJoinRide.ts` | ✅ |
 | צ'אט (REST) | `api/chat.ts` ← MessageThread, ChatPopup, Messages, `useMyBookings`; **`useMessageThread`/`useChatPopup`** — `Idempotency-Key` יציב (**`outboundIdempotencyKey`**) + רשימת **`ChatListRow`** (אופטימי) + **`applyInboundRealMessage`** / **`appendMessageDedupById`** מול REST ו-WS | ✅ |
-| התראות / unread | `users.fetchMyNotifications` + `chat.fetchUnreadMessageCount` ב־`ChatContext`; `useChatNotificationsFeed` (REST + polling ~5 דקות); רענון חי — `useUserEvent` / `useUserEventStream` על `user:{id}:events` (chat-ws) | ✅ |
+| התראות / unread | `users.fetchMyNotifications` + `chat.fetchUnreadMessageCount` ב־`ChatContext`; `useChatNotificationsFeed` (REST + polling ~5 דקות); רענון חי — `useUserEventStream` ב־`ChatContext` (`invalidate` + `UserEvent`, `setUnreadDirect` ל-unread); `useLayoutShell` לא מחזיק WS | ✅ |
 | מיקום | `bookings.postDriverBookingLocation` / `postPassengerBookingLocation`; טעינת רשימת נהג: `fetchDriverBookingSummary` (מחליף N+1 של מניפסטים); מניפסט לנסיעה בודדת — `fetchRideManifest` אם נדרש. הוקים `useLocationBroadcast`, `usePassengerLocationBroadcast`, `useLocationWatcher` (throttle 1.5s, `maximumAge: 0`); WS `useDriverLocation`, `usePassengerLocations`; `useMapMarker` + `LiveMapModal` / `LiveRideMapModal` | ✅ |
 | הזמנות שלי (REST) | `fetchPassengerBookingSummary`, `fetchDriverBookingSummary` ב־`api/bookings.ts`; הוקים `useMyBookingsPassenger`, `useMyBookingsDriver`; VM מקונן ב־`useMyBookings` + `PassengerBookingCard` | ✅ |
 | WebSocket read | `chat.markConversationRead` (כולל `useChatWebSocket`) | ✅ |

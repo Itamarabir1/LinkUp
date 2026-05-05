@@ -22,10 +22,7 @@ export function useChatUnreadMessages(userId: string | undefined, dispatch: Disp
 
   useEffect(() => {
     if (data === undefined) return;
-    dispatch({
-      type: 'SET_UNREAD_MESSAGES',
-      count: data,
-    });
+    dispatch({ type: 'SET_UNREAD_MESSAGES', count: data });
   }, [data, dispatch]);
 
   useEffect(() => {
@@ -33,10 +30,18 @@ export function useChatUnreadMessages(userId: string | undefined, dispatch: Disp
     queryClient.removeQueries({ queryKey: qk.chat.unread() });
   }, [userId, queryClient]);
 
+  const setUnreadDirect = useCallback(
+    (count: number) => {
+      if (!userId) return;
+      queryClient.setQueryData(qk.chat.unread(), count);
+    },
+    [queryClient, userId]
+  );
+
   const refreshUnread = useCallback(() => {
     if (!userId) return;
     void queryClient.invalidateQueries({ queryKey: qk.chat.unread() });
   }, [queryClient, userId]);
 
-  return refreshUnread;
+  return { refreshUnread, setUnreadDirect };
 }

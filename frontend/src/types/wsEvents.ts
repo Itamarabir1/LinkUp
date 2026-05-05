@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// --- Ride Status Events (channel: ride_{id}) ---
+// --- Ride Status Events ---
 export const RideEventSchema = z
   .object({
     event: z.string(),
@@ -12,7 +12,7 @@ export const RideEventSchema = z
   .passthrough();
 export type RideEvent = z.infer<typeof RideEventSchema>;
 
-// --- Driver Location Events (channel: booking_{id}) ---
+// --- Driver Location Events ---
 export const DriverLocationEventSchema = z.object({
   type: z.literal('location_update'),
   ride_id: z.string().optional(),
@@ -24,7 +24,7 @@ export const DriverLocationEventSchema = z.object({
 });
 export type DriverLocationEvent = z.infer<typeof DriverLocationEventSchema>;
 
-// --- Passenger Location Events (channel: ride_{id}:passenger_locations) ---
+// --- Passenger Location Events ---
 export const PassengerLocationEventSchema = z.object({
   type: z.literal('passenger_location'),
   booking_id: z.string(),
@@ -38,7 +38,17 @@ export const PassengerLocationEventSchema = z.object({
 });
 export type PassengerLocationEvent = z.infer<typeof PassengerLocationEventSchema>;
 
-// --- Chat / Presence Events (chat WebSocket) ---
+// --- Invalidate Event (real-time badge updates) ---
+export const InvalidateEventSchema = z.object({
+  type: z.literal('invalidate'),
+  resource: z.enum(['unread_messages', 'notifications']),
+  count: z.number().optional(), // present for unread_messages
+  event: z.string().optional(), // present for notifications
+  user_id: z.string().optional(),
+});
+export type InvalidateEvent = z.infer<typeof InvalidateEventSchema>;
+
+// --- Chat / Presence Events ---
 export const UserOnlineEventSchema = z.object({
   type: z.literal('user_online'),
   user_id: z.string(),
@@ -64,8 +74,10 @@ export const TypingStopEventSchema = z.object({
   recipient_id: z.string(),
 });
 
+/** Still used by chat channel frames; see processChatWebSocketMessage. */
 export const UnreadCountEventSchema = z.object({
   type: z.literal('unread_count'),
+  count: z.number().optional(),
 });
 
 export const MessageReadEventSchema = z.object({
@@ -86,7 +98,7 @@ export const ChatPresenceEventSchema = z.discriminatedUnion('type', [
 export type ChatPresenceEvent = z.infer<typeof ChatPresenceEventSchema>;
 export type MessageReadEvent = z.infer<typeof MessageReadEventSchema>;
 
-/** Chat message frame arriving over WS (parallel to API MessageResponse). */
+// --- Chat Message Frame ---
 export const ChatMessageSchema = z
   .object({
     message_id: z.number(),
@@ -98,7 +110,7 @@ export const ChatMessageSchema = z
   .passthrough();
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
-// --- User Events (channel: user:{user_id}:events via chat-ws) ---
+// --- User Events (booking, ride etc.) ---
 export const UserEventSchema = z
   .object({
     event: z.string(),

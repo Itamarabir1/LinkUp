@@ -21,7 +21,7 @@
 | chat-ws **כן** | chat-ws **לא** |
 |----------------|-----------------|
 | ניהול חיבורי WebSocket, אימות JWT על WS ו-HTTP מינימלי | Calendar export, ייצוא iCal |
-| Subscribe ל-Redis (`chat:conversation:*`, `chat:typing:*`, `chat:notification:*`, `user:*:events`, presence online/offline) | לוגיקה עסקית, שאילתות DB |
+| Subscribe ל-Redis (`chat:conversation:*`, `chat:typing:*`, `user:*:events`, presence online/offline) | לוגיקה עסקית, שאילתות DB |
 | Forward הודעות ללקוחות; typing; `user_online` / `user_offline` | ניתוח AI — רק forward אם צריך; התוצאה נשמרת ב-backend + worker |
 | Presence ב-Redis (`presence:*`), debounce לעדכון last-seen | CRUD צ'אט — נשמר ב-**POST** ל-FastAPI, שאז מפרסם ל-Redis |
 

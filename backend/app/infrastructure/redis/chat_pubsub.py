@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class RedisChatPubSub:
-    """Dedicated connection to REDIS_CHAT_URL — chat:conversation:*, chat:notification:*, user:*:events"""
+    """Dedicated connection to REDIS_CHAT_URL — chat:conversation:*, user:*:events (and other DB1 pub/sub used with chat-ws)."""
 
     def __init__(self):
         self.client: redis.Redis | None = None

@@ -245,8 +245,10 @@ async def send_message(
     try:
         unread = await chat_crud.get_unread_conversations_count(db, recipient_id)
         await redis_chat_pubsub.publish(
-            f"chat:notification:{recipient_id}",
-            json.dumps({"type": "unread_count", "count": unread}),
+            f"user:{recipient_id}:events",
+            json.dumps(
+                {"type": "invalidate", "resource": "unread_messages", "count": unread},
+            ),
         )
     except Exception as e:
         logger.warning("Publish unread_count failed: %s", e, exc_info=True)

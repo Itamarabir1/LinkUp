@@ -1,15 +1,14 @@
-/**
- */
-import { createContext, useContext, useMemo, useReducer } from 'react';
+import { createContext, useCallback, useContext, useMemo, useReducer } from 'react';
 import { useLocation } from 'react-router-dom';
 import { NOTIFICATIONS_REFRESH_EVENT } from '../config/constants';
+import { useUserEventStream } from '../hooks/useUserEventStream';
+import type { InvalidateEvent, UserEvent } from '../types/wsEvents';
 import { useAuth } from './AuthContext';
 import type { ChatContextValue, ChatProviderProps } from './chatContext.types';
 import { chatReducer, initialChatState } from './chatState';
 import { useChatNotificationsFeed } from './useChatNotificationsFeed';
 import { useChatOpenClose } from './useChatOpenClose';
 import { useChatUnreadMessages } from './useChatUnreadMessages';
-import { useUserEvent } from '../hooks/useUserEvent';
 
 export { getNotificationItemKey } from './chatNotificationStorage';
 
@@ -27,7 +26,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const [state, dispatch] = useReducer(chatReducer, initialChatState);
 
   const { openChat, closeChat } = useChatOpenClose(location.pathname, dispatch);
-  const refreshUnread = useChatUnreadMessages(user?.user_id, dispatch);
+  const { refreshUnread, setUnreadDirect } = useChatUnreadMessages(user?.user_id, dispatch);
 
   const {
     refreshUnreadNotifications,
@@ -38,20 +37,44 @@ export function ChatProvider({ children }: ChatProviderProps) {
     notificationsError,
   } = useChatNotificationsFeed(user?.user_id, state.notificationList, dispatch);
 
-  // Must match backend REFRESH_EVENTS in websocket_provider.py.
-  useUserEvent(
-    [
-      'booking.passenger_join_request',
-      'booking.approved_by_driver',
-      'booking.rejected_by_driver',
-      'ride.cancelled_by_driver',
-    ],
-    () => {
-      void refreshUnreadNotifications();
-      void refreshUnread();
-      window.dispatchEvent(new CustomEvent(NOTIFICATIONS_REFRESH_EVENT));
-    }
+  const handleInvalidate = useCallback(
+    (event: InvalidateEvent) => {
+      if (event.resource === 'unread_messages') {
+        if (typeof event.count === 'number') {
+          setUnreadDirect(event.count);
+        } else {
+          refreshUnread();
+        }
+      } else if (event.resource === 'notifications') {
+        void refreshUnreadNotifications();
+        window.dispatchEvent(new CustomEvent(NOTIFICATIONS_REFRESH_EVENT));
+        if (event.event && event.user_id) {
+          window.dispatchEvent(
+            new CustomEvent('linkup:user-event', {
+              detail: { event: event.event, user_id: event.user_id },
+            })
+          );
+        }
+      }
+    },
+    [setUnreadDirect, refreshUnread, refreshUnreadNotifications]
   );
+
+  const handleUserEvent = useCallback(
+    (event: UserEvent) => {
+      window.dispatchEvent(new CustomEvent('linkup:user-event', { detail: event }));
+      void refreshUnread();
+      void refreshUnreadNotifications();
+      window.dispatchEvent(new CustomEvent(NOTIFICATIONS_REFRESH_EVENT));
+    },
+    [refreshUnread, refreshUnreadNotifications]
+  );
+
+  useUserEventStream({
+    enabled: !!user?.user_id,
+    onInvalidate: handleInvalidate,
+    onUserEvent: handleUserEvent,
+  });
 
   const value = useMemo<ChatContextValue>(
     () => ({

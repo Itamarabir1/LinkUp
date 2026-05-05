@@ -1,13 +1,23 @@
 import { WS_URLS } from '../config/wsUrls';
-import { UserEventSchema, type UserEvent } from '../types/wsEvents';
+import {
+  InvalidateEventSchema,
+  UserEventSchema,
+  type InvalidateEvent,
+  type UserEvent,
+} from '../types/wsEvents';
 import { useReconnectingWebSocket } from './useReconnectingWebSocket';
 
 type UseUserEventStreamParams = {
   enabled?: boolean;
-  onEvent: (event: UserEvent) => void;
+  onUserEvent: (event: UserEvent) => void;
+  onInvalidate: (event: InvalidateEvent) => void;
 };
 
-export function useUserEventStream({ enabled = true, onEvent }: UseUserEventStreamParams) {
+export function useUserEventStream({
+  enabled = true,
+  onUserEvent,
+  onInvalidate,
+}: UseUserEventStreamParams) {
   useReconnectingWebSocket({
     buildUrl: (token) => WS_URLS.chat(token),
     enabled,
@@ -16,9 +26,18 @@ export function useUserEventStream({ enabled = true, onEvent }: UseUserEventStre
       for (const line of chunks) {
         if (!line.trim()) continue;
         try {
-          const parsed = UserEventSchema.safeParse(JSON.parse(line));
-          if (!parsed.success) continue;
-          onEvent(parsed.data);
+          const raw = JSON.parse(line);
+
+          const invalidate = InvalidateEventSchema.safeParse(raw);
+          if (invalidate.success) {
+            onInvalidate(invalidate.data);
+            continue;
+          }
+
+          const userEvent = UserEventSchema.safeParse(raw);
+          if (userEvent.success) {
+            onUserEvent(userEvent.data);
+          }
         } catch {
           continue;
         }
