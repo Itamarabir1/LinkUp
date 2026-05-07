@@ -14,7 +14,7 @@ from app.core.exceptions.ride import (
     RideNotFoundError,
     SessionExpiredError,
 )
-from app.core.exceptions.validation import SameOriginDestinationError
+from app.core.exceptions.validation import BadRequestError, SameOriginDestinationError
 from app.domain.bookings.crud import crud_booking
 from app.domain.bookings.enum import BookingStatus
 from app.domain.events.enum import DispatchTarget
@@ -27,12 +27,14 @@ from app.domain.rides.mapper import RideMapper
 from app.domain.rides.model import Ride
 from app.domain.rides.repository import RideCacheRepository, ride_cache_repo
 from app.domain.rides.schema import (
+    PaginatedRidesResponse,
     RideCreate,
     RidePreviewCreate,
     RidePreviewResponse,
     RideResponse,
     RideUpdate,
 )
+from app.core.pagination.cursor import CursorDecodeError, decode_cursor, encode_cursor
 from app.infrastructure.redis.broadcast import broadcast
 from app.infrastructure.redis.keys import RIDES_LIST_CHANNEL
 from app.infrastructure.redis.publisher import publish_ride_event
@@ -189,16 +191,68 @@ class RideService:
         db: AsyncSession,
         driver_id: UUID,
         status: str | None = None,
-    ) -> list[RideResponse]:
-        """List rides for the authenticated driver."""
+        limit: int = 20,
+        after: str | None = None,
+    ) -> PaginatedRidesResponse:
+        """Keyset-paginated rides for the authenticated driver."""
         status_enum = RideStatus(status) if status else None
-        rides = await crud_ride.get_by_driver_id(db, driver_id, status_enum)
-        return [RideMapper.to_response(r) for r in rides]
+        after_tuple: tuple | None = None
+        if after:
+            try:
+                after_tuple = decode_cursor(after)
+            except CursorDecodeError as e:
+                raise BadRequestError("מסמן עמוד לא תקין") from e
+        rides = await crud_ride.get_by_driver_id(
+            db,
+            driver_id,
+            status_enum,
+            limit=limit,
+            after=after_tuple,
+        )
+        has_more = len(rides) > limit
+        page_items = rides[:limit]
+        next_cursor = None
+        if has_more and page_items:
+            last = page_items[-1]
+            next_cursor = encode_cursor(last.departure_time, last.ride_id)
+        return PaginatedRidesResponse(
+            rides=[RideMapper.to_response(r) for r in page_items],
+            next_cursor=next_cursor,
+            has_more=has_more,
+        )
 
-    async def get_rides_by_group_id(self, db: AsyncSession, group_id: UUID) -> list[RideResponse]:
-        """List rides for a group tab; does not verify membership — call only after authz."""
-        rides = await crud_ride.get_by_group_id(db, group_id, exclude_cancelled=True)
-        return [RideMapper.to_response(r) for r in rides]
+    async def get_rides_by_group_id(
+        self,
+        db: AsyncSession,
+        group_id: UUID,
+        limit: int = 20,
+        after: str | None = None,
+    ) -> PaginatedRidesResponse:
+        """Keyset-paginated rides for a group tab; does not verify membership — call only after authz."""
+        after_tuple: tuple | None = None
+        if after:
+            try:
+                after_tuple = decode_cursor(after)
+            except CursorDecodeError as e:
+                raise BadRequestError("מסמן עמוד לא תקין") from e
+        rides = await crud_ride.get_by_group_id(
+            db,
+            group_id,
+            exclude_cancelled=True,
+            limit=limit,
+            after=after_tuple,
+        )
+        has_more = len(rides) > limit
+        page_items = rides[:limit]
+        next_cursor = None
+        if has_more and page_items:
+            last = page_items[-1]
+            next_cursor = encode_cursor(last.departure_time, last.ride_id)
+        return PaginatedRidesResponse(
+            rides=[RideMapper.to_response(r) for r in page_items],
+            next_cursor=next_cursor,
+            has_more=has_more,
+        )
 
     # --- Update (partial) ---
 

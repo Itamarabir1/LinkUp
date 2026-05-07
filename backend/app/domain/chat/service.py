@@ -26,11 +26,13 @@ from app.domain.bookings.enum import BookingStatus
 from app.domain.bookings.model import Booking
 from app.domain.chat import crud as chat_crud
 from app.domain.chat.model import ConversationParticipant
+from app.core.pagination.cursor import CursorDecodeError, encode_cursor
 from app.domain.chat.schema import (
     ConversationDetail,
     ConversationListItem,
     ConversationPartner,
     MessageResponse,
+    PaginatedConversationsResponse,
     PaginatedMessagesResponse,
 )
 from app.domain.rides.model import Ride
@@ -166,20 +168,38 @@ def _partner_from_conversation(conv, current_user_id: UUID) -> ConversationPartn
     )
 
 
-async def list_my_conversations(db: AsyncSession, current_user_id: UUID) -> list[ConversationListItem]:
+async def list_my_conversations(
+    db: AsyncSession,
+    current_user_id: UUID,
+    *,
+    limit: int = 30,
+    after: str | None = None,
+) -> PaginatedConversationsResponse:
     """
-    Lists the user’s conversations with partner details and last message.
-    Uses a single aggregated DB batch — no N+1 per conversation.
+    Paginated inbox — partner + last message preview; sort_key matches list_conversations_paginated.
     """
-    convs = await chat_crud.list_conversations_for_user(db, current_user_id)
-    if not convs:
-        return []
+    try:
+        page_rows, has_more = await chat_crud.list_conversations_paginated(
+            db,
+            current_user_id,
+            limit,
+            after_cursor=after,
+        )
+    except CursorDecodeError as e:
+        raise LinkUpError(
+            message=str(e) or "מזהה דף לא תקין",
+            status_code=422,
+            error_code="CHAT_INVALID_INBOX_CURSOR",
+        ) from e
 
-    conversation_ids = [conv.conversation_id for conv in convs]
+    if not page_rows:
+        return PaginatedConversationsResponse(items=[], has_more=False, next_cursor=None)
+
+    conversation_ids = [conv.conversation_id for conv, _sk in page_rows]
     aggregates = await chat_crud.get_inbox_aggregates(db, current_user_id, conversation_ids)
 
-    out = []
-    for conv in convs:
+    out: list[ConversationListItem] = []
+    for conv, _sort_key in page_rows:
         partner_user = conv.user_2 if conv.user_id_1 == current_user_id else conv.user_1
         partner = ConversationPartner(
             user_id=partner_user.user_id,
@@ -197,7 +217,13 @@ async def list_my_conversations(db: AsyncSession, current_user_id: UUID) -> list
                 has_unread=agg.get("has_unread", False),
             ),
         )
-    return out
+
+    next_cursor: str | None = None
+    if has_more and page_rows:
+        last_conv, last_sk = page_rows[-1]
+        next_cursor = encode_cursor(last_sk, last_conv.conversation_id, id_field="c")
+
+    return PaginatedConversationsResponse(items=out, has_more=has_more, next_cursor=next_cursor)
 
 
 async def get_conversation_detail(db: AsyncSession, conversation_id: UUID, current_user_id: UUID) -> ConversationDetail:

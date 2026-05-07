@@ -6,10 +6,11 @@ Always persist user_id_1 < user_id_2 on Conversation.
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import and_, desc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.pagination.cursor import CursorDecodeError, decode_cursor
 from app.domain.chat.model import ChatAnalysis, Conversation, ConversationParticipant, Message
 
 # --- Conversations ---
@@ -86,6 +87,62 @@ async def list_conversations_for_user(db: AsyncSession, user_id: UUID) -> list[C
         .order_by(desc(Conversation.created_at)),
     )
     return list(result.scalars().unique().all())
+
+
+async def list_conversations_paginated(
+    db: AsyncSession,
+    user_id: UUID,
+    limit: int,
+    after_cursor: str | None = None,
+) -> tuple[list[tuple[Conversation, datetime]], bool]:
+    """
+    Inbox page: sort by last message time (or conversation created_at if none), newest first.
+    Correlated scalar subquery matches LATERAL MAX(messages.created_at) per row.
+    Cursor (t, c): next page is strictly older in (sort_key DESC, conversation_id DESC) order.
+    """
+    uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
+
+    cursor_bound: tuple[datetime, UUID] | None = None
+    if after_cursor is not None:
+        try:
+            cursor_bound = decode_cursor(
+                after_cursor,
+                id_field="c",
+                id_error_label="conversation id",
+            )
+        except CursorDecodeError:
+            raise
+
+    sort_key_col = func.coalesce(Conversation.last_message_at, Conversation.created_at)
+
+    stmt = (
+        select(Conversation, sort_key_col)
+        .options(
+            selectinload(Conversation.user_1),
+            selectinload(Conversation.user_2),
+        )
+        .where(
+            or_(
+                Conversation.user_id_1 == uid,
+                Conversation.user_id_2 == uid,
+            ),
+        )
+    )
+    if cursor_bound is not None:
+        ct, cid = cursor_bound
+        stmt = stmt.where(
+            or_(
+                sort_key_col < ct,
+                and_(sort_key_col == ct, Conversation.conversation_id < cid),
+            ),
+        )
+    stmt = stmt.order_by(sort_key_col.desc(), Conversation.conversation_id.desc()).limit(limit + 1)
+
+    result = await db.execute(stmt)
+    rows = [(r[0], r[1]) for r in result.all()]
+    has_more = len(rows) > limit
+    page = rows[:limit]
+    return (page, has_more)
 
 
 async def get_inbox_aggregates(
@@ -240,6 +297,23 @@ async def create_message(
         body=body,
     )
     db.add(msg)
+    await db.flush()
+    await db.execute(
+        text(
+            """
+            UPDATE conversations
+            SET last_message_at = GREATEST(
+                COALESCE(last_message_at, TIMESTAMPTZ '1970-01-01'),
+                :new_ts
+            )
+            WHERE conversation_id = :cid
+            """
+        ),
+        {
+            "new_ts": msg.created_at,
+            "cid": cid,
+        },
+    )
     await db.commit()
     await db.refresh(msg)
     return msg
