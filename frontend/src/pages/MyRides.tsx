@@ -189,7 +189,7 @@ export default function MyRides() {
                         destinationLabel={r.destination_name ?? '?'}
                         scheduleCaption={t('rides:rideTimeLabel')}
                         time={formatDateTimeNoSeconds(r.departure_time)}
-                        status={getRideStatusLabel(r)}
+                        status={getRideStatusLabel(r as Ride)}
                         source={getRideSourceLabel(r.group_id, myGroups)}
                       />
                     </div>
@@ -210,7 +210,7 @@ export default function MyRides() {
                         destinationLabel={r.destination_name ?? '?'}
                         scheduleCaption={t('rides:rideTimeLabel')}
                         time={formatDateTimeNoSeconds(r.departure_time)}
-                        status={getRideStatusLabel(r)}
+                        status={getRideStatusLabel(r as Ride)}
                         source={getRideSourceLabel(r.group_id, myGroups)}
                       />
                     </div>
