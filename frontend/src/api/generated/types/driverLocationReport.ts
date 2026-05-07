@@ -9,6 +9,7 @@
  * Request body for driver location report (POST /bookings/{booking_id}/location).
  */
 export interface DriverLocationReport {
+  heading?: number | null;
   /**
      * @minimum -90
      * @maximum 90
@@ -19,6 +20,5 @@ export interface DriverLocationReport {
      * @maximum 180
      */
   lng: number;
-  heading?: number | null;
   speed?: number | null;
 }

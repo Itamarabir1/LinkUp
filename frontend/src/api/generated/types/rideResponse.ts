@@ -10,25 +10,25 @@ import type { RideStatus } from './rideStatus';
  * Full ride row from the database.
  */
 export interface RideResponse {
-  /** @minLength 2 */
-  origin_name: string;
+  /** @minimum 1 */
+  available_seats?: number;
+  created_at: string;
+  departure_time: string;
   /** @minLength 2 */
   destination_name: string;
   driver_id: string;
-  departure_time: string;
   estimated_arrival_time: string;
-  /** @minimum 1 */
-  available_seats?: number;
+  group_id?: string | null;
+  group_name?: string | null;
+  /** @minLength 2 */
+  origin_name: string;
   /** @minimum 0 */
   price?: number;
   ride_id: string;
-  status: RideStatus;
-  created_at: string;
-  user_booking_status?: string | null;
-  group_id?: string | null;
-  group_name?: string | null;
-  total_distance_km: number;
-  total_duration_min: number;
   route_coords: number[][];
   route_summary?: string | null;
+  status: RideStatus;
+  total_distance_km: number;
+  total_duration_min: number;
+  user_booking_status?: string | null;
 }

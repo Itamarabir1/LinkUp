@@ -9,9 +9,13 @@ import type {
   AISearchResult,
   AddressFromCoordsResponse,
   AdminAuditLogApiV1AdminAuditLogGetParams,
+  AdminBillingPaymentsApiV1AdminBillingPaymentsGetParams,
+  AdminBookingsApiV1AdminBookingsGetParams,
   AdminGroupsApiV1AdminGroupsGetParams,
   AdminOutboxApiV1AdminOutboxGetParams,
+  AdminOutboxByIdApiV1AdminOutboxEventIdGetParams,
   AdminRidesApiV1AdminRidesGetParams,
+  AdminToggleUserAdminApiV1AdminUsersUserIdAdminPatchParams,
   AdminUsersApiV1AdminUsersGetParams,
   AppDomainChatSchemaMessageResponse,
   AppDomainUsersSchemaMessageResponse,
@@ -25,18 +29,22 @@ import type {
   CheckoutResponse,
   ConversationCreate,
   ConversationDetail,
-  ConversationListItem,
+  DriverActiveResponse,
+  DriverHistoryResponse,
   DriverInfoResponse,
   DriverLocationReport,
-  DriverSummaryResponse,
   EmailOnlyRequest,
   FCMTokenUpdate,
   ForgotPasswordApiV1AuthForgotPasswordPostParams,
   GetAddressFromCoordsApiV1GeoAddressGetParams,
   GetAllRidesAdminApiV1PassengerPassengersAllGetParams,
   GetAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGetParams,
+  GetDriverHistorySummaryApiV1BookingsDriverSummaryHistoryGetParams,
+  GetGroupRidesApiV1GroupsGroupIdRidesGetParams,
+  GetMyNotificationsApiV1UsersMeNotificationsGetParams,
   GetMyRequestsApiV1PassengerPassengersMeGetParams,
   GetMyRidesApiV1RidesMeGetParams,
+  GetPassengerHistorySummaryApiV1BookingsPassengerSummaryHistoryGetParams,
   GetUserBookingsApiV1BookingsMyBookingsGetParams,
   GoogleSignInRequest,
   GroupCreate,
@@ -46,16 +54,22 @@ import type {
   GroupOut,
   GroupUpdate,
   ListConversationMessagesApiV1ChatConversationsConversationIdMessagesGetParams,
+  ListConversationMessagesGapApiV1ChatConversationsConversationIdMessagesGapGetParams,
+  ListConversationsApiV1ChatConversationsGetParams,
   LoginRequest,
   LoginResponse,
   MessageCreate,
-  NotificationItemResponse,
+  MessageGapResponse,
+  PaginatedConversationsResponse,
   PaginatedMessagesResponse,
+  PaginatedNotificationsResponse,
+  PaginatedPassengerRequestsResponse,
+  PaginatedRidesResponse,
+  PassengerActiveResponse,
+  PassengerHistoryResponse,
   PassengerLocationReport,
   PassengerRequestCreate,
-  PassengerRequestResponse,
   PassengerRequestWithMatches,
-  PassengerSummaryResponse,
   PasswordResetConfirm,
   PasswordResetConfirmResponse,
   PaymentRead,
@@ -86,287 +100,571 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
   export const getLinkUpAPI = () => {
 /**
- * Step 1: route options and metrics for ride preview.
- * @summary Preview Ride Options
+ * @summary Read Root
  */
-const previewRideOptionsApiV1RidesPreviewRoutesPost = (
-    ridePreviewCreate: RidePreviewCreate,
- options?: SecondParameter<typeof apiMutator<RidePreviewResponse>>,) => {
-      return apiMutator<RidePreviewResponse>(
-      {url: `/api/v1/rides/preview-routes`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: ridePreviewCreate
-    },
-      options);
-    }
+const readRootGet = (
 
-/**
- * @summary Create New Ride
- */
-const createNewRideApiV1RidesPost = (
-    rideCreate: RideCreate,
- options?: SecondParameter<typeof apiMutator<RideResponse>>,) => {
-      return apiMutator<RideResponse>(
-      {url: `/api/v1/rides/`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: rideCreate
-    },
-      options);
-    }
-
-/**
- * List current user's rides as driver.
- * @summary Get My Rides
- */
-const getMyRidesApiV1RidesMeGet = (
-    params?: GetMyRidesApiV1RidesMeGetParams,
- options?: SecondParameter<typeof apiMutator<RideResponse[]>>,) => {
-      return apiMutator<RideResponse[]>(
-      {url: `/api/v1/rides/me`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * Partial ride update: departure and/or seats (driver owner only).
- * @summary Update Ride
- */
-const updateRideApiV1RidesRideIdPatch = (
-    rideId: string,
-    rideUpdate: RideUpdate,
- options?: SecondParameter<typeof apiMutator<RideResponse>>,) => {
-      return apiMutator<RideResponse>(
-      {url: `/api/v1/rides/${rideId}`, method: 'PATCH',
-      headers: {'Content-Type': 'application/json', },
-      data: rideUpdate
-    },
-      options);
-    }
-
-/**
- * @summary Read Ride
- */
-const readRideApiV1RidesRideIdGet = (
-    rideId: string,
- options?: SecondParameter<typeof apiMutator<RideResponse>>,) => {
-      return apiMutator<RideResponse>(
-      {url: `/api/v1/rides/${rideId}`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * Start ride → ACTIVE; requires at least one confirmed passenger.
- * @summary Start Ride
- */
-const startRideApiV1RidesRideIdStartPost = (
-    rideId: string,
- options?: SecondParameter<typeof apiMutator<RideResponse>>,) => {
-      return apiMutator<RideResponse>(
-      {url: `/api/v1/rides/${rideId}/start`, method: 'POST'
-    },
-      options);
-    }
-
-/**
- * End ride → COMPLETED.
- * @summary End Ride
- */
-const endRideApiV1RidesRideIdEndPost = (
-    rideId: string,
- options?: SecondParameter<typeof apiMutator<RideResponse>>,) => {
-      return apiMutator<RideResponse>(
-      {url: `/api/v1/rides/${rideId}/end`, method: 'POST'
-    },
-      options);
-    }
-
-/**
- * @summary Cancel Ride
- */
-const cancelRideApiV1RidesRideIdCancelDelete = (
-    rideId: string,
- options?: SecondParameter<typeof apiMutator<void>>,) => {
-      return apiMutator<void>(
-      {url: `/api/v1/rides/${rideId}/cancel`, method: 'DELETE'
-    },
-      options);
-    }
-
-/**
- * List the current user's passenger requests.
- * @summary Get My Requests
- */
-const getMyRequestsApiV1PassengerPassengersMeGet = (
-    params?: GetMyRequestsApiV1PassengerPassengersMeGetParams,
- options?: SecondParameter<typeof apiMutator<PassengerRequestResponse[]>>,) => {
-      return apiMutator<PassengerRequestResponse[]>(
-      {url: `/api/v1/passenger/passengers/me`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * @summary רישום נוסע לטרמפ (יצירת בקשה קבועה)
- */
-const createNewRequestApiV1PassengerPassengersPost = (
-    passengerRequestCreate: PassengerRequestCreate,
- options?: SecondParameter<typeof apiMutator<PassengerRequestWithMatches>>,) => {
-      return apiMutator<PassengerRequestWithMatches>(
-      {url: `/api/v1/passenger/passengers/`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: passengerRequestCreate
-    },
-      options);
-    }
-
-/**
- * Join request from search results.
-Optional Idempotency-Key header prevents duplicate bookings on retry/double-click.
-Same key + different body → 422. Same key + same body → returns original result.
- * @summary שלח בקשה להצטרפות לנסיעה מתוך תוצאות חיפוש
- */
-const requestRideFromSearchApiV1PassengerPassengersRequestRideFromSearchPost = (
-    requestRideFromSearch: RequestRideFromSearch,
- options?: SecondParameter<typeof apiMutator<BookingResponse>>,) => {
-      return apiMutator<BookingResponse>(
-      {url: `/api/v1/passenger/passengers/request-ride-from-search`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: requestRideFromSearch
-    },
-      options);
-    }
-
-/**
- * Parse Hebrew/English free text into structured pickup/destination/time/radius.
-Does not run search — client fills the form and calls GET /search-rides.
- * @summary ניתוח חיפוש נסיעה בטקסט חופשי (AI)
- */
-const aiParseSearchApiV1PassengerPassengersAiParseSearchPost = (
-    aISearchQuery: AISearchQuery,
- options?: SecondParameter<typeof apiMutator<AISearchResult>>,) => {
-      return apiMutator<AISearchResult>(
-      {url: `/api/v1/passenger/passengers/ai-parse-search`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: aISearchQuery
-    },
-      options);
-    }
-
-/**
- * @summary חיפוש טרמפים (ללא שמירת בקשה; שמירת התראה ב-POST /)
- */
-const searchAvailableRidesApiV1PassengerPassengersSearchRidesGet = (
-    params: SearchAvailableRidesApiV1PassengerPassengersSearchRidesGetParams,
- options?: SecondParameter<typeof apiMutator<RideSearchResponse>>,) => {
-      return apiMutator<RideSearchResponse>(
-      {url: `/api/v1/passenger/passengers/search-rides`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * Cancel the request and release all seat holds against drivers (request owner only).
- * @summary ביטול בקשת נסיעה ושחרור שריונים
- */
-const cancelRequestApiV1PassengerPassengersRequestIdCancelDelete = (
-    requestId: string,
  options?: SecondParameter<typeof apiMutator<unknown>>,) => {
       return apiMutator<unknown>(
-      {url: `/api/v1/passenger/passengers/${requestId}/cancel`, method: 'DELETE'
+      {url: `/`, method: 'GET'
     },
       options);
     }
 
 /**
- * @summary שליפת התאמות עדכניות לבקשה קיימת
+ * @summary Admin Audit Log
  */
-const getLatestMatchesApiV1PassengerPassengersRequestIdMatchesGet = (
-    requestId: string,
- options?: SecondParameter<typeof apiMutator<RideResponse[]>>,) => {
-      return apiMutator<RideResponse[]>(
-      {url: `/api/v1/passenger/passengers/${requestId}/matches`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * Return all rides in the system; optional status filter.
- * @summary תצוגת כל הנסיעות (ניהול ובקרה)
- */
-const getAllRidesAdminApiV1PassengerPassengersAllGet = (
-    params?: GetAllRidesAdminApiV1PassengerPassengersAllGetParams,
- options?: SecondParameter<typeof apiMutator<RideResponse[]>>,) => {
-      return apiMutator<RideResponse[]>(
-      {url: `/api/v1/passenger/passengers/all`, method: 'GET',
+const adminAuditLogApiV1AdminAuditLogGet = (
+    params?: AdminAuditLogApiV1AdminAuditLogGetParams,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/audit-log`, method: 'GET',
         params
     },
       options);
     }
 
 /**
- * Return driver name and phone for open rides; requires authentication.
- * @summary פרטי נהג לנסיעה (רק כשלחיצה על 'הצג פרטי הנהג')
+ * @summary Admin Billing Payments
  */
-const getRideDriverInfoApiV1PassengerRidesRideIdDriverInfoGet = (
+const adminBillingPaymentsApiV1AdminBillingPaymentsGet = (
+    params?: AdminBillingPaymentsApiV1AdminBillingPaymentsGetParams,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/billing/payments`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Billing Payment By Id
+ */
+const adminBillingPaymentByIdApiV1AdminBillingPaymentsPaymentIdGet = (
+    paymentId: string,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/billing/payments/${paymentId}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Billing Reconcile Payment
+ */
+const adminBillingReconcilePaymentApiV1AdminBillingReconcilePaymentIdPost = (
+    paymentId: string,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/billing/reconcile/${paymentId}`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Billing Stale Pending
+ */
+const adminBillingStalePendingApiV1AdminBillingStalePendingGet = (
+
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/billing/stale-pending`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Bookings
+ */
+const adminBookingsApiV1AdminBookingsGet = (
+    params?: AdminBookingsApiV1AdminBookingsGetParams,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/bookings`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Booking By Id
+ */
+const adminBookingByIdApiV1AdminBookingsBookingIdGet = (
+    bookingId: string,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/bookings/${bookingId}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Groups
+ */
+const adminGroupsApiV1AdminGroupsGet = (
+    params?: AdminGroupsApiV1AdminGroupsGetParams,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/groups`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Health
+ */
+const adminHealthApiV1AdminHealthGet = (
+
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/health`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Me
+ */
+const adminMeApiV1AdminMeGet = (
+
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/me`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Outbox
+ */
+const adminOutboxApiV1AdminOutboxGet = (
+    params?: AdminOutboxApiV1AdminOutboxGetParams,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/outbox`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Outbox By Id
+ */
+const adminOutboxByIdApiV1AdminOutboxEventIdGet = (
+    eventId: string,
+    params?: AdminOutboxByIdApiV1AdminOutboxEventIdGetParams,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/outbox/${eventId}`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Outbox Requeue
+ */
+const adminOutboxRequeueApiV1AdminOutboxEventIdRequeuePost = (
+    eventId: string,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/outbox/${eventId}/requeue`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Queues
+ */
+const adminQueuesApiV1AdminQueuesGet = (
+
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/queues`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Rides
+ */
+const adminRidesApiV1AdminRidesGet = (
+    params?: AdminRidesApiV1AdminRidesGetParams,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/rides`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Ride By Id
+ */
+const adminRideByIdApiV1AdminRidesRideIdGet = (
     rideId: string,
- options?: SecondParameter<typeof apiMutator<DriverInfoResponse>>,) => {
-      return apiMutator<DriverInfoResponse>(
-      {url: `/api/v1/passenger/rides/${rideId}/driver-info`, method: 'GET'
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/rides/${rideId}`, method: 'GET'
     },
       options);
     }
 
 /**
- * Request to join a ride. request_id must belong to the authenticated user.
- * @summary Request To Join
+ * @summary Admin Cancel Ride
  */
-const requestToJoinApiV1BookingsRequestToJoinPost = (
-    bookingCreate: BookingCreate,
- options?: SecondParameter<typeof apiMutator<BookingResponse>>,) => {
-      return apiMutator<BookingResponse>(
-      {url: `/api/v1/bookings/request-to-join`, method: 'POST',
+const adminCancelRideApiV1AdminRidesRideIdCancelPost = (
+    rideId: string,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/rides/${rideId}/cancel`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * Aggregates for admin dashboard (single round-trip).
+ * @summary Admin Stats
+ */
+const adminStatsApiV1AdminStatsGet = (
+
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/stats`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin System Overview
+ */
+const adminSystemOverviewApiV1AdminSystemOverviewGet = (
+
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/system/overview`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Users
+ */
+const adminUsersApiV1AdminUsersGet = (
+    params?: AdminUsersApiV1AdminUsersGetParams,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/users`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Toggle User Active
+ */
+const adminToggleUserActiveApiV1AdminUsersUserIdActivePatch = (
+    userId: string,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/users/${userId}/active`, method: 'PATCH'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Toggle User Admin
+ */
+const adminToggleUserAdminApiV1AdminUsersUserIdAdminPatch = (
+    userId: string,
+    params?: AdminToggleUserAdminApiV1AdminUsersUserIdAdminPatchParams,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/users/${userId}/admin`, method: 'PATCH',
+        params
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Workers
+ */
+const adminWorkersApiV1AdminWorkersGet = (
+
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/workers`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Authenticated password change with old password + new password confirmation.
+Same strength rules as registration.
+ * @summary Change Password
+ */
+const changePasswordApiV1AuthChangePasswordPost = (
+    changePasswordRequest: ChangePasswordRequest,
+ options?: SecondParameter<typeof apiMutator<AuthMessageResponse>>,) => {
+      return apiMutator<AuthMessageResponse>(
+      {url: `/api/v1/auth/change-password`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
-      data: bookingCreate
+      data: changePasswordRequest
     },
       options);
     }
 
 /**
- * @summary Approve Booking
+ * @summary Forgot Password
  */
-const approveBookingApiV1BookingsBookingIdApprovePatch = (
-    bookingId: string,
- options?: SecondParameter<typeof apiMutator<BookingResponse>>,) => {
-      return apiMutator<BookingResponse>(
-      {url: `/api/v1/bookings/${bookingId}/approve`, method: 'PATCH'
+const forgotPasswordApiV1AuthForgotPasswordPost = (
+    params: ForgotPasswordApiV1AuthForgotPasswordPostParams,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/auth/forgot-password`, method: 'POST',
+        params
     },
       options);
     }
 
 /**
- * @summary Reject Booking
+ * Google Sign-In: verify ID token from the client, auto-provision user if new.
+
+Returns the same token bundle as password /login.
+ * @summary התחברות דרך Google OAuth
  */
-const rejectBookingApiV1BookingsBookingIdRejectPatch = (
-    bookingId: string,
- options?: SecondParameter<typeof apiMutator<BookingResponse>>,) => {
-      return apiMutator<BookingResponse>(
-      {url: `/api/v1/bookings/${bookingId}/reject`, method: 'PATCH'
+const googleSigninApiV1AuthGoogleSigninPost = (
+    googleSignInRequest: GoogleSignInRequest,
+ options?: SecondParameter<typeof apiMutator<LoginResponse>>,) => {
+      return apiMutator<LoginResponse>(
+      {url: `/api/v1/auth/google-signin`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: googleSignInRequest
     },
       options);
     }
 
 /**
- * @summary Cancel Booking
+ * Authenticate and return a short-lived **access_token** plus **refresh_token**.
+
+Validates user exists, password matches, and `is_verified`.
+Response includes JWT access token, rotated refresh token, `token_type: bearer`, and user info.
+
+**Swagger:** run Login, copy `access_token`, click Authorize, paste token for protected routes.
+
+Clients send `Authorization: Bearer <access_token>` on protected APIs and call POST /auth/refresh
+with the stored refresh token when the access token expires.
+ * @summary התחברות (Access Token)
  */
-const cancelBookingApiV1BookingsBookingIdCancelPost = (
-    bookingId: string,
- options?: SecondParameter<typeof apiMutator<BookingResponse>>,) => {
-      return apiMutator<BookingResponse>(
-      {url: `/api/v1/bookings/${bookingId}/cancel`, method: 'POST'
+const loginApiV1AuthLoginPost = (
+    loginRequest: LoginRequest,
+ options?: SecondParameter<typeof apiMutator<LoginResponse>>,) => {
+      return apiMutator<LoginResponse>(
+      {url: `/api/v1/auth/login`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: loginRequest
+    },
+      options);
+    }
+
+/**
+ * Revoke refresh token(s) for the user (logout until next password login).
+ * @summary התנתקות (Logout)
+ */
+const logoutApiV1AuthLogoutPost = (
+
+ options?: SecondParameter<typeof apiMutator<void>>,) => {
+      return apiMutator<void>(
+      {url: `/api/v1/auth/logout`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * Password reset step 2: email + OTP + new password (twice).
+ * @summary Confirm Password Reset
+ */
+const confirmPasswordResetApiV1AuthPasswordResetConfirmPost = (
+    passwordResetConfirm: PasswordResetConfirm,
+ options?: SecondParameter<typeof apiMutator<PasswordResetConfirmResponse>>,) => {
+      return apiMutator<PasswordResetConfirmResponse>(
+      {url: `/api/v1/auth/password-reset/confirm`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: passwordResetConfirm
+    },
+      options);
+    }
+
+/**
+ * Password reset step 1: request OTP emailed to the user.
+ * @summary Request Password Reset
+ */
+const requestPasswordResetApiV1AuthPasswordResetRequestPost = (
+    emailOnlyRequest: EmailOnlyRequest,
+ options?: SecondParameter<typeof apiMutator<AuthMessageResponse>>,) => {
+      return apiMutator<AuthMessageResponse>(
+      {url: `/api/v1/auth/password-reset/request`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: emailOnlyRequest
+    },
+      options);
+    }
+
+/**
+ * Exchange the refresh token from login for a new access token and rotated refresh token.
+
+Previous refresh tokens are invalidated; only the latest hash in DB is valid.
+Returns 401 (`InvalidRefreshTokenError`) when the token is wrong, expired, or not in DB.
+ * @summary רענון Access Token
+ */
+const refreshTokenApiV1AuthRefreshPost = (
+    refreshRequest: RefreshRequest,
+ options?: SecondParameter<typeof apiMutator<RefreshResponse>>,) => {
+      return apiMutator<RefreshResponse>(
+      {url: `/api/v1/auth/refresh`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: refreshRequest
+    },
+      options);
+    }
+
+/**
+ * Register a new user (step one: create unverified account).
+ * @summary Register
+ */
+const registerApiV1AuthRegisterPost = (
+    userRegister: UserRegister,
+ options?: SecondParameter<typeof apiMutator<UserOut>>,) => {
+      return apiMutator<UserOut>(
+      {url: `/api/v1/auth/register`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: userRegister
+    },
+      options);
+    }
+
+/**
+ * Resend email verification code.
+ * @summary Resend Verification Code
+ */
+const resendVerificationCodeApiV1AuthResendVerificationPost = (
+    emailOnlyRequest: EmailOnlyRequest,
+ options?: SecondParameter<typeof apiMutator<AuthMessageResponse>>,) => {
+      return apiMutator<AuthMessageResponse>(
+      {url: `/api/v1/auth/resend-verification`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: emailOnlyRequest
+    },
+      options);
+    }
+
+/**
+ * Verify email from the SPA using a typed code.
+Email may come from the registration cookie or from the request body.
+ * @summary Verify Email
+ */
+const verifyEmailApiV1AuthVerifyEmailPost = (
+    verifyEmailRequest: VerifyEmailRequest,
+ options?: SecondParameter<typeof apiMutator<AuthMessageResponse>>,) => {
+      return apiMutator<AuthMessageResponse>(
+      {url: `/api/v1/auth/verify-email`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: verifyEmailRequest
+    },
+      options);
+    }
+
+/**
+ * Email verification via one-click link; redirects to frontend on success or error.
+ * @summary Verify Email By Link
+ */
+const verifyEmailByLinkApiV1AuthVerifyEmailConfirmGet = (
+    params: VerifyEmailByLinkApiV1AuthVerifyEmailConfirmGetParams,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/auth/verify-email/confirm`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * Create a Stripe Checkout Session for premium upgrade.
+ * @summary Create Checkout
+ */
+const createCheckoutApiV1BillingCheckoutPost = (
+
+ options?: SecondParameter<typeof apiMutator<CheckoutResponse>>,) => {
+      return apiMutator<CheckoutResponse>(
+      {url: `/api/v1/billing/checkout`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * Return payment history for the authenticated user.
+ * @summary Get My Payments
+ */
+const getMyPaymentsApiV1BillingPaymentsGet = (
+
+ options?: SecondParameter<typeof apiMutator<PaymentRead[]>>,) => {
+      return apiMutator<PaymentRead[]>(
+      {url: `/api/v1/billing/payments`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Return whether the authenticated user is premium.
+ * @summary Get Billing Status
+ */
+const getBillingStatusApiV1BillingStatusGet = (
+
+ options?: SecondParameter<typeof apiMutator<PaymentStatusResponse>>,) => {
+      return apiMutator<PaymentStatusResponse>(
+      {url: `/api/v1/billing/status`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Stripe webhook endpoint.
+No auth - Stripe calls this directly.
+Signature verified inside handle_webhook.
+ * @summary Stripe Webhook
+ */
+const stripeWebhookApiV1BillingWebhookPost = (
+
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/billing/webhook`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * Active driver rides only (paginated counterpart uses /driver-summary/history).
+ * @summary Get Driver Active Summary
+ */
+const getDriverActiveSummaryApiV1BookingsDriverSummaryActiveGet = (
+
+ options?: SecondParameter<typeof apiMutator<DriverActiveResponse>>,) => {
+      return apiMutator<DriverActiveResponse>(
+      {url: `/api/v1/bookings/driver-summary/active`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Get Driver History Summary
+ */
+const getDriverHistorySummaryApiV1BookingsDriverSummaryHistoryGet = (
+    params?: GetDriverHistorySummaryApiV1BookingsDriverSummaryHistoryGetParams,
+ options?: SecondParameter<typeof apiMutator<DriverHistoryResponse>>,) => {
+      return apiMutator<DriverHistoryResponse>(
+      {url: `/api/v1/bookings/driver-summary/history`, method: 'GET',
+        params
     },
       options);
     }
@@ -385,27 +683,41 @@ const getUserBookingsApiV1BookingsMyBookingsGet = (
     }
 
 /**
- * Driver rides with embedded passengers — replaces N+1 fetchRideManifest loop.
- * @summary Get Driver Summary
+ * @summary Get Passenger Active Summary
  */
-const getDriverSummaryApiV1BookingsDriverSummaryGet = (
+const getPassengerActiveSummaryApiV1BookingsPassengerSummaryActiveGet = (
 
- options?: SecondParameter<typeof apiMutator<DriverSummaryResponse>>,) => {
-      return apiMutator<DriverSummaryResponse>(
-      {url: `/api/v1/bookings/driver-summary`, method: 'GET'
+ options?: SecondParameter<typeof apiMutator<PassengerActiveResponse>>,) => {
+      return apiMutator<PassengerActiveResponse>(
+      {url: `/api/v1/bookings/passenger-summary/active`, method: 'GET'
     },
       options);
     }
 
 /**
- * Passenger bookings with embedded ride + driver — replaces N+1 fetchRideById loop.
- * @summary Get Passenger Summary
+ * @summary Get Passenger History Summary
  */
-const getPassengerSummaryApiV1BookingsPassengerSummaryGet = (
+const getPassengerHistorySummaryApiV1BookingsPassengerSummaryHistoryGet = (
+    params?: GetPassengerHistorySummaryApiV1BookingsPassengerSummaryHistoryGetParams,
+ options?: SecondParameter<typeof apiMutator<PassengerHistoryResponse>>,) => {
+      return apiMutator<PassengerHistoryResponse>(
+      {url: `/api/v1/bookings/passenger-summary/history`, method: 'GET',
+        params
+    },
+      options);
+    }
 
- options?: SecondParameter<typeof apiMutator<PassengerSummaryResponse>>,) => {
-      return apiMutator<PassengerSummaryResponse>(
-      {url: `/api/v1/bookings/passenger-summary`, method: 'GET'
+/**
+ * Request to join a ride. request_id must belong to the authenticated user.
+ * @summary Request To Join
+ */
+const requestToJoinApiV1BookingsRequestToJoinPost = (
+    bookingCreate: BookingCreate,
+ options?: SecondParameter<typeof apiMutator<BookingResponse>>,) => {
+      return apiMutator<BookingResponse>(
+      {url: `/api/v1/bookings/request-to-join`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: bookingCreate
     },
       options);
     }
@@ -447,6 +759,30 @@ const getBookingApiV1BookingsBookingIdGet = (
     }
 
 /**
+ * @summary Approve Booking
+ */
+const approveBookingApiV1BookingsBookingIdApprovePatch = (
+    bookingId: string,
+ options?: SecondParameter<typeof apiMutator<BookingResponse>>,) => {
+      return apiMutator<BookingResponse>(
+      {url: `/api/v1/bookings/${bookingId}/approve`, method: 'PATCH'
+    },
+      options);
+    }
+
+/**
+ * @summary Cancel Booking
+ */
+const cancelBookingApiV1BookingsBookingIdCancelPost = (
+    bookingId: string,
+ options?: SecondParameter<typeof apiMutator<BookingResponse>>,) => {
+      return apiMutator<BookingResponse>(
+      {url: `/api/v1/bookings/${bookingId}/cancel`, method: 'POST'
+    },
+      options);
+    }
+
+/**
  * Driver reports location during the ride. Broadcast to confirmed passengers over WebSocket.
 Requires: ride driver, ride in active status.
  * @summary Report Driver Location
@@ -481,427 +817,27 @@ const reportPassengerLocationApiV1BookingsBookingIdPassengerLocationPost = (
     }
 
 /**
- * Return the authenticated user's profile (including sensitive fields like verification state).
- * @summary Get My Profile
+ * @summary Reject Booking
  */
-const getMyProfileApiV1UsersMeGet = (
-
- options?: SecondParameter<typeof apiMutator<UserRead>>,) => {
-      return apiMutator<UserRead>(
-      {url: `/api/v1/users/me`, method: 'GET'
+const rejectBookingApiV1BookingsBookingIdRejectPatch = (
+    bookingId: string,
+ options?: SecondParameter<typeof apiMutator<BookingResponse>>,) => {
+      return apiMutator<BookingResponse>(
+      {url: `/api/v1/bookings/${bookingId}/reject`, method: 'PATCH'
     },
       options);
     }
 
 /**
- * Update the authenticated user's profile.
-Accepts a UserUpdate object and passes it through to the service unchanged.
- * @summary Update My Profile
- */
-const updateMyProfileApiV1UsersMePut = (
-    userUpdate: UserUpdate,
- options?: SecondParameter<typeof apiMutator<UserRead>>,) => {
-      return apiMutator<UserRead>(
-      {url: `/api/v1/users/me`, method: 'PUT',
-      headers: {'Content-Type': 'application/json', },
-      data: userUpdate
-    },
-      options);
-    }
-
-/**
- * @summary Update Last Seen
- */
-const updateLastSeenApiV1UsersMeLastSeenPatch = (
-
- options?: SecondParameter<typeof apiMutator<void>>,) => {
-      return apiMutator<void>(
-      {url: `/api/v1/users/me/last-seen`, method: 'PATCH'
-    },
-      options);
-    }
-
-/**
- * Source for chat UI `last_seen`; called from chat-ws on GET /presence/{id}.
- * @summary Get User Last Seen
- */
-const getUserLastSeenApiV1UsersUserIdLastSeenGet = (
-    userId: string,
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/users/${userId}/last-seen`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * All notifications for the user: as driver — join requests; as passenger — approve/reject/pending.
- * @summary Get My Notifications
- */
-const getMyNotificationsApiV1UsersMeNotificationsGet = (
-
- options?: SecondParameter<typeof apiMutator<NotificationItemResponse[]>>,) => {
-      return apiMutator<NotificationItemResponse[]>(
-      {url: `/api/v1/users/me/notifications`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * @summary Update Fcm Token
- */
-const updateFcmTokenApiV1UsersFcmTokenPatch = (
-    fCMTokenUpdate: FCMTokenUpdate,
- options?: SecondParameter<typeof apiMutator<AppDomainUsersSchemaMessageResponse>>,) => {
-      return apiMutator<AppDomainUsersSchemaMessageResponse>(
-      {url: `/api/v1/users/fcm-token`, method: 'PATCH',
-      headers: {'Content-Type': 'application/json', },
-      data: fCMTokenUpdate
-    },
-      options);
-    }
-
-/**
- * @summary Test Push
- */
-const testPushApiV1UsersMeTestPushPost = (
-
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/users/me/test-push`, method: 'POST'
-    },
-      options);
-    }
-
-/**
- * Return a presigned URL for direct upload to S3.
-Flow:
-1. Client calls this endpoint → receives presigned URL + staging_key
-2. Client uploads directly to S3 via the URL (5–8s)
-3. Client calls POST /me/avatar/confirm with staging_key
-4. Server enqueues work and returns 202 immediately (~1s)
-5. Worker processes in the background (finalize + DB update)
- * @summary Get Avatar Upload Url
- */
-const getAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGet = (
-    params?: GetAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGetParams,
- options?: SecondParameter<typeof apiMutator<AvatarUploadUrlResponse>>,) => {
-      return apiMutator<AvatarUploadUrlResponse>(
-      {url: `/api/v1/users/me/avatar/upload-url`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * Confirm upload after the client uploaded directly to S3. Updates avatar_key in DB immediately and enqueues work.
-Processing (resize to 3 sizes) runs in the background. staging_key must start with avatars/staging/{user_id}_.
- * @summary Confirm Avatar Upload
- */
-const confirmAvatarUploadApiV1UsersMeAvatarConfirmPost = (
-    avatarUploadConfirmRequest: AvatarUploadConfirmRequest,
- options?: SecondParameter<typeof apiMutator<AvatarUploadAcceptedResponse>>,) => {
-      return apiMutator<AvatarUploadAcceptedResponse>(
-      {url: `/api/v1/users/me/avatar/confirm`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: avatarUploadConfirmRequest
-    },
-      options);
-    }
-
-/**
- * Remove profile photo: deletes avatars/{user_id}/ from S3 and clears avatar_key in DB.
- * @summary Remove My Avatar
- */
-const removeMyAvatarApiV1UsersMeAvatarDelete = (
-
- options?: SecondParameter<typeof apiMutator<AvatarUploadAcceptedResponse>>,) => {
-      return apiMutator<AvatarUploadAcceptedResponse>(
-      {url: `/api/v1/users/me/avatar`, method: 'DELETE'
-    },
-      options);
-    }
-
-/**
- * Register a new user (step one: create unverified account).
- * @summary Register
- */
-const registerApiV1AuthRegisterPost = (
-    userRegister: UserRegister,
- options?: SecondParameter<typeof apiMutator<UserOut>>,) => {
-      return apiMutator<UserOut>(
-      {url: `/api/v1/auth/register`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: userRegister
-    },
-      options);
-    }
-
-/**
- * @summary Forgot Password
- */
-const forgotPasswordApiV1AuthForgotPasswordPost = (
-    params: ForgotPasswordApiV1AuthForgotPasswordPostParams,
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/auth/forgot-password`, method: 'POST',
-        params
-    },
-      options);
-    }
-
-/**
- * Authenticate and return a short-lived **access_token** plus **refresh_token**.
-
-Validates user exists, password matches, and `is_verified`.
-Response includes JWT access token, rotated refresh token, `token_type: bearer`, and user info.
-
-**Swagger:** run Login, copy `access_token`, click Authorize, paste token for protected routes.
-
-Clients send `Authorization: Bearer <access_token>` on protected APIs and call POST /auth/refresh
-with the stored refresh token when the access token expires.
- * @summary התחברות (Access Token)
- */
-const loginApiV1AuthLoginPost = (
-    loginRequest: LoginRequest,
- options?: SecondParameter<typeof apiMutator<LoginResponse>>,) => {
-      return apiMutator<LoginResponse>(
-      {url: `/api/v1/auth/login`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: loginRequest
-    },
-      options);
-    }
-
-/**
- * Exchange the refresh token from login for a new access token and rotated refresh token.
-
-Previous refresh tokens are invalidated; only the latest hash in DB is valid.
-Returns 401 (`InvalidRefreshTokenError`) when the token is wrong, expired, or not in DB.
- * @summary רענון Access Token
- */
-const refreshTokenApiV1AuthRefreshPost = (
-    refreshRequest: RefreshRequest,
- options?: SecondParameter<typeof apiMutator<RefreshResponse>>,) => {
-      return apiMutator<RefreshResponse>(
-      {url: `/api/v1/auth/refresh`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: refreshRequest
-    },
-      options);
-    }
-
-/**
- * Revoke refresh token(s) for the user (logout until next password login).
- * @summary התנתקות (Logout)
- */
-const logoutApiV1AuthLogoutPost = (
-
- options?: SecondParameter<typeof apiMutator<void>>,) => {
-      return apiMutator<void>(
-      {url: `/api/v1/auth/logout`, method: 'POST'
-    },
-      options);
-    }
-
-/**
- * Email verification via one-click link; redirects to frontend on success or error.
- * @summary Verify Email By Link
- */
-const verifyEmailByLinkApiV1AuthVerifyEmailConfirmGet = (
-    params: VerifyEmailByLinkApiV1AuthVerifyEmailConfirmGetParams,
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/auth/verify-email/confirm`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * Verify email from the SPA using a typed code.
-Email may come from the registration cookie or from the request body.
- * @summary Verify Email
- */
-const verifyEmailApiV1AuthVerifyEmailPost = (
-    verifyEmailRequest: VerifyEmailRequest,
- options?: SecondParameter<typeof apiMutator<AuthMessageResponse>>,) => {
-      return apiMutator<AuthMessageResponse>(
-      {url: `/api/v1/auth/verify-email`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: verifyEmailRequest
-    },
-      options);
-    }
-
-/**
- * Resend email verification code.
- * @summary Resend Verification Code
- */
-const resendVerificationCodeApiV1AuthResendVerificationPost = (
-    emailOnlyRequest: EmailOnlyRequest,
- options?: SecondParameter<typeof apiMutator<AuthMessageResponse>>,) => {
-      return apiMutator<AuthMessageResponse>(
-      {url: `/api/v1/auth/resend-verification`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: emailOnlyRequest
-    },
-      options);
-    }
-
-/**
- * Password reset step 1: request OTP emailed to the user.
- * @summary Request Password Reset
- */
-const requestPasswordResetApiV1AuthPasswordResetRequestPost = (
-    emailOnlyRequest: EmailOnlyRequest,
- options?: SecondParameter<typeof apiMutator<AuthMessageResponse>>,) => {
-      return apiMutator<AuthMessageResponse>(
-      {url: `/api/v1/auth/password-reset/request`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: emailOnlyRequest
-    },
-      options);
-    }
-
-/**
- * Password reset step 2: email + OTP + new password (twice).
- * @summary Confirm Password Reset
- */
-const confirmPasswordResetApiV1AuthPasswordResetConfirmPost = (
-    passwordResetConfirm: PasswordResetConfirm,
- options?: SecondParameter<typeof apiMutator<PasswordResetConfirmResponse>>,) => {
-      return apiMutator<PasswordResetConfirmResponse>(
-      {url: `/api/v1/auth/password-reset/confirm`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: passwordResetConfirm
-    },
-      options);
-    }
-
-/**
- * Authenticated password change with old password + new password confirmation.
-Same strength rules as registration.
- * @summary Change Password
- */
-const changePasswordApiV1AuthChangePasswordPost = (
-    changePasswordRequest: ChangePasswordRequest,
- options?: SecondParameter<typeof apiMutator<AuthMessageResponse>>,) => {
-      return apiMutator<AuthMessageResponse>(
-      {url: `/api/v1/auth/change-password`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: changePasswordRequest
-    },
-      options);
-    }
-
-/**
- * Google Sign-In: verify ID token from the client, auto-provision user if new.
-
-Returns the same token bundle as password /login.
- * @summary התחברות דרך Google OAuth
- */
-const googleSigninApiV1AuthGoogleSigninPost = (
-    googleSignInRequest: GoogleSignInRequest,
- options?: SecondParameter<typeof apiMutator<LoginResponse>>,) => {
-      return apiMutator<LoginResponse>(
-      {url: `/api/v1/auth/google-signin`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: googleSignInRequest
-    },
-      options);
-    }
-
-/**
- * Create a Stripe Checkout Session for premium upgrade.
- * @summary Create Checkout
- */
-const createCheckoutApiV1BillingCheckoutPost = (
-
- options?: SecondParameter<typeof apiMutator<CheckoutResponse>>,) => {
-      return apiMutator<CheckoutResponse>(
-      {url: `/api/v1/billing/checkout`, method: 'POST'
-    },
-      options);
-    }
-
-/**
- * Return whether the authenticated user is premium.
- * @summary Get Billing Status
- */
-const getBillingStatusApiV1BillingStatusGet = (
-
- options?: SecondParameter<typeof apiMutator<PaymentStatusResponse>>,) => {
-      return apiMutator<PaymentStatusResponse>(
-      {url: `/api/v1/billing/status`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * Return payment history for the authenticated user.
- * @summary Get My Payments
- */
-const getMyPaymentsApiV1BillingPaymentsGet = (
-
- options?: SecondParameter<typeof apiMutator<PaymentRead[]>>,) => {
-      return apiMutator<PaymentRead[]>(
-      {url: `/api/v1/billing/payments`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * Stripe webhook endpoint.
-No auth - Stripe calls this directly.
-Signature verified inside handle_webhook.
- * @summary Stripe Webhook
- */
-const stripeWebhookApiV1BillingWebhookPost = (
-
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/billing/webhook`, method: 'POST'
-    },
-      options);
-    }
-
-/**
- * מחזיר את מפתח ה-API המוגדר בבקאנד (GOOGLE_MAPS_API_KEY). הפרונט משתמש בו ל-Maps JavaScript API.
- * @summary מפתח Google Maps לתצוגת מפה בפרונט
- */
-const getMapsApiKeyApiV1GeoMapsKeyGet = (
-
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/geo/maps-key`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * מקבל קואורדינטות ומחזיר כתובת קריאה. לשימוש בכפתור 'השתמש במיקום שלי' אצל נהג ונוסע. דורש authentication.
- * @summary כתובת ממיקום נוכחי (Reverse Geocode)
- */
-const getAddressFromCoordsApiV1GeoAddressGet = (
-    params: GetAddressFromCoordsApiV1GeoAddressGetParams,
- options?: SecondParameter<typeof apiMutator<AddressFromCoordsResponse>>,) => {
-      return apiMutator<AddressFromCoordsResponse>(
-      {url: `/api/v1/geo/address`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * Inbox for the current user with partner info and last message.
+ * Inbox for the current user with partner info and last message (cursor pagination).
  * @summary רשימת השיחות שלי
  */
 const listConversationsApiV1ChatConversationsGet = (
-
- options?: SecondParameter<typeof apiMutator<ConversationListItem[]>>,) => {
-      return apiMutator<ConversationListItem[]>(
-      {url: `/api/v1/chat/conversations`, method: 'GET'
+    params?: ListConversationsApiV1ChatConversationsGetParams,
+ options?: SecondParameter<typeof apiMutator<PaginatedConversationsResponse>>,) => {
+      return apiMutator<PaginatedConversationsResponse>(
+      {url: `/api/v1/chat/conversations`, method: 'GET',
+        params
     },
       options);
     }
@@ -950,17 +886,14 @@ const getConversationApiV1ChatConversationsConversationIdGet = (
     }
 
 /**
- * Post a message; participants only. Rate limited: 30 messages/minute per user.
- * @summary שליחת הודעה
+ * Export conversation to iCal (.ics); requires AI analysis (not fully implemented).
+ * @summary ייצוא שיחה ללוח שנה (iCal)
  */
-const postMessageApiV1ChatConversationsConversationIdMessagesPost = (
+const exportConversationCalendarApiV1ChatConversationsConversationIdCalendarIcsGet = (
     conversationId: string,
-    messageCreate: MessageCreate,
- options?: SecondParameter<typeof apiMutator<AppDomainChatSchemaMessageResponse>>,) => {
-      return apiMutator<AppDomainChatSchemaMessageResponse>(
-      {url: `/api/v1/chat/conversations/${conversationId}/messages`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
-      data: messageCreate
+ options?: SecondParameter<typeof apiMutator<void>>,) => {
+      return apiMutator<void>(
+      {url: `/api/v1/chat/conversations/${conversationId}/calendar.ics`, method: 'GET'
     },
       options);
     }
@@ -981,14 +914,35 @@ const listConversationMessagesApiV1ChatConversationsConversationIdMessagesGet = 
     }
 
 /**
- * Export conversation to iCal (.ics); requires AI analysis (not fully implemented).
- * @summary ייצוא שיחה ללוח שנה (iCal)
+ * Post a message; participants only. Rate limited: 30 messages/minute per user.
+
+Optional Idempotency-Key: same semantics as POST request-ride-from-search (Redis TTL;
+mismatch → 422, in-flight → 409 + Retry-After).
+ * @summary שליחת הודעה
  */
-const exportConversationCalendarApiV1ChatConversationsConversationIdCalendarIcsGet = (
+const postMessageApiV1ChatConversationsConversationIdMessagesPost = (
     conversationId: string,
- options?: SecondParameter<typeof apiMutator<void>>,) => {
-      return apiMutator<void>(
-      {url: `/api/v1/chat/conversations/${conversationId}/calendar.ics`, method: 'GET'
+    messageCreate: MessageCreate,
+ options?: SecondParameter<typeof apiMutator<AppDomainChatSchemaMessageResponse>>,) => {
+      return apiMutator<AppDomainChatSchemaMessageResponse>(
+      {url: `/api/v1/chat/conversations/${conversationId}/messages`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: messageCreate
+    },
+      options);
+    }
+
+/**
+ * Reconnect backfill for messages newer than since_message_id.
+ * @summary פער הודעות מאז message_id אחרון
+ */
+const listConversationMessagesGapApiV1ChatConversationsConversationIdMessagesGapGet = (
+    conversationId: string,
+    params: ListConversationMessagesGapApiV1ChatConversationsConversationIdMessagesGapGetParams,
+ options?: SecondParameter<typeof apiMutator<MessageGapResponse>>,) => {
+      return apiMutator<MessageGapResponse>(
+      {url: `/api/v1/chat/conversations/${conversationId}/messages/gap`, method: 'GET',
+        params
     },
       options);
     }
@@ -1018,187 +972,28 @@ const unreadCountApiV1ChatUnreadCountGet = (
     }
 
 /**
- * @summary Admin Me
+ * מקבל קואורדינטות ומחזיר כתובת קריאה. לשימוש בכפתור 'השתמש במיקום שלי' אצל נהג ונוסע. דורש authentication.
+ * @summary כתובת ממיקום נוכחי (Reverse Geocode)
  */
-const adminMeApiV1AdminMeGet = (
-
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/admin/me`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * @summary Admin Health
- */
-const adminHealthApiV1AdminHealthGet = (
-
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/admin/health`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * Aggregates for admin dashboard (single round-trip).
- * @summary Admin Stats
- */
-const adminStatsApiV1AdminStatsGet = (
-
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/admin/stats`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * @summary Admin Users
- */
-const adminUsersApiV1AdminUsersGet = (
-    params?: AdminUsersApiV1AdminUsersGetParams,
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/admin/users`, method: 'GET',
+const getAddressFromCoordsApiV1GeoAddressGet = (
+    params: GetAddressFromCoordsApiV1GeoAddressGetParams,
+ options?: SecondParameter<typeof apiMutator<AddressFromCoordsResponse>>,) => {
+      return apiMutator<AddressFromCoordsResponse>(
+      {url: `/api/v1/geo/address`, method: 'GET',
         params
     },
       options);
     }
 
 /**
- * @summary Admin Toggle User Active
+ * מחזיר את מפתח ה-API המוגדר בבקאנד (GOOGLE_MAPS_API_KEY). הפרונט משתמש בו ל-Maps JavaScript API.
+ * @summary מפתח Google Maps לתצוגת מפה בפרונט
  */
-const adminToggleUserActiveApiV1AdminUsersUserIdActivePatch = (
-    userId: string,
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/admin/users/${userId}/active`, method: 'PATCH'
-    },
-      options);
-    }
+const getMapsApiKeyApiV1GeoMapsKeyGet = (
 
-/**
- * @summary Admin Toggle User Admin
- */
-const adminToggleUserAdminApiV1AdminUsersUserIdAdminPatch = (
-    userId: string,
  options?: SecondParameter<typeof apiMutator<unknown>>,) => {
       return apiMutator<unknown>(
-      {url: `/api/v1/admin/users/${userId}/admin`, method: 'PATCH'
-    },
-      options);
-    }
-
-/**
- * @summary Admin Rides
- */
-const adminRidesApiV1AdminRidesGet = (
-    params?: AdminRidesApiV1AdminRidesGetParams,
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/admin/rides`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * @summary Admin Cancel Ride
- */
-const adminCancelRideApiV1AdminRidesRideIdCancelPost = (
-    rideId: string,
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/admin/rides/${rideId}/cancel`, method: 'POST'
-    },
-      options);
-    }
-
-/**
- * @summary Admin Groups
- */
-const adminGroupsApiV1AdminGroupsGet = (
-    params?: AdminGroupsApiV1AdminGroupsGetParams,
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/admin/groups`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * @summary Admin Outbox
- */
-const adminOutboxApiV1AdminOutboxGet = (
-    params?: AdminOutboxApiV1AdminOutboxGetParams,
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/admin/outbox`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * @summary Admin Audit Log
- */
-const adminAuditLogApiV1AdminAuditLogGet = (
-    params?: AdminAuditLogApiV1AdminAuditLogGetParams,
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/admin/audit-log`, method: 'GET',
-        params
-    },
-      options);
-    }
-
-/**
- * @summary Admin Outbox By Id
- */
-const adminOutboxByIdApiV1AdminOutboxEventIdGet = (
-    eventId: string,
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/admin/outbox/${eventId}`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * @summary Admin Outbox Requeue
- */
-const adminOutboxRequeueApiV1AdminOutboxEventIdRequeuePost = (
-    eventId: string,
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/admin/outbox/${eventId}/requeue`, method: 'POST'
-    },
-      options);
-    }
-
-/**
- * @summary Admin Ride By Id
- */
-const adminRideByIdApiV1AdminRidesRideIdGet = (
-    rideId: string,
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/admin/rides/${rideId}`, method: 'GET'
-    },
-      options);
-    }
-
-/**
- * @summary Admin Booking By Id
- */
-const adminBookingByIdApiV1AdminBookingsBookingIdGet = (
-    bookingId: string,
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/api/v1/admin/bookings/${bookingId}`, method: 'GET'
+      {url: `/api/v1/geo/maps-key`, method: 'GET'
     },
       options);
     }
@@ -1213,18 +1008,6 @@ const createGroupApiV1GroupsPost = (
       {url: `/api/v1/groups`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: groupCreate
-    },
-      options);
-    }
-
-/**
- * @summary Get My Groups
- */
-const getMyGroupsApiV1GroupsMyGet = (
-
- options?: SecondParameter<typeof apiMutator<GroupOut[]>>,) => {
-      return apiMutator<GroupOut[]>(
-      {url: `/api/v1/groups/my`, method: 'GET'
     },
       options);
     }
@@ -1254,39 +1037,40 @@ const joinGroupApiV1GroupsJoinInviteCodePost = (
     }
 
 /**
- * @summary Get Members
+ * @summary Get My Groups
  */
-const getMembersApiV1GroupsGroupIdMembersGet = (
-    groupId: string,
- options?: SecondParameter<typeof apiMutator<GroupMemberOut[]>>,) => {
-      return apiMutator<GroupMemberOut[]>(
-      {url: `/api/v1/groups/${groupId}/members`, method: 'GET'
+const getMyGroupsApiV1GroupsMyGet = (
+
+ options?: SecondParameter<typeof apiMutator<GroupOut[]>>,) => {
+      return apiMutator<GroupOut[]>(
+      {url: `/api/v1/groups/my`, method: 'GET'
     },
       options);
     }
 
 /**
- * Group ride feed. Only group members may view.
- * @summary Get Group Rides
+ * @summary Close Group
  */
-const getGroupRidesApiV1GroupsGroupIdRidesGet = (
+const closeGroupApiV1GroupsGroupIdDelete = (
     groupId: string,
- options?: SecondParameter<typeof apiMutator<RideResponse[]>>,) => {
-      return apiMutator<RideResponse[]>(
-      {url: `/api/v1/groups/${groupId}/rides`, method: 'GET'
+ options?: SecondParameter<typeof apiMutator<void>>,) => {
+      return apiMutator<void>(
+      {url: `/api/v1/groups/${groupId}`, method: 'DELETE'
     },
       options);
     }
 
 /**
- * Admin only. Returns presigned URL for group image upload.
- * @summary Get Group Image Upload Url
+ * @summary Update Group
  */
-const getGroupImageUploadUrlApiV1GroupsGroupIdUploadImagePost = (
+const updateGroupApiV1GroupsGroupIdPatch = (
     groupId: string,
- options?: SecondParameter<typeof apiMutator<GroupImageUploadResponse>>,) => {
-      return apiMutator<GroupImageUploadResponse>(
-      {url: `/api/v1/groups/${groupId}/upload-image`, method: 'POST'
+    groupUpdate: GroupUpdate,
+ options?: SecondParameter<typeof apiMutator<GroupOut>>,) => {
+      return apiMutator<GroupOut>(
+      {url: `/api/v1/groups/${groupId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: groupUpdate
     },
       options);
     }
@@ -1321,6 +1105,30 @@ const deleteGroupImageApiV1GroupsGroupIdImageDelete = (
     }
 
 /**
+ * @summary Leave Group
+ */
+const leaveGroupApiV1GroupsGroupIdLeaveDelete = (
+    groupId: string,
+ options?: SecondParameter<typeof apiMutator<void>>,) => {
+      return apiMutator<void>(
+      {url: `/api/v1/groups/${groupId}/leave`, method: 'DELETE'
+    },
+      options);
+    }
+
+/**
+ * @summary Get Members
+ */
+const getMembersApiV1GroupsGroupIdMembersGet = (
+    groupId: string,
+ options?: SecondParameter<typeof apiMutator<GroupMemberOut[]>>,) => {
+      return apiMutator<GroupMemberOut[]>(
+      {url: `/api/v1/groups/${groupId}/members`, method: 'GET'
+    },
+      options);
+    }
+
+/**
  * @summary Remove Member
  */
 const removeMemberApiV1GroupsGroupIdMembersUserIdDelete = (
@@ -1347,52 +1155,29 @@ const promoteMemberApiV1GroupsGroupIdMembersUserIdPromotePatch = (
     }
 
 /**
- * @summary Leave Group
+ * Group ride feed. Only group members may view.
+ * @summary Get Group Rides
  */
-const leaveGroupApiV1GroupsGroupIdLeaveDelete = (
+const getGroupRidesApiV1GroupsGroupIdRidesGet = (
     groupId: string,
- options?: SecondParameter<typeof apiMutator<void>>,) => {
-      return apiMutator<void>(
-      {url: `/api/v1/groups/${groupId}/leave`, method: 'DELETE'
+    params?: GetGroupRidesApiV1GroupsGroupIdRidesGetParams,
+ options?: SecondParameter<typeof apiMutator<PaginatedRidesResponse>>,) => {
+      return apiMutator<PaginatedRidesResponse>(
+      {url: `/api/v1/groups/${groupId}/rides`, method: 'GET',
+        params
     },
       options);
     }
 
 /**
- * @summary Close Group
+ * Admin only. Returns presigned URL for group image upload.
+ * @summary Get Group Image Upload Url
  */
-const closeGroupApiV1GroupsGroupIdDelete = (
+const getGroupImageUploadUrlApiV1GroupsGroupIdUploadImagePost = (
     groupId: string,
- options?: SecondParameter<typeof apiMutator<void>>,) => {
-      return apiMutator<void>(
-      {url: `/api/v1/groups/${groupId}`, method: 'DELETE'
-    },
-      options);
-    }
-
-/**
- * @summary Update Group
- */
-const updateGroupApiV1GroupsGroupIdPatch = (
-    groupId: string,
-    groupUpdate: GroupUpdate,
- options?: SecondParameter<typeof apiMutator<GroupOut>>,) => {
-      return apiMutator<GroupOut>(
-      {url: `/api/v1/groups/${groupId}`, method: 'PATCH',
-      headers: {'Content-Type': 'application/json', },
-      data: groupUpdate
-    },
-      options);
-    }
-
-/**
- * @summary Read Root
- */
-const readRootGet = (
-
- options?: SecondParameter<typeof apiMutator<unknown>>,) => {
-      return apiMutator<unknown>(
-      {url: `/`, method: 'GET'
+ options?: SecondParameter<typeof apiMutator<GroupImageUploadResponse>>,) => {
+      return apiMutator<GroupImageUploadResponse>(
+      {url: `/api/v1/groups/${groupId}/upload-image`, method: 'POST'
     },
       options);
     }
@@ -1410,101 +1195,490 @@ const apiHealthApiV1HealthGet = (
       options);
     }
 
-return {previewRideOptionsApiV1RidesPreviewRoutesPost,createNewRideApiV1RidesPost,getMyRidesApiV1RidesMeGet,updateRideApiV1RidesRideIdPatch,readRideApiV1RidesRideIdGet,startRideApiV1RidesRideIdStartPost,endRideApiV1RidesRideIdEndPost,cancelRideApiV1RidesRideIdCancelDelete,getMyRequestsApiV1PassengerPassengersMeGet,createNewRequestApiV1PassengerPassengersPost,requestRideFromSearchApiV1PassengerPassengersRequestRideFromSearchPost,aiParseSearchApiV1PassengerPassengersAiParseSearchPost,searchAvailableRidesApiV1PassengerPassengersSearchRidesGet,cancelRequestApiV1PassengerPassengersRequestIdCancelDelete,getLatestMatchesApiV1PassengerPassengersRequestIdMatchesGet,getAllRidesAdminApiV1PassengerPassengersAllGet,getRideDriverInfoApiV1PassengerRidesRideIdDriverInfoGet,requestToJoinApiV1BookingsRequestToJoinPost,approveBookingApiV1BookingsBookingIdApprovePatch,rejectBookingApiV1BookingsBookingIdRejectPatch,cancelBookingApiV1BookingsBookingIdCancelPost,getUserBookingsApiV1BookingsMyBookingsGet,getDriverSummaryApiV1BookingsDriverSummaryGet,getPassengerSummaryApiV1BookingsPassengerSummaryGet,getRideManifestApiV1BookingsRideRideIdManifestGet,getPendingRequestsApiV1BookingsRideRideIdPendingGet,getBookingApiV1BookingsBookingIdGet,reportDriverLocationApiV1BookingsBookingIdLocationPost,reportPassengerLocationApiV1BookingsBookingIdPassengerLocationPost,getMyProfileApiV1UsersMeGet,updateMyProfileApiV1UsersMePut,updateLastSeenApiV1UsersMeLastSeenPatch,getUserLastSeenApiV1UsersUserIdLastSeenGet,getMyNotificationsApiV1UsersMeNotificationsGet,updateFcmTokenApiV1UsersFcmTokenPatch,testPushApiV1UsersMeTestPushPost,getAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGet,confirmAvatarUploadApiV1UsersMeAvatarConfirmPost,removeMyAvatarApiV1UsersMeAvatarDelete,registerApiV1AuthRegisterPost,forgotPasswordApiV1AuthForgotPasswordPost,loginApiV1AuthLoginPost,refreshTokenApiV1AuthRefreshPost,logoutApiV1AuthLogoutPost,verifyEmailByLinkApiV1AuthVerifyEmailConfirmGet,verifyEmailApiV1AuthVerifyEmailPost,resendVerificationCodeApiV1AuthResendVerificationPost,requestPasswordResetApiV1AuthPasswordResetRequestPost,confirmPasswordResetApiV1AuthPasswordResetConfirmPost,changePasswordApiV1AuthChangePasswordPost,googleSigninApiV1AuthGoogleSigninPost,createCheckoutApiV1BillingCheckoutPost,getBillingStatusApiV1BillingStatusGet,getMyPaymentsApiV1BillingPaymentsGet,stripeWebhookApiV1BillingWebhookPost,getMapsApiKeyApiV1GeoMapsKeyGet,getAddressFromCoordsApiV1GeoAddressGet,listConversationsApiV1ChatConversationsGet,createOrGetConversationApiV1ChatConversationsPost,createOrGetConversationByBookingApiV1ChatConversationsByBookingBookingIdPost,getConversationApiV1ChatConversationsConversationIdGet,postMessageApiV1ChatConversationsConversationIdMessagesPost,listConversationMessagesApiV1ChatConversationsConversationIdMessagesGet,exportConversationCalendarApiV1ChatConversationsConversationIdCalendarIcsGet,markReadApiV1ChatConversationsConversationIdReadPost,unreadCountApiV1ChatUnreadCountGet,adminMeApiV1AdminMeGet,adminHealthApiV1AdminHealthGet,adminStatsApiV1AdminStatsGet,adminUsersApiV1AdminUsersGet,adminToggleUserActiveApiV1AdminUsersUserIdActivePatch,adminToggleUserAdminApiV1AdminUsersUserIdAdminPatch,adminRidesApiV1AdminRidesGet,adminCancelRideApiV1AdminRidesRideIdCancelPost,adminGroupsApiV1AdminGroupsGet,adminOutboxApiV1AdminOutboxGet,adminAuditLogApiV1AdminAuditLogGet,adminOutboxByIdApiV1AdminOutboxEventIdGet,adminOutboxRequeueApiV1AdminOutboxEventIdRequeuePost,adminRideByIdApiV1AdminRidesRideIdGet,adminBookingByIdApiV1AdminBookingsBookingIdGet,createGroupApiV1GroupsPost,getMyGroupsApiV1GroupsMyGet,getGroupByInviteApiV1GroupsJoinInviteCodeGet,joinGroupApiV1GroupsJoinInviteCodePost,getMembersApiV1GroupsGroupIdMembersGet,getGroupRidesApiV1GroupsGroupIdRidesGet,getGroupImageUploadUrlApiV1GroupsGroupIdUploadImagePost,confirmGroupImageApiV1GroupsGroupIdConfirmImagePost,deleteGroupImageApiV1GroupsGroupIdImageDelete,removeMemberApiV1GroupsGroupIdMembersUserIdDelete,promoteMemberApiV1GroupsGroupIdMembersUserIdPromotePatch,leaveGroupApiV1GroupsGroupIdLeaveDelete,closeGroupApiV1GroupsGroupIdDelete,updateGroupApiV1GroupsGroupIdPatch,readRootGet,apiHealthApiV1HealthGet}};
-export type PreviewRideOptionsApiV1RidesPreviewRoutesPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['previewRideOptionsApiV1RidesPreviewRoutesPost']>>>
-export type CreateNewRideApiV1RidesPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['createNewRideApiV1RidesPost']>>>
-export type GetMyRidesApiV1RidesMeGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMyRidesApiV1RidesMeGet']>>>
-export type UpdateRideApiV1RidesRideIdPatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['updateRideApiV1RidesRideIdPatch']>>>
-export type ReadRideApiV1RidesRideIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['readRideApiV1RidesRideIdGet']>>>
-export type StartRideApiV1RidesRideIdStartPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['startRideApiV1RidesRideIdStartPost']>>>
-export type EndRideApiV1RidesRideIdEndPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['endRideApiV1RidesRideIdEndPost']>>>
-export type CancelRideApiV1RidesRideIdCancelDeleteResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['cancelRideApiV1RidesRideIdCancelDelete']>>>
-export type GetMyRequestsApiV1PassengerPassengersMeGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMyRequestsApiV1PassengerPassengersMeGet']>>>
-export type CreateNewRequestApiV1PassengerPassengersPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['createNewRequestApiV1PassengerPassengersPost']>>>
-export type RequestRideFromSearchApiV1PassengerPassengersRequestRideFromSearchPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['requestRideFromSearchApiV1PassengerPassengersRequestRideFromSearchPost']>>>
-export type AiParseSearchApiV1PassengerPassengersAiParseSearchPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['aiParseSearchApiV1PassengerPassengersAiParseSearchPost']>>>
-export type SearchAvailableRidesApiV1PassengerPassengersSearchRidesGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['searchAvailableRidesApiV1PassengerPassengersSearchRidesGet']>>>
-export type CancelRequestApiV1PassengerPassengersRequestIdCancelDeleteResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['cancelRequestApiV1PassengerPassengersRequestIdCancelDelete']>>>
-export type GetLatestMatchesApiV1PassengerPassengersRequestIdMatchesGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getLatestMatchesApiV1PassengerPassengersRequestIdMatchesGet']>>>
-export type GetAllRidesAdminApiV1PassengerPassengersAllGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getAllRidesAdminApiV1PassengerPassengersAllGet']>>>
-export type GetRideDriverInfoApiV1PassengerRidesRideIdDriverInfoGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getRideDriverInfoApiV1PassengerRidesRideIdDriverInfoGet']>>>
-export type RequestToJoinApiV1BookingsRequestToJoinPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['requestToJoinApiV1BookingsRequestToJoinPost']>>>
-export type ApproveBookingApiV1BookingsBookingIdApprovePatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['approveBookingApiV1BookingsBookingIdApprovePatch']>>>
-export type RejectBookingApiV1BookingsBookingIdRejectPatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['rejectBookingApiV1BookingsBookingIdRejectPatch']>>>
-export type CancelBookingApiV1BookingsBookingIdCancelPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['cancelBookingApiV1BookingsBookingIdCancelPost']>>>
+/**
+ * @summary רישום נוסע לטרמפ (יצירת בקשה קבועה)
+ */
+const createNewRequestApiV1PassengerPassengersPost = (
+    passengerRequestCreate: PassengerRequestCreate,
+ options?: SecondParameter<typeof apiMutator<PassengerRequestWithMatches>>,) => {
+      return apiMutator<PassengerRequestWithMatches>(
+      {url: `/api/v1/passenger/passengers/`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: passengerRequestCreate
+    },
+      options);
+    }
+
+/**
+ * Parse Hebrew/English free text into structured pickup/destination/time/radius.
+Does not run search — client fills the form and calls GET /search-rides.
+ * @summary ניתוח חיפוש נסיעה בטקסט חופשי (AI)
+ */
+const aiParseSearchApiV1PassengerPassengersAiParseSearchPost = (
+    aISearchQuery: AISearchQuery,
+ options?: SecondParameter<typeof apiMutator<AISearchResult>>,) => {
+      return apiMutator<AISearchResult>(
+      {url: `/api/v1/passenger/passengers/ai-parse-search`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: aISearchQuery
+    },
+      options);
+    }
+
+/**
+ * Return all rides in the system; optional status filter.
+ * @summary תצוגת כל הנסיעות (ניהול ובקרה)
+ */
+const getAllRidesAdminApiV1PassengerPassengersAllGet = (
+    params?: GetAllRidesAdminApiV1PassengerPassengersAllGetParams,
+ options?: SecondParameter<typeof apiMutator<RideResponse[]>>,) => {
+      return apiMutator<RideResponse[]>(
+      {url: `/api/v1/passenger/passengers/all`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * List the current user's passenger requests (paginated).
+ * @summary Get My Requests
+ */
+const getMyRequestsApiV1PassengerPassengersMeGet = (
+    params?: GetMyRequestsApiV1PassengerPassengersMeGetParams,
+ options?: SecondParameter<typeof apiMutator<PaginatedPassengerRequestsResponse>>,) => {
+      return apiMutator<PaginatedPassengerRequestsResponse>(
+      {url: `/api/v1/passenger/passengers/me`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * Join request from search results.
+Optional Idempotency-Key header prevents duplicate bookings on retry/double-click.
+Same key + different body → 422. Same key + same body → returns original result.
+ * @summary שלח בקשה להצטרפות לנסיעה מתוך תוצאות חיפוש
+ */
+const requestRideFromSearchApiV1PassengerPassengersRequestRideFromSearchPost = (
+    requestRideFromSearch: RequestRideFromSearch,
+ options?: SecondParameter<typeof apiMutator<BookingResponse>>,) => {
+      return apiMutator<BookingResponse>(
+      {url: `/api/v1/passenger/passengers/request-ride-from-search`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: requestRideFromSearch
+    },
+      options);
+    }
+
+/**
+ * @summary חיפוש טרמפים (ללא שמירת בקשה; שמירת התראה ב-POST /)
+ */
+const searchAvailableRidesApiV1PassengerPassengersSearchRidesGet = (
+    params: SearchAvailableRidesApiV1PassengerPassengersSearchRidesGetParams,
+ options?: SecondParameter<typeof apiMutator<RideSearchResponse>>,) => {
+      return apiMutator<RideSearchResponse>(
+      {url: `/api/v1/passenger/passengers/search-rides`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * Cancel the request and release all seat holds against drivers (request owner only).
+ * @summary ביטול בקשת נסיעה ושחרור שריונים
+ */
+const cancelRequestApiV1PassengerPassengersRequestIdCancelDelete = (
+    requestId: string,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/passenger/passengers/${requestId}/cancel`, method: 'DELETE'
+    },
+      options);
+    }
+
+/**
+ * @summary שליפת התאמות עדכניות לבקשה קיימת
+ */
+const getLatestMatchesApiV1PassengerPassengersRequestIdMatchesGet = (
+    requestId: string,
+ options?: SecondParameter<typeof apiMutator<RideResponse[]>>,) => {
+      return apiMutator<RideResponse[]>(
+      {url: `/api/v1/passenger/passengers/${requestId}/matches`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Return driver name and phone for open rides; requires authentication.
+ * @summary פרטי נהג לנסיעה (רק כשלחיצה על 'הצג פרטי הנהג')
+ */
+const getRideDriverInfoApiV1PassengerRidesRideIdDriverInfoGet = (
+    rideId: string,
+ options?: SecondParameter<typeof apiMutator<DriverInfoResponse>>,) => {
+      return apiMutator<DriverInfoResponse>(
+      {url: `/api/v1/passenger/rides/${rideId}/driver-info`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Create New Ride
+ */
+const createNewRideApiV1RidesPost = (
+    rideCreate: RideCreate,
+ options?: SecondParameter<typeof apiMutator<RideResponse>>,) => {
+      return apiMutator<RideResponse>(
+      {url: `/api/v1/rides/`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: rideCreate
+    },
+      options);
+    }
+
+/**
+ * List current user's rides as driver.
+ * @summary Get My Rides
+ */
+const getMyRidesApiV1RidesMeGet = (
+    params?: GetMyRidesApiV1RidesMeGetParams,
+ options?: SecondParameter<typeof apiMutator<PaginatedRidesResponse>>,) => {
+      return apiMutator<PaginatedRidesResponse>(
+      {url: `/api/v1/rides/me`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * Step 1: route options and metrics for ride preview.
+ * @summary Preview Ride Options
+ */
+const previewRideOptionsApiV1RidesPreviewRoutesPost = (
+    ridePreviewCreate: RidePreviewCreate,
+ options?: SecondParameter<typeof apiMutator<RidePreviewResponse>>,) => {
+      return apiMutator<RidePreviewResponse>(
+      {url: `/api/v1/rides/preview-routes`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: ridePreviewCreate
+    },
+      options);
+    }
+
+/**
+ * @summary Read Ride
+ */
+const readRideApiV1RidesRideIdGet = (
+    rideId: string,
+ options?: SecondParameter<typeof apiMutator<RideResponse>>,) => {
+      return apiMutator<RideResponse>(
+      {url: `/api/v1/rides/${rideId}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Partial ride update: departure and/or seats (driver owner only).
+ * @summary Update Ride
+ */
+const updateRideApiV1RidesRideIdPatch = (
+    rideId: string,
+    rideUpdate: RideUpdate,
+ options?: SecondParameter<typeof apiMutator<RideResponse>>,) => {
+      return apiMutator<RideResponse>(
+      {url: `/api/v1/rides/${rideId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: rideUpdate
+    },
+      options);
+    }
+
+/**
+ * @summary Cancel Ride
+ */
+const cancelRideApiV1RidesRideIdCancelDelete = (
+    rideId: string,
+ options?: SecondParameter<typeof apiMutator<void>>,) => {
+      return apiMutator<void>(
+      {url: `/api/v1/rides/${rideId}/cancel`, method: 'DELETE'
+    },
+      options);
+    }
+
+/**
+ * End ride → COMPLETED.
+ * @summary End Ride
+ */
+const endRideApiV1RidesRideIdEndPost = (
+    rideId: string,
+ options?: SecondParameter<typeof apiMutator<RideResponse>>,) => {
+      return apiMutator<RideResponse>(
+      {url: `/api/v1/rides/${rideId}/end`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * Start ride → ACTIVE; requires at least one confirmed passenger.
+ * @summary Start Ride
+ */
+const startRideApiV1RidesRideIdStartPost = (
+    rideId: string,
+ options?: SecondParameter<typeof apiMutator<RideResponse>>,) => {
+      return apiMutator<RideResponse>(
+      {url: `/api/v1/rides/${rideId}/start`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * @summary Update Fcm Token
+ */
+const updateFcmTokenApiV1UsersFcmTokenPatch = (
+    fCMTokenUpdate: FCMTokenUpdate,
+ options?: SecondParameter<typeof apiMutator<AppDomainUsersSchemaMessageResponse>>,) => {
+      return apiMutator<AppDomainUsersSchemaMessageResponse>(
+      {url: `/api/v1/users/fcm-token`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: fCMTokenUpdate
+    },
+      options);
+    }
+
+/**
+ * Return the authenticated user's profile (including sensitive fields like verification state).
+ * @summary Get My Profile
+ */
+const getMyProfileApiV1UsersMeGet = (
+
+ options?: SecondParameter<typeof apiMutator<UserRead>>,) => {
+      return apiMutator<UserRead>(
+      {url: `/api/v1/users/me`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * Update the authenticated user's profile.
+Accepts a UserUpdate object and passes it through to the service unchanged.
+ * @summary Update My Profile
+ */
+const updateMyProfileApiV1UsersMePut = (
+    userUpdate: UserUpdate,
+ options?: SecondParameter<typeof apiMutator<UserRead>>,) => {
+      return apiMutator<UserRead>(
+      {url: `/api/v1/users/me`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: userUpdate
+    },
+      options);
+    }
+
+/**
+ * Remove profile photo: deletes avatars/{user_id}/ from S3 and clears avatar_key in DB.
+ * @summary Remove My Avatar
+ */
+const removeMyAvatarApiV1UsersMeAvatarDelete = (
+
+ options?: SecondParameter<typeof apiMutator<AvatarUploadAcceptedResponse>>,) => {
+      return apiMutator<AvatarUploadAcceptedResponse>(
+      {url: `/api/v1/users/me/avatar`, method: 'DELETE'
+    },
+      options);
+    }
+
+/**
+ * Confirm upload after the client uploaded directly to S3. Updates avatar_key in DB immediately and enqueues work.
+Processing (resize to 3 sizes) runs in the background. staging_key must start with avatars/staging/{user_id}_.
+ * @summary Confirm Avatar Upload
+ */
+const confirmAvatarUploadApiV1UsersMeAvatarConfirmPost = (
+    avatarUploadConfirmRequest: AvatarUploadConfirmRequest,
+ options?: SecondParameter<typeof apiMutator<AvatarUploadAcceptedResponse>>,) => {
+      return apiMutator<AvatarUploadAcceptedResponse>(
+      {url: `/api/v1/users/me/avatar/confirm`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: avatarUploadConfirmRequest
+    },
+      options);
+    }
+
+/**
+ * Return a presigned URL for direct upload to S3.
+Flow:
+1. Client calls this endpoint → receives presigned URL + staging_key
+2. Client uploads directly to S3 via the URL (5–8s)
+3. Client calls POST /me/avatar/confirm with staging_key
+4. Server enqueues work and returns 202 immediately (~1s)
+5. Worker processes in the background (finalize + DB update)
+ * @summary Get Avatar Upload Url
+ */
+const getAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGet = (
+    params?: GetAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGetParams,
+ options?: SecondParameter<typeof apiMutator<AvatarUploadUrlResponse>>,) => {
+      return apiMutator<AvatarUploadUrlResponse>(
+      {url: `/api/v1/users/me/avatar/upload-url`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * @summary Update Last Seen
+ */
+const updateLastSeenApiV1UsersMeLastSeenPatch = (
+
+ options?: SecondParameter<typeof apiMutator<void>>,) => {
+      return apiMutator<void>(
+      {url: `/api/v1/users/me/last-seen`, method: 'PATCH'
+    },
+      options);
+    }
+
+/**
+ * Cursor-paginated notifications: driver pending joins + passenger booking updates.
+ * @summary Get My Notifications
+ */
+const getMyNotificationsApiV1UsersMeNotificationsGet = (
+    params?: GetMyNotificationsApiV1UsersMeNotificationsGetParams,
+ options?: SecondParameter<typeof apiMutator<PaginatedNotificationsResponse>>,) => {
+      return apiMutator<PaginatedNotificationsResponse>(
+      {url: `/api/v1/users/me/notifications`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * @summary Test Push
+ */
+const testPushApiV1UsersMeTestPushPost = (
+
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/users/me/test-push`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * Source for chat UI `last_seen`; called from chat-ws on GET /presence/{id}.
+ * @summary Get User Last Seen
+ */
+const getUserLastSeenApiV1UsersUserIdLastSeenGet = (
+    userId: string,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/users/${userId}/last-seen`, method: 'GET'
+    },
+      options);
+    }
+
+return {readRootGet,adminAuditLogApiV1AdminAuditLogGet,adminBillingPaymentsApiV1AdminBillingPaymentsGet,adminBillingPaymentByIdApiV1AdminBillingPaymentsPaymentIdGet,adminBillingReconcilePaymentApiV1AdminBillingReconcilePaymentIdPost,adminBillingStalePendingApiV1AdminBillingStalePendingGet,adminBookingsApiV1AdminBookingsGet,adminBookingByIdApiV1AdminBookingsBookingIdGet,adminGroupsApiV1AdminGroupsGet,adminHealthApiV1AdminHealthGet,adminMeApiV1AdminMeGet,adminOutboxApiV1AdminOutboxGet,adminOutboxByIdApiV1AdminOutboxEventIdGet,adminOutboxRequeueApiV1AdminOutboxEventIdRequeuePost,adminQueuesApiV1AdminQueuesGet,adminRidesApiV1AdminRidesGet,adminRideByIdApiV1AdminRidesRideIdGet,adminCancelRideApiV1AdminRidesRideIdCancelPost,adminStatsApiV1AdminStatsGet,adminSystemOverviewApiV1AdminSystemOverviewGet,adminUsersApiV1AdminUsersGet,adminToggleUserActiveApiV1AdminUsersUserIdActivePatch,adminToggleUserAdminApiV1AdminUsersUserIdAdminPatch,adminWorkersApiV1AdminWorkersGet,changePasswordApiV1AuthChangePasswordPost,forgotPasswordApiV1AuthForgotPasswordPost,googleSigninApiV1AuthGoogleSigninPost,loginApiV1AuthLoginPost,logoutApiV1AuthLogoutPost,confirmPasswordResetApiV1AuthPasswordResetConfirmPost,requestPasswordResetApiV1AuthPasswordResetRequestPost,refreshTokenApiV1AuthRefreshPost,registerApiV1AuthRegisterPost,resendVerificationCodeApiV1AuthResendVerificationPost,verifyEmailApiV1AuthVerifyEmailPost,verifyEmailByLinkApiV1AuthVerifyEmailConfirmGet,createCheckoutApiV1BillingCheckoutPost,getMyPaymentsApiV1BillingPaymentsGet,getBillingStatusApiV1BillingStatusGet,stripeWebhookApiV1BillingWebhookPost,getDriverActiveSummaryApiV1BookingsDriverSummaryActiveGet,getDriverHistorySummaryApiV1BookingsDriverSummaryHistoryGet,getUserBookingsApiV1BookingsMyBookingsGet,getPassengerActiveSummaryApiV1BookingsPassengerSummaryActiveGet,getPassengerHistorySummaryApiV1BookingsPassengerSummaryHistoryGet,requestToJoinApiV1BookingsRequestToJoinPost,getRideManifestApiV1BookingsRideRideIdManifestGet,getPendingRequestsApiV1BookingsRideRideIdPendingGet,getBookingApiV1BookingsBookingIdGet,approveBookingApiV1BookingsBookingIdApprovePatch,cancelBookingApiV1BookingsBookingIdCancelPost,reportDriverLocationApiV1BookingsBookingIdLocationPost,reportPassengerLocationApiV1BookingsBookingIdPassengerLocationPost,rejectBookingApiV1BookingsBookingIdRejectPatch,listConversationsApiV1ChatConversationsGet,createOrGetConversationApiV1ChatConversationsPost,createOrGetConversationByBookingApiV1ChatConversationsByBookingBookingIdPost,getConversationApiV1ChatConversationsConversationIdGet,exportConversationCalendarApiV1ChatConversationsConversationIdCalendarIcsGet,listConversationMessagesApiV1ChatConversationsConversationIdMessagesGet,postMessageApiV1ChatConversationsConversationIdMessagesPost,listConversationMessagesGapApiV1ChatConversationsConversationIdMessagesGapGet,markReadApiV1ChatConversationsConversationIdReadPost,unreadCountApiV1ChatUnreadCountGet,getAddressFromCoordsApiV1GeoAddressGet,getMapsApiKeyApiV1GeoMapsKeyGet,createGroupApiV1GroupsPost,getGroupByInviteApiV1GroupsJoinInviteCodeGet,joinGroupApiV1GroupsJoinInviteCodePost,getMyGroupsApiV1GroupsMyGet,closeGroupApiV1GroupsGroupIdDelete,updateGroupApiV1GroupsGroupIdPatch,confirmGroupImageApiV1GroupsGroupIdConfirmImagePost,deleteGroupImageApiV1GroupsGroupIdImageDelete,leaveGroupApiV1GroupsGroupIdLeaveDelete,getMembersApiV1GroupsGroupIdMembersGet,removeMemberApiV1GroupsGroupIdMembersUserIdDelete,promoteMemberApiV1GroupsGroupIdMembersUserIdPromotePatch,getGroupRidesApiV1GroupsGroupIdRidesGet,getGroupImageUploadUrlApiV1GroupsGroupIdUploadImagePost,apiHealthApiV1HealthGet,createNewRequestApiV1PassengerPassengersPost,aiParseSearchApiV1PassengerPassengersAiParseSearchPost,getAllRidesAdminApiV1PassengerPassengersAllGet,getMyRequestsApiV1PassengerPassengersMeGet,requestRideFromSearchApiV1PassengerPassengersRequestRideFromSearchPost,searchAvailableRidesApiV1PassengerPassengersSearchRidesGet,cancelRequestApiV1PassengerPassengersRequestIdCancelDelete,getLatestMatchesApiV1PassengerPassengersRequestIdMatchesGet,getRideDriverInfoApiV1PassengerRidesRideIdDriverInfoGet,createNewRideApiV1RidesPost,getMyRidesApiV1RidesMeGet,previewRideOptionsApiV1RidesPreviewRoutesPost,readRideApiV1RidesRideIdGet,updateRideApiV1RidesRideIdPatch,cancelRideApiV1RidesRideIdCancelDelete,endRideApiV1RidesRideIdEndPost,startRideApiV1RidesRideIdStartPost,updateFcmTokenApiV1UsersFcmTokenPatch,getMyProfileApiV1UsersMeGet,updateMyProfileApiV1UsersMePut,removeMyAvatarApiV1UsersMeAvatarDelete,confirmAvatarUploadApiV1UsersMeAvatarConfirmPost,getAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGet,updateLastSeenApiV1UsersMeLastSeenPatch,getMyNotificationsApiV1UsersMeNotificationsGet,testPushApiV1UsersMeTestPushPost,getUserLastSeenApiV1UsersUserIdLastSeenGet}};
+export type ReadRootGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['readRootGet']>>>
+export type AdminAuditLogApiV1AdminAuditLogGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminAuditLogApiV1AdminAuditLogGet']>>>
+export type AdminBillingPaymentsApiV1AdminBillingPaymentsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminBillingPaymentsApiV1AdminBillingPaymentsGet']>>>
+export type AdminBillingPaymentByIdApiV1AdminBillingPaymentsPaymentIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminBillingPaymentByIdApiV1AdminBillingPaymentsPaymentIdGet']>>>
+export type AdminBillingReconcilePaymentApiV1AdminBillingReconcilePaymentIdPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminBillingReconcilePaymentApiV1AdminBillingReconcilePaymentIdPost']>>>
+export type AdminBillingStalePendingApiV1AdminBillingStalePendingGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminBillingStalePendingApiV1AdminBillingStalePendingGet']>>>
+export type AdminBookingsApiV1AdminBookingsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminBookingsApiV1AdminBookingsGet']>>>
+export type AdminBookingByIdApiV1AdminBookingsBookingIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminBookingByIdApiV1AdminBookingsBookingIdGet']>>>
+export type AdminGroupsApiV1AdminGroupsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminGroupsApiV1AdminGroupsGet']>>>
+export type AdminHealthApiV1AdminHealthGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminHealthApiV1AdminHealthGet']>>>
+export type AdminMeApiV1AdminMeGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminMeApiV1AdminMeGet']>>>
+export type AdminOutboxApiV1AdminOutboxGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminOutboxApiV1AdminOutboxGet']>>>
+export type AdminOutboxByIdApiV1AdminOutboxEventIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminOutboxByIdApiV1AdminOutboxEventIdGet']>>>
+export type AdminOutboxRequeueApiV1AdminOutboxEventIdRequeuePostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminOutboxRequeueApiV1AdminOutboxEventIdRequeuePost']>>>
+export type AdminQueuesApiV1AdminQueuesGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminQueuesApiV1AdminQueuesGet']>>>
+export type AdminRidesApiV1AdminRidesGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminRidesApiV1AdminRidesGet']>>>
+export type AdminRideByIdApiV1AdminRidesRideIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminRideByIdApiV1AdminRidesRideIdGet']>>>
+export type AdminCancelRideApiV1AdminRidesRideIdCancelPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminCancelRideApiV1AdminRidesRideIdCancelPost']>>>
+export type AdminStatsApiV1AdminStatsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminStatsApiV1AdminStatsGet']>>>
+export type AdminSystemOverviewApiV1AdminSystemOverviewGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminSystemOverviewApiV1AdminSystemOverviewGet']>>>
+export type AdminUsersApiV1AdminUsersGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminUsersApiV1AdminUsersGet']>>>
+export type AdminToggleUserActiveApiV1AdminUsersUserIdActivePatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminToggleUserActiveApiV1AdminUsersUserIdActivePatch']>>>
+export type AdminToggleUserAdminApiV1AdminUsersUserIdAdminPatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminToggleUserAdminApiV1AdminUsersUserIdAdminPatch']>>>
+export type AdminWorkersApiV1AdminWorkersGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminWorkersApiV1AdminWorkersGet']>>>
+export type ChangePasswordApiV1AuthChangePasswordPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['changePasswordApiV1AuthChangePasswordPost']>>>
+export type ForgotPasswordApiV1AuthForgotPasswordPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['forgotPasswordApiV1AuthForgotPasswordPost']>>>
+export type GoogleSigninApiV1AuthGoogleSigninPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['googleSigninApiV1AuthGoogleSigninPost']>>>
+export type LoginApiV1AuthLoginPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['loginApiV1AuthLoginPost']>>>
+export type LogoutApiV1AuthLogoutPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['logoutApiV1AuthLogoutPost']>>>
+export type ConfirmPasswordResetApiV1AuthPasswordResetConfirmPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['confirmPasswordResetApiV1AuthPasswordResetConfirmPost']>>>
+export type RequestPasswordResetApiV1AuthPasswordResetRequestPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['requestPasswordResetApiV1AuthPasswordResetRequestPost']>>>
+export type RefreshTokenApiV1AuthRefreshPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['refreshTokenApiV1AuthRefreshPost']>>>
+export type RegisterApiV1AuthRegisterPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['registerApiV1AuthRegisterPost']>>>
+export type ResendVerificationCodeApiV1AuthResendVerificationPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['resendVerificationCodeApiV1AuthResendVerificationPost']>>>
+export type VerifyEmailApiV1AuthVerifyEmailPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['verifyEmailApiV1AuthVerifyEmailPost']>>>
+export type VerifyEmailByLinkApiV1AuthVerifyEmailConfirmGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['verifyEmailByLinkApiV1AuthVerifyEmailConfirmGet']>>>
+export type CreateCheckoutApiV1BillingCheckoutPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['createCheckoutApiV1BillingCheckoutPost']>>>
+export type GetMyPaymentsApiV1BillingPaymentsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMyPaymentsApiV1BillingPaymentsGet']>>>
+export type GetBillingStatusApiV1BillingStatusGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getBillingStatusApiV1BillingStatusGet']>>>
+export type StripeWebhookApiV1BillingWebhookPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['stripeWebhookApiV1BillingWebhookPost']>>>
+export type GetDriverActiveSummaryApiV1BookingsDriverSummaryActiveGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getDriverActiveSummaryApiV1BookingsDriverSummaryActiveGet']>>>
+export type GetDriverHistorySummaryApiV1BookingsDriverSummaryHistoryGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getDriverHistorySummaryApiV1BookingsDriverSummaryHistoryGet']>>>
 export type GetUserBookingsApiV1BookingsMyBookingsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getUserBookingsApiV1BookingsMyBookingsGet']>>>
-export type GetDriverSummaryApiV1BookingsDriverSummaryGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getDriverSummaryApiV1BookingsDriverSummaryGet']>>>
-export type GetPassengerSummaryApiV1BookingsPassengerSummaryGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getPassengerSummaryApiV1BookingsPassengerSummaryGet']>>>
+export type GetPassengerActiveSummaryApiV1BookingsPassengerSummaryActiveGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getPassengerActiveSummaryApiV1BookingsPassengerSummaryActiveGet']>>>
+export type GetPassengerHistorySummaryApiV1BookingsPassengerSummaryHistoryGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getPassengerHistorySummaryApiV1BookingsPassengerSummaryHistoryGet']>>>
+export type RequestToJoinApiV1BookingsRequestToJoinPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['requestToJoinApiV1BookingsRequestToJoinPost']>>>
 export type GetRideManifestApiV1BookingsRideRideIdManifestGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getRideManifestApiV1BookingsRideRideIdManifestGet']>>>
 export type GetPendingRequestsApiV1BookingsRideRideIdPendingGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getPendingRequestsApiV1BookingsRideRideIdPendingGet']>>>
 export type GetBookingApiV1BookingsBookingIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getBookingApiV1BookingsBookingIdGet']>>>
+export type ApproveBookingApiV1BookingsBookingIdApprovePatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['approveBookingApiV1BookingsBookingIdApprovePatch']>>>
+export type CancelBookingApiV1BookingsBookingIdCancelPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['cancelBookingApiV1BookingsBookingIdCancelPost']>>>
 export type ReportDriverLocationApiV1BookingsBookingIdLocationPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['reportDriverLocationApiV1BookingsBookingIdLocationPost']>>>
 export type ReportPassengerLocationApiV1BookingsBookingIdPassengerLocationPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['reportPassengerLocationApiV1BookingsBookingIdPassengerLocationPost']>>>
-export type GetMyProfileApiV1UsersMeGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMyProfileApiV1UsersMeGet']>>>
-export type UpdateMyProfileApiV1UsersMePutResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['updateMyProfileApiV1UsersMePut']>>>
-export type UpdateLastSeenApiV1UsersMeLastSeenPatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['updateLastSeenApiV1UsersMeLastSeenPatch']>>>
-export type GetUserLastSeenApiV1UsersUserIdLastSeenGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getUserLastSeenApiV1UsersUserIdLastSeenGet']>>>
-export type GetMyNotificationsApiV1UsersMeNotificationsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMyNotificationsApiV1UsersMeNotificationsGet']>>>
-export type UpdateFcmTokenApiV1UsersFcmTokenPatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['updateFcmTokenApiV1UsersFcmTokenPatch']>>>
-export type TestPushApiV1UsersMeTestPushPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['testPushApiV1UsersMeTestPushPost']>>>
-export type GetAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGet']>>>
-export type ConfirmAvatarUploadApiV1UsersMeAvatarConfirmPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['confirmAvatarUploadApiV1UsersMeAvatarConfirmPost']>>>
-export type RemoveMyAvatarApiV1UsersMeAvatarDeleteResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['removeMyAvatarApiV1UsersMeAvatarDelete']>>>
-export type RegisterApiV1AuthRegisterPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['registerApiV1AuthRegisterPost']>>>
-export type ForgotPasswordApiV1AuthForgotPasswordPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['forgotPasswordApiV1AuthForgotPasswordPost']>>>
-export type LoginApiV1AuthLoginPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['loginApiV1AuthLoginPost']>>>
-export type RefreshTokenApiV1AuthRefreshPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['refreshTokenApiV1AuthRefreshPost']>>>
-export type LogoutApiV1AuthLogoutPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['logoutApiV1AuthLogoutPost']>>>
-export type VerifyEmailByLinkApiV1AuthVerifyEmailConfirmGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['verifyEmailByLinkApiV1AuthVerifyEmailConfirmGet']>>>
-export type VerifyEmailApiV1AuthVerifyEmailPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['verifyEmailApiV1AuthVerifyEmailPost']>>>
-export type ResendVerificationCodeApiV1AuthResendVerificationPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['resendVerificationCodeApiV1AuthResendVerificationPost']>>>
-export type RequestPasswordResetApiV1AuthPasswordResetRequestPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['requestPasswordResetApiV1AuthPasswordResetRequestPost']>>>
-export type ConfirmPasswordResetApiV1AuthPasswordResetConfirmPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['confirmPasswordResetApiV1AuthPasswordResetConfirmPost']>>>
-export type ChangePasswordApiV1AuthChangePasswordPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['changePasswordApiV1AuthChangePasswordPost']>>>
-export type GoogleSigninApiV1AuthGoogleSigninPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['googleSigninApiV1AuthGoogleSigninPost']>>>
-export type CreateCheckoutApiV1BillingCheckoutPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['createCheckoutApiV1BillingCheckoutPost']>>>
-export type GetBillingStatusApiV1BillingStatusGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getBillingStatusApiV1BillingStatusGet']>>>
-export type GetMyPaymentsApiV1BillingPaymentsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMyPaymentsApiV1BillingPaymentsGet']>>>
-export type StripeWebhookApiV1BillingWebhookPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['stripeWebhookApiV1BillingWebhookPost']>>>
-export type GetMapsApiKeyApiV1GeoMapsKeyGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMapsApiKeyApiV1GeoMapsKeyGet']>>>
-export type GetAddressFromCoordsApiV1GeoAddressGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getAddressFromCoordsApiV1GeoAddressGet']>>>
+export type RejectBookingApiV1BookingsBookingIdRejectPatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['rejectBookingApiV1BookingsBookingIdRejectPatch']>>>
 export type ListConversationsApiV1ChatConversationsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['listConversationsApiV1ChatConversationsGet']>>>
 export type CreateOrGetConversationApiV1ChatConversationsPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['createOrGetConversationApiV1ChatConversationsPost']>>>
 export type CreateOrGetConversationByBookingApiV1ChatConversationsByBookingBookingIdPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['createOrGetConversationByBookingApiV1ChatConversationsByBookingBookingIdPost']>>>
 export type GetConversationApiV1ChatConversationsConversationIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getConversationApiV1ChatConversationsConversationIdGet']>>>
-export type PostMessageApiV1ChatConversationsConversationIdMessagesPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['postMessageApiV1ChatConversationsConversationIdMessagesPost']>>>
-export type ListConversationMessagesApiV1ChatConversationsConversationIdMessagesGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['listConversationMessagesApiV1ChatConversationsConversationIdMessagesGet']>>>
 export type ExportConversationCalendarApiV1ChatConversationsConversationIdCalendarIcsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['exportConversationCalendarApiV1ChatConversationsConversationIdCalendarIcsGet']>>>
+export type ListConversationMessagesApiV1ChatConversationsConversationIdMessagesGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['listConversationMessagesApiV1ChatConversationsConversationIdMessagesGet']>>>
+export type PostMessageApiV1ChatConversationsConversationIdMessagesPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['postMessageApiV1ChatConversationsConversationIdMessagesPost']>>>
+export type ListConversationMessagesGapApiV1ChatConversationsConversationIdMessagesGapGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['listConversationMessagesGapApiV1ChatConversationsConversationIdMessagesGapGet']>>>
 export type MarkReadApiV1ChatConversationsConversationIdReadPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['markReadApiV1ChatConversationsConversationIdReadPost']>>>
 export type UnreadCountApiV1ChatUnreadCountGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['unreadCountApiV1ChatUnreadCountGet']>>>
-export type AdminMeApiV1AdminMeGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminMeApiV1AdminMeGet']>>>
-export type AdminHealthApiV1AdminHealthGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminHealthApiV1AdminHealthGet']>>>
-export type AdminStatsApiV1AdminStatsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminStatsApiV1AdminStatsGet']>>>
-export type AdminUsersApiV1AdminUsersGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminUsersApiV1AdminUsersGet']>>>
-export type AdminToggleUserActiveApiV1AdminUsersUserIdActivePatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminToggleUserActiveApiV1AdminUsersUserIdActivePatch']>>>
-export type AdminToggleUserAdminApiV1AdminUsersUserIdAdminPatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminToggleUserAdminApiV1AdminUsersUserIdAdminPatch']>>>
-export type AdminRidesApiV1AdminRidesGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminRidesApiV1AdminRidesGet']>>>
-export type AdminCancelRideApiV1AdminRidesRideIdCancelPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminCancelRideApiV1AdminRidesRideIdCancelPost']>>>
-export type AdminGroupsApiV1AdminGroupsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminGroupsApiV1AdminGroupsGet']>>>
-export type AdminOutboxApiV1AdminOutboxGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminOutboxApiV1AdminOutboxGet']>>>
-export type AdminAuditLogApiV1AdminAuditLogGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminAuditLogApiV1AdminAuditLogGet']>>>
-export type AdminOutboxByIdApiV1AdminOutboxEventIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminOutboxByIdApiV1AdminOutboxEventIdGet']>>>
-export type AdminOutboxRequeueApiV1AdminOutboxEventIdRequeuePostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminOutboxRequeueApiV1AdminOutboxEventIdRequeuePost']>>>
-export type AdminRideByIdApiV1AdminRidesRideIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminRideByIdApiV1AdminRidesRideIdGet']>>>
-export type AdminBookingByIdApiV1AdminBookingsBookingIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminBookingByIdApiV1AdminBookingsBookingIdGet']>>>
+export type GetAddressFromCoordsApiV1GeoAddressGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getAddressFromCoordsApiV1GeoAddressGet']>>>
+export type GetMapsApiKeyApiV1GeoMapsKeyGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMapsApiKeyApiV1GeoMapsKeyGet']>>>
 export type CreateGroupApiV1GroupsPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['createGroupApiV1GroupsPost']>>>
-export type GetMyGroupsApiV1GroupsMyGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMyGroupsApiV1GroupsMyGet']>>>
 export type GetGroupByInviteApiV1GroupsJoinInviteCodeGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getGroupByInviteApiV1GroupsJoinInviteCodeGet']>>>
 export type JoinGroupApiV1GroupsJoinInviteCodePostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['joinGroupApiV1GroupsJoinInviteCodePost']>>>
-export type GetMembersApiV1GroupsGroupIdMembersGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMembersApiV1GroupsGroupIdMembersGet']>>>
-export type GetGroupRidesApiV1GroupsGroupIdRidesGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getGroupRidesApiV1GroupsGroupIdRidesGet']>>>
-export type GetGroupImageUploadUrlApiV1GroupsGroupIdUploadImagePostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getGroupImageUploadUrlApiV1GroupsGroupIdUploadImagePost']>>>
-export type ConfirmGroupImageApiV1GroupsGroupIdConfirmImagePostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['confirmGroupImageApiV1GroupsGroupIdConfirmImagePost']>>>
-export type DeleteGroupImageApiV1GroupsGroupIdImageDeleteResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['deleteGroupImageApiV1GroupsGroupIdImageDelete']>>>
-export type RemoveMemberApiV1GroupsGroupIdMembersUserIdDeleteResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['removeMemberApiV1GroupsGroupIdMembersUserIdDelete']>>>
-export type PromoteMemberApiV1GroupsGroupIdMembersUserIdPromotePatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['promoteMemberApiV1GroupsGroupIdMembersUserIdPromotePatch']>>>
-export type LeaveGroupApiV1GroupsGroupIdLeaveDeleteResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['leaveGroupApiV1GroupsGroupIdLeaveDelete']>>>
+export type GetMyGroupsApiV1GroupsMyGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMyGroupsApiV1GroupsMyGet']>>>
 export type CloseGroupApiV1GroupsGroupIdDeleteResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['closeGroupApiV1GroupsGroupIdDelete']>>>
 export type UpdateGroupApiV1GroupsGroupIdPatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['updateGroupApiV1GroupsGroupIdPatch']>>>
-export type ReadRootGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['readRootGet']>>>
+export type ConfirmGroupImageApiV1GroupsGroupIdConfirmImagePostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['confirmGroupImageApiV1GroupsGroupIdConfirmImagePost']>>>
+export type DeleteGroupImageApiV1GroupsGroupIdImageDeleteResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['deleteGroupImageApiV1GroupsGroupIdImageDelete']>>>
+export type LeaveGroupApiV1GroupsGroupIdLeaveDeleteResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['leaveGroupApiV1GroupsGroupIdLeaveDelete']>>>
+export type GetMembersApiV1GroupsGroupIdMembersGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMembersApiV1GroupsGroupIdMembersGet']>>>
+export type RemoveMemberApiV1GroupsGroupIdMembersUserIdDeleteResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['removeMemberApiV1GroupsGroupIdMembersUserIdDelete']>>>
+export type PromoteMemberApiV1GroupsGroupIdMembersUserIdPromotePatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['promoteMemberApiV1GroupsGroupIdMembersUserIdPromotePatch']>>>
+export type GetGroupRidesApiV1GroupsGroupIdRidesGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getGroupRidesApiV1GroupsGroupIdRidesGet']>>>
+export type GetGroupImageUploadUrlApiV1GroupsGroupIdUploadImagePostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getGroupImageUploadUrlApiV1GroupsGroupIdUploadImagePost']>>>
 export type ApiHealthApiV1HealthGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['apiHealthApiV1HealthGet']>>>
+export type CreateNewRequestApiV1PassengerPassengersPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['createNewRequestApiV1PassengerPassengersPost']>>>
+export type AiParseSearchApiV1PassengerPassengersAiParseSearchPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['aiParseSearchApiV1PassengerPassengersAiParseSearchPost']>>>
+export type GetAllRidesAdminApiV1PassengerPassengersAllGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getAllRidesAdminApiV1PassengerPassengersAllGet']>>>
+export type GetMyRequestsApiV1PassengerPassengersMeGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMyRequestsApiV1PassengerPassengersMeGet']>>>
+export type RequestRideFromSearchApiV1PassengerPassengersRequestRideFromSearchPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['requestRideFromSearchApiV1PassengerPassengersRequestRideFromSearchPost']>>>
+export type SearchAvailableRidesApiV1PassengerPassengersSearchRidesGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['searchAvailableRidesApiV1PassengerPassengersSearchRidesGet']>>>
+export type CancelRequestApiV1PassengerPassengersRequestIdCancelDeleteResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['cancelRequestApiV1PassengerPassengersRequestIdCancelDelete']>>>
+export type GetLatestMatchesApiV1PassengerPassengersRequestIdMatchesGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getLatestMatchesApiV1PassengerPassengersRequestIdMatchesGet']>>>
+export type GetRideDriverInfoApiV1PassengerRidesRideIdDriverInfoGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getRideDriverInfoApiV1PassengerRidesRideIdDriverInfoGet']>>>
+export type CreateNewRideApiV1RidesPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['createNewRideApiV1RidesPost']>>>
+export type GetMyRidesApiV1RidesMeGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMyRidesApiV1RidesMeGet']>>>
+export type PreviewRideOptionsApiV1RidesPreviewRoutesPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['previewRideOptionsApiV1RidesPreviewRoutesPost']>>>
+export type ReadRideApiV1RidesRideIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['readRideApiV1RidesRideIdGet']>>>
+export type UpdateRideApiV1RidesRideIdPatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['updateRideApiV1RidesRideIdPatch']>>>
+export type CancelRideApiV1RidesRideIdCancelDeleteResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['cancelRideApiV1RidesRideIdCancelDelete']>>>
+export type EndRideApiV1RidesRideIdEndPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['endRideApiV1RidesRideIdEndPost']>>>
+export type StartRideApiV1RidesRideIdStartPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['startRideApiV1RidesRideIdStartPost']>>>
+export type UpdateFcmTokenApiV1UsersFcmTokenPatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['updateFcmTokenApiV1UsersFcmTokenPatch']>>>
+export type GetMyProfileApiV1UsersMeGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMyProfileApiV1UsersMeGet']>>>
+export type UpdateMyProfileApiV1UsersMePutResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['updateMyProfileApiV1UsersMePut']>>>
+export type RemoveMyAvatarApiV1UsersMeAvatarDeleteResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['removeMyAvatarApiV1UsersMeAvatarDelete']>>>
+export type ConfirmAvatarUploadApiV1UsersMeAvatarConfirmPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['confirmAvatarUploadApiV1UsersMeAvatarConfirmPost']>>>
+export type GetAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGet']>>>
+export type UpdateLastSeenApiV1UsersMeLastSeenPatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['updateLastSeenApiV1UsersMeLastSeenPatch']>>>
+export type GetMyNotificationsApiV1UsersMeNotificationsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMyNotificationsApiV1UsersMeNotificationsGet']>>>
+export type TestPushApiV1UsersMeTestPushPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['testPushApiV1UsersMeTestPushPost']>>>
+export type GetUserLastSeenApiV1UsersUserIdLastSeenGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getUserLastSeenApiV1UsersUserIdLastSeenGet']>>>

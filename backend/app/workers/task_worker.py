@@ -13,6 +13,7 @@ from app.domain.events.routing import (
 )
 from app.infrastructure.rabbitmq.client import worker_rabbit_client
 from app.infrastructure.rabbitmq.consumer import RabbitMQConsumer
+from app.infrastructure.rabbitmq.dlq_monitor import run_dlq_monitor
 from app.infrastructure.rabbitmq.supervisor import run_supervised
 from app.infrastructure.redis.broadcast import broadcast
 from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
@@ -91,6 +92,13 @@ async def main():
                 run_supervised(
                     "scheduled-tasks-consumer",
                     lambda: scheduled_tasks_consumer.consume(callback=handle_scheduled_task, stop_event=stop_event),
+                    stop_event,
+                )
+            ),
+            asyncio.create_task(
+                run_supervised(
+                    "dlq-monitor",
+                    lambda: run_dlq_monitor(worker_rabbit_client, stop_event),
                     stop_event,
                 )
             ),

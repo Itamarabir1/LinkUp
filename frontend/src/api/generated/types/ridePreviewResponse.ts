@@ -7,12 +7,12 @@
 import type { RouteOption } from './routeOption';
 
 export interface RidePreviewResponse {
-  /** @minLength 2 */
-  origin_name: string;
+  destination_coords: number[];
   /** @minLength 2 */
   destination_name: string;
-  session_id: string;
   origin_coords: number[];
-  destination_coords: number[];
+  /** @minLength 2 */
+  origin_name: string;
   routes: RouteOption[];
+  session_id: string;
 }

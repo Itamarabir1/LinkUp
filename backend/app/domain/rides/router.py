@@ -18,6 +18,7 @@ from app.api.dependencies.services import get_ride_service
 from app.core.exceptions.ride import RideNotFoundError
 from app.db.session import get_db
 from app.domain.rides.schema import (
+    PaginatedRidesResponse,
     RideCreate,
     RidePreviewCreate,
     RidePreviewResponse,
@@ -57,7 +58,7 @@ async def create_new_ride(
     return await ride_svc.create_ride(db=db, ride_in=ride_in, current_user_id=current_user.user_id)
 
 
-@router.get("/me", response_model=list[RideResponse])
+@router.get("/me", response_model=PaginatedRidesResponse)
 async def get_my_rides(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -65,10 +66,18 @@ async def get_my_rides(
         None,
         description="סנן לפי סטטוס: open, full, active, completed, cancelled",
     ),
+    limit: int = Query(20, ge=1, le=100),
+    after: str | None = Query(None),
     ride_svc: RideService = Depends(get_ride_service),
 ):
     """List current user's rides as driver."""
-    return await ride_svc.get_my_rides(db, current_user.user_id, status=status)
+    return await ride_svc.get_my_rides(
+        db,
+        current_user.user_id,
+        status=status,
+        limit=limit,
+        after=after,
+    )
 
 
 @router.patch("/{ride_id}", response_model=RideResponse)

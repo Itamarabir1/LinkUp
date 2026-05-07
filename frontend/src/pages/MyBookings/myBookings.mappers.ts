@@ -1,15 +1,21 @@
-import type { Ride } from '../../types/api';
-import type {
-  DriverSummaryResponse,
-  PassengerSummaryResponse,
-  RideWithPassengers,
-  PassengerBookingSummary,
-} from '../../types/api';
 import type {
   DriverBookingItem,
   PassengerBookingItem,
   PassengerInRide,
 } from './myBookings.types';
+import type {
+  DriverActiveResponse,
+  PassengerBookingSummary,
+  PassengerActiveResponse,
+  Ride,
+  RideWithPassengers,
+} from '../../types/api';
+
+/** Any payload shaped like `{ rides }` — summary, active-only, or a history page slice. */
+type DriverRidesPayload = Pick<DriverActiveResponse, 'rides'>;
+
+/** Any payload shaped like `{ bookings }` — summary, active-only, or a history page slice. */
+type PassengerBookingsPayload = Pick<PassengerActiveResponse, 'bookings'>;
 
 /**
  * Maps a single RideWithPassengers from the driver-summary endpoint
@@ -52,9 +58,7 @@ function mapRideWithPassengersToDriverItem(raw: RideWithPassengers): DriverBooki
  * Maps the full DriverSummaryResponse to a sorted list of DriverBookingItem.
  * Filters out rides with no passengers (nothing to show in driver tab).
  */
-export function mapDriverSummaryToItems(
-  response: DriverSummaryResponse
-): DriverBookingItem[] {
+export function mapDriverSummaryToItems(response: DriverRidesPayload): DriverBookingItem[] {
   return response.rides
     .filter((r) => r.passengers.length > 0)
     .map(mapRideWithPassengersToDriverItem)
@@ -100,9 +104,7 @@ function mapPassengerSummaryRowToItem(raw: PassengerBookingSummary): PassengerBo
 /**
  * Maps the full PassengerSummaryResponse to a sorted list of PassengerBookingItem.
  */
-export function mapPassengerSummaryToItems(
-  response: PassengerSummaryResponse
-): PassengerBookingItem[] {
+export function mapPassengerSummaryToItems(response: PassengerBookingsPayload): PassengerBookingItem[] {
   return response.bookings
     .map(mapPassengerSummaryRowToItem)
     .sort(

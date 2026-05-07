@@ -6,9 +6,9 @@
  */
 
 export interface RouteOption {
+  coords: number[][];
+  distance_km: number;
+  duration_min: number;
   route_index: number;
   summary: string;
-  duration_min: number;
-  distance_km: number;
-  coords: number[][];
 }

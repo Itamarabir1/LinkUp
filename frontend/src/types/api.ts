@@ -64,6 +64,12 @@ export interface PaginatedMessagesResponse {
   has_more: boolean;
 }
 
+export interface MessageGapResponse {
+  items: MessageResponse[];
+  truncated: boolean;
+  last_message_id: number | null;
+}
+
 export interface ConversationDetail {
   conversation_id: string;
   partner: {

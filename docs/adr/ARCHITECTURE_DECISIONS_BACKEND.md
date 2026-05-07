@@ -94,8 +94,8 @@
 
 | | |
 |--|--|
-| **החלטה** | מספר workers לפי `UVICORN_WORKERS` (Docker); `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT`, `DB_POOL_RECYCLE`, `pool_pre_ping` מ-config. |
-| **למה (סקייל)** | יותר workers = יותר בקשות מקביליות, אבל כל worker משתמש בחיבורי pool — צריך איזון מול מגבלות Postgres. **`pool_pre_ping`** מפחית כשלי חיבור מתים אחרי recycle של השרת. |
+| **החלטה** | מספר workers לפי `UVICORN_WORKERS` (Docker); `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT`, `DB_POOL_RECYCLE`, `pool_pre_ping` מ-config. **`statement_timeout`** דו-שכבתי: **`DB_STATEMENT_TIMEOUT_MS`** מוחל ברמת session דרך `connect_args.server_settings` ב-`app/db/session.py` (ערך אופרטיבי, default 30s); מיגרציה **017** קובעת ceiling דיפנסיבי **קשיח** של 60s ברמת role (literal — דטרמיניסטי בלי תלות ב-runtime config). רשימות נסיעות לנהג ולקבוצה (`/rides/me`, `/groups/{id}/rides`) משתמשות ב-keyset cursor pagination (`limit`/`after`) על `(departure_time DESC, ride_id DESC)` עם אינדקסים מורכבים (**018**). |
+| **למה (סקייל)** | יותר workers = יותר בקשות מקביליות, אבל כל worker משתמש בחיבורי pool — צריך איזון מול מגבלות Postgres. **`pool_pre_ping`** מפחית כשלי חיבור מתים אחרי recycle של השרת. **`statement_timeout`** ברמת session = שינוי `.env` תקף ב-restart בלי מיגרציה. ה-ceiling ברמת role מספק defense-in-depth מול connections ישירים שעוקפים את ה-engine. keyset pagination לרשימות נסיעות מפחית סריקות עמוקות ו-payload גדול לעומת cap קשיח יחיד. |
 | **בקצרה לראיון** | "מגדילים replicas ו-workers בזהירות מול גודל ה-pool — זה trade-off קלאסי." |
 
 ---

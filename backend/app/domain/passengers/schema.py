@@ -106,6 +106,7 @@ class RideSearchRequest(BaseModel):
     pickup_name: str = Field(..., min_length=2)
     destination_name: str = Field(..., min_length=2)
     search_radius: float = Field(default=1.0, ge=0.1, le=50, description="רדיוס חיפוש בקילומטרים (אחיד)")
+    destination_radius: float | None = Field(None, ge=0.1, le=50, description="רדיוס יעד בקילומטרים (אופציונלי)")
     departure_date: date | None = Field(
         None,
         description="יום יציאה בלוח השנה Asia/Jerusalem (00:00–24:00 מקומי). הדדי ל־departure_time.",
@@ -119,7 +120,7 @@ class RideSearchRequest(BaseModel):
         description="יחד עם departure_time — מסיים טווח כולל [departure_time, departure_time_to]. דורש departure_time.",
     )
     limit: int = Field(default=20, ge=1, le=50)
-    after: UUID | None = Field(None, description="cursor: ride_id אחרייו להמשיך")
+    after: str | None = Field(None, description="opaque cursor להמשך")
     group_id: UUID | None = Field(None, description="אם קיים — מסנן רק נסיעות של הקבוצה")
 
     @model_validator(mode="after")

@@ -9,9 +9,9 @@
  * Single message in API responses.
  */
 export interface AppDomainChatSchemaMessageResponse {
-  message_id: number;
-  conversation_id: string;
-  sender_id: string;
   body: string;
+  conversation_id: string;
   created_at: string;
+  message_id: number;
+  sender_id: string;
 }

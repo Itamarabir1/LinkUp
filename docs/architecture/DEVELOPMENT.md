@@ -55,6 +55,7 @@
 | DB_MAX_OVERFLOW | — | חיבורים נוספים תחת עומס (ברירת מחדל 10) |
 | DB_POOL_TIMEOUT | — | שניות המתנה לחיבור מהמאגר (ברירת מחדל 30) |
 | DB_POOL_RECYCLE | — | מחזור חיבורים בשניות (ברירת מחדל 1800) |
+| DB_STATEMENT_TIMEOUT_MS | — | מגבלת זמן לשאילתה (מילישניות); ברירת מחדל 30000. **מיושם ברמת session** דרך `connect_args.server_settings` ב-[`app/db/session.py`](../../backend/app/db/session.py) — שינוי `.env` + restart מיד תקף. Alembic **017** קובע ceiling דיפנסיבי קשיח של 60000ms ברמת role (literal, ללא תלות ב-`settings`). |
 | DB pooling runtime path | — | runtime services דרך `pgbouncer`; migrations ישירות ל-`db` |
 | DATABASE_URL | אופציונלי | override מלא (למשל פרודקשן / K8s / CI); נטען ל־`DATABASE_URL_RAW` ב־Settings דרך **`validation_alias`** (גם **`DATABASE_URL_RAW`** תקף כשם env) |
 | REDIS_URL | אופציונלי | override מלא ל-Redis; נטען ל־`REDIS_URL_RAW` (גם **`REDIS_URL_RAW`** תקף) |
@@ -323,7 +324,8 @@ LinkUp/
 
 ## Recent backend architecture updates
 
-- **Async refactor (passengers/bookings/rides):** רוב זרימות הליבה עברו ל-SQLAlchemy async (`AsyncSession`, `select/execute`) כדי לשפר throughput ולשמור שרשרת async נקייה בין router -> service -> crud. **מסך “הזמנות שלי” (ווב):** endpoints מאוגדים `GET /bookings/driver-summary` ו־`GET /bookings/passenger-summary` עם `joinedload` / `with_loader_criteria` — ראו `docs/architecture/DATABASE.md` ו־`API.md`.
+- **Async refactor (passengers/bookings/rides):** רוב זרימות הליבה עברו ל-SQLAlchemy async (`AsyncSession`, `select/execute`) כדי לשפר throughput ולשמור שרשרת async נקייה בין router -> service -> crud. **מסך “הזמנות שלי” (ווב):** קריאות מאוגדות **פעיל + היסטוריה** — `GET /bookings/driver-summary/active`, `…/driver-summary/history`, `…/passenger-summary/active`, `…/passenger-summary/history` (cursor core משותף, תקרת 200 לפעיל) — ראו `docs/architecture/DATABASE.md` ו-`API.md`.
+- **רשימות נסיעות (נהג/קבוצה):** **`GET …/rides/me`** ו-**`GET …/groups/{group_id}/rides`** מוגבלות ל־**200** נסיעות (`departure_time` יורד); מיגרציה **018** — אינדקסים מורכבים על `rides` והסרת אינדקסי עמודה בודדת מיותרים. פירוט: **`API.md`**, **`DATABASE.md`**.
 - **Async end-to-end (API + workers):** **Bookings** וזרימות ליבה async-only; workers (למשל `app/workers/tasks/notification_tasks.py`) משתמשים ב־`await db.execute(select(...))` — אין `Session.run_sync` בקוד האפליקציה. `run_sync` נשאר רק ב־Alembic (`alembic/env.py`) עבור מיגרציות.
 - **Geocode cache (24h) + stampede:** כתובות נשמרות ב-Redis ל-24 שעות; על **cold miss** או פרץ בקשות מקבילות לאותו מפתח — **`get_or_compute`** (`cache_stampede.py`) מאחד קריאות ל-Google. פירוט: [`FEATURE_DECISIONS.md`](../FEATURE_DECISIONS.md#geocode-cache-stampede), [`MONITORING.md`](../operations/MONITORING.md).
 - **Admin API + מסך אדמין:** `GET/PATCH … /api/v1/admin/*` דרך `get_current_admin_user`; ממשק React ב־`frontend/src/features/admin/` (`/admin`, lazy). פירוט: **`ADMIN_DASHBOARD.md`** בשורש ה-repo.

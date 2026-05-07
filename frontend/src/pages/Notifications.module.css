@@ -76,6 +76,36 @@
   flex-direction: column;
 }
 
+.loadMoreWrap {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 4px;
+}
+
+.loadMoreBtn {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-light);
+  border: 1px solid var(--primary-soft-border);
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-family: var(--font-primary);
+  transition: all var(--transition-fast, 150ms ease);
+}
+
+.loadMoreBtn:hover:not(:disabled) {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.loadMoreBtn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 .group {
   margin-bottom: 4px;
 }

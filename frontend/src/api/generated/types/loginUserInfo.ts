@@ -9,8 +9,8 @@
  * User summary returned on login, Google sign-in, and refresh (includes is_admin).
  */
 export interface LoginUserInfo {
-  user_id: string;
-  full_name: string;
   email: string;
+  full_name: string;
   is_admin?: boolean;
+  user_id: string;
 }

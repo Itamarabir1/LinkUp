@@ -1,89 +1,123 @@
-import { useCallback, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo, useState } from 'react';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { qk, mk } from '../../api/queryKeys';
 import { useUserEvent } from '../../hooks/useUserEvent';
 import { apiErr } from '../../utils/i18nError';
-import { cancelPassengerBooking, fetchPassengerSummary } from '../../api/bookings';
+import {
+  cancelPassengerBooking,
+  fetchPassengerActive,
+  fetchPassengerHistory,
+} from '../../api/bookings';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { useRideWebSocket } from '../../hooks/useRideWebSocket';
 import type { RideEvent } from '../../types/wsEvents';
-import type { PassengerBookingItem } from './myBookings.types';
+import type { TabKind } from './myBookings.types';
 import { LIVE_STATUSES } from '../../constants/rideStatuses';
 import { mapPassengerSummaryToItems } from './myBookings.mappers';
 
-/** Passenger mode: loading and booking cancellation. */
+/** Ride WS while booking is alive (not pending/rejected-only). */
+const WATCH_BOOKING_STATUSES = new Set([
+  'confirmed',
+  'en_route',
+  'arrived',
+  'trip_in_progress',
+]);
+
+/** Passenger mode: active + paginated history. */
 export function useMyBookingsPassenger(
   userId: string | undefined,
+  activeTab: TabKind,
   setError: (message: string) => void
 ) {
   const queryClient = useQueryClient();
-  const [bookingToCancel, setBookingToCancel] = useState<string | null>(null);
-  const { data, isLoading: passengerLoading } = useQuery({
-    queryKey: qk.bookings.passenger(userId),
+
+  const invalidatePassengerCaches = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: qk.bookings.passengerActive(userId) }),
+      queryClient.invalidateQueries({ queryKey: qk.bookings.passengerHistory(userId) }),
+    ]);
+  }, [queryClient, userId]);
+
+  const enabled = activeTab === 'passenger' && !!userId;
+
+  const activeQuery = useQuery({
+    queryKey: qk.bookings.passengerActive(userId),
     queryFn: async () => {
-      const { data } = await fetchPassengerSummary();
+      const { data } = await fetchPassengerActive();
       return mapPassengerSummaryToItems(data);
     },
-    enabled: !!userId,
+    enabled,
     staleTime: 30_000,
   });
-  const passengerList = data ?? [];
 
-  const { mutate: cancelPassengerBookingMutation, isPending: isCancellingPassengerBooking } = useMutation({
-    mutationKey: mk.bookings.cancel('passenger'),
-    mutationFn: (bookingId: string) => cancelPassengerBooking(bookingId),
-    onSuccess: (_, bookingId) => {
-      queryClient.setQueryData(
-        qk.bookings.passenger(userId),
-        (old: PassengerBookingItem[] = []) =>
-          old.map((item) =>
-            item.bookingId === bookingId
-              ? { ...item, bookingStatus: 'cancelled' }
-              : item
-          )
-      );
-      setBookingToCancel(null);
+  const historyQuery = useInfiniteQuery({
+    queryKey: qk.bookings.passengerHistory(userId),
+    queryFn: async ({ pageParam }) => {
+      const { data } = await fetchPassengerHistory({ limit: 20, after: pageParam ?? undefined });
+      return data;
     },
-    onError: async (err) => {
-      setError(getApiErrorMessage(err, apiErr('err_cancel_booking')));
-      await queryClient.invalidateQueries({ queryKey: qk.bookings.passenger(userId) });
-    },
+    enabled,
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
+    staleTime: 30_000,
   });
+  const fetchNextPassengerHistory = historyQuery.fetchNextPage;
+  const hasNextPassengerHistory = historyQuery.hasNextPage;
+
+  const activeItems = useMemo(() => activeQuery.data ?? [], [activeQuery.data]);
+
+  const historyItems = useMemo(
+    () =>
+      historyQuery.data?.pages.flatMap((page) => mapPassengerSummaryToItems({ bookings: page.bookings })) ??
+      [],
+    [historyQuery.data?.pages],
+  );
+
+  const passengerLoading =
+    activeQuery.isLoading || (historyQuery.isLoading && !historyQuery.data);
+
+  const fetchMorePassengerHistory = useCallback(() => {
+    if (hasNextPassengerHistory) void fetchNextPassengerHistory();
+  }, [fetchNextPassengerHistory, hasNextPassengerHistory]);
+
+  const [bookingToCancel, setBookingToCancel] = useState<string | null>(null);
+
+  const { mutate: cancelPassengerBookingMutation, isPending: isCancellingPassengerBooking } =
+    useMutation({
+      mutationKey: mk.bookings.cancel('passenger'),
+      mutationFn: (bookingId: string) => cancelPassengerBooking(bookingId),
+      onSuccess: async () => {
+        setBookingToCancel(null);
+        await invalidatePassengerCaches();
+      },
+      onError: async (err) => {
+        setError(getApiErrorMessage(err, apiErr('err_cancel_booking')));
+        await invalidatePassengerCaches();
+      },
+    });
 
   useUserEvent(
     ['booking.approved_by_driver', 'booking.rejected_by_driver'],
     useCallback(() => {
-      void queryClient.invalidateQueries({ queryKey: qk.bookings.passenger(userId) });
-    }, [queryClient, userId])
+      void invalidatePassengerCaches();
+    }, [invalidatePassengerCaches]),
   );
 
   useUserEvent(
     'BOOKING_COMPLETED',
-    useCallback((detail) => {
-      if (!detail.booking_id) return;
-      queryClient.setQueryData(
-        qk.bookings.passenger(userId),
-        (old: PassengerBookingItem[] = []) =>
-          old.map((item) =>
-            item.bookingId === detail.booking_id
-              ? { ...item, bookingStatus: 'completed' }
-              : item
-          )
-      );
-    }, [queryClient, userId])
+    useCallback(() => void invalidatePassengerCaches(), [invalidatePassengerCaches]),
   );
 
-  // Subscribed while ride is still open/full/active so cancel/start/end events arrive; pick soonest departure when multiple confirmed.
   const watchedRideId =
-    passengerList
+    activeItems
       .filter(
         (item) =>
-          item.bookingStatus === 'confirmed' && LIVE_STATUSES.has(item.ride.status)
+          WATCH_BOOKING_STATUSES.has(item.bookingStatus) &&
+          LIVE_STATUSES.has(item.ride.status),
       )
       .sort(
         (a, b) =>
-          new Date(a.ride.departure_time).getTime() -
-          new Date(b.ride.departure_time).getTime()
+          new Date(a.ride.departure_time).getTime() - new Date(b.ride.departure_time).getTime(),
       )[0]?.ride.ride_id ?? null;
 
   useRideWebSocket({
@@ -91,15 +125,11 @@ export function useMyBookingsPassenger(
     enabled: !!watchedRideId,
     onMessage: useCallback(
       (msg: RideEvent) => {
-        if (
-          msg.event === 'RIDE_STARTED' ||
-          msg.event === 'RIDE_CANCELLED' ||
-          msg.event === 'RIDE_ENDED'
-        ) {
-          void queryClient.invalidateQueries({ queryKey: qk.bookings.passenger(userId) });
+        if (msg.event === 'RIDE_STARTED' || msg.event === 'RIDE_CANCELLED' || msg.event === 'RIDE_ENDED') {
+          void invalidatePassengerCaches();
         }
       },
-      [queryClient, userId]
+      [invalidatePassengerCaches],
     ),
   });
 
@@ -108,8 +138,12 @@ export function useMyBookingsPassenger(
   }, [bookingToCancel, cancelPassengerBookingMutation]);
 
   return {
-    passengerList,
+    activeItems,
+    historyItems,
     passengerLoading,
+    fetchMorePassengerHistory,
+    hasMorePassengerHistory: hasNextPassengerHistory ?? false,
+    isFetchingPassengerHistory: historyQuery.isFetchingNextPage,
     bookingToCancel,
     setBookingToCancel,
     cancelling: isCancellingPassengerBooking,

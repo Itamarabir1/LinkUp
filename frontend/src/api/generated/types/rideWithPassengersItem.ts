@@ -10,15 +10,15 @@ import type { BookingManifestItem } from './bookingManifestItem';
  * Single ride with embedded confirmed/pending passengers.
  */
 export interface RideWithPassengersItem {
-  ride_id: string;
-  origin_name: string | null;
-  destination_name: string | null;
-  departure_time: string;
-  estimated_arrival_time: string | null;
   available_seats: number;
-  price: number;
-  status: string;
+  departure_time: string;
+  destination_name: string | null;
+  estimated_arrival_time: string | null;
   group_id?: string | null;
   group_name?: string | null;
+  origin_name: string | null;
   passengers: BookingManifestItem[];
+  price: number;
+  ride_id: string;
+  status: string;
 }

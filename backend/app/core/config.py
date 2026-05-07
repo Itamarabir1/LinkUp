@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = Field(10, description="Extra connections under load")
     DB_POOL_TIMEOUT: int = Field(30, description="Seconds to wait for a free connection")
     DB_POOL_RECYCLE: int = Field(1800, description="Recycle connections every 30 minutes")
+    DB_STATEMENT_TIMEOUT_MS: int = Field(
+        30000,
+        description=(
+            "Per-session Postgres statement_timeout (ms). Applied via SQLAlchemy "
+            "connect_args -> asyncpg server_settings in app/db/session.py. "
+            "Alembic 017 sets a fixed 60000ms role-level ceiling (defense-in-depth)."
+        ),
+    )
 
     # Optional: full Postgres URL from env (e.g. K8s / production)
     DATABASE_URL_RAW: str | None = Field(

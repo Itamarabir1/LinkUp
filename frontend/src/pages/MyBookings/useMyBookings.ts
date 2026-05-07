@@ -27,7 +27,7 @@ export function useMyBookings() {
   );
 
   const [error, setError] = useState('');
-  const passenger = useMyBookingsPassenger(user?.user_id, setError);
+  const passenger = useMyBookingsPassenger(user?.user_id, activeTab, setError);
   const driver = useMyBookingsDriver(user, activeTab, setError);
 
   const [chatLoading, setChatLoading] = useState<string | null>(null);
@@ -60,8 +60,12 @@ export function useMyBookings() {
     setActiveTab,
     error,
     passenger: {
-      list: passenger.passengerList,
+      activeItems: passenger.activeItems,
+      historyItems: passenger.historyItems,
       loading: passenger.passengerLoading,
+      fetchMorePassengerHistory: passenger.fetchMorePassengerHistory,
+      hasMorePassengerHistory: passenger.hasMorePassengerHistory,
+      isFetchingPassengerHistory: passenger.isFetchingPassengerHistory,
       bookingToCancel: passenger.bookingToCancel,
       setBookingToCancel: passenger.setBookingToCancel,
       cancelling: passenger.cancelling,
@@ -72,8 +76,12 @@ export function useMyBookings() {
       setTrackDriverBookingId,
     },
     driver: {
-      list: driver.driverList,
+      activeItems: driver.activeItems,
+      historyItems: driver.historyItems,
       loading: driver.driverLoading,
+      fetchMoreDriverHistory: driver.fetchMoreDriverHistory,
+      hasMoreDriverHistory: driver.hasMoreDriverHistory,
+      isFetchingDriverHistory: driver.isFetchingDriverHistory,
       sharingRideId: driver.sharingRideId,
       setSharingRideId: driver.setSharingRideId,
       liveRideId: driver.liveRideId,

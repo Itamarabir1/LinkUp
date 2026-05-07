@@ -1,7 +1,7 @@
 # app/domain/bookings/router.py
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import WsUser, get_current_user, get_current_user_ws
@@ -11,8 +11,10 @@ from app.db.session import get_db
 from app.domain.bookings.schema import (
     BookingCreate,
     BookingResponse,
-    DriverSummaryResponse,
-    PassengerSummaryResponse,
+    DriverActiveResponse,
+    DriverHistoryResponse,
+    PassengerActiveResponse,
+    PassengerHistoryResponse,
     RideManifestResponse,
 )
 from app.domain.bookings.booking_reads_service import BookingReadsService
@@ -92,22 +94,43 @@ async def get_user_bookings(
     return result.items
 
 
-@router.get("/driver-summary", response_model=DriverSummaryResponse)
-async def get_driver_summary(
+@router.get("/driver-summary/active", response_model=DriverActiveResponse)
+async def get_driver_active_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Driver rides with embedded passengers — replaces N+1 fetchRideManifest loop."""
-    return await BookingReadsService.get_driver_summary(db, current_user.user_id)
+    """Active driver rides only (paginated counterpart uses /driver-summary/history)."""
+    return await BookingReadsService.get_driver_active_summary(db, current_user.user_id)
 
 
-@router.get("/passenger-summary", response_model=PassengerSummaryResponse)
-async def get_passenger_summary(
+@router.get("/driver-summary/history", response_model=DriverHistoryResponse)
+async def get_driver_history_summary(
+    limit: int = Query(20, ge=1, le=100),
+    after: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Passenger bookings with embedded ride + driver — replaces N+1 fetchRideById loop."""
-    return await BookingReadsService.get_passenger_summary(db, current_user.user_id)
+    return await BookingReadsService.get_driver_history_summary(db, current_user.user_id, limit=limit, after=after)
+
+
+@router.get("/passenger-summary/active", response_model=PassengerActiveResponse)
+async def get_passenger_active_summary(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await BookingReadsService.get_passenger_active_summary(db, current_user.user_id)
+
+
+@router.get("/passenger-summary/history", response_model=PassengerHistoryResponse)
+async def get_passenger_history_summary(
+    limit: int = Query(20, ge=1, le=100),
+    after: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return await BookingReadsService.get_passenger_history_summary(
+        db, current_user.user_id, limit=limit, after=after
+    )
 
 
 @router.get("/ride/{ride_id}/manifest", response_model=RideManifestResponse)

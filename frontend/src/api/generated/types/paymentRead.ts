@@ -7,12 +7,12 @@
 import type { PaymentStatus } from './paymentStatus';
 
 export interface PaymentRead {
-  payment_id: string;
-  user_id: string;
-  stripe_payment_intent_id: string | null;
   /** @pattern ^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$ */
   amount: string;
-  currency: string;
-  status: PaymentStatus;
   created_at: string;
+  currency: string;
+  payment_id: string;
+  status: PaymentStatus;
+  stripe_payment_intent_id: string | null;
+  user_id: string;
 }

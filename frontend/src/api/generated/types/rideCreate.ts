@@ -6,7 +6,7 @@
  */
 
 export interface RideCreate {
-  session_id: string;
-  selected_route_index?: number;
   group_id?: string | null;
+  selected_route_index?: number;
+  session_id: string;
 }

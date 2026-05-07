@@ -32,5 +32,6 @@
   ,"requestsCount": "{count, plural, one {# בקשה} other {# בקשות}}"
   ,"approvedCount": "{count, plural, one {# מאושר} other {# מאושרים}}"
   ,"pickup": "עולה"
-  ,"dropoff": "יורד"
+  ,"dropoff": "יורד",
+  "loadMoreHistory": "טען עוד"
 }

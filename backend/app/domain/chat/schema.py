@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ConversationCreate(BaseModel):
@@ -51,8 +51,22 @@ class PaginatedMessagesResponse(BaseModel):
     """Cursor-paginated message list."""
 
     items: list[MessageResponse] = Field(default_factory=list)
-    next_cursor: str | None = Field(None, description="Oldest message_id for next page (before=)")
+    next_cursor: str | None = Field(None, description="Opaque cursor — pass as `after` query param.")
     has_more: bool = False
+
+
+class MessageGapResponse(BaseModel):
+    """Reconnect backfill messages since a known message id."""
+
+    items: list[MessageResponse] = Field(default_factory=list)
+    truncated: bool = False
+    last_message_id: int | None = None
+
+    @model_validator(mode="after")
+    def validate_last_message_id_when_truncated(self) -> "MessageGapResponse":
+        if self.truncated and self.last_message_id is None:
+            raise ValueError("last_message_id is required when truncated is true")
+        return self
 
 
 class ConversationPartner(BaseModel):
@@ -75,6 +89,14 @@ class ConversationListItem(BaseModel):
     has_unread: bool = False
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PaginatedConversationsResponse(BaseModel):
+    """Cursor-paginated inbox (conversation list)."""
+
+    items: list[ConversationListItem] = Field(default_factory=list)
+    has_more: bool = False
+    next_cursor: str | None = Field(None, description="Opaque cursor — pass as `after` query param.")
 
 
 class ConversationDetail(BaseModel):

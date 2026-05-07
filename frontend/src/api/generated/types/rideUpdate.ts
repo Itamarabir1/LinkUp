@@ -9,6 +9,6 @@
  * Partial ride update: departure time and/or seat count (all fields optional).
  */
 export interface RideUpdate {
-  departure_time?: string | null;
   available_seats?: number | null;
+  departure_time?: string | null;
 }

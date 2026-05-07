@@ -8,13 +8,13 @@ import type { BookingStatus } from './bookingStatus';
 
 export interface BookingManifestItem {
   booking_id: string;
+  destination_name?: string | null;
+  num_seats: number;
   passenger_id: string;
   passenger_name: string;
   phone: string;
-  num_seats: number;
-  whatsapp_link?: string | null;
-  status: BookingStatus;
   pickup_name?: string | null;
   pickup_time?: string | null;
-  destination_name?: string | null;
+  status: BookingStatus;
+  whatsapp_link?: string | null;
 }

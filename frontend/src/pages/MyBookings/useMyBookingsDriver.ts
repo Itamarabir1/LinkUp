@@ -1,13 +1,18 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { qk, mk } from '../../api/queryKeys';
 import { apiErr } from '../../utils/i18nError';
 import { useUserEvent } from '../../hooks/useUserEvent';
-import { approveBooking, fetchDriverSummary, rejectBooking } from '../../api/bookings';
+import {
+  approveBooking,
+  fetchDriverActive,
+  fetchDriverHistory,
+  rejectBooking,
+} from '../../api/bookings';
 import { cancelRide, endRide, startRide } from '../../api/rides';
 import { useLocationBroadcast } from '../../hooks/useLocationBroadcast';
 import { getApiErrorCode, getApiErrorMessage, getApiStatus } from '../../utils/apiError';
-import type { DriverBookingItem, TabKind } from './myBookings.types';
+import type { TabKind } from './myBookings.types';
 import { mapDriverSummaryToItems } from './myBookings.mappers';
 
 type DriverStatus =
@@ -29,17 +34,50 @@ export function useMyBookingsDriver(
   const [rideToCancel, setRideToCancel] = useState<string | null>(null);
   const [cancellingRide, setCancellingRide] = useState(false);
 
-  const { data, isLoading } = useQuery({
-    queryKey: qk.bookings.driver(userId),
+  const invalidateDriverCaches = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: qk.bookings.driverActive(userId) }),
+      queryClient.invalidateQueries({ queryKey: qk.bookings.driverHistory(userId) }),
+    ]);
+  }, [queryClient, userId]);
+
+  const enabled = activeTab === 'driver' && !!userId;
+
+  const activeQuery = useQuery({
+    queryKey: qk.bookings.driverActive(userId),
     queryFn: async () => {
-      const { data } = await fetchDriverSummary();
+      const { data } = await fetchDriverActive();
       return mapDriverSummaryToItems(data);
     },
-    enabled: activeTab === 'driver' && !!userId,
+    enabled,
     staleTime: 30_000,
   });
-  const driverList = useMemo(() => data ?? [], [data]);
-  const driverLoading = isLoading;
+
+  const historyQuery = useInfiniteQuery({
+    queryKey: qk.bookings.driverHistory(userId),
+    queryFn: async ({ pageParam }) => {
+      const { data } = await fetchDriverHistory({ limit: 20, after: pageParam ?? undefined });
+      return data;
+    },
+    enabled,
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
+    staleTime: 30_000,
+  });
+  const fetchNextDriverHistory = historyQuery.fetchNextPage;
+  const hasNextDriverHistory = historyQuery.hasNextPage;
+
+  const activeItems = useMemo(() => activeQuery.data ?? [], [activeQuery.data]);
+
+  const historyItems = useMemo(
+    () =>
+      historyQuery.data?.pages.flatMap((page) => mapDriverSummaryToItems({ rides: page.rides })) ??
+      [],
+    [historyQuery.data?.pages],
+  );
+
+  const driverLoading =
+    activeQuery.isLoading || (historyQuery.isLoading && !historyQuery.data);
 
   const { mutate: approveBookingMutation } = useMutation({
     mutationKey: mk.bookings.approve(''),
@@ -47,9 +85,7 @@ export function useMyBookingsDriver(
       setDriverStatus({ kind: 'action', bookingId });
       await approveBooking(bookingId);
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
-    },
+    onSuccess: invalidateDriverCaches,
     onError: (err) => {
       setError(getApiErrorMessage(err, apiErr('err_approve_booking')));
     },
@@ -62,9 +98,7 @@ export function useMyBookingsDriver(
       setDriverStatus({ kind: 'action', bookingId });
       await rejectBooking(bookingId);
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
-    },
+    onSuccess: invalidateDriverCaches,
     onError: (err) => {
       setError(getApiErrorMessage(err, apiErr('err_reject_booking')));
     },
@@ -74,16 +108,16 @@ export function useMyBookingsDriver(
   useUserEvent(
     'booking.passenger_join_request',
     useCallback(() => {
-      void queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
-    }, [queryClient, userId])
+      void invalidateDriverCaches();
+    }, [invalidateDriverCaches]),
   );
 
   useUserEvent(
     'RIDE_FINISHED',
     useCallback((detail) => {
       if (!detail.ride_id) return;
-      void queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
-    }, [queryClient, userId])
+      void invalidateDriverCaches();
+    }, [invalidateDriverCaches]),
   );
 
   const handleShareStart = useCallback(
@@ -91,20 +125,20 @@ export function useMyBookingsDriver(
       setError('');
       try {
         await startRide(rideId);
-        await queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
+        await invalidateDriverCaches();
       } catch (err: unknown) {
         const status = getApiStatus(err);
         const code = getApiErrorCode(err);
         const detail = getApiErrorMessage(err, '');
         if (status === 400 && (code === 'RIDE_INVALID_STATUS' || /active|ACTIVE|פעיל/i.test(detail))) {
-          await queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
+          await invalidateDriverCaches();
           return;
         }
         setError(detail || apiErr('err_start_ride'));
         throw err;
       }
     },
-    [queryClient, setError, userId]
+    [invalidateDriverCaches, setError],
   );
 
   const handleShareStop = useCallback(
@@ -117,17 +151,17 @@ export function useMyBookingsDriver(
         if (status === 400) return;
         console.error('handleShareStop error:', err);
       } finally {
-        await queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
+        await invalidateDriverCaches();
       }
     },
-    [queryClient, userId]
+    [invalidateDriverCaches],
   );
 
   const driverShareConfirmedBookingId = useMemo(() => {
     if (!sharingRideId) return null;
-    const block = driverList.find((d) => d.ride.ride_id === sharingRideId);
+    const block = activeItems.find((d) => d.ride.ride_id === sharingRideId);
     return block?.passengers.find((p) => p.status === 'confirmed')?.bookingId ?? null;
-  }, [sharingRideId, driverList]);
+  }, [sharingRideId, activeItems]);
 
   useLocationBroadcast({
     rideId: sharingRideId,
@@ -138,15 +172,21 @@ export function useMyBookingsDriver(
     onStop: handleShareStop,
   });
 
-  const handleApprove = useCallback((bookingId: string) => {
-    if (!userId) return;
-    approveBookingMutation(bookingId);
-  }, [approveBookingMutation, userId]);
+  const handleApprove = useCallback(
+    (bookingId: string) => {
+      if (!userId) return;
+      approveBookingMutation(bookingId);
+    },
+    [approveBookingMutation, userId],
+  );
 
-  const handleReject = useCallback((bookingId: string) => {
-    if (!userId) return;
-    rejectBookingMutation(bookingId);
-  }, [rejectBookingMutation, userId]);
+  const handleReject = useCallback(
+    (bookingId: string) => {
+      if (!userId) return;
+      rejectBookingMutation(bookingId);
+    },
+    [rejectBookingMutation, userId],
+  );
 
   const confirmCancelRide = useCallback(async () => {
     if (rideToCancel == null) return;
@@ -154,25 +194,21 @@ export function useMyBookingsDriver(
     setError('');
     try {
       await cancelRide(rideToCancel);
-      queryClient.setQueryData(
-        qk.bookings.driver(userId),
-        (old: DriverBookingItem[] = []) =>
-          old.map((item) =>
-            item.ride.ride_id === rideToCancel
-              ? { ...item, ride: { ...item.ride, status: 'cancelled' } }
-              : item
-          )
-      );
+      await invalidateDriverCaches();
       if (sharingRideId === rideToCancel) setSharingRideId(null);
       setLiveRideId((prev) => (prev === rideToCancel ? null : prev));
       setRideToCancel(null);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, apiErr('err_cancel_ride')));
-      await queryClient.invalidateQueries({ queryKey: qk.bookings.driver(userId) });
+      await invalidateDriverCaches();
     } finally {
       setCancellingRide(false);
     }
-  }, [rideToCancel, sharingRideId, queryClient, userId, setError]);
+  }, [rideToCancel, sharingRideId, invalidateDriverCaches, setError]);
+
+  const fetchMoreDriverHistory = useCallback(() => {
+    if (hasNextDriverHistory) void fetchNextDriverHistory();
+  }, [fetchNextDriverHistory, hasNextDriverHistory]);
 
   const actionBookingIdForUi =
     driverStatus.kind === 'action'
@@ -182,8 +218,12 @@ export function useMyBookingsDriver(
         : null;
 
   return {
-    driverList,
+    activeItems,
+    historyItems,
     driverLoading,
+    fetchMoreDriverHistory,
+    hasMoreDriverHistory: hasNextDriverHistory ?? false,
+    isFetchingDriverHistory: historyQuery.isFetchingNextPage,
     sharingRideId,
     setSharingRideId,
     liveRideId,

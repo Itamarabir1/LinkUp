@@ -13,13 +13,13 @@ import type { DriverSummaryInfo } from './driverSummaryInfo';
 export interface PassengerBookingSummaryItem {
   booking_id: string;
   booking_status: BookingStatus;
-  ride_id: string;
-  origin_name: string | null;
-  destination_name: string | null;
   departure_time: string;
+  destination_name: string | null;
+  driver?: DriverSummaryInfo | null;
   estimated_arrival_time: string | null;
-  ride_status: string;
   group_id?: string | null;
   group_name?: string | null;
-  driver?: DriverSummaryInfo | null;
+  origin_name: string | null;
+  ride_id: string;
+  ride_status: string;
 }

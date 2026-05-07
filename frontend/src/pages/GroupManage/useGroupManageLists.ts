@@ -38,8 +38,8 @@ export function useGroupManageLists(
     setLoadingRides(true);
     setError('');
     try {
-      const list = await getGroupRides(groupId);
-      setRides(Array.isArray(list) ? list : []);
+      const page = await getGroupRides(groupId, { limit: 20 });
+      setRides(Array.isArray(page.rides) ? page.rides : []);
     } catch (err) {
       setError(getApiErrorMessage(err, apiErr('err_load_group_rides')));
       setRides([]);

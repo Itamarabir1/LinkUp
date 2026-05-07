@@ -6,12 +6,12 @@
  */
 
 export interface UserOut {
-  user_id: string;
-  full_name: string;
-  email: string;
-  phone_number: string;
-  is_verified: boolean;
   avatar_key?: string | null;
   /** Backward-compatible medium avatar URL (400x400). */
   readonly avatar_url: string | null;
+  email: string;
+  full_name: string;
+  is_verified: boolean;
+  phone_number: string;
+  user_id: string;
 }

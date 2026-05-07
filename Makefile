@@ -1,4 +1,4 @@
-.PHONY: render-pgbouncer-userlist up down build logs ps restart migrate admin-check admin-grant admin-revoke
+.PHONY: render-pgbouncer-userlist up down build logs ps restart migrate admin-check admin-grant admin-revoke openapi
 
 # Secrets and DB/Redis/RabbitMQ passwords: single source of truth — backend/.env
 COMPOSE=docker compose --env-file backend/.env
@@ -41,3 +41,8 @@ admin-revoke: ## Revoke admin by email: make admin-revoke EMAIL=user@example.com
 	@test -n "$(EMAIL)" || (echo "ERROR: EMAIL is required. Usage: make admin-revoke EMAIL=user@example.com"; exit 1)
 	$(COMPOSE) exec -T db sh -lc 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -v ON_ERROR_STOP=1 -c "UPDATE users SET is_admin = FALSE WHERE lower(email)=lower('\''$(EMAIL)'\'' );"'
 	$(MAKE) admin-check EMAIL="$(EMAIL)"
+
+openapi: ## Export OpenAPI schema from FastAPI and regenerate the frontend client
+	cd backend && uv run python scripts/export_openapi.py --out ../frontend/openapi-snapshot.json
+	cd frontend && npm run gen:api
+	@echo "Done. Review changes in frontend/src/api/generated/ and commit them."

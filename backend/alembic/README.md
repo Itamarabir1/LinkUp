@@ -11,7 +11,7 @@ cd backend
 uv run alembic upgrade head
 ```
 
-אותו מהלך מתוך ה-root של הפרויקט אחרי התקנה ב־`backend/.venv`/uv. פועל על DB ריק או מתקדם בין רוויזיות (מציב head אחיד אחרי **`016_merge015_heads`**).
+אותו מהלך מתוך ה-root של הפרויקט אחרי התקנה ב־`backend/.venv`/uv. פועל על DB ריק או מתקדם בין רוויזיות. **019_booking_lifecycle_enum** מוסיף ל־PostgreSQL את **`en_route`**, **`arrived`**, **`trip_in_progress`** ב־**`booking_status`** (יישור עם `BookingStatus` ב-Python; נדרש ל־`IN (...)` וביטול בקשת נוסע ב-bulk).
 
 ## אם ה-DB כבר מכיל מיגרציות ישנות
 

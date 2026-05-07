@@ -28,8 +28,8 @@ export function useChatNotificationsFeed(
   } = useQuery({
     queryKey: qk.notifications.all(),
     queryFn: async () => {
-      const { data } = await fetchMyNotifications();
-      return Array.isArray(data) ? data : [];
+      const { data } = await fetchMyNotifications({ limit: 20 });
+      return Array.isArray(data.items) ? data.items : [];
     },
     enabled: !!userId,
     staleTime: 0,

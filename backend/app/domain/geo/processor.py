@@ -5,6 +5,7 @@ from datetime import datetime
 from app.core.exceptions.validation import InvalidLocationError
 from app.domain.geo.schema import GeoLocation, RouteOptionData
 from app.infrastructure.geo.client import geo_client
+from app.infrastructure.geo.geocode_cache import get_coordinates
 from app.infrastructure.geo.geocoding import GeocodingService
 
 logger = logging.getLogger(__name__)
@@ -37,13 +38,14 @@ async def get_full_routing_data(
     """
     Orchestrate external directions API and map results to domain route DTOs.
     """
-    # 1. Coordinates from GeocodingService
-    lat_o, lon_o = await GeocodingService.get_coordinates_from_address(origin_name)
-    lat_d, lon_d = await GeocodingService.get_coordinates_from_address(dest_name)
-
-    if lat_o is None or lat_d is None:
+    # 1. Coordinates via Redis-backed cache (+ stampede protection on miss)
+    origin_coords = await get_coordinates(origin_name)
+    dest_coords = await get_coordinates(dest_name)
+    if origin_coords is None or dest_coords is None:
         logger.warning(f"Could not find coordinates for: {origin_name} or {dest_name}")
         return None
+    lat_o, lon_o = origin_coords
+    lat_d, lon_d = dest_coords
 
     # 2. Up to 3 routes from GeoClient / Directions (1–3 as returned)
     raw_routes = await geo_client.fetch_raw_routes((lat_o, lon_o), (lat_d, lon_d), departure_time)

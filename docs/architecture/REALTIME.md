@@ -106,7 +106,7 @@ Payload של הודעה חדשה מה-WS (ללא שדה `type` של typing/prese
 
 ## התראות in-app (רשימה + רענון בזמן אמת)
 
-- **REST — מקור הרשימה:** **`GET /api/v1/users/me/notifications`** (ראו [`API.md`](API.md)). בפרונט — **`useChatNotificationsFeed`** עם React Query ו־**refetch** כל **~5 דקות**.
+- **REST — מקור הרשימה:** **`GET /api/v1/users/me/notifications`** (ראו [`API.md`](API.md)) עם cursor pagination (`limit`, `after`, `next_cursor`, `has_more`). בפרונט: מסך התראות ב-`useInfiniteQuery`; באדג'ים ב-`useChatNotificationsFeed` על עמוד ראשון (`limit=20`) עם **refetch** כל ~5 דקות.
 - **אין** כרגע WebSocket ייעודי ב-FastAPI ל־`/api/v1/notifications/ws` — הקובץ [`app/domain/notifications/router.py`](../../backend/app/domain/notifications/router.py) ריק ולא נרשם ב־[`api_router.py`](../../backend/app/api/v1/api_router.py).
 - **דחיפת רענון (סיכום):** אותו ערוץ **`user:{user_id}:events`**. תבנית **`invalidate`** לרענון UI (התראות + unread); תבנית **`UserEvent`** מ־`publish_user_event`. פירוט מלא בפסקה על Redis DB1 למעלה; polling ל-REST נשאר גיבוי.
 

@@ -6,16 +6,16 @@
  */
 
 export interface GroupOut {
-  group_id: string;
-  name: string;
-  invite_code: string;
   admin_id: string;
+  avatar_key?: string | null;
+  readonly avatar_url: string | null;
+  created_at: string;
+  description?: string | null;
+  group_id: string;
+  invite_code: string;
+  invite_expires_at: string | null;
   is_active: boolean;
   max_members: number | null;
-  invite_expires_at: string | null;
-  created_at: string;
   member_count?: number | null;
-  avatar_key?: string | null;
-  description?: string | null;
-  readonly avatar_url: string | null;
+  name: string;
 }

@@ -1,6 +1,12 @@
 import { api } from './client';
+import type { RideManifestResponse } from './generated/types/rideManifestResponse';
 import type { BookingRow } from '../pages/MyBookings/myBookings.types';
-import type { DriverSummaryResponse, PassengerSummaryResponse } from '../types/api';
+import type {
+  DriverActiveResponse,
+  DriverHistoryResponse,
+  PassengerActiveResponse,
+  PassengerHistoryResponse,
+} from '../types/api';
 
 export function fetchMyBookings(limit = 50, status?: string) {
   return api.get<BookingRow[]>('/bookings/my-bookings', {
@@ -8,12 +14,24 @@ export function fetchMyBookings(limit = 50, status?: string) {
   });
 }
 
-export function fetchDriverSummary() {
-  return api.get<DriverSummaryResponse>('/bookings/driver-summary');
+export function fetchDriverActive() {
+  return api.get<DriverActiveResponse>('/bookings/driver-summary/active');
 }
 
-export function fetchPassengerSummary() {
-  return api.get<PassengerSummaryResponse>('/bookings/passenger-summary');
+export function fetchDriverHistory(params?: { limit?: number; after?: string | null }) {
+  return api.get<DriverHistoryResponse>('/bookings/driver-summary/history', {
+    params: { limit: params?.limit ?? 20, after: params?.after || undefined },
+  });
+}
+
+export function fetchPassengerActive() {
+  return api.get<PassengerActiveResponse>('/bookings/passenger-summary/active');
+}
+
+export function fetchPassengerHistory(params?: { limit?: number; after?: string | null }) {
+  return api.get<PassengerHistoryResponse>('/bookings/passenger-summary/history', {
+    params: { limit: params?.limit ?? 20, after: params?.after || undefined },
+  });
 }
 
 export type RideManifestPassenger = {
@@ -27,7 +45,7 @@ export type RideManifestPassenger = {
 };
 
 export function fetchRideManifest(rideId: string) {
-  return api.get<{ passengers: RideManifestPassenger[] }>(`/bookings/ride/${rideId}/manifest`);
+  return api.get<RideManifestResponse>(`/bookings/ride/${rideId}/manifest`);
 }
 
 export function approveBooking(bookingId: string) {

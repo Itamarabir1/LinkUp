@@ -6,9 +6,6 @@
  */
 import type { RideWithPassengersItem } from './rideWithPassengersItem';
 
-/**
- * Aggregated driver view: all rides with passengers embedded.
- */
-export interface DriverSummaryResponse {
+export interface DriverActiveResponse {
   rides: RideWithPassengersItem[];
 }

@@ -15,7 +15,7 @@ depends_on = None
 
 def upgrade() -> None:
     # bookings.request_id -- HIGH risk
-    # Used in: determine_passenger_request_status, cancel_all_bookings_for_request
+    # Used in: determine_passenger_request_status, bulk_cancel_bookings_for_request (e.g. PassengerService.cancel_request)
     op.create_index(
         "idx_bookings_request_id",
         "bookings",

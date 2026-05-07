@@ -9,10 +9,10 @@
  * Response with presigned URL for avatar upload.
  */
 export interface AvatarUploadUrlResponse {
-  /** Presigned URL for direct upload to S3 */
-  upload_url: string;
-  /** Staging key for confirm step */
-  staging_key: string;
   /** URL TTL in seconds */
   expires_in?: number;
+  /** Staging key for confirm step */
+  staging_key: string;
+  /** Presigned URL for direct upload to S3 */
+  upload_url: string;
 }

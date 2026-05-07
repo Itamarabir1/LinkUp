@@ -27,13 +27,17 @@ departure_time?: string | null;
  */
 departure_time_to?: string | null;
 /**
+ * רדיוס יעד בקילומטרים (אופציונלי)
+ */
+destination_radius?: number | null;
+/**
  * כמות תוצאות
  * @minimum 1
  * @maximum 50
  */
 limit?: number;
 /**
- * cursor: ride_id להמשך
+ * opaque cursor
  */
 after?: string | null;
 group_id?: string | null;

@@ -89,7 +89,7 @@
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
-| Cache, rate limit, pub/sub, denylist, idempotency | שימושים: geocode cache (**כולל mutex/stampede** — [`cache_stampede.py`](../../backend/app/infrastructure/redis/cache_stampede.py), [`FEATURE_DECISIONS.md`](../FEATURE_DECISIONS.md#geocode-cache-stampede)), ride preview, OTP, auth rate limit, **JWT denylist (`denylist:{jti}`)**, **Idempotency-Key** ל־**`request-ride-from-search`** ול־**POST הודעת צ’אט** (`SET NX`, fingerprint), broadcast, צ’אט — מסוכמים ב-ADR §18–**§19**, **§25**, Frontend ADR §2, ובהיילייטס §2–3, **§7ד**, **§7ה**. **פרונט:** **`useJoinRide`** (ref); **`useMessageThread`** / **`useChatPopup`** + **`ChatListRow`** + **`applyInboundRealMessage`** / **`appendMessageDedupById`**. |
+| Cache, rate limit, pub/sub, denylist, idempotency | שימושים: geocode cache (**כולל mutex/stampede** — [`cache_stampede.py`](../../backend/app/infrastructure/redis/cache_stampede.py), [`FEATURE_DECISIONS.md`](../FEATURE_DECISIONS.md#geocode-cache-stampede)); **זוג קואורדינטות ב-preview נסיעה** עובר ב־[**`processor.get_full_routing_data`**](../../backend/app/domain/geo/processor.py) דרך **`get_coordinates`** (ראו גם **`#geo-manifest-passenger-reads`**); Redis ל־**ride preview payload** שלב 1→2; OTP; auth rate limit; **JWT denylist (`denylist:{jti}`)**; **Idempotency-Key** ל־**`request-ride-from-search`** ול־**POST הודעת צ’אט** (`SET NX`, fingerprint); broadcast; צ’אט — מסוכמים ב-ADR §18–**§19**, **§25**, Frontend ADR §2, ובהיילייטס §2–3, **§7ד**, **§7ה**. **פרונט:** **`useJoinRide`** (ref); **`useMessageThread`** / **`useChatPopup`** + **`ChatListRow`** + **`applyInboundRealMessage`** / **`appendMessageDedupById`**; **`useMyRequests`** — pagination **`/passengers/me`**. |
 
 ---
 

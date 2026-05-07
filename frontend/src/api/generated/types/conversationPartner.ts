@@ -9,7 +9,7 @@
  * Minimal partner profile for conversation lists.
  */
 export interface ConversationPartner {
-  user_id: string;
-  full_name: string;
   avatar_url?: string | null;
+  full_name: string;
+  user_id: string;
 }

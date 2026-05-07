@@ -32,5 +32,6 @@
   ,"requestsCount": "{count, plural, one {# request} other {# requests}}"
   ,"approvedCount": "{count, plural, one {# approved} other {# approved}}"
   ,"pickup": "Pickup"
-  ,"dropoff": "Dropoff"
+  ,"dropoff": "Dropoff",
+  "loadMoreHistory": "Load more"
 }

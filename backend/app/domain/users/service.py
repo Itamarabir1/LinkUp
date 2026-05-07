@@ -4,7 +4,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # 1. Core, Security & Exceptions
 from app.core.exceptions.auth import PermissionDeniedError
-from app.core.exceptions.infrastructure import S3DeleteFailed
 from app.core.exceptions.user import (
     EmailAlreadyRegisteredError,
     UserNotFoundError,
@@ -87,7 +86,8 @@ class UserService:
 
     async def remove_avatar(self, db: AsyncSession, user_id) -> None:
         """
-        Remove profile photo: delete avatars/{user_id}/ on S3 and clear avatar_key in DB.
+        Clear avatar in DB and publish user.avatar_remove to the outbox (same transaction).
+        S3 deletion under avatars/{user_id}/ runs asynchronously in task-worker (avatar queue).
         No-op if already empty.
         """
         user = await self.get_user_by_id(db, user_id=user_id)
@@ -96,11 +96,6 @@ class UserService:
             await db.commit()
             logger.info("Avatar already empty for user %s", user_id)
             return
-
-        try:
-            await self.s3.delete_user_avatar_folder(user.user_id)
-        except S3DeleteFailed as e:
-            logger.warning("Could not delete avatar folder for user %s: %s", user_id, e.message)
 
         await self.crud.update(
             db,
@@ -111,8 +106,9 @@ class UserService:
                 "avatar_status": "none",
             },
         )
+        await publish_to_outbox(db, "user.avatar_remove", {"user_id": str(user.user_id)})
         await db.commit()
-        logger.info("Avatar removed for user %s", user_id)
+        logger.info("Avatar removed for user %s (outbox user.avatar_remove)", user_id)
 
     async def update_user_location(self, db: AsyncSession, user_id: int, lat: float, lon: float) -> bool:
         if not (-90 <= lat <= 90) or not (-180 <= lon <= 180) or (lat == 0 and lon == 0):

@@ -11,7 +11,7 @@ from uuid import UUID
 
 from app.core.config import settings
 from app.core.exceptions.infrastructure import S3DeleteFailed
-from app.infrastructure.s3.client import s3_client
+from app.infrastructure.s3.client import S3_DELETE_OBJECTS_MAX_KEYS, s3_client
 
 logger = logging.getLogger(__name__)
 
@@ -47,15 +47,33 @@ class StorageService:
         return presigned_url, staging_key
 
     async def list_and_delete_prefix(self, prefix: str) -> None:
-        """Deletes all objects under the given prefix."""
-        keys = await self.client.list_objects_by_prefix(prefix)
-        for key in keys:
-            try:
-                await self.client.delete_object(key)
-                logger.info("S3 deleted: key=%s", key)
-            except Exception as e:
-                logger.error("S3 delete failed for key=%s: %s", key, e, exc_info=True)
-                raise S3DeleteFailed() from e
+        """Deletes all objects under prefix using streamed listing and DeleteObjects batches."""
+        buf: list[str] = []
+        total_deleted = 0
+        batches = 0
+        try:
+            async for key in self.client.iter_prefix_keys(prefix):
+                buf.append(key)
+                if len(buf) >= S3_DELETE_OBJECTS_MAX_KEYS:
+                    await self.client.delete_object_keys_batch(buf)
+                    batches += 1
+                    total_deleted += len(buf)
+                    buf.clear()
+            if buf:
+                await self.client.delete_object_keys_batch(buf)
+                batches += 1
+                total_deleted += len(buf)
+            logger.info(
+                "S3 prefix delete complete: prefix=%s batches=%s deleted_total=%s",
+                prefix,
+                batches,
+                total_deleted,
+            )
+        except S3DeleteFailed:
+            raise
+        except Exception as e:
+            logger.error("S3 prefix delete failed prefix=%s: %s", prefix, e, exc_info=True)
+            raise S3DeleteFailed() from e
 
     async def delete_avatar_prefix(self, prefix: str) -> None:
         """Deletes all objects under the given prefix (legacy avatar version cleanup)."""

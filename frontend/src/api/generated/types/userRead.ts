@@ -6,16 +6,16 @@
  */
 
 export interface UserRead {
-  user_id: string;
-  full_name: string;
-  phone_number: string;
-  email?: string | null;
   avatar_key?: string | null;
   avatar_status?: string;
-  is_verified?: boolean;
-  is_admin?: boolean;
-  /** 150x150 — chat lists, small avatars. */
-  readonly avatar_url_small: string | null;
   /** 400x400 — main profile image. */
   readonly avatar_url_medium: string | null;
+  /** 150x150 — chat lists, small avatars. */
+  readonly avatar_url_small: string | null;
+  email?: string | null;
+  full_name: string;
+  is_admin?: boolean;
+  is_verified?: boolean;
+  phone_number: string;
+  user_id: string;
 }

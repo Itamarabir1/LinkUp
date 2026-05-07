@@ -11,13 +11,13 @@ import type { ConversationTurn } from './conversationTurn';
  */
 export interface AISearchQuery {
   /**
-     * @minLength 1
-     * @maxLength 400
-     */
-  query: string;
-  /**
      * Previous turns for context (max 6)
      * @maxItems 6
      */
   conversation_history?: ConversationTurn[];
+  /**
+     * @minLength 1
+     * @maxLength 400
+     */
+  query: string;
 }

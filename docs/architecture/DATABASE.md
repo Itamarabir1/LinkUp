@@ -8,6 +8,7 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 
 - **Driver**: asyncpg (`postgresql+asyncpg://`).
 - **Connection**: `backend/app/db/session.py` — `get_db()` מחזיר AsyncSession.
+- **רשימות נסיעות (נהג / קבוצה):** `get_by_driver_id` / `get_by_group_id` מגבילות ל־**200** שורות במיון `departure_time DESC` (קבוע `_RIDES_HARD_LIMIT` ב־`rides/crud.py`); ראו **`docs/architecture/API.md`** ל־`/rides/me` ו־`/groups/{id}/rides`.
 - **מדיה (קשר ל-S3, לא עמודה נפרדת):** שדות `avatar_key` ב-`users` / `groups` מחזיקים prefix או מפתח אובייקט ב-bucket; ה-API בונה URL ציבורי — עם **`CLOUDFRONT_DOMAIN`** (ראו `app/core/config.py`, `app/infrastructure/s3/service.py`) או presigned. פירוט תהליך אווטאר גרסתי: `ARCHITECTURE.md` (Features), `docs/ENGINEERING_HIGHLIGHTS.md` (סעיף 12).
 
 ---
@@ -25,6 +26,7 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | pool_recycle | `DB_POOL_RECYCLE` (default 1800s) | מחזור חיבורים (למניעת חיבורים “מתים” אצל שרת ה-DB) |
 | pool_pre_ping | True (קוד) | בודק חיבור לפני שימוש (מונע חיבורים מתים) |
 | connect_args.statement_cache_size | 0 (קוד) | תאימות asyncpg עם PgBouncer במצב transaction pooling |
+| statement_timeout (layered) | `DB_STATEMENT_TIMEOUT_MS` ב-`connect_args.server_settings` (`app/db/session.py`) + migration **`017_set_statement_timeout`** ceiling | **ערך אופרטיבי ברמת session** מהאפליקציה (תלוי `.env`, ברירת מחדל 30s); **ceiling דיפנסיבי קשיח של 60s** ברמת role (literal — דטרמיניסטי בלי תלות runtime). הגבלת זמן לשאילתה ברמת Postgres לפני Gunicorn timeout. |
 
 ### PgBouncer (runtime layer)
 
@@ -151,8 +153,8 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | שדה | טיפוס | הערות |
 |-----|--------|--------|
 | ride_id | UUID PK | |
-| driver_id | UUID FK users NOT NULL | index (004) |
-| group_id | UUID FK groups | index (004), nullable |
+| driver_id | UUID FK users NOT NULL | btree מורכב עם `departure_time` — **018** (`idx_rides_driver_departure`; הוסר `idx_rides_driver_id` מ־**004**) |
+| group_id | UUID FK groups | btree מורכב חלקי עם `departure_time` — **018** (`idx_rides_group_departure`; הוסר `idx_rides_group_id` מ־**004**), nullable |
 | departure_time | TIMESTAMPTZ NOT NULL | |
 | estimated_arrival_time | TIMESTAMPTZ | |
 | origin_name, destination_name | VARCHAR(255) | |
@@ -196,14 +198,17 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | request_id | UUID FK passenger_requests | |
 | num_seats | INTEGER NOT NULL | |
 | pickup_name, pickup_point, pickup_time | VARCHAR/GEOGRAPHY/TIMESTAMPTZ | |
-| status | booking_status ENUM NOT NULL | pending_approval, confirmed, rejected, cancelled, completed — index (004) |
+| status | booking_status ENUM NOT NULL | pending_approval, confirmed, rejected, cancelled, completed, **en_route**, **arrived**, **trip_in_progress** (השלוש האחרונים — מיגרציה **019**; מחזור נסיעה; אינדקס 004) |
 | created_at, updated_at | TIMESTAMPTZ | |
 | UNIQUE(ride_id, passenger_id) | | |
 
 **קריאות מאוגדות (מסך “הזמנות שלי”):**
 
-- **נהג:** `GET /bookings/driver-summary` — `select(Ride)` עם `joinedload` ל־`Ride.bookings` → `Booking.passenger_request` → `PassengerRequest.user`, ול־`Ride.group`; על ישות `Booking` בטעינה מוחלת **`with_loader_criteria`** כך שרק הזמנות בסטטוס **pending_approval** ו־**confirmed** נטענות לקולקציה (מימוש: [`get_driver_rides_with_passengers`](../../backend/app/domain/bookings/crud.py)).
-- **נוסע:** `GET /bookings/passenger-summary` — `select(Booking)` עם `join` ל־`Ride`, `joinedload` ל־`ride.driver` ו־`ride.group`, מיון לפי `Ride.departure_time` ([`get_passenger_bookings_with_rides`](../../backend/app/domain/bookings/crud.py)).
+- **נהג — פעיל:** `GET /bookings/driver-summary/active` — [`get_driver_active_rides`](../../backend/app/domain/bookings/crud.py): רק נסיעות **`open` / `full` / `active`**; `with_loader_criteria` כולל גם סטטוסי **מחזור נסיעה** (`en_route`, `arrived`, `trip_in_progress`); מיון `departure_time ASC`; **`LIMIT 200`**.
+- **נהג — היסטוריה:** `GET /bookings/driver-summary/history` — [`get_driver_history_rides`](../../backend/app/domain/bookings/crud.py): נסיעות **`completed` / `cancelled`**; אותם joins; **`with_loader_criteria`** על **confirmed, cancelled, completed, rejected** כדי שיופיעו נוסעים גם אחרי סיום/ביטול; מיון **`departure_time DESC, ride_id DESC`**; דפדוף `limit+1` + תנאי קורסור על `(departure_time, ride_id)`.
+- **נוסע — פעיל:** `GET /bookings/passenger-summary/active` — [`get_passenger_active_bookings`](../../backend/app/domain/bookings/crud.py): הזמנות פעילות (כולל מחזור נסיעה); **`LIMIT 200`**.
+- **נוסע — היסטוריה:** `GET /bookings/passenger-summary/history` — [`get_passenger_history_bookings`](../../backend/app/domain/bookings/crud.py): סטטוסים טרמינליים; מיון **`Ride.departure_time DESC, booking_id DESC`**; דפדוף `limit+1` + קורסור.
+- **קוד קורסור משותף (UTC):** [`core/pagination/cursor.py`](../../backend/app/core/pagination/cursor.py) משמש bookings/chat/rides/passengers עם payload אטום ו-normalization ל-UTC.
 
 ### conversations
 
@@ -298,8 +303,8 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 
 | טבלה | שדות | שם Index | סיבה |
 |------|------|----------|--------|
-| rides | driver_id | idx_rides_driver_id | נסיעות שלי כנהג, WHERE driver_id |
-| rides | group_id | idx_rides_group_id | נסיעות לפי קבוצה |
+| rides | driver_id, departure_time | idx_rides_driver_departure (DESC על `departure_time`) | רשימת נהג + מיון זמן יציאה; מחליף את `idx_rides_driver_id` (מיגרציה **018**) |
+| rides | group_id, departure_time | idx_rides_group_departure (DESC; **WHERE group_id IS NOT NULL**) | נסיעות לפי קבוצה + מיון; מחליף את `idx_rides_group_id` (**018**) |
 | rides | status | idx_rides_status | סינון לפי סטטוס |
 | rides | departure_time, status | idx_ride_time_status | ORDER BY departure_time + WHERE status |
 | bookings | ride_id | idx_bookings_ride | הזמנות לנסיעה |
@@ -332,6 +337,10 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 | 015_add_audit_log | טבלת `audit_log` (אדמין + ניסיונות webhook billing) | 2026-04-26 |
 | 015_billing_idem (`015_billing_idempotency_and_indexes.py`) | טבלת `idempotency_keys` + אינדקס חלקי `idx_payments_status_created` על `payments` | 2026-05-01 |
 | 016_merge015_heads (`016_merge_015_audit_and_billing_heads.py`) | merge revision — מאחד את **`015_add_audit_log`** ו־**`015_billing_idem`** (אין שינוי סכמה) | 2026-05-01 |
+| 017_set_statement_timeout (`017_set_statement_timeout.py`) | **Ceiling דיפנסיבי קשיח של 60000ms** ברמת role (`ALTER ROLE CURRENT_USER`) — literal, ללא תלות ב-`settings`; ערך אופרטיבי תחת ה-ceiling מוחל ברמת session דרך `connect_args.server_settings` ב-`app/db/session.py` (מ-`DB_STATEMENT_TIMEOUT_MS`, ברירת מחדל 30s). | 2026-05-06 |
+| 018_rides_composite_indexes (`018_rides_composite_indexes.py`) | אינדקסים `idx_rides_driver_departure`, `idx_rides_group_departure` (חלקי); מחיקת `idx_rides_driver_id` / `idx_rides_group_id` כפולים | 2026-05-06 |
+| 019_booking_lifecycle_enum (`019_booking_lifecycle_enum.py`) | הוספת **`en_route`**, **`arrived`**, **`trip_in_progress`** ל־enum **`booking_status`** — תואם ל־`BookingStatus` בקוד ול־`IN (...)` queries (סיכול bulk ביטול בקשה + צינור קריאות פעילות) | 2026-05-06 |
+| 020_conversation_last_message_at (`020_add_conversations_last_message_at.py`) | הוספת `conversations.last_message_at`, backfill מ־`MAX(messages.created_at)` (fallback ל־`conversations.created_at`) ואינדקס `idx_conversations_last_message_at` | 2026-05-07 |
 
 **הערת Alembic:** רוויזיות **`015_add_audit_log`** ו־**`015_billing_idem`** מתפצלות מ־**014**; המיזוג הוא **`016_merge015_heads`** בקובץ **`016_merge_015_audit_and_billing_heads.py`** (מזהי רוויזיה חייבים להתאים ל־`VARCHAR(32)` בטבלת **`alembic_version`** — לכן הסט מקוצר עבור מיגרציית האידמפוטנטיות).
 
@@ -365,8 +374,9 @@ conversations ◄── messages (conversation_id), chat_analysis (conversation_
 |--------|------|--------|
 | approve_booking | rides | נעילת נסיעה לפני עדכון מושבים וסטטוס — מונע double-approve ו-overbooking |
 | cancel_booking | rides | נעילת נסיעה לפני החזרת סטטוס ל-OPEN ושחרור מושבים — מונע race עם approve |
+| **Passenger cancel request** (`bulk_cancel_bookings_for_request`) | rides | לפני החזרת מושבים לבקשה (סטטוסים שתפסו מושב: confirmed / en_route / arrived / trip_in_progress) — `SELECT ride_id ... WITH FOR UPDATE` על כל הנסיעות המושפעות, ואז `UPDATE rides` פר־נסיעה |
 
-מימוש: `get_ride_for_update(db, ride_id)` ב-`bookings/crud.py` משתמש ב־`AsyncSession` ומבצע `select(Ride).with_for_update()` כדי לנעול את שורת הנסיעה. ה-service קורא ל-crud זה לפני שינוי booking/ride.
+מימוש: `get_ride_for_update(db, ride_id)` ב-`bookings/crud.py` משתמש ב־`AsyncSession` ומבצע `select(Ride).with_for_update()` כדי לנעול את שורת הנסיעה. ה-service קורא ל-crud זה לפני שינוי booking/ride. **`bulk_cancel_bookings_for_request`** נועל את שורות **`rides`** לפני עדכון `available_seats` כשמבטלים בקשת נוסע (`DELETE …/passengers/{id}/cancel`).
 
 ---
 
@@ -374,6 +384,7 @@ conversations ◄── messages (conversation_id), chat_analysis (conversation_
 
 No automated EXPLAIN ANALYZE pipeline exists. Manual review recommended on heavy paths (search, matching) using `pg_stat_statements` or Django-style query logging. דפוסי צמצום N+1 מתועדים ב-`ARCHITECTURE.md`:
 - **My Bookings** / `BookingReadsService` — `joinedload` + aggregate per screen.
-- **Chat inbox** / `get_inbox_aggregates` ([`backend/app/domain/chat/crud.py`](../../backend/app/domain/chat/crud.py)) — 3 `func.max` aggregate queries לכלל השיחות, מ-~3N ל-4 קריאות קבועות.
+- **Chat inbox** / `get_inbox_aggregates` ([`backend/app/domain/chat/crud.py`](../../backend/app/domain/chat/crud.py)) — 3 `func.max` aggregate queries **למזהי השיחות בעמוד הנוכחי** (לא לכל האינבוקס), יחד עם `list_conversations_paginated`; מ-~3N ל-**4 קריאות קבועות לעמוד**. מיון העמוד עצמו עובר דרך `COALESCE(conversations.last_message_at, conversations.created_at)` (ללא correlated `MAX(...)` על כל שורה).
+- **Bookings / groups read paths** — `get_user_bookings_with_relations` מוגבל ל-**100** שורות (פיד התראות נוסע); `cancel_ride_and_bookings` מרכז עדכון סטטוס `passenger_requests` אחרי ביטול; `get_member_counts_batch` לרשימת קבוצות — [`docs/FEATURE_DECISIONS.md#api-read-caps-batch-status`](../FEATURE_DECISIONS.md#api-read-caps-batch-status).
 
-פירוט: `docs/ENGINEERING_HIGHLIGHTS.md`, [`docs/FEATURE_DECISIONS.md#chat-inbox-n1`](../FEATURE_DECISIONS.md#chat-inbox-n1).
+פירוט: `docs/ENGINEERING_HIGHLIGHTS.md`, [`docs/FEATURE_DECISIONS.md#chat-inbox-n1`](../FEATURE_DECISIONS.md#chat-inbox-n1), [`#chat-inbox-cursor-pagination`](../FEATURE_DECISIONS.md#chat-inbox-cursor-pagination).

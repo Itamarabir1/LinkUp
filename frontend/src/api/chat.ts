@@ -2,7 +2,9 @@ import { api } from './client';
 import type {
   ConversationDetail,
   ConversationListItem,
+  MessageGapResponse,
   MessageResponse,
+  PaginatedConversationsResponse,
   PaginatedMessagesResponse,
 } from '../types/api';
 
@@ -13,16 +15,39 @@ export async function openChatByBooking(bookingId: string): Promise<Conversation
   return data;
 }
 
-export function listConversations() {
-  return api.get<ConversationListItem[]>('/chat/conversations');
+const DEFAULT_INBOX_LIMIT = 30;
+
+export async function listConversations(
+  params?: { limit?: number; after?: string },
+): Promise<PaginatedConversationsResponse> {
+  const limit = params?.limit ?? DEFAULT_INBOX_LIMIT;
+  const { data } = await api.get<PaginatedConversationsResponse>('/chat/conversations', {
+    params: {
+      limit,
+      ...(params?.after ? { after: params.after } : {}),
+    },
+  });
+  return {
+    items: data.items ?? [],
+    has_more: data.has_more ?? false,
+    next_cursor: data.next_cursor ?? null,
+  };
 }
+
+export const inboxPageSizeDefault = DEFAULT_INBOX_LIMIT;
 
 export function getConversation(conversationId: string) {
   return api.get<ConversationDetail>(`/chat/conversations/${conversationId}`);
 }
 
-export function getMessages(conversationId: string, params?: { limit?: number; before?: number; after?: number }) {
+export function getMessages(conversationId: string, params?: { limit?: number; after?: string }) {
   return api.get<PaginatedMessagesResponse>(`/chat/conversations/${conversationId}/messages`, { params });
+}
+
+export function getMessagesGap(conversationId: string, since_message_id: number) {
+  return api.get<MessageGapResponse>(`/chat/conversations/${conversationId}/messages/gap`, {
+    params: { since_message_id },
+  });
 }
 
 export function sendMessage(conversationId: string, body: string, idempotencyKey?: string) {

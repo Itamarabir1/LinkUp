@@ -203,6 +203,21 @@ class PassengerService:
             d_lat, d_lon = dest_coords
 
             radius = _radius_km_to_meters(getattr(search_data, "search_radius", None) or getattr(search_data, "radius", _DEFAULT_SEARCH_RADIUS_KM))
+            destination_radius_m = (
+                _radius_km_to_meters(search_data.destination_radius)
+                if search_data.destination_radius is not None
+                else None
+            )
+            after_tuple: tuple[datetime, UUID] | None = None
+            if search_data.after:
+                try:
+                    after_tuple = decode_cursor(search_data.after)
+                except CursorDecodeError as e:
+                    raise LinkUpError(
+                        message="מסמן עמוד חיפוש לא תקין",
+                        status_code=422,
+                        error_code="INVALID_SEARCH_CURSOR",
+                    ) from e
 
             day_s = day_e = None
             range_s = range_e = None
@@ -221,7 +236,8 @@ class PassengerService:
                 d_lon,
                 radius,
                 limit=search_data.limit,
-                after_ride_id=search_data.after,
+                after=after_tuple,
+                destination_radius_m=destination_radius_m,
                 departure_day_start_utc=day_s,
                 departure_day_end_exclusive_utc=day_e,
                 departure_range_start=range_s,
@@ -233,7 +249,10 @@ class PassengerService:
             items = []
             for ride, booking_status in matches:
                 items.append(RideMapper.to_response(ride, user_booking_status=booking_status))
-            next_cursor = str(items[-1].ride_id) if has_more and items else None
+            next_cursor = None
+            if has_more and items:
+                last_ride = items[-1]
+                next_cursor = encode_cursor(last_ride.departure_time, last_ride.ride_id)
             return RideSearchResponse(
                 items=items,
                 next_cursor=next_cursor,

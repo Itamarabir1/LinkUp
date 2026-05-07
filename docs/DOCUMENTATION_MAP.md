@@ -12,12 +12,17 @@
 | פריסת production, rollback | [`docs/DEPLOYMENT.md`](DEPLOYMENT.md), [`docs/operations/RUNBOOK.md`](operations/RUNBOOK.md) |
 | ניתור, Prometheus, בריאות, Sentry, Better Stack | [`docs/operations/MONITORING.md`](operations/MONITORING.md) (כולל טבלאות מטריקות והערות **wired vs reserved**), [`docs/architecture/API.md`](architecture/API.md) (Health) |
 | API endpoints | [`docs/architecture/API.md`](architecture/API.md) |
+| cursor pagination לרכיבות (`/rides/me`, `/groups/{group_id}/rides`) | [`docs/architecture/API.md`](architecture/API.md), [`docs/architecture/DATABASE.md`](architecture/DATABASE.md), [`backend/app/core/pagination/cursor.py`](../backend/app/core/pagination/cursor.py) |
 | סכימת DB, Alembic | [`docs/architecture/DATABASE.md`](architecture/DATABASE.md), [`backend/alembic/README.md`](../backend/alembic/README.md) |
 | Outbox, RabbitMQ, DLQ | [`docs/architecture/EVENTS.md`](architecture/EVENTS.md) |
 | צ’אט / WS / Redis | [`docs/architecture/REALTIME.md`](architecture/REALTIME.md), [`chat-ws/ARCHITECTURE.md`](../chat-ws/ARCHITECTURE.md) |
+| רשימת שיחות (אינבוקס, cursor) | [`docs/architecture/API.md`](architecture/API.md) (`GET /chat/conversations`), [`docs/FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#chat-inbox-cursor-pagination) |
 | סיכום שיחה (Groq), `task-worker` מול `ai-worker` | [`docs/architecture/AI.md`](architecture/AI.md) |
 | התראות, FCM, Brevo | [`docs/architecture/NOTIFICATIONS.md`](architecture/NOTIFICATIONS.md), [`docs/FCM_SYSTEM_SUMMARY.md`](FCM_SYSTEM_SUMMARY.md) |
 | Billing, Stripe, idempotency | [`docs/BILLING_REFACTOR_SUMMARY.md`](BILLING_REFACTOR_SUMMARY.md), [`docs/FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md) |
+| S3 — מחיקת prefix (DeleteObjects batches) + אווטאר async (outbox) | [`docs/architecture/STORAGE.md`](architecture/STORAGE.md), [`docs/FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#s3-delete-objects-avatar-async) |
+| תקרות קריאות API (התראות, נוסע, קבוצות) + batch אחרי ביטול נסיעה | [`docs/FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#api-read-caps-batch-status), [`docs/architecture/API.md`](architecture/API.md) |
+| Geocode orchestration ל-preview + מגבלת מניפסט נהג + pagination ל-/passengers/me | [`docs/FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#geo-manifest-passenger-reads), [`docs/architecture/API.md`](architecture/API.md), [`docs/ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) (Latest architecture updates) |
 | החלטות ותירוצים (ADR) | [`docs/adr/README.md`](adr/README.md) |
 | Frontend (ארכיטקטורה מפורטת) | [`frontend/docs/ARCHITECTURE.md`](../frontend/docs/ARCHITECTURE.md) |
 | פרונט — **מה נשאר / backlog** (RQ, a11y, compiler, בדיקות) | [`docs/FRONTEND_UPGRADE_ROADMAP.md`](FRONTEND_UPGRADE_ROADMAP.md) |
@@ -32,7 +37,8 @@
 - **Nginx CSP + PgBouncer secrets (מקור אמת):** [`nginx/nginx.conf.template`](../nginx/nginx.conf.template), [`scripts/ops/render-nginx-conf.sh`](../scripts/ops/render-nginx-conf.sh), [`docs/SECURITY_HEADERS.md`](SECURITY_HEADERS.md), [`infrastructure/pgbouncer/userlist.txt.template`](../infrastructure/pgbouncer/userlist.txt.template), [`infrastructure/pgbouncer/entrypoint.sh`](../infrastructure/pgbouncer/entrypoint.sh), סעיף **PgBouncer** ב־[`docs/FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#pgbouncer).
 - **תמונות GHCR בשורש הפרויקט:** [`README.md`](../README.md) (טבלת CI + רשימת repositories).
 - **רואטרים בפועל:** [`backend/app/api/v1/api_router.py`](../backend/app/api/v1/api_router.py) (prefix **`/api/v1`**).
-- **CI frontend — חוזה OpenAPI:** [`frontend-ci.yml`](../.github/workflows/frontend-ci.yml) → job **`contract-codegen`** (`npm run gen:api` + בדיקת `git diff` על [`frontend/src/api/generated/`](../frontend/src/api/generated/)); **`publish-image`** דוחף **`ghcr.io/.../linkup/frontend:latest`**.
+- **CI חוזה OpenAPI (workflow ייעודי):** [`openapi-contract.yml`](../.github/workflows/openapi-contract.yml) — מייצא `app.openapi()` דרך [`backend/scripts/export_openapi.py`](../backend/scripts/export_openapi.py), מריץ Orval, ובודק `git diff` על [`frontend/src/api/generated/`](../frontend/src/api/generated/). הסכמה אינה מקומיטת (`frontend/openapi-snapshot.json` ב-`.gitignore`); DX מקומי: `make openapi` או `npm run openapi:sync`. ראו [FEATURE_DECISIONS — OpenAPI snapshot code generation, Stage 2](FEATURE_DECISIONS.md#openapi-snapshot-code-generation-orval).
+- **CI frontend (build/quality):** [`frontend-ci.yml`](../.github/workflows/frontend-ci.yml) → job `quality` (lint, build, size); **`publish-image`** דוחף **`ghcr.io/.../linkup/frontend:latest`** (תלוי `quality` בלבד אחרי הוצאת `contract-codegen`).
 - **Deploy מלא ל־EC2 (אחרי CI מוצלח על `main`):** [`deploy-ec2.yml`](../.github/workflows/deploy-ec2.yml) — טריגר **`workflow_run`** כשאחד מ־**Backend CI** / **Frontend CI** / **Chat-WS CI** / **Email renderer CI** על **`main`** מסתיים ב־**success**; SSH, `docker pull`, compose מלא + smokes (`config.js` ב־`linkup_frontend`, `/health` ב־`linkup_email_renderer`) לפני rollout של **`backend`**.
 
 ## 3. מסמכים קצרים / הרחבה

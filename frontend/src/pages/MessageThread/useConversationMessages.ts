@@ -69,7 +69,7 @@ export function useConversationMessages(cid: string, userId: string | undefined)
     if (!cid || !messagesNextCursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const msgRes = await getMessages(cid, { limit: 30, before: parseInt(messagesNextCursor, 10) });
+      const msgRes = await getMessages(cid, { limit: 30, after: messagesNextCursor });
       const paginated = msgRes.data;
       const older = paginated?.items ?? [];
       setMessages((prev) => [...toConfirmedRows(older), ...prev]);

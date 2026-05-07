@@ -1,8 +1,19 @@
 import { api } from './client';
-import type { DriverInfo, Ride, RidePreviewResponse } from '../types/api';
+import type {
+  DriverInfo,
+  PaginatedRidesResponse,
+  Ride,
+  RidePreviewResponse,
+} from '../types/api';
 
-export function fetchMyRides() {
-  return api.get<Ride[]>('/rides/me');
+export function fetchMyRides(params?: { status?: string; limit?: number; after?: string }) {
+  return api.get<PaginatedRidesResponse>('/rides/me', {
+    params: {
+      status: params?.status,
+      limit: params?.limit ?? 20,
+      after: params?.after,
+    },
+  });
 }
 
 export function fetchRideById(rideId: string) {

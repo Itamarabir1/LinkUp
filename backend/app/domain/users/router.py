@@ -1,12 +1,13 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_current_user
 from app.core.exceptions.user import UserNotFoundError
 from app.db.session import get_db
-from app.domain.bookings.schema import NotificationItemResponse
+from app.core.constants import NOTIFICATIONS_DEFAULT_LIMIT, NOTIFICATIONS_MAX_LIMIT
+from app.domain.bookings.schema import PaginatedNotificationsResponse
 from app.domain.bookings.booking_reads_service import BookingReadsService
 from app.domain.users.crud import crud_user
 from app.domain.users.model import User
@@ -60,13 +61,20 @@ async def get_user_last_seen(
 
 
 # --- Notifications (notifications screen) ---
-@router.get("/me/notifications", response_model=list[NotificationItemResponse])
+@router.get("/me/notifications", response_model=PaginatedNotificationsResponse)
 async def get_my_notifications(
+    limit: int = Query(NOTIFICATIONS_DEFAULT_LIMIT, ge=1, le=NOTIFICATIONS_MAX_LIMIT),
+    after: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """All notifications for the user: as driver — join requests; as passenger — approve/reject/pending."""
-    return await BookingReadsService.get_notifications_for_user(db, current_user.user_id)
+    """Cursor-paginated notifications: driver pending joins + passenger booking updates."""
+    return await BookingReadsService.get_notifications_for_user(
+        db,
+        current_user.user_id,
+        limit=limit,
+        after=after,
+    )
 
 
 # --- 2. FCM token update (push notifications) ---

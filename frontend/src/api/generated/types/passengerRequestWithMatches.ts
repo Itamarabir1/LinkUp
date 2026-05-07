@@ -12,17 +12,17 @@ import type { RideResponse } from './rideResponse';
 Inherits is_notification_active from PassengerRequestResponse.
  */
 export interface PassengerRequestWithMatches {
-  request_id: string;
-  passenger_id: string;
-  group_id?: string | null;
-  num_passengers: number;
-  pickup_name: string;
-  destination_name: string;
-  requested_departure_time: string;
-  status: PassengerStatus;
-  created_at: string;
   booking_id?: string | null;
+  created_at: string;
+  destination_name: string;
+  group_id?: string | null;
   is_notification_active: boolean;
   /** רשימת נהגים רלוונטיים שנמצאו מיד */
   matching_rides?: RideResponse[];
+  num_passengers: number;
+  passenger_id: string;
+  pickup_name: string;
+  request_id: string;
+  requested_departure_time: string;
+  status: PassengerStatus;
 }

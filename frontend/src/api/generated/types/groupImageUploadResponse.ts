@@ -6,6 +6,6 @@
  */
 
 export interface GroupImageUploadResponse {
-  upload_url: string;
   key: string;
+  upload_url: string;
 }

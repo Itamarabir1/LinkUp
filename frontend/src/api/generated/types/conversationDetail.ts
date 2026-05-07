@@ -10,10 +10,10 @@ import type { ConversationPartner } from './conversationPartner';
  * Full conversation header for open/view (id + partner).
  */
 export interface ConversationDetail {
-  conversation_id: string;
-  partner: ConversationPartner;
-  created_at: string;
   booking_id?: string | null;
+  conversation_id: string;
+  created_at: string;
+  partner: ConversationPartner;
   partner_last_read_at?: string | null;
   partner_read_up_to_message_id?: number | null;
 }

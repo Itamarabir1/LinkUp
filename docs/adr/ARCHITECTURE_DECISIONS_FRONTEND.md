@@ -74,7 +74,7 @@
 
 | | |
 |--|--|
-| **החלטה** | `AuthContext`, `ChatContext`, `GroupContext`; לוגיקת צ'אט/התראות מפוצלת ל-hooks קטנים (`useChatUnreadMessages`, וכו'). **הזמנות שלי**: קומפוזיציה ב-[`useMyBookings.ts`](../../frontend/src/pages/MyBookings/useMyBookings.ts) עם **מבנה החזרה מקונן** (`passenger`, `driver`, `chat`) — בלי spread של תוצאות ה-hooks לשטח אחד; יצוא טיפוס **`MyBookingsViewModel`**. נתונים נטענים מ־**endpoints מאוגדים** בבקאנד (`driver-summary` / `passenger-summary`) כדי למנוע N+1. |
+| **החלטה** | `AuthContext`, `ChatContext`, `GroupContext`; לוגיקת צ'אט/התראות מפוצלת ל-hooks קטנים (`useChatUnreadMessages`, וכו'). **הזמנות שלי**: קומפוזיציה ב-[`useMyBookings.ts`](../../frontend/src/pages/MyBookings/useMyBookings.ts) עם **מבנה החזרה מקונן** (`passenger`, `driver`, `chat`); יצוא **`MyBookingsViewModel`**. נתונים מ־**`/bookings/*-summary/active`** + **`/history`** (קורסור) — בלי N+1. |
 | **למה** | גבולות אחריות ברורים; חוזה VM קריא; פחות רשת ורינדורים מיותרים. |
 | **בקצרה לראיון** | "מפרידים hooks לפי דומיין; VM מקונן; שרת מאחד קריאות לטאב נהג/נוסע." |
 
@@ -197,8 +197,9 @@
 | **Source of truth policy** | קבצי generated נכנסים ל-git במכוון כדי שכל שינוי API יהיה reviewable כחלק מה-PR. |
 | **למה** | סוגר פערים בין schema לקוד לקוח, מוריד boilerplate ידני, ומחזק type-safety מקצה לקצה. |
 | **Trade-off** | מוסיף שלב generation לתהליך הפיתוח ומאריך מעט את זמן CI, אבל מצמצם משמעותית סיכון ל-contract drift. |
-| **CI enforcement (final)** | ב-`frontend-ci` יש job ייעודי `contract-codegen` שמריץ `npm run gen:api`, אחריו `git update-index -q --refresh`, ואז `git diff --exit-code -- src/api/generated/` כדי לחסום merge כשקבצי generated לא מסונכרנים. |
-| **בקצרה לראיון** | "עברנו מ-API types ידניים ל-codegen חוזי עם Orval; ה-generated client מחויב ב-repo ונבדק ב-CI כדי למנוע drift בין backend ל-frontend." |
+| **CI enforcement (Stage 1, deprecated)** | ב-`frontend-ci` היה job `contract-codegen` שמריץ `npm run gen:api` ואז `git diff --exit-code -- src/api/generated/`. החיסרון: ה-snapshot עצמו היה committed ויכל לסטות בשקט מ-`app.openapi()`; אכיפה הייתה רק על תוצר Orval. |
+| **CI enforcement (Stage 2, current)** | ה-snapshot **לא מקומיט** יותר (gitignored כ-build artifact). Workflow ייעודי [`openapi-contract.yml`](../../.github/workflows/openapi-contract.yml) מייצא טרי מ-`app.openapi()` בכל ריצה דרך [`backend/scripts/export_openapi.py`](../../backend/scripts/export_openapi.py), ואז `gen:api`, ואז `git diff --exit-code -- frontend/src/api/generated/`. שינוי schema ב-FastAPI שלא הופעל בפרונט מפיל את ה-PR. ה-job `contract-codegen` הוסר מ-`frontend-ci`. ללא Postgres ב-CI — `app.openapi()` lazy. DX מקומי: `make openapi` / `npm run openapi:sync`. |
+| **בקצרה לראיון** | "עברנו מ-API types ידניים ל-codegen חוזי עם Orval, ובסטייג' 2 הסרנו את ה-snapshot מ-git: ה-CI מייצא טרי מ-FastAPI בכל ריצה ובודק drift רק על התוצר הנצרך — מקור אמת יחיד, אין כפילות snapshot↔FastAPI." |
 
 ---
 

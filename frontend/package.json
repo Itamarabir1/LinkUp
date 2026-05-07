@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "gen:api": "orval --config orval.config.ts",
+    "openapi:sync": "make -C .. openapi",
     "size": "size-limit",
     "analyze": "vite build"
   },

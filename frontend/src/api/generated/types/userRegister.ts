@@ -10,17 +10,17 @@
 Optional fcm_token is supplied by the app (push permission), not a user-typed field.
  */
 export interface UserRegister {
+  /** @minLength 8 */
+  confirm_password: string;
+  email: string;
+  /** App-only (push registration); not shown on signup form. */
+  fcm_token?: string | null;
   /**
      * @minLength 2
      * @maxLength 100
      */
   full_name: string;
-  email: string;
-  phone_number: string;
   /** @minLength 8 */
   password: string;
-  /** @minLength 8 */
-  confirm_password: string;
-  /** App-only (push registration); not shown on signup form. */
-  fcm_token?: string | null;
+  phone_number: string;
 }

@@ -7,8 +7,24 @@
 import type { BookingManifestItem } from './bookingManifestItem';
 
 export interface RideManifestResponse {
-  ride_id: string;
-  total_confirmed_passengers: number;
   available_seats_left: number;
+  /**
+     * כל שורות confirmed לנסיעה (COUNT)
+     * @minimum 0
+     */
+  confirmed_total: number;
+  /** True אם confirmed_total + pending_total חורגים מ-manifest row limit והרשימה נחתכה */
+  manifest_truncated: boolean;
   passengers: BookingManifestItem[];
+  /**
+     * כל שורות pending לנסיעה (COUNT)
+     * @minimum 0
+     */
+  pending_total: number;
+  ride_id: string;
+  /**
+     * תואם confirmed_total לתאימות לאחור; ספירת מאושרים ב-DB לאורך הנסיעה
+     * @minimum 0
+     */
+  total_confirmed_passengers: number;
 }

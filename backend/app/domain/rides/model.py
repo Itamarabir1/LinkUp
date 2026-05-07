@@ -65,13 +65,11 @@ class Ride(Base):
         PG_UUID(as_uuid=True),
         ForeignKey("users.user_id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
     group_id = Column(
         PG_UUID(as_uuid=True),
         ForeignKey("groups.group_id", ondelete="SET NULL"),
         nullable=True,
-        index=True,
     )
 
     # --- Times ---

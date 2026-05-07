@@ -1,10 +1,8 @@
-import { getMessages } from '../../api/chat';
-import type { MessageResponse, PaginatedMessagesResponse } from '../../types/api';
+import { getMessagesGap } from '../../api/chat';
+import type { MessageResponse } from '../../types/api';
 
-const DEFAULT_PAGE_SIZE = 30;
-/** Safety cap: 50 pages × 30 = 1500 messages max per reconnect backfill. */
 const DEFAULT_MAX_PAGES = 50;
-const RETRIES_PER_PAGE = 2;
+const RETRIES_PER_BATCH = 2;
 const RETRY_BASE_MS = 400;
 
 function sleep(ms: number): Promise<void> {
@@ -12,8 +10,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 export interface FetchMissedGapOptions {
-  pageSize?: number;
-  /** Max HTTP pages (first `after` + continued `before`); default 50. */
+  /** Max HTTP batches for truncated reconnect responses; default 50. */
   maxPages?: number;
   /** Return true to stop after current page and mark `incomplete` (e.g. conversation changed). */
   shouldAbort?: () => boolean;
@@ -31,27 +28,22 @@ function addToMap(map: Map<number, MessageResponse>, items: MessageResponse[]) {
   }
 }
 
-async function fetchPageWithRetry(
+async function fetchGapWithRetry(
   conversationId: string,
-  pageSize: number,
-  params: { after?: number; before?: number },
+  sinceMessageId: number,
   shouldAbort?: () => boolean
-): Promise<PaginatedMessagesResponse> {
+): Promise<{ items: MessageResponse[]; truncated: boolean; last_message_id: number | null }> {
   let lastErr: unknown;
-  for (let attempt = 0; attempt <= RETRIES_PER_PAGE; attempt++) {
+  for (let attempt = 0; attempt <= RETRIES_PER_BATCH; attempt++) {
     if (shouldAbort?.()) {
       throw new Error('fetchMissedGap:aborted');
     }
     try {
-      const res = await getMessages(conversationId, {
-        limit: pageSize,
-        ...(params.after !== undefined ? { after: params.after } : {}),
-        ...(params.before !== undefined ? { before: params.before } : {}),
-      });
-      return res.data ?? { items: [], has_more: false, next_cursor: null };
+      const res = await getMessagesGap(conversationId, sinceMessageId);
+      return res.data ?? { items: [], truncated: false, last_message_id: null };
     } catch (e) {
       lastErr = e;
-      if (attempt < RETRIES_PER_PAGE) {
+      if (attempt < RETRIES_PER_BATCH) {
         await sleep(RETRY_BASE_MS * (attempt + 1));
       }
     }
@@ -60,48 +52,30 @@ async function fetchPageWithRetry(
 }
 
 /**
- * Loads all messages in the "gap" after `afterMessageId` using the same pagination
- * contract as the backend: first `GET ...?after=`, then `GET ...?before=next_cursor`
- * while `has_more` (newest chunk first, then older chunks toward the anchor).
+ * Loads all messages in the reconnect "gap" from the dedicated gap endpoint.
+ * Repeats while server reports truncation using last_message_id as the next anchor.
  */
 export async function fetchMissedGap(
   conversationId: string,
   afterMessageId: number,
   options: FetchMissedGapOptions = {}
 ): Promise<FetchMissedGapResult> {
-  const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
   const maxPages = options.maxPages ?? DEFAULT_MAX_PAGES;
   const shouldAbort = options.shouldAbort;
 
   const byId = new Map<number, MessageResponse>();
   let incomplete = false;
-  let pageCount = 0;
+  let batchCount = 0;
+  let sinceMessageId = afterMessageId;
 
-  let data: PaginatedMessagesResponse;
-
-  try {
-    data = await fetchPageWithRetry(conversationId, pageSize, { after: afterMessageId }, shouldAbort);
-  } catch (e) {
-    if ((e as Error)?.message === 'fetchMissedGap:aborted') {
-      return { messages: [], incomplete: true };
-    }
-    return { messages: [], incomplete: true };
-  }
-
-  pageCount += 1;
-  addToMap(byId, data.items ?? []);
-
-  while (data.has_more && data.next_cursor && pageCount < maxPages) {
+  while (batchCount < maxPages) {
     if (shouldAbort?.()) {
       incomplete = true;
       break;
     }
-    const before = parseInt(data.next_cursor, 10);
-    if (!Number.isFinite(before)) {
-      break;
-    }
+    let data: { items: MessageResponse[]; truncated: boolean; last_message_id: number | null };
     try {
-      data = await fetchPageWithRetry(conversationId, pageSize, { before }, shouldAbort);
+      data = await fetchGapWithRetry(conversationId, sinceMessageId, shouldAbort);
     } catch (e) {
       if ((e as Error)?.message === 'fetchMissedGap:aborted') {
         incomplete = true;
@@ -110,11 +84,20 @@ export async function fetchMissedGap(
       incomplete = true;
       break;
     }
-    pageCount += 1;
+    batchCount += 1;
     addToMap(byId, data.items ?? []);
+
+    if (!data.truncated) {
+      break;
+    }
+    if (data.last_message_id == null || data.last_message_id <= sinceMessageId) {
+      incomplete = true;
+      break;
+    }
+    sinceMessageId = data.last_message_id;
   }
 
-  if (pageCount >= maxPages && data.has_more && data.next_cursor) {
+  if (batchCount >= maxPages) {
     incomplete = true;
   }
 

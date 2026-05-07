@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle,
   XCircle,
@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useChat, getNotificationItemKey } from '../context/ChatContext';
-import { api } from '../api/client';
+import { fetchMyNotifications } from '../api/users';
 import { qk } from '../api/queryKeys';
 import type { NotificationItem } from '../types/api';
 import { formatMonthYearLong, formatRelativeNotificationTime, formatWeekdayLong } from '../utils/date';
@@ -51,18 +51,27 @@ export default function Notifications() {
   } = useChat();
   const queryClient = useQueryClient();
   const {
-    data: list = [],
+    data,
     isLoading: loading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
     error: fetchError,
-  } = useQuery({
-    queryKey: qk.notifications.all(),
-    queryFn: async () => {
-      const { data } = await api.get<NotificationItem[]>('/users/me/notifications');
-      return Array.isArray(data) ? data : [];
+  } = useInfiniteQuery({
+    queryKey: qk.notifications.page(20),
+    queryFn: async ({ pageParam }) => {
+      const { data } = await fetchMyNotifications({ limit: 20, after: pageParam ?? undefined });
+      return data;
     },
     enabled: !!user?.user_id,
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
     staleTime: 30_000,
   });
+  const list = useMemo(
+    () => data?.pages.flatMap((page) => page.items) ?? [],
+    [data?.pages]
+  );
   const error = fetchError ? getApiErrorMessage(fetchError, apiErr('err_load_notifications')) : '';
 
   const getTimeGroup = useCallback(
@@ -89,7 +98,7 @@ export default function Notifications() {
 
   useEffect(() => {
     const onRefresh = () => {
-      void queryClient.invalidateQueries({ queryKey: qk.notifications.all() });
+      void queryClient.invalidateQueries({ queryKey: qk.notifications.page(20) });
     };
     window.addEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
     return () => window.removeEventListener(NOTIFICATIONS_REFRESH_EVENT, onRefresh);
@@ -284,6 +293,18 @@ export default function Notifications() {
               })}
             </div>
           ))}
+          {hasNextPage && (
+            <div className={styles.loadMoreWrap}>
+              <button
+                type="button"
+                className={styles.loadMoreBtn}
+                onClick={() => void fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? t('loading') : t('common:load_more', { defaultValue: 'טען עוד' })}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

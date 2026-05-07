@@ -31,9 +31,11 @@ Copy `.env.example` to `.env` and set your values. See root README for full setu
 **Groq (optional):** for chat summaries (`ai-worker`) and passenger AI ride search parsing, set **`GROQ_API_KEY`** or **`GROK_API_KEY`** in `backend/.env` (see `app/domain/chat/ai/client.py`). Docker Compose already loads `backend/.env` into the backend and worker containers — no duplicate key in `docker-compose.yml`.
 The same parser endpoint (`POST /api/v1/passenger/passengers/ai-parse-search`) is shared by both passenger search and driver CreateRide in the frontend; business rule differences are enforced client-side per flow.
 
-**`GET /api/v1/passenger/passengers/search-rides`** supports optional **`departure_date`** (Jerusalem calendar day bounds in UTC), **`departure_time`** (±2h window), or **`departure_time` + `departure_time_to`** (closed range); mixing date with timestamps returns **422** — see **`docs/architecture/API.md`** and **`app/domain/passengers/schema.py`** (`RideSearchRequest`).
+**`GET /api/v1/passenger/passengers/search-rides`** supports optional **`departure_date`** (Jerusalem calendar day bounds in UTC), **`departure_time`** (±2h window), or **`departure_time` + `departure_time_to`** (closed range); mixing date with timestamps returns **422**. Pagination cursor is **opaque** (`after`/`next_cursor`) via shared helper (`app/core/pagination/cursor.py`), and destination filtering supports optional **`destination_radius`** (km) in addition to `search_radius` — see **`docs/architecture/API.md`** and **`app/domain/passengers/schema.py`** (`RideSearchRequest`).
 
-**Database connection pool** (optional tuning): `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT`, `DB_POOL_RECYCLE` — documented in `.env.example` and `docs/architecture/DEVELOPMENT.md`.
+**Database connection pool** (optional tuning): `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT`, `DB_POOL_RECYCLE`. **`DB_STATEMENT_TIMEOUT_MS`** is applied **per session** via SQLAlchemy `connect_args` → asyncpg `server_settings` in [`app/db/session.py`](app/db/session.py) (default 30000ms; set in `.env`/`.env.example`). Alembic **017** also sets a fixed role-level **ceiling of 60000ms** as defense-in-depth — gate of last resort if `connect_args` ever bypasses (e.g., direct connection without the engine). Documented in `.env.example` and `docs/architecture/DEVELOPMENT.md`.
+
+**Migrations:** after pulling, run **`uv run alembic upgrade head`**. Revision **`019_booking_lifecycle_enum`** extends PostgreSQL **`booking_status`** with **`en_route`**, **`arrived`**, **`trip_in_progress`** (required for passenger-request bulk cancel and active-booking filters). See **`docs/architecture/DATABASE.md`**.
 
 ## Security & auth (backend)
 
@@ -60,6 +62,16 @@ Portfolio-style summary: **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 - **GitHub Actions** (`.github/workflows/backend-ci.yml`): שירות Postgres, **`DATABASE_URL` ברמת ה-job** (מיפוי אחיד ל־**Alembic** ול־**pytest**), שלבי איכות בסדר בפועל: **Ruff check** → **Ruff format --check** → **`uv run alembic upgrade head`** → **`uv run pytest`**. קבצים תחת `alembic/` נכללים ב־autogenerate דרך `env.py` (ייבוא `app.db.models`); אם CI ירחיב ל־`ruff check alembic/`, ה־`per-file-ignores` ל־`alembic/env.py` מכסה F401 על ייבוא registry.
 - **Settings:** משתני סביבה **`DATABASE_URL`** / **`REDIS_URL`** נקראים ל־`DATABASE_URL_RAW` / `REDIS_URL_RAW` דרך **`validation_alias=AliasChoices(...)`** ב־`app/core/config.py` (pydantic-settings) — כך Alembic (`settings.DATABASE_URL`) והריצה ב-CI מסתנכרנים.
 
+## Updating the API contract
+
+מקור האמת לחוזה ה-API הוא **`app.openapi()`** ב-[`app/main.py`](app/main.py). חוזה ה-Orval בפרונט (`frontend/src/api/generated/`) מיוצר אוטומטית מ-FastAPI ו**חייב** להיות מסונכרן בכל PR שמשנה schema/router/Pydantic model.
+
+- **לאחר שינוי endpoint או schema** הריצו בשורש הריפו:
+  - `make openapi` — מייצא את הסכמה ל-`frontend/openapi-snapshot.json` (gitignored), מריץ Orval, ומציג את ה-diff ב-`frontend/src/api/generated/`. את התוצרים שם **קמיטו**.
+  - או מהפרונט: `npm run openapi:sync` (קורא לאותו target).
+- **ה-CI** ([`.github/workflows/openapi-contract.yml`](../.github/workflows/openapi-contract.yml)) מאמת ש-`frontend/src/api/generated/` תואם ל-FastAPI; ללא Postgres/Redis/RabbitMQ בייצוא — `app.openapi()` עצמו lazy ולא נוגע ב-IO.
+- **הסקריפט:** [`backend/scripts/export_openapi.py`](scripts/export_openapi.py) (פלט דטרמיניסטי: `indent=2`, `sort_keys=True`, `ensure_ascii=False`).
+
 **Error responses (JSON, `error_code`, `trace_id`, handlers):** [`docs/ERRORS.md`](../docs/ERRORS.md).
 
 **Health & circuit breakers (Google Maps + Brevo email):** `GET /api/v1/health` runs DB, Redis, and RabbitMQ checks; response includes **`status`** (`healthy` if all three are `ok`, else `unhealthy` — **503** in that case) and informational **`circuit_breakers`** (`google_geocoding`, `google_directions`, `google_distance_matrix`, `brevo_email` — values `closed` / `open` / `half_open`). See [`../docs/architecture/API.md`](../docs/architecture/API.md#health), [`../docs/architecture/NOTIFICATIONS.md`](../docs/architecture/NOTIFICATIONS.md), and [`../docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md) §20.
@@ -74,11 +86,15 @@ Endpoints for operators only: FastAPI dependency **`get_current_admin_user`** (`
 ## Bookings — aggregated reads (My Bookings)
 
 - **Service split (SRP):** read-only aggregations live in [`app/domain/bookings/booking_reads_service.py`](app/domain/bookings/booking_reads_service.py) (`BookingReadsService`); GPS broadcast validation lives in [`app/domain/bookings/location_service.py`](app/domain/bookings/location_service.py) (`BookingLocationService`). Lifecycle mutations (`request_to_join`, approve/reject/cancel, etc.) stay in [`app/domain/bookings/service.py`](app/domain/bookings/service.py) (`BookingService`). Both helper modules are also re-exported from `service.py` for backward-compatible imports.
-- **`GET /api/v1/bookings/driver-summary`** (auth): all rides for the current driver with **pending + confirmed** bookings and passenger contact fields in **one** `AsyncSession.execute` — `CRUDBooking.get_driver_rides_with_passengers` uses `joinedload(Ride.bookings → passenger_request → user)`, `joinedload(Ride.group)`, and `with_loader_criteria(Booking, …)` so cancelled/rejected rows are not loaded into the collection.
-- **`GET /api/v1/bookings/passenger-summary`** (auth): all bookings for the current passenger with ride, **driver**, and **group** in **one** query — `get_passenger_bookings_with_rides`.
-- **Shared manifest mapping:** `booking_to_manifest_item` in [`app/domain/bookings/manifest_mapping.py`](app/domain/bookings/manifest_mapping.py) feeds both the per-ride manifest endpoint and driver-summary passengers (both surfaced via `BookingReadsService`).
+- **`GET /api/v1/bookings/driver-summary/active`** (auth): active rides only (`open` / `full` / `active`), **soft limit 200** — `get_driver_active_rides`; `with_loader_criteria` includes in-trip booking statuses.
+- **`GET /api/v1/bookings/driver-summary/history`** (auth): completed/cancelled rides with cursor pagination (`limit`, `after`) — `get_driver_history_rides`; history loader uses **confirmed/cancelled/completed/rejected** so passengers still appear on past rides.
+- **`GET /api/v1/bookings/passenger-summary/active`** / **`…/history`**: active (**cap 200**) vs terminal bookings + cursor — `get_passenger_active_bookings` / `get_passenger_history_bookings`.
+- **Important semantics:** `/driver-summary/active` and `/passenger-summary/active` are bounded snapshots (soft cap 200), not complete active feeds; very heavy users may not see all active rides/bookings in a single response.
+- **Cursors:** [`app/core/pagination/cursor.py`](app/core/pagination/cursor.py) (URL-safe Base64 JSON, timestamps normalized to **UTC**; shared across bookings/chat/rides/passengers).
+- **Chat inbox pagination:** `GET /api/v1/chat/conversations` נשען על cursor אטום דרך ה-core helper, עם מיון keyset לפי `COALESCE(conversations.last_message_at, conversations.created_at)`; `last_message_at` נשמר בכתיבה ונעשה לו backfill במיגרציה **020**.
+- **Shared manifest mapping:** `booking_to_manifest_item` in [`app/domain/bookings/manifest_mapping.py`](app/domain/bookings/manifest_mapping.py) feeds manifest + summary passengers (via `BookingReadsService`).
 - **GPS REST:** `BookingLocationService.broadcast_driver_location` / `broadcast_passenger_location` centralize permission checks; routers delegate only.
-- **Frontend contract:** web client consumes these endpoints via `fetchDriverSummary` / `fetchPassengerSummary` and maps payloads in `frontend/src/pages/MyBookings/myBookings.mappers.ts` to keep transport DTOs decoupled from UI view models.
+- **Frontend contract:** `fetchDriverActive` / `fetchDriverHistory` / `fetchPassengerActive` / `fetchPassengerHistory` in `frontend/src/api/bookings.ts`; React Query keys `qk.bookings.driverActive`, `driverHistory`, `passengerActive`, `passengerHistory`; mapping in `frontend/src/pages/MyBookings/myBookings.mappers.ts`.
 
 See `docs/architecture/API.md` and `docs/architecture/DATABASE.md`.
 
@@ -160,11 +176,13 @@ k6 run k6/scripts/load_test_auth.js
 
 - **Uploads:** clients use **presigned PUT** to S3 (see API routes for user avatar and group image); the API does not stream file bytes.
 - **Public URLs:** when **`CLOUDFRONT_DOMAIN`** is set in `backend/.env` (see `app/core/config.py`), the storage layer builds **`https://{CLOUDFRONT_DOMAIN}/{key}`** for reads; otherwise **presigned GET** to S3 (`app/infrastructure/s3/service.py`).
-- **Avatar pipeline:** staging key → RabbitMQ **`avatar_upload_queue`** → worker resizes to WebP and writes under a **new versioned prefix** `avatars/{user_id}/v{version}/` (`app/infrastructure/s3/image_processor.py`, `app/workers/tasks/avatar_tasks.py`). The DB stores that prefix in **`users.avatar_key`**. The previous version’s prefix is deleted **only after** a successful DB commit; failed commits trigger best-effort cleanup of the new prefix. **Remove-avatar** still deletes the whole `avatars/{user_id}/` tree in S3.
+- **Avatar pipeline:** staging key → outbox **`user.avatar_upload`** → **`avatar_upload_queue`** → worker resizes to WebP and writes under a **new versioned prefix** `avatars/{user_id}/v{version}/` (`app/infrastructure/s3/image_processor.py`, `app/workers/tasks/avatar_tasks.py`). The DB stores that prefix in **`users.avatar_key`**. The previous version’s prefix is deleted **only after** a successful DB commit; failed commits trigger best-effort cleanup of the new prefix. **Remove-avatar** clears `avatar_*` in Postgres + publishes **`user.avatar_remove`** (same transaction); the worker deletes the `avatars/{user_id}/` tree using streamed **`delete_objects`** batches (`iter_prefix_keys` + chunked **`delete_objects`** in `app/infrastructure/s3/`).
 - **CORS:** browser uploads — `docs/S3_CORS.md`. **Schema / field notes:** `docs/architecture/DATABASE.md` (`users.avatar_key`).
 
 ## Geo caching updates
 
-- Redis cache now stores geocoding results for 24 hours to reduce repeated calls for the same address input.
+- Redis cache now stores geocoding results for 24 hours to reduce repeated calls for the same address input (**`geocode:{address}`** plus **`get_or_compute`** stampede guard in [`app/infrastructure/geo/geocode_cache.py`](app/infrastructure/geo/geocode_cache.py)).
+- **Ride preview routing:** [`app/domain/geo/processor.py`](app/domain/geo/processor.py) **`get_full_routing_data`** resolves origin/destination text through **`get_coordinates`** (above), not duplicate bare **`GeocodingService`** calls per axis.
 - The cache is fail-open: geo flows continue even if Redis is unavailable.
-- This complements the existing 24h ride-preview cache and reduces external API pressure during repeated searches.
+- This complements the existing 24h **full preview payload** Redis cache (`RideCacheRepository`) between preview and create steps.
+- **Related read caps:** driver **`GET …/bookings/ride/{id}/manifest`** caps listed rows (**100**) with CONFIRMED-before-PENDING ordering + aggregate totals in response; **`GET …/passenger/passengers/me`** uses cursor pagination (`cursor`, `limit` -> `items`, `next_cursor`, `has_more`) — [`docs/architecture/API.md`](../docs/architecture/API.md), **`MANIFEST_BOOKING_ROW_LIMIT`** / **`PASSENGER_REQUESTS_*`** in [`app/core/constants.py`](app/core/constants.py).

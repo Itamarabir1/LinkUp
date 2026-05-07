@@ -6,6 +6,8 @@
  */
 import type { PassengerBookingSummaryItem } from './passengerBookingSummaryItem';
 
-export interface PassengerSummaryResponse {
+export interface PassengerHistoryResponse {
   bookings: PassengerBookingSummaryItem[];
+  has_more?: boolean;
+  next_cursor?: string | null;
 }

@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_current_user, get_db
@@ -24,7 +24,7 @@ from app.domain.groups.schema import (
     group_member_to_out,
     group_to_out,
 )
-from app.domain.rides.schema import RideResponse
+from app.domain.rides.schema import PaginatedRidesResponse
 from app.domain.rides.service import RideService
 from app.domain.users.model import User
 from app.infrastructure.s3.service import storage_service
@@ -85,9 +85,11 @@ async def get_members(
     return [group_member_to_out(m) for m in members]
 
 
-@router.get("/{group_id}/rides", response_model=list[RideResponse])
+@router.get("/{group_id}/rides", response_model=PaginatedRidesResponse)
 async def get_group_rides(
     group_id: UUID,
+    limit: int = Query(20, ge=1, le=100),
+    after: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     ride_svc: RideService = Depends(get_ride_service),
@@ -96,7 +98,7 @@ async def get_group_rides(
     membership = await crud.get_membership(db, group_id, current_user.user_id)
     if not membership:
         raise GroupNotMemberError()
-    return await ride_svc.get_rides_by_group_id(db, group_id)
+    return await ride_svc.get_rides_by_group_id(db, group_id, limit=limit, after=after)
 
 
 @router.post("/{group_id}/upload-image", response_model=GroupImageUploadResponse)

@@ -32,7 +32,7 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 | Queue | Exchanges | Consumer | Purpose |
 |-------|-----------|----------|---------|
 | notifications_queue | user, ride, booking, system_events | handle_notification_event | שליחת מייל (Brevo), פוש (Firebase) |
-| avatar_upload_queue | tasks | handle_avatar_upload_event | עיבוד S3 (resize), העלאה ל־`avatars/{user_id}/v{version}/`, commit ל-`avatar_key`, מחיקת גרסה קודמת (best-effort) אחרי commit |
+| avatar_upload_queue | tasks | handle_avatar_upload_event | `user.avatar_upload`: resize + העלאה ל־`avatars/{user_id}/v{version}/`; `user.avatar_remove`: מחיקת `avatars/{user_id}/` ב-S3 (DeleteObjects batches) אחרי ניקוי DB ב-API |
 | scheduled_tasks_queue | scheduled | handle_scheduled_task | תזכורות, fuel scan, maintenance, chat timeout |
 
 ---
@@ -47,7 +47,7 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 | auth.password_reset_code | user | auth.password_reset_code | בקשת איפוס סיסמה | email, user_id, code |
 | user.registered | user | user.registered | רישום מוצלח | user_id, email, ... |
 | user.avatar_upload | tasks | user.avatar_upload | confirm_avatar_upload | user_id, staging_key |
-| user.avatar_remove | tasks | user.avatar_remove | remove_avatar | user_id |
+| user.avatar_remove | tasks | user.avatar_remove | remove_avatar (איפוס DB + שורת outbox באותה txn; מחיקת S3 אסינכרונית ב-worker) | user_id |
 
 ### Billing
 

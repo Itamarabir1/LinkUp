@@ -1,5 +1,6 @@
 """
 S3 client (aioboto3) — upload, download, copy, delete.
+Prefix cleanup uses streamed ListObjects + DeleteObjects batches (≤1000 keys per call).
 Used by StorageService and background workers (presigned upload → finalize under avatars/{user_id}/).
 
 Note: for browser PUT to presigned URLs, the bucket must allow CORS from the frontend origin
@@ -7,6 +8,7 @@ Note: for browser PUT to presigned URLs, the bucket must allow CORS from the fro
 """
 
 import logging
+from collections.abc import AsyncIterator, Sequence
 from urllib.parse import quote
 
 import boto3
@@ -21,6 +23,9 @@ from app.core.exceptions.infrastructure import (
 )
 
 logger = logging.getLogger(__name__)
+
+# AWS DeleteObjects accepts at most this many keys per request.
+S3_DELETE_OBJECTS_MAX_KEYS = 1000
 
 
 class S3Client:
@@ -93,6 +98,57 @@ class S3Client:
         except Exception as e:
             logger.error("S3 get_object failed key=%s: %s", key, e, exc_info=True)
             raise ExternalServiceError() from e
+
+    async def iter_prefix_keys(self, prefix: str) -> AsyncIterator[str]:
+        """Stream object keys under prefix (listing only; callers batch-delete)."""
+        try:
+            async with self._session.client("s3") as s3:
+                paginator = s3.get_paginator("list_objects_v2")
+                async for page in paginator.paginate(Bucket=self.bucket_name, Prefix=prefix):
+                    for obj in page.get("Contents") or []:
+                        k = obj.get("Key")
+                        if k:
+                            yield k
+        except Exception as e:
+            logger.error("S3 list_objects iter failed prefix=%s: %s", prefix, e, exc_info=True)
+            raise ExternalServiceError() from e
+
+    async def delete_object_keys_batch(self, keys: Sequence[str]) -> None:
+        """
+        Delete up to many keys using DeleteObjects (chunked to S3_DELETE_OBJECTS_MAX_KEYS per call).
+        """
+        filtered = [k for k in keys if k]
+        if not filtered:
+            return
+        for i in range(0, len(filtered), S3_DELETE_OBJECTS_MAX_KEYS):
+            chunk = filtered[i : i + S3_DELETE_OBJECTS_MAX_KEYS]
+            try:
+                async with self._session.client("s3") as s3:
+                    resp = await s3.delete_objects(
+                        Bucket=self.bucket_name,
+                        Delete={"Objects": [{"Key": k} for k in chunk], "Quiet": True},
+                    )
+            except Exception as e:
+                logger.error(
+                    "S3 delete_objects failed bucket=%s count=%s: %s",
+                    self.bucket_name,
+                    len(chunk),
+                    e,
+                    exc_info=True,
+                )
+                raise S3DeleteFailed() from e
+            errors = resp.get("Errors") or []
+            if errors:
+                err0 = errors[0]
+                logger.error(
+                    "S3 delete_objects partial failure bucket=%s key=%s code=%s message=%s (%d errors)",
+                    self.bucket_name,
+                    err0.get("Key"),
+                    err0.get("Code"),
+                    err0.get("Message"),
+                    len(errors),
+                )
+                raise S3DeleteFailed()
 
     async def list_objects_by_prefix(self, prefix: str) -> list[str]:
         """List object keys under a prefix."""

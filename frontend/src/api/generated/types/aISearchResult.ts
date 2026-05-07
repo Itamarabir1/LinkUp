@@ -10,22 +10,22 @@
 Location/time fields may be null when uncertain.
  */
 export interface AISearchResult {
-  pickup_name?: string | null;
-  destination_name?: string | null;
-  departure_time?: string | null;
-  departure_time_to?: string | null;
-  departure_date?: string | null;
-  destination_radius?: number | null;
-  search_radius?: number | null;
+  ambiguity_reasons?: string[];
   /**
      * @minimum 0
      * @maximum 1
      */
   confidence?: number;
-  raw_interpretation?: string;
-  needs_clarification?: boolean;
-  missing_fields?: string[];
-  ambiguity_reasons?: string[];
+  departure_date?: string | null;
+  departure_time?: string | null;
+  departure_time_to?: string | null;
+  destination_name?: string | null;
+  destination_radius?: number | null;
   /** Hebrew question when critical fields missing */
   follow_up_question?: string | null;
+  missing_fields?: string[];
+  needs_clarification?: boolean;
+  pickup_name?: string | null;
+  raw_interpretation?: string;
+  search_radius?: number | null;
 }

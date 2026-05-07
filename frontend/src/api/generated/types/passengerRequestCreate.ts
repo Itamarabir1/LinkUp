@@ -6,17 +6,24 @@
  */
 
 export interface PassengerRequestCreate {
-  /** ממולא בשרת מהטוקן; התעלם בקליינט */
-  passenger_id?: string | null;
+  /** @minLength 1 */
+  destination_name: string;
+  group_id?: string | null;
+  /** האם נוצר מחיפוש אוטומטי */
+  is_auto_generated?: boolean;
+  /** התראות מייל ופוש לבקשה זו */
+  is_notification_active?: boolean;
   /** @minimum 1 */
   num_passengers?: number;
+  /** ממולא בשרת מהטוקן; התעלם בקליינט */
+  passenger_id?: string | null;
+  pickup_lat?: number | null;
+  pickup_lon?: number | null;
   /**
      * שם מקום איסוף (טקסט או ממיקום נוכחי)
      * @minLength 1
      */
   pickup_name: string;
-  /** @minLength 1 */
-  destination_name: string;
   /** אופציונלי – אם ריק יחפש 'מעכשיו' */
   requested_departure_time?: string | null;
   /**
@@ -25,11 +32,4 @@ export interface PassengerRequestCreate {
      * @maximum 50
      */
   search_radius?: number;
-  /** התראות מייל ופוש לבקשה זו */
-  is_notification_active?: boolean;
-  pickup_lat?: number | null;
-  pickup_lon?: number | null;
-  /** האם נוצר מחיפוש אוטומטי */
-  is_auto_generated?: boolean;
-  group_id?: string | null;
 }

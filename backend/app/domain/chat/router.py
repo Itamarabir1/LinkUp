@@ -23,14 +23,16 @@ from app.domain.chat.message_idempotency import (
 from app.domain.chat.schema import (
     ConversationCreate,
     ConversationDetail,
-    ConversationListItem,
+    MessageGapResponse,
     MessageCreate,
     MessageResponse,
+    PaginatedConversationsResponse,
     PaginatedMessagesResponse,
 )
 from app.domain.chat.service import (
     get_conversation_detail,
     get_messages,
+    get_messages_gap,
     get_or_create_conversation,
     get_or_create_conversation_by_booking,
     list_my_conversations,
@@ -91,15 +93,22 @@ async def create_or_get_conversation_by_booking(
 
 @router.get(
     "/conversations",
-    response_model=list[ConversationListItem],
+    response_model=PaginatedConversationsResponse,
     summary="רשימת השיחות שלי",
 )
 async def list_conversations(
+    limit: int = Query(30, ge=1, le=100),
+    after: str | None = Query(None, description="Cursor from previous page next_cursor"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Inbox for the current user with partner info and last message."""
-    return await list_my_conversations(db, current_user_id=current_user.user_id)
+    """Inbox for the current user with partner info and last message (cursor pagination)."""
+    return await list_my_conversations(
+        db,
+        current_user_id=current_user.user_id,
+        limit=limit,
+        after=after,
+    )
 
 
 @router.get(
@@ -212,8 +221,7 @@ async def post_message(
 async def list_conversation_messages(
     conversation_id: UUID,
     limit: int = Query(30, ge=1, le=100),
-    before: int | None = Query(None, description="לפני message_id (טעינת הודעות ישנות יותר)"),
-    after: int | None = Query(None, description="after message_id"),
+    after: str | None = Query(None, description="Opaque cursor from previous page next_cursor"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -223,8 +231,27 @@ async def list_conversation_messages(
         conversation_id=conversation_id,
         current_user_id=current_user.user_id,
         limit=limit,
-        before_message_id=before,
-        after_message_id=after,
+        after_cursor=after,
+    )
+
+
+@router.get(
+    "/conversations/{conversation_id}/messages/gap",
+    response_model=MessageGapResponse,
+    summary="פער הודעות מאז message_id אחרון",
+)
+async def list_conversation_messages_gap(
+    conversation_id: UUID,
+    since_message_id: int = Query(..., ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reconnect backfill for messages newer than since_message_id."""
+    return await get_messages_gap(
+        db,
+        conversation_id=conversation_id,
+        current_user_id=current_user.user_id,
+        since_message_id=since_message_id,
     )
 
 

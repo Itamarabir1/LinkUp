@@ -6,6 +6,6 @@
  */
 
 export interface VerifyEmailRequest {
-  email?: string | null;
   code: string;
+  email?: string | null;
 }

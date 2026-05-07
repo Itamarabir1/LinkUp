@@ -10,7 +10,8 @@ type MyGroup = { group_id: string; name: string };
 
 export interface PassengerBookingsTabProps {
   loading: boolean;
-  items: PassengerBookingItem[];
+  activeItems: PassengerBookingItem[];
+  historyItems: PassengerBookingItem[];
   myGroups: MyGroup[];
   sharingLocationBookingId: string | null;
   onSharingChange: (id: string | null) => void;
@@ -19,11 +20,15 @@ export interface PassengerBookingsTabProps {
   cancelling: boolean;
   chatLoading: string | null;
   onOpenChat: (bookingId: string) => void;
+  onLoadMoreHistory?: () => void;
+  hasMoreHistory?: boolean;
+  loadingMoreHistory?: boolean;
 }
 
 export default function PassengerBookingsTab({
   loading,
-  items,
+  activeItems,
+  historyItems,
   myGroups,
   sharingLocationBookingId,
   onSharingChange,
@@ -32,14 +37,11 @@ export default function PassengerBookingsTab({
   cancelling,
   chatLoading,
   onOpenChat,
+  onLoadMoreHistory,
+  hasMoreHistory = false,
+  loadingMoreHistory = false,
 }: PassengerBookingsTabProps) {
   const { t } = useTranslation(['bookings', 'common']);
-  const activeItems = items.filter(
-    (item) => item.bookingStatus !== 'cancelled' && item.bookingStatus !== 'completed'
-  );
-  const pastItems = items.filter(
-    (item) => item.bookingStatus === 'cancelled' || item.bookingStatus === 'completed'
-  );
 
   const handlers: PassengerBookingCardHandlers = {
     onSharingChange,
@@ -48,11 +50,14 @@ export default function PassengerBookingsTab({
     onOpenChat,
   };
 
+  const isEmpty =
+    !loading && activeItems.length === 0 && historyItems.length === 0 && !hasMoreHistory;
+
   return (
     <div className={styles.cardList}>
       {loading ? (
         <p className={styles.pageLoading}>{t('common:loading')}</p>
-      ) : items.length === 0 ? (
+      ) : isEmpty ? (
         <p className={styles.emptyText}>{t('bookings:noPassengerBookings')}</p>
       ) : (
         <>
@@ -67,9 +72,9 @@ export default function PassengerBookingsTab({
               handlers={handlers}
             />
           ))}
-          {pastItems.length > 0 ? (
+          {(historyItems.length > 0 || hasMoreHistory) && (
             <HistorySection title={t('bookings:passengerHistoryTitle')}>
-              {pastItems.map((item) => (
+              {historyItems.map((item) => (
                 <PassengerBookingCard
                   key={item.bookingId}
                   item={item}
@@ -80,8 +85,20 @@ export default function PassengerBookingsTab({
                   handlers={handlers}
                 />
               ))}
+              {hasMoreHistory && onLoadMoreHistory ? (
+                <div className={styles.historyLoadMore}>
+                  <button
+                    type="button"
+                    className={styles.historyLoadMoreBtn}
+                    disabled={loadingMoreHistory}
+                    onClick={() => onLoadMoreHistory()}
+                  >
+                    {loadingMoreHistory ? t('common:loading') : t('bookings:loadMoreHistory')}
+                  </button>
+                </div>
+              ) : null}
             </HistorySection>
-          ) : null}
+          )}
         </>
       )}
     </div>

@@ -6,15 +6,15 @@
  */
 
 export interface NotificationItemResponse {
-  type: string;
-  title: string;
-  body?: string | null;
   action_url?: string | null;
-  created_at: string;
+  body?: string | null;
   booking_id: string;
-  ride_id: string;
+  created_at: string;
   other_party_name?: string | null;
-  ride_origin?: string | null;
   ride_destination?: string | null;
+  ride_id: string;
+  ride_origin?: string | null;
   status?: string | null;
+  title: string;
+  type: string;
 }

@@ -6,10 +6,10 @@
  */
 
 export interface PasswordResetConfirm {
-  email: string;
   code: string;
   /** @minLength 8 */
-  new_password: string;
-  /** @minLength 8 */
   confirm_new_password: string;
+  email: string;
+  /** @minLength 8 */
+  new_password: string;
 }

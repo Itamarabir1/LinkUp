@@ -39,6 +39,7 @@ export function buildManualRideSearchParams(input: {
   pickup: string;
   destination: string;
   searchRadius: number;
+  destinationRadius?: number | null;
   searchMode: SearchMode;
   selectedDate: Date;
   departureDateOnly: Date | null;
@@ -52,6 +53,9 @@ export function buildManualRideSearchParams(input: {
     limit: 20,
   };
   if (input.groupId) params.group_id = input.groupId;
+  if (input.destinationRadius != null && !Number.isNaN(Number(input.destinationRadius))) {
+    params.destination_radius = Number(input.destinationRadius);
+  }
 
   if (input.searchMode === 'date_only') {
     const d = input.departureDateOnly ?? input.selectedDate;
@@ -392,6 +396,7 @@ export function useSearchRides() {
       pickup,
       destination,
       searchRadius,
+      destinationRadius,
       searchMode,
       selectedDate,
       departureDateOnly,
@@ -402,6 +407,7 @@ export function useSearchRides() {
     pickup,
     destination,
     searchRadius,
+    destinationRadius,
     searchMode,
     selectedDate,
     departureDateOnly,

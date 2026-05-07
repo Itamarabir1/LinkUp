@@ -11,7 +11,11 @@ export const qk = {
   },
   bookings: {
     driver: (userId?: string) => ['bookings', 'driver', userId] as const,
+    driverActive: (userId?: string) => ['bookings', 'driver', 'active', userId] as const,
+    driverHistory: (userId?: string) => ['bookings', 'driver', 'history', userId] as const,
     passenger: (userId?: string) => ['bookings', 'passenger', userId] as const,
+    passengerActive: (userId?: string) => ['bookings', 'passenger', 'active', userId] as const,
+    passengerHistory: (userId?: string) => ['bookings', 'passenger', 'history', userId] as const,
   },
   groups: {
     list: () => ['groups', 'list'] as const,
@@ -20,13 +24,14 @@ export const qk = {
     rides: (id: string) => ['groups', id, 'rides'] as const,
   },
   chat: {
-    conversations: () => ['chat', 'conversations'] as const,
+    conversations: (limit: number = 30) => ['chat', 'conversations', 'list', limit] as const,
     conversation: (id: string) => ['chat', 'conversations', id] as const,
     messages: (id: string) => ['chat', 'messages', id] as const,
     unread: () => ['chat', 'unread'] as const,
   },
   notifications: {
     all: () => ['notifications'] as const,
+    page: (limit: number = 20) => ['notifications', 'page', limit] as const,
   },
   passengers: {
     requests: () => ['passengers', 'requests'] as const,

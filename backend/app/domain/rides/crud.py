@@ -1,9 +1,9 @@
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # --- Imports ---
@@ -96,13 +96,27 @@ class CRUDRide:
         db: AsyncSession,
         driver_id: UUID,
         status: RideStatus | None = None,
+        limit: int = 20,
+        after: tuple[datetime, UUID] | None = None,
     ) -> list[Ride]:
-        """List rides for a driver (driver's rides screen)."""
+        """Keyset-paginated rides for a driver ordered by departure_time DESC, ride_id DESC."""
         did = UUID(str(driver_id)) if isinstance(driver_id, str) else driver_id
         stmt = self._base_ride_stmt().where(Ride.driver_id == did)
         if status is not None:
             stmt = stmt.where(Ride.status == status)
-        stmt = stmt.order_by(Ride.departure_time.desc())
+        if after is not None:
+            cursor_time, cursor_ride_id = after
+            stmt = stmt.where(
+                or_(
+                    Ride.departure_time < cursor_time,
+                    and_(
+                        Ride.departure_time == cursor_time,
+                        Ride.ride_id < cursor_ride_id,
+                    ),
+                )
+            )
+        stmt = stmt.order_by(Ride.departure_time.desc(), Ride.ride_id.desc())
+        stmt = stmt.limit(limit + 1)
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
@@ -111,13 +125,27 @@ class CRUDRide:
         db: AsyncSession,
         group_id: UUID,
         exclude_cancelled: bool = True,
+        limit: int = 20,
+        after: tuple[datetime, UUID] | None = None,
     ) -> list[Ride]:
-        """List rides for a group (group rides tab)."""
+        """Keyset-paginated rides for a group ordered by departure_time DESC, ride_id DESC."""
         gid = UUID(str(group_id)) if isinstance(group_id, str) else group_id
         stmt = self._base_ride_stmt().where(Ride.group_id == gid)
         if exclude_cancelled:
             stmt = stmt.where(Ride.status != RideStatus.CANCELLED)
-        stmt = stmt.order_by(Ride.departure_time.desc())
+        if after is not None:
+            cursor_time, cursor_ride_id = after
+            stmt = stmt.where(
+                or_(
+                    Ride.departure_time < cursor_time,
+                    and_(
+                        Ride.departure_time == cursor_time,
+                        Ride.ride_id < cursor_ride_id,
+                    ),
+                )
+            )
+        stmt = stmt.order_by(Ride.departure_time.desc(), Ride.ride_id.desc())
+        stmt = stmt.limit(limit + 1)
         result = await db.execute(stmt)
         return list(result.scalars().all())
 

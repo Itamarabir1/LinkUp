@@ -9,15 +9,15 @@
  * Create ride preview: origin as text (origin_name) or current GPS (origin_lat/origin_lon), like passenger flow.
  */
 export interface RidePreviewCreate {
-  driver_id: string;
-  origin_name?: string | null;
-  destination_name: string;
-  departure_time: string;
   /** @minimum 1 */
   available_seats?: number;
-  /** @minimum 0 */
-  price?: number;
+  departure_time: string;
+  destination_name: string;
+  driver_id: string;
+  group_id?: string | null;
   origin_lat?: number | null;
   origin_lon?: number | null;
-  group_id?: string | null;
+  origin_name?: string | null;
+  /** @minimum 0 */
+  price?: number;
 }

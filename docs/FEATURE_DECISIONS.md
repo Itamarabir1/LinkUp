@@ -39,6 +39,21 @@
 
 ---
 
+<a id="s3-delete-objects-avatar-async"></a>
+
+## S3 — מחיקת prefix ב-`DeleteObjects` + הסרת אווטאר אסינכרונית
+
+| | |
+|--|--|
+| **בעיה** | Listing של כל המפתחות ל־RAM + **`delete_object` פר פריט** מגדילים משך קריאה, מספר round-trips וסיכון timeout; הסרת אווטאר סינכרונית מה-HTTP מחברת latency משתמש לנפח אובייקטים בתיק המשתמש. |
+| **החלטה** | (1) **זרימה**: `iter_prefix_keys` → צבירת מפתחות עד 1000 → **`delete_objects`** עם טיפול ב־`Errors`. (2) **`remove_avatar`**: איפוס `users.avatar_*` + **`publish_to_outbox(..., "user.avatar_remove")`** באותה טרנזקציה; מחיקת `avatars/{user_id}/` ב־[`avatar_tasks`](../backend/app/workers/tasks/avatar_tasks.py). |
+| **אלטרנטיבות** | מחיקה סדרתית (פשוט, גרוע בסקייל); S3 Lifecycle בלבד (לא מסונכן מייד עם שינוי מצב DB); משימת Celery חיצונית בלי Outbox — פחות עקביות מול טרנזקציה. |
+| **יתרון** | פחות זיכרון וקריאות API; פרופיל משתמש חוזר מהר; אותה מודל **DB + אירוע** כמו העלאת אווטאר. |
+| **Trade-off** | חלון קצר שבו DB ללא תמונה אבל קבצים עדיין ב-S3 אם worker מאחר; מתקבל בהחלפת אווטאר/מחיקה רכה בשירותים מבוזרים. |
+| **הפניה** | [`backend/app/infrastructure/s3/client.py`](../backend/app/infrastructure/s3/client.py), [`service.py`](../backend/app/infrastructure/s3/service.py), [`backend/app/domain/users/service.py`](../backend/app/domain/users/service.py), [STORAGE.md](architecture/STORAGE.md), [EVENTS.md](architecture/EVENTS.md) |
+
+---
+
 <a id="rabbitmq-pr1-pr2"></a>
 
 ## RabbitMQ reliability refactor (PR1 + PR2)
@@ -210,7 +225,7 @@
 | | |
 |--|--|
 | **בעיה** | `OFFSET` גדול על טבלאות שצומחות — שאילתה יקרה, ותוצאות "מדלגות" אם נכנסות רשומות חדשות בזמן גלילה. |
-| **החלטה** | **נסיעות (חיפוש נוסע):** `after` + `limit` על מזהה cursor; **הודעות צ’אט:** `before` / `after` + `limit` לפי `message_id` — ראו [API messages](architecture/API.md). |
+| **החלטה** | **נסיעות (חיפוש נוסע):** `after` + `limit` על מזהה cursor; **הודעות צ’אט (היסטוריה בשיחה):** `before` / `after` + `limit` לפי `message_id` — ראו [API messages](architecture/API.md); **אינבוקס רשימת שיחות:** `GET /chat/conversations` עם `limit` / `after` (cursor אטום) — [API inbox](architecture/API.md), פירוט: [#chat-inbox-cursor-pagination](#chat-inbox-cursor-pagination). |
 | **אלטרנטיבות** | Keyset מורכב יותר לכל מסך; offset בלבד — פשוט אבל לא יציב ולא סקייל בצורה טובה. |
 | **יתרון** | עומס סביר על DB בגלילה ארוכה; התאמה טבעית ל-“טען עוד” ול־reconnect (`after` אחרי WS). |
 | **Interview pitch (≈15s)** | *"ברשימות שנשארות ארוכות עברנו ל-cursor על מזהים, לא offset — פחות full scan ופחーズ חיתוך באמצע עמוד."* |
@@ -257,6 +272,16 @@
 | **יתרון** | מפחית drift חוזי בין backend/frontend, מקטין boilerplate ידני, ומשפר type-safety בזמן קומפילציה. |
 | **Trade-off** | דורש discipline תהליכי: כל שינוי schema מחייב regeneration לפני merge. |
 | **הפניה** | [`../frontend/orval.config.ts`](../frontend/orval.config.ts), [`../frontend/src/api/client.ts`](../frontend/src/api/client.ts), [`../frontend/src/api/generated/client.ts`](../frontend/src/api/generated/client.ts) |
+
+### Stage 2 — snapshot uncommitted, dedicated workflow
+
+| | |
+|--|--|
+| **בעיה** | `frontend/openapi-snapshot.json` היה **תוצר ביניים מקומיט** ל-git שנערך ידנית בסקריפטי patch (`scripts/patch-openapi-manifest-passengers.py`) כשלא היה ניתן לייצא ישירות מ-FastAPI. כפילות מקור-אמת: הסכמה הייתה גם ב-`app.openapi()` וגם בקובץ JSON מקומיט שיכל לסטות בשקט. ה-job `contract-codegen` ב-`frontend-ci.yml` בדק drift רק על `src/api/generated/` ולא על ה-snapshot עצמו, כלומר schema של backend יכלה להשתנות בלי שאף בדיקה תיכשל עד שמישהו ירוץ patch + Orval. |
+| **החלטה** | (1) ה-snapshot יורד מ-git: [`frontend/.gitignore`](../frontend/.gitignore) מסמן את `openapi-snapshot.json` כתוצר build. (2) Workflow ייעודי [`.github/workflows/openapi-contract.yml`](../.github/workflows/openapi-contract.yml) מייצא טרי בכל ריצה: `uv sync` → [`backend/scripts/export_openapi.py`](../backend/scripts/export_openapi.py) → `npm run gen:api` → `git diff --exit-code -- frontend/src/api/generated/`. (3) ה-job `contract-codegen` הוסר מ-[`frontend-ci.yml`](../.github/workflows/frontend-ci.yml). (4) DX מקומי: target `openapi` ב-[`Makefile`](../Makefile) השורש + `npm run openapi:sync` ב-[`frontend/package.json`](../frontend/package.json) שמפנה אליו. (5) `scripts/patch-openapi-manifest-passengers.py` נמחק. |
+| **למה לא DB ב-CI** | `app.openapi()` הוא קריאה lazy: `setup_admin(app, engine)` מסתפק ב-engine (לא מתחבר עד request), Firebase init מטפל ב-credentials חסרים עם warning בלבד, ו-lifespan לא רץ בלי uvicorn. כתוצאה — ה-workflow רץ ללא service Postgres, בלי env vars מיוחדים, ב-< 30 שניות. |
+| **Trade-off** | מפתח ש-`from app.main import app` לא מצליח אצלו לוקלית (למשל בעיית DLL ב-Windows) חייב להסתמך על ה-CI לאמת את הסכמה — אבל ה-CI ממילא מחייב כדי לעצור drift. |
+| **הפניה** | [`../backend/scripts/export_openapi.py`](../backend/scripts/export_openapi.py), [`../.github/workflows/openapi-contract.yml`](../.github/workflows/openapi-contract.yml), [`../Makefile`](../Makefile), [`../frontend/.gitignore`](../frontend/.gitignore) |
 
 ---
 
@@ -325,12 +350,50 @@
 | | |
 |--|--|
 | **בעיה** | `list_my_conversations` קראה ל-`get_last_message` + `has_unread_messages` **לכל שיחה בנפרד** → 2N+ DB round-trips כשלמשתמש יש N שיחות. |
-| **החלטה** | פונקציה חדשה `get_inbox_aggregates` ב-`chat/crud.py`: שלוש שאילתות מאוגדות (last message per conversation, last incoming per conversation, last_read_at per participant) + מיזוג בזיכרון. `list_my_conversations` קוראת לה פעם **אחת** ומייצרת את כל ה-`ConversationListItem`. |
+| **החלטה** | פונקציה חדשה `get_inbox_aggregates` ב-`chat/crud.py`: שלוש שאילתות מאוגדות (last message per conversation, last incoming per conversation, last_read_at per participant) + מיזוג בזיכרון. הרשימה נמשכת בעמודים דרך `list_conversations_paginated`; **`list_my_conversations` קוראת לה רק על `conversation_id`-ים של העמוד** (לא על כל האינבוקס בבת אחת). |
 | **אלטרנטיבות** | (1) `joinedload` ב-ORM — לא מספיק: לא מחשב `has_unread` ב-SQL. (2) GraphQL + DataLoader — overkill לממשק REST הנוכחי. (3) view materialised ב-Postgres — מורכבות תפעולית גבוהה, stale data. |
-| **יתרון** | מ-~3N קריאות ל-**4 קריאות קבועות** ללא תלות בגודל ה-inbox; `get_last_message` + `has_unread_messages` המקוריות נשמרות לשימושים אחרים (DRY). |
+| **יתרון** | מ-~3N קריאות (לעומת N שיחות **בעמוד**) ל-**4 קריאות קבועות לעמוד**; `get_last_message` + `has_unread_messages` המקוריות נשמרות לשימושים אחרים (DRY). |
 | **Trade-off** | שאילתות ה-aggregate ארוכות יותר (subquery + join); אם inbox ריק — early return מיידי. |
-| **Interview pitch (≈30s)** | *"ה-inbox הריץ get_last_message + has_unread לכל שיחה — N+1 קלאסי. החלפתי בפונקציה אחת שמריצה שלוש aggregate queries ומאחדת בזיכרון. מ-3N ל-4 קריאות קבועות, והפונקציות המקוריות נשמרות כי בשימוש במקומות אחרים."* |
+| **Interview pitch (≈30s)** | *"ה-inbox הריץ get_last_message + has_unread לכל שיחה — N+1 קלאסי. החלפתי באגרגציה אחת שמריצה שלוש שאילתות מאוגדות ומאחדת בזיכרון, ועם pagination האגרגציות רצות רק על השיחות בעמוד. מ-3N ל-4 קריאות קבועות לעמוד."* |
 | **הפניה** | [`../backend/app/domain/chat/crud.py`](../backend/app/domain/chat/crud.py) (`get_inbox_aggregates`), [`../backend/app/domain/chat/service.py`](../backend/app/domain/chat/service.py) (`list_my_conversations`) |
+
+---
+
+<a id="chat-inbox-cursor-pagination"></a>
+
+## Chat inbox: cursor pagination (keyset)
+
+| | |
+|--|--|
+| **בעיה** | משיכת כל רשימת השיחות בבקשה אחת לא סקיילת; `OFFSET` גדול לא יציב. |
+| **החלטה** | **`list_conversations_paginated`** — מיון לפי `COALESCE(conversations.last_message_at, conversations.created_at)` + `conversation_id DESC`, `LIMIT limit+1`, פילטר אחרי cursor ב-keyset; `last_message_at` נשמר ב-`create_message` עם עדכון מונוטוני (`GREATEST`) כדי לשמור סדר יציב תחת קונקרנציה. קידוד/פענוח cursor עבר ל-helper המשותף **`app/core/pagination/cursor.py`** (payload אטום, UTC normalization; בצ'אט נשמר `{"t","c"}`); תגובה **`PaginatedConversationsResponse`**; cursor לא תקין → **422** (`CHAT_INVALID_INBOX_CURSOR`). **`list_conversations_for_user`** נשאר ללא מחיקה לשימושים אחרים. פרונט: **`useInfiniteQuery`**, **`getNextPageParam` מ־`next_cursor`**, sentinel **`IntersectionObserver`** בתוך סיידבר עם גלילה. |
+| **הפניה** | [`../backend/app/core/pagination/cursor.py`](../backend/app/core/pagination/cursor.py), [`../backend/app/domain/chat/crud.py`](../backend/app/domain/chat/crud.py) (`list_conversations_paginated`), [`../frontend/src/pages/Messages.tsx`](../frontend/src/pages/Messages.tsx), [`docs/architecture/API.md`](architecture/API.md) |
+
+---
+
+<a id="api-read-caps-batch-status"></a>
+
+## API read caps + batch passenger-request status (notifications / cancel ride / groups)
+
+| | |
+|--|--|
+| **בעיה** | חיפוש מרחבי בלי תקרה בעת יצירת בקשה או רענון התאמות; feed in-app של התראות משך את כל ה-bookings של הנוסע; `cancel_ride_and_bookings` ריצה פר־`request_id` (select+update); **ביטול בקשת נוסע** (`DELETE …/passengers/{id}/cancel`) היה לולאה על כל booking עם `execute_booking_cancellation` → ~O(N) שאילתות + עדכוני `PassengerRequest` מיותרים לפני `status=CANCELLED`; `get_my_groups` — N+1 על `get_member_count`. |
+| **החלטה** | **`_IMMEDIATE_MATCH_LIMIT = 20`** ב־`passengers/service.py` על `find_rides_by_coordinates` ב־`create_passenger_request` / `get_matches_by_request_id`. פיד ההתראות (**`GET /users/me/notifications`**) עבר ל-**cursor pagination**: `limit` (default 20, max 100), `after`, תגובה `items`/`next_cursor`/`has_more`/`limit`. ב-CRUD שני מקורות ההתראות (`get_user_bookings_with_relations`, `get_all_pending_bookings_for_driver`) עובדים ב-keyset עם `ORDER BY created_at DESC, booking_id DESC`, פילטר `after=(created_at, booking_id)`, ו-`limit+1`; ב-service מתבצע merge+sort אחיד ואז חישוב cursor דרך helper משותף (`app/core/pagination/cursor.py`). אחרי ביטול נסיעה: **select אחד** `Booking` עם `request_id IN (...)`, חישוב סטטוס מ־**`_status_from_bookings_list`** (מקור יחיד שממנו גם **`determine_passenger_request_status`**), ואז **`bulk_update_requests_status`** לפי קבוצות סטטוס. **ביטול בקשת נוסע:** **`bulk_cancel_bookings_for_request`** — אגרגציה של מושבים לפי נסיעה (סטטוסים שתפסו מקום), **`FOR UPDATE`** על `rides`, עדכון **`UPDATE bookings … request_id`** אחד; `PassengerRequest.status=CANCELLED` נשאר ב-service. מיגרציה **019** מוסיפה ל-PostgreSQL את ערכי **`en_route` / `arrived` / `trip_in_progress`** ב-`booking_status` (תואם ל-Python `BookingStatus`). קבוצות: **`get_member_counts_batch`** (`GROUP BY`) + שימוש ב־`get_my_groups`. |
+| **Trade-off** | ה-badge בפרונט נשאר מבוסס עמוד ראשון (`limit=20`) עם read-state מקומי (localStorage), ולכן לא מייצג ספירה מוחלטת של כל היסטוריית ההתראות — זה מחיר מודע עד מעבר עתידי לשרת עם `read_state` קנוני. |
+| **הפניה** | [`../backend/app/domain/passengers/service.py`](../backend/app/domain/passengers/service.py), [`../backend/app/domain/bookings/crud.py`](../backend/app/domain/bookings/crud.py), [`../backend/app/domain/groups/crud.py`](../backend/app/domain/groups/crud.py), [`docs/architecture/API.md`](architecture/API.md) |
+
+---
+
+<a id="geo-manifest-passenger-reads"></a>
+
+## זרימת preview גיאוגרף + תקרות קריאה (מניפסט נהג / בקשות נוסע)
+
+| | |
+|--|--|
+| **בעיה** | **`get_full_routing_data`** (`processor.py`) קרא ל-Google Geocoding ישירות משני צירי טקסט ובכך דילג על שכבת **`geocode_cache`** (Redis + **`get_or_compute`**). **`get_ride_manifest`** טען את כל ה-PENDING/CONFIRMED ללא תקרה. **`GET /passenger/passengers/me`** החזיר רשימה לא מוגבלת לעומס זיכרון/API בנוסע עם היסטוריה ארוכה. |
+| **החלטה** | **Preview:** `processor.get_full_routing_data` משתמש ב-**`geocode_cache.get_coordinates`** למוצא ויעד לפני Directions. **מניפסט:** ספירות סטטוס + **SELECT** יחיד עם מיון **`CASE` (confirmed לפני pending)**, **`.limit(MANIFEST_BOOKING_ROW_LIMIT)`** (100 ב-[`../backend/app/core/constants.py`](../backend/app/core/constants.py)); תגובה כוללת **`confirmed_total`**, **`pending_total`**, **`manifest_truncated`**, ו-**`total_confirmed_passengers`** כספירת מאושרים ב-DB (**`BookingReadsService`**). **בקשות נוסע (`GET /passenger/passengers/me`):** מעבר מ-offset/page ל-**cursor pagination** (`cursor`, `limit` -> `items`, `next_cursor`, `has_more`) עם keyset יציב `requested_departure_time DESC, request_id DESC`; פרונט: **`fetchMyPassengerRequests`** + **`useMyRequests`** עם `useInfiniteQuery`. OpenAPI: בעקבות [Stage 2 של `OpenAPI snapshot code generation`](#openapi-snapshot-code-generation-orval) הסכמה מיוצאת אוטומטית דרך **`make openapi`** — אין יותר patch ידני על snapshot. |
+| **Trade-off** | מניפסט מקוצר עלול להסתיר PENDING אם יש יותר מ-100 צירופי pending+confirmed — לשקול UI "עמוד נוסף" אם יידרש מוצרית. |
+| **הפניה** | [`../backend/app/domain/geo/processor.py`](../backend/app/domain/geo/processor.py), [`../backend/app/infrastructure/geo/geocode_cache.py`](../backend/app/infrastructure/geo/geocode_cache.py), [`../backend/app/domain/bookings/booking_reads_service.py`](../backend/app/domain/bookings/booking_reads_service.py), [`../backend/app/domain/passengers/router.py`](../backend/app/domain/passengers/router.py), [`docs/architecture/API.md`](architecture/API.md), [`docs/ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) |
 
 ---
 
@@ -341,12 +404,12 @@
 | | |
 |--|--|
 | **בעיה** | בטאב "הזמנות שלי" מספר קריאות per booking/ride יוצרות N+1 ו-UX איטי. |
-| **החלטה** | Dedicate endpoints: `GET /bookings/driver-summary` ו-`GET /bookings/passenger-summary` + mapping ל-view-model; hooks מבודדים. |
-| **אלטרנטיבות** | (1) GraphQL עם DataLoader. (2) BFF שמרכז. (3) N+1 עם `joinedload` — עדיין הרבה round-trips אם ה-UI שואל "פר booking". |
-| **יתרון** | מעט round-trips, חוזה יציב ל-UI, קל לדגום ב-ראיון. |
-| **Trade-off** | endpoints ייעודיים = יותר שטח API לתחזק. |
-| **Interview pitch (≈30s)** | *"במקום שהפרונט יריץ N קריאות, הוספתי read models מרוכזים לנהג ולנוסע: טאב אחד = קריאה אחת, והמאפר מרכז את DTO→UI."* |
-| **הפניה** | HIGHLIGHTS, `BookingReadsService`, [architecture/DATABASE.md](architecture/DATABASE.md) (אם רלוונטי) |
+| **החלטה** | Read models מאוגדים לנהג ולנוסע; **הפרדת פעיל מול היסטוריה**: `GET …/driver-summary/active` + `…/driver-summary/history` (ומקבילים לנוסע) עם **קורסור** (`after` + `next_cursor`, Base64 JSON ב־UTC דרך [`core/pagination/cursor.py`](../backend/app/core/pagination/cursor.py)). **Legacy** `GET …/driver-summary` ו-`…/passenger-summary` נשמרים לתאימות ומסומנים **deprecated** ב-FastAPI/OpenAPI. |
+| **אלטרנטיבות** | (1) GraphQL עם DataLoader. (2) BFF שמרכז. (3) N+1 עם `joinedload` — עדיין הרבה round-trips אם ה-UI שואל "פר booking". (4) רק endpoint אחד ללא פיצול — payloads בלתי חסומים בהיסטוריה. |
+| **יתרון** | מעט round-trips לפעיל; היסטוריה מדורגת; פחות זיכרון/רשת; נוסעים בהיסטוריית נהג נטענים עם `with_loader_criteria` מתאים (לא רק pending/confirmed). |
+| **Trade-off** | יותר נתיבים ומפתחות React Query (`driverActive` / `driverHistory` וכו’). |
+| **Interview pitch (≈30s)** | *"במקום N+1 יש read models; לפעיל תקרה רכה ולפעמים שני מפתחות cache; היסטוריה עם cursor כמו inbox."* |
+| **הפניה** | HIGHLIGHTS, `BookingReadsService`, [architecture/API.md](architecture/API.md), [architecture/DATABASE.md](architecture/DATABASE.md) |
 
 ---
 
@@ -374,6 +437,7 @@
 |--|--|
 | **בעיה** | נוסע רוצה לראות נסיעות זמינות בלי “לזהם” את ה-DB; וגם לקבל התראה כשנהג מפרסם נסיעה שמתאימה לפרופיל/מיקום. |
 | **החלטה** | **חיפוש בלבד** — `GET /passenger/passengers/search-rides`: שאילתה (PostGIS / פילטרים), **בלי** `INSERT` ל־`passenger_requests`. **שמירה + מנוי להתאמות** — `POST /passenger/passengers/` עם `PassengerRequestCreate` (`is_notification_active`, `group_id` אופציונלי) — אותו מודל בקשה גם ל-matching מיידי. **התראות אסינכרוניות:** אחרי יצירת נסיעה נרשם ב־Outbox **`ride.created`**; `notification-worker` מפרסם ל־RabbitMQ; **`handle_ride_created`** טוען את הנסיעה, מריץ `find_passengers_for_ride_notification` (סינון פעיל/התראות/תאריכים/`group_id`/קרבה גיאוגרפית), ולכל נוסע מתאים מפעיל את שכבת ההתראות עם אירוע פנימי **`ride.created_for_passengers`** (מייל Brevo וכו’) — **לא** אותו routing key כמו `ride.created`. |
+| **עדכון pagination/filters** | cursor של `search-rides` הוקשח ל-**opaque token** (`after: str`, `next_cursor`) עם decode ב-service ו-keyset ישיר ב-CRUD על `(Ride.departure_time, Ride.ride_id)` — ללא lookup נוסף לפי `ride_id` קיים. שגיאת cursor לא תקין מוחזרת כ-**422** (`INVALID_SEARCH_CURSOR`). בנוסף, נוספה תמיכה מלאה ב-**`destination_radius`** (ק״מ) כרדיוס יעד נפרד; אם קיים הוא מחליף רק את רדיוס תנאי היעד ב-`ST_DWithin`, בעוד `search_radius` ממשיך לרדיוס הכללי/מוצא. |
 | **אלטרנטיבות** | (1) לשמור כל חיפוש כ־row — רעש ועומס DB. (2) התראות בלי שורת בקשה — קשה לביטול/הרשאות. |
 | **יתרון** | הפרדה ברורה בין צפייה חד־פעמית לבין מנוי אירועים; מקור אמת אחד ל־`passenger_requests` גם ל־matching וגם לתור התראות. |
 | **Trade-off** | שני מסלולי API לנוסע — דורש מוצר/תיעוד ברורים כדי שלא יבלבלו משתמשים. |

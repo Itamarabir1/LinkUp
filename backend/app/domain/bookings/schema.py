@@ -3,6 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.constants import NOTIFICATIONS_DEFAULT_LIMIT
 from app.domain.bookings.enum import BookingStatus
 
 
@@ -49,7 +50,16 @@ class BookingManifestItem(BaseModel):
 # 4. Full manifest response
 class RideManifestResponse(BaseModel):
     ride_id: UUID
-    total_confirmed_passengers: int
+    confirmed_total: int = Field(ge=0, description="כל שורות confirmed לנסיעה (COUNT)")
+    pending_total: int = Field(ge=0, description="כל שורות pending לנסיעה (COUNT)")
+    manifest_truncated: bool = Field(
+        ...,
+        description="True אם confirmed_total + pending_total חורגים מ-manifest row limit והרשימה נחתכה",
+    )
+    total_confirmed_passengers: int = Field(
+        ge=0,
+        description="תואם confirmed_total לתאימות לאחור; ספירת מאושרים ב-DB לאורך הנסיעה",
+    )
     available_seats_left: int
     passengers: list[BookingManifestItem]
 
@@ -109,14 +119,6 @@ class RideWithPassengersItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class DriverSummaryResponse(BaseModel):
-    """Aggregated driver view: all rides with passengers embedded."""
-
-    rides: list[RideWithPassengersItem]
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 class DriverSummaryInfo(BaseModel):
     full_name: str
     phone_number: str | None = None
@@ -140,8 +142,30 @@ class PassengerBookingSummaryItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PassengerSummaryResponse(BaseModel):
+class DriverActiveResponse(BaseModel):
+    rides: list[RideWithPassengersItem]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DriverHistoryResponse(BaseModel):
+    rides: list[RideWithPassengersItem]
+    next_cursor: str | None = None
+    has_more: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PassengerActiveResponse(BaseModel):
     bookings: list[PassengerBookingSummaryItem]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PassengerHistoryResponse(BaseModel):
+    bookings: list[PassengerBookingSummaryItem]
+    next_cursor: str | None = None
+    has_more: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -159,3 +183,14 @@ class NotificationItemResponse(BaseModel):
     ride_origin: str | None = None
     ride_destination: str | None = None
     status: str | None = None  # לנוסע: confirmed / rejected / pending_approval
+
+
+class PaginatedNotificationsResponse(BaseModel):
+    """Cursor-paginated notifications for GET /users/me/notifications."""
+
+    items: list[NotificationItemResponse] = Field(default_factory=list)
+    next_cursor: str | None = None
+    has_more: bool = False
+    limit: int = NOTIFICATIONS_DEFAULT_LIMIT
+
+    model_config = ConfigDict(from_attributes=True)

@@ -26,11 +26,12 @@ from app.domain.bookings.enum import BookingStatus
 from app.domain.bookings.model import Booking
 from app.domain.chat import crud as chat_crud
 from app.domain.chat.model import ConversationParticipant
-from app.core.pagination.cursor import CursorDecodeError, encode_cursor
+from app.core.pagination.cursor import CursorDecodeError, decode_cursor_int, encode_cursor, encode_cursor_int
 from app.domain.chat.schema import (
     ConversationDetail,
     ConversationListItem,
     ConversationPartner,
+    MessageGapResponse,
     MessageResponse,
     PaginatedConversationsResponse,
     PaginatedMessagesResponse,
@@ -293,8 +294,7 @@ async def get_messages(
     conversation_id: UUID,
     current_user_id: UUID,
     limit: int = 50,
-    before_message_id: int | None = None,
-    after_message_id: int | None = None,
+    after_cursor: str | None = None,
 ) -> PaginatedMessagesResponse:
     """
     Message history for a conversation (pagination).
@@ -302,12 +302,23 @@ async def get_messages(
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
     if not conv:
         raise ChatRoomNotFound()
+
+    after: tuple[datetime, int] | None = None
+    if after_cursor is not None:
+        try:
+            after = decode_cursor_int(after_cursor)
+        except CursorDecodeError as e:
+            raise LinkUpError(
+                message=str(e) or "מזהה דף לא תקין",
+                status_code=422,
+                error_code="CHAT_INVALID_MESSAGE_CURSOR",
+            ) from e
+
     messages, has_more = await chat_crud.get_messages(
         db,
         conversation_id=conversation_id,
         limit=limit,
-        before_message_id=before_message_id,
-        after_message_id=after_message_id,
+        after=after,
     )
     items = [
         MessageResponse(
@@ -319,11 +330,51 @@ async def get_messages(
         )
         for m in messages
     ]
-    next_cursor = str(items[0].message_id) if has_more and items else None
+    next_cursor = encode_cursor_int(items[0].created_at, items[0].message_id) if has_more and items else None
     return PaginatedMessagesResponse(
         items=items,
         next_cursor=next_cursor,
         has_more=has_more,
+    )
+
+
+async def get_messages_gap(
+    db: AsyncSession,
+    conversation_id: UUID,
+    current_user_id: UUID,
+    since_message_id: int,
+) -> MessageGapResponse:
+    """Reconnect backfill messages newer than a known message id."""
+    if since_message_id < 0:
+        raise LinkUpError(
+            message="since_message_id must be non-negative",
+            status_code=422,
+            error_code="CHAT_INVALID_GAP_SINCE_ID",
+        )
+
+    conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
+    if not conv:
+        raise ChatRoomNotFound()
+
+    messages, truncated, last_message_id = await chat_crud.get_messages_gap_since(
+        db,
+        conversation_id=conversation_id,
+        since_message_id=since_message_id,
+    )
+    items = [
+        MessageResponse(
+            message_id=m.message_id,
+            conversation_id=m.conversation_id,
+            sender_id=m.sender_id,
+            body=m.body,
+            created_at=m.created_at,
+        )
+        for m in messages
+    ]
+    return MessageGapResponse(
+        items=items,
+        truncated=truncated,
+        last_message_id=last_message_id,
     )
 
 

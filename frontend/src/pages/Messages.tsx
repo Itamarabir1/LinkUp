@@ -1,9 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useChat } from '../context/ChatContext';
-import { listConversations } from '../api/chat';
+import { inboxPageSizeDefault, listConversations } from '../api/chat';
 import { qk } from '../api/queryKeys';
 import { formatConversationTime } from '../utils/date';
 import ErrorBanner from '../components/ErrorBanner';
@@ -13,38 +14,60 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import MessageThread from './MessageThread';
 import styles from './Messages.module.css';
 
+const inboxLimit = inboxPageSizeDefault;
+
 export default function Messages() {
   const { t } = useTranslation('nav');
   const pageTitle = t('messages');
   usePageTitle(pageTitle);
   const { user } = useAuth();
   const { openChat, panelConversationId, unreadMessages } = useChat();
+
+  const sidebarRef = useRef<HTMLElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
   const {
     data,
     isLoading: loading,
     error: fetchError,
-  } = useQuery({
-    queryKey: qk.chat.conversations(),
-    queryFn: async () => {
-      const { data } = await listConversations();
-      return (Array.isArray(data) ? data : []).slice().sort((a, b) => {
-        const at = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
-        const bt = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
-        return bt - at;
-      });
-    },
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: qk.chat.conversations(inboxLimit),
+    queryFn: ({ pageParam }) => listConversations({ limit: inboxLimit, after: pageParam }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
     enabled: !!user?.user_id,
     staleTime: 30_000,
     refetchOnReconnect: false,
   });
 
-  const list = data ?? [];
+  const list = data?.pages.flatMap((p) => p.items) ?? [];
+
+  useEffect(() => {
+    const root = sidebarRef.current;
+    const target = sentinelRef.current;
+    if (!root || !target || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const hit = entries[0]?.isIntersecting;
+        if (hit && hasNextPage && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      { root, rootMargin: '100px' },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, list.length]);
+
   const error = fetchError ? getApiErrorMessage(fetchError, apiErr('err_load_conversations')) : '';
 
   return (
     <div className={styles.container}>
       <h1 className="sr-only">{pageTitle}</h1>
-      <aside className={styles.sidebar}>
+      <aside ref={sidebarRef} className={styles.sidebar}>
         <header className={styles.sidebarHeader}>
           {unreadMessages > 0 && (
             <span className={styles.newCount}>{unreadMessages} חדשות</span>
@@ -97,6 +120,10 @@ export default function Messages() {
                 </div>
               </button>
             ))}
+            <div ref={sentinelRef} className={styles.inboxSentinel} aria-hidden />
+            {isFetchingNextPage && (
+              <div className={styles.loadingMore}>טוען עוד…</div>
+            )}
           </div>
         )}
       </aside>

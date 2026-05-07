@@ -2,7 +2,6 @@
 import logging
 from uuid import UUID
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions.booking import (
@@ -119,16 +118,6 @@ class BookingService:
             await db.rollback()
             logger.error(f"Failed to cancel ride {ride_id}: {e}")
             raise
-
-    @staticmethod
-    async def cancel_all_bookings_for_request(db: AsyncSession, request_id: UUID) -> None:
-        """Cancel every booking tied to a passenger request (PassengerService hook)."""
-        stmt = select(Booking).where(Booking.request_id == request_id)
-        result = await db.execute(stmt)
-        bookings = list(result.scalars().all())
-        for b in bookings:
-            await crud_booking.execute_booking_cancellation(db, b)
-        await db.commit()
 
     @staticmethod
     async def get_booking(db: AsyncSession, booking_id: UUID) -> Booking:

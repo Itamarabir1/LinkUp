@@ -168,6 +168,12 @@ class RideResponse(RideBase):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
+class PaginatedRidesResponse(BaseModel):
+    rides: list[RideResponse]
+    next_cursor: str | None = None
+    has_more: bool = False
+
+
 class RideSearchResponse(BaseModel):
     """Compact ride shape for search listings."""
 

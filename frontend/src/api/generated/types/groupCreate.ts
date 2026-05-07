@@ -6,7 +6,7 @@
  */
 
 export interface GroupCreate {
-  name: string;
-  max_members?: number | null;
   description?: string | null;
+  max_members?: number | null;
+  name: string;
 }

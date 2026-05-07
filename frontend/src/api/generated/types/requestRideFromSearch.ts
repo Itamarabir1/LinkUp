@@ -9,13 +9,13 @@
  * Join a ride from search results.
  */
 export interface RequestRideFromSearch {
-  ride_id: string;
-  /** מזהה הבקשה מהחיפוש (אם קיים) */
-  request_id?: string | null;
-  /** @minLength 1 */
-  pickup_name: string;
   /** @minLength 1 */
   destination_name: string;
   /** @minimum 1 */
   num_seats?: number;
+  /** @minLength 1 */
+  pickup_name: string;
+  /** מזהה הבקשה מהחיפוש (אם קיים) */
+  request_id?: string | null;
+  ride_id: string;
 }

@@ -323,24 +323,57 @@ async def get_messages(
     db: AsyncSession,
     conversation_id: UUID,
     limit: int = 50,
-    before_message_id: int | None = None,
-    after_message_id: int | None = None,
+    after: tuple[datetime, int] | None = None,
 ) -> tuple[list[Message], bool]:
     """
     Message history for a conversation (pagination).
     Returns (list in chronological order oldest→newest, has_more).
     """
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
-    q = select(Message).where(Message.conversation_id == cid).order_by(desc(Message.created_at)).limit(limit + 1)
-    if before_message_id is not None:
-        q = q.where(Message.message_id < before_message_id)
-    if after_message_id is not None:
-        q = q.where(Message.message_id > after_message_id)
+    q = (
+        select(Message)
+        .where(Message.conversation_id == cid)
+        .order_by(desc(Message.created_at), desc(Message.message_id))
+        .limit(limit + 1)
+    )
+    if after is not None:
+        ct, message_id = after
+        q = q.where(
+            or_(
+                Message.created_at < ct,
+                and_(Message.created_at == ct, Message.message_id < message_id),
+            )
+        )
     result = await db.execute(q)
     rows = list(result.scalars().unique().all())
     has_more = len(rows) > limit
     items = rows[:limit][::-1]  # oldest -> newest
     return (items, has_more)
+
+
+async def get_messages_gap_since(
+    db: AsyncSession,
+    conversation_id: UUID,
+    since_message_id: int,
+    cap: int = 500,
+) -> tuple[list[Message], bool, int | None]:
+    """Messages newer than since_message_id for reconnect backfill."""
+    cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
+    q = (
+        select(Message)
+        .where(
+            Message.conversation_id == cid,
+            Message.message_id > since_message_id,
+        )
+        .order_by(Message.message_id.asc())
+        .limit(cap + 1)
+    )
+    result = await db.execute(q)
+    rows = list(result.scalars().unique().all())
+    truncated = len(rows) > cap
+    items = rows[:cap]
+    last_message_id = items[-1].message_id if items else None
+    return (items, truncated, last_message_id)
 
 
 async def get_all_messages_for_conversation(

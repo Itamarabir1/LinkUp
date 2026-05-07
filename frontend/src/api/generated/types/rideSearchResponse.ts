@@ -10,8 +10,8 @@ import type { RideResponse } from './rideResponse';
  * Ride search results with cursor-based pagination.
  */
 export interface RideSearchResponse {
+  has_more?: boolean;
   items?: RideResponse[];
   /** ride_id להבא (after=) */
   next_cursor?: string | null;
-  has_more?: boolean;
 }

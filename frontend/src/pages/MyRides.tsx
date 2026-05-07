@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Car, Plus, X } from 'lucide-react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { cancelRide, fetchMyRides } from '../api/rides';
 import type { Ride } from '../types/api';
 import { mk, qk } from '../api/queryKeys';
@@ -32,17 +32,23 @@ export default function MyRides() {
   const [rideToCancel, setRideToCancel] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState('');
   const {
-    data: rides = [],
+    data: ridesPages,
     isLoading: loading,
     error: fetchError,
-  } = useQuery({
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: qk.rides.list(),
-    queryFn: async () => {
-      const { data } = await fetchMyRides();
-      return Array.isArray(data) ? data : [];
+    queryFn: async ({ pageParam }) => {
+      const { data } = await fetchMyRides({ after: pageParam ?? undefined, limit: 20 });
+      return data;
     },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
     staleTime: 30_000,
   });
+  const rides = ridesPages?.pages.flatMap((p) => p.rides) ?? [];
   const fetchErrorMessage = fetchError
     ? getApiErrorMessage(fetchError, apiErr('err_load_rides'))
     : '';
@@ -78,10 +84,8 @@ export default function MyRides() {
   const { mutate: cancelRideMutation, isPending: isCancellingRide } = useMutation({
     mutationKey: mk.rides.cancel(rideToCancel ?? ''),
     mutationFn: (rideId: string) => cancelRide(rideId),
-    onSuccess: (_, rideId) => {
-      queryClient.setQueryData(qk.rides.list(), (old: Ride[] = []) =>
-        old.map((r) => (r.ride_id === rideId ? { ...r, status: 'cancelled' as const } : r))
-      );
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: qk.rides.list() });
       setMutationError('');
       setRideToCancel(null);
     },
@@ -215,6 +219,18 @@ export default function MyRides() {
               </HistorySection>
             </div>
           )}
+          {hasNextPage ? (
+            <div className={styles.gridWrap} style={{ textAlign: 'center', marginTop: '12px' }}>
+              <button
+                type="button"
+                className={styles.btnPrimary}
+                disabled={isFetchingNextPage}
+                onClick={() => void fetchNextPage()}
+              >
+                {isFetchingNextPage ? t('common:loading') : t('rides:loadMore')}
+              </button>
+            </div>
+          ) : null}
         </>
       )}
 

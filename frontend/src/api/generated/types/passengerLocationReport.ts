@@ -9,6 +9,7 @@
  * Request body for passenger location report (POST /bookings/{booking_id}/passenger-location).
  */
 export interface PassengerLocationReport {
+  heading?: number | null;
   /**
      * @minimum -90
      * @maximum 90
@@ -19,6 +20,5 @@ export interface PassengerLocationReport {
      * @maximum 180
      */
   lng: number;
-  heading?: number | null;
   speed?: number | null;
 }

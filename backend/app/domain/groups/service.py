@@ -21,11 +21,10 @@ async def create_group(db: AsyncSession, data: GroupCreate, user_id: UUID) -> Gr
 
 async def get_my_groups(db: AsyncSession, user_id: UUID) -> list[GroupOut]:
     groups = await crud.get_user_groups(db, user_id)
-    result = []
-    for g in groups:
-        count = await crud.get_member_count(db, g.group_id)
-        result.append(group_to_out(g, count))
-    return result
+    if not groups:
+        return []
+    counts = await crud.get_member_counts_batch(db, [g.group_id for g in groups])
+    return [group_to_out(g, counts.get(g.group_id, 0)) for g in groups]
 
 
 async def join_by_invite(db: AsyncSession, invite_code: str, user_id: UUID) -> GroupOut:

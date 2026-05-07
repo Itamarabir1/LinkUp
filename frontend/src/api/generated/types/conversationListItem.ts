@@ -11,8 +11,8 @@ import type { ConversationPartner } from './conversationPartner';
  */
 export interface ConversationListItem {
   conversation_id: string;
-  partner: ConversationPartner;
+  has_unread?: boolean;
   last_message_at?: string | null;
   last_message_preview?: string | null;
-  has_unread?: boolean;
+  partner: ConversationPartner;
 }

@@ -46,10 +46,12 @@ Authorization: Bearer <access_token>
 
 ---
 
-### Cursor-based (נסיעות חיפוש, הודעות צ'אט)
+### Cursor-based (נסיעות חיפוש, הודעות צ'אט, התראות משתמש)
 
-- **נסיעות (חיפוש נוסע)** (`GET /api/v1/passenger/passengers/search-rides`): query נוסף לסינון זמן — **`departure_date`** (תאריך בלבד, יום מלא **Asia/Jerusalem**), או **`departure_time`** (נקודת זמן → חלון **±2 שעות** ב־DB), או **`departure_time`** + **`departure_time_to`** (טווח כולל). **אסור לשלב** `departure_date` עם `departure_time` / `departure_time_to` — **422**. בנוסף: `after` (cursor), `limit`, `pickup_name`, `destination_name`, `search_radius`, `group_id?`. תגובה: `items`, `next_cursor`, `has_more`.
-- **הודעות** (`GET /chat/conversations/{id}/messages`): `before` (message_id — טעינת הודעות ישנות יותר), `after` (message_id — מחזיר הודעות עם **`message_id > after`**; בפרונט, אחרי **`onopen`** של צ’אט WS מתחילים ב־**`after`**; אם התשובה מחזירה **`has_more`**, ההמשך הוא **`before=next_cursor`** בדיוק כמו בגלילה לישנות יותר — ראו **`fetchMissedGap`** ב־REALTIME/HIGHLIGHTS), `limit`. תגובה: `items`, `next_cursor`, `has_more`.
+- **נסיעות (חיפוש נוסע)** (`GET /api/v1/passenger/passengers/search-rides`): query נוסף לסינון זמן — **`departure_date`** (תאריך בלבד, יום מלא **Asia/Jerusalem**), או **`departure_time`** (נקודת זמן → חלון **±2 שעות** ב־DB), או **`departure_time`** + **`departure_time_to`** (טווח כולל). **אסור לשלב** `departure_date` עם `departure_time` / `departure_time_to` — **422**. בנוסף: `after` (opaque cursor), `limit`, `pickup_name`, `destination_name`, `search_radius`, **`destination_radius?`**, `group_id?`. תגובה: `items`, `next_cursor`, `has_more`.
+- **הודעות (history)** (`GET /chat/conversations/{id}/messages`): `after` (opaque cursor בלבד) + `limit`. cursor מקודד composite key `(created_at, message_id)` דרך `app.core.pagination.cursor`, עם keyset predicate יציב ו-deterministic ordering. תגובה: `items`, `next_cursor`, `has_more`.
+- **הודעות (reconnect gap)** (`GET /chat/conversations/{id}/messages/gap`): `since_message_id` (int, `>=0`) בלבד. תגובה: `items`, `truncated`, `last_message_id`. אין cursor ואין pagination contract כללי — זה endpoint ייעודי ל-WS reconnect backfill.
+- **התראות משתמש** (`GET /api/v1/users/me/notifications`): `limit` (ברירת מחדל 20, עד 100), `after` (cursor אטום). תגובה: `items`, `next_cursor`, `has_more`, `limit`. סדר keyset יציב: `created_at DESC, booking_id DESC`; cursor פגום מחזיר 400.
 
 ### Page-based (הזמנות שלי)
 
@@ -113,7 +115,7 @@ Authorization: Bearer <access_token>
 |--------|------|------|--------|
 | POST | /preview-routes | כן | body: RidePreviewCreate. מחזיר אפשרויות מסלול ומחירים. |
 | POST | / | כן | יצירת נסיעה — body: RideCreate. מחזיר RideResponse (201). |
-| GET | /me | כן | נסיעות שלי כנהג. query: status (אופציונלי — open, full, active, completed, cancelled). |
+| GET | /me | כן | נסיעות שלי כנהג. query: status (אופציונלי — open, full, active, completed, cancelled). **עד 200** נסיעות, ממוינות לפי `departure_time` **יורד** (מעבר לכך — נסיעות ישנות יותר לא יופיעו בתגובה). |
 | PATCH | /{ride_id} | כן | עדכון חלקי — body: RideUpdate (רק בעלים). |
 | POST | /{ride_id}/start | כן | התחלת נסיעה — מעביר לסטטוס ACTIVE. דורש לפחות נוסע מאושר אחד. מחזיר RideResponse. |
 | POST | /{ride_id}/end | כן | סיום נסיעה — מעביר לסטטוס COMPLETED. נסיעה חייבת להיות ACTIVE. מחזיר RideResponse. |
@@ -130,13 +132,13 @@ Authorization: Bearer <access_token>
 
 | Method | Path | Auth | תיאור |
 |--------|------|------|--------|
-| GET | /passengers/me | כן | הבקשות שלי כנוסע. query: `request_status` (pending, approved, cancelled, matched, expired, completed, rejected). |
-| POST | /passengers/ | כן | יצירת בקשה קבועה — body: `PassengerRequestCreate` (pickup/destination, `num_passengers`, `search_radius`, `requested_departure_time` אופציונלי, `pickup_lat`/`pickup_lon` זוגיים, **`is_notification_active`** — האם לכלול את הבקשה בהתאמות אימייל/פוש כשנהג יוצר נסיעה מתאימה, **`group_id`** אופציונלי — התאמה רק לנסיעות באותה קבוצה, `is_auto_generated`). מחזיר `PassengerRequestWithMatches` (201) כולל `matching_rides` מיידי. **זהו גם מסלול “שמירת התראה”** אחרי חיפוש: אותם פרמטרי מסלול כמו בחיפוש, בלי תלות ב-`GET search-rides` (החיפוש עצמו **לא** יוצר שורה ב-DB). |
+| GET | /passengers/me | כן | הבקשות שלי כנוסע — **cursor paginated**. query: `request_status`, `cursor` (optional), `limit` (default 50, max 200). תגובה: `items`, `next_cursor`, `has_more`. |
+| POST | /passengers/ | כן | יצירת בקשה קבועה — body: `PassengerRequestCreate` (pickup/destination, `num_passengers`, `search_radius`, `requested_departure_time` אופציונלי, `pickup_lat`/`pickup_lon` זוגיים, **`is_notification_active`** — האם לכלול את הבקשה בהתאמות אימייל/פוש כשנהג יוצר נסיעה מתאימה, **`group_id`** אופציונלי — התאמה רק לנסיעות באותה קבוצה, `is_auto_generated`). מחזיר `PassengerRequestWithMatches` (201) כולל `matching_rides` מיידי (**עד 20** התאמות ראשונות — חיפוש מרחבי עם `limit`). **זהו גם מסלול “שמירת התראה”** אחרי חיפוש: אותם פרמטרי מסלול כמו בחיפוש, בלי תלות ב-`GET search-rides` (החיפוש עצמו **לא** יוצר שורה ב-DB). |
 | GET | /rides/{ride_id}/driver-info | כן | פרטי נהג לנסיעה (מנותב תחת `/api/v1/passenger/rides/...`). |
 | POST | /passengers/request-ride-from-search | כן | body: `RequestRideFromSearch` (`ride_id`, `request_id?`, `num_seats`, כתובות). אם אין `request_id` — יוצר בקשה זמנית לחיפוש; אז `BookingService.request_to_join` + אירועי outbox (התראה לנהג). **כותרת אופציונלית `Idempotency-Key`** — מניע כפילות (Redis; fingerprint ב־`ride_join_idempotency.py`); ראו סעיף Idempotency-Key למעלה. |
-| GET | /passengers/search-rides | אופציונלי | חיפוש נסיעות **ללא שמירה** ב-DB. query: `pickup_name`, `destination_name`, `search_radius` (ק״מ, ברירת מחדל 1), **`departure_date?`** (יום מלא Asia/Jerusalem), **`departure_time?`** (±2 שעות או תחילת טווח עם `departure_time_to`), **`departure_time_to?`**, `limit` (ברירת מחדל 20, עד 50), `after` (cursor), **`group_id?`** — רק אם המשתמש מחובר וחבר בקבוצה. **הדדיות** בין `departure_date` לבין זוג הזמנים → **422**. **Pagination**: `items`, `next_cursor`, `has_more`. |
-| DELETE | /passengers/{request_id}/cancel | כן | ביטול בקשת נסיעה ושחרור שריונים (204). |
-| GET | /passengers/{request_id}/matches | כן | התאמות עדכניות לבקשה קיימת. |
+| GET | /passengers/search-rides | אופציונלי | חיפוש נסיעות **ללא שמירה** ב-DB. query: `pickup_name`, `destination_name`, `search_radius` (ק״מ, ברירת מחדל 1), **`destination_radius?`** (ק״מ; אם קיים מחליף את רדיוס היעד בלבד), **`departure_date?`** (יום מלא Asia/Jerusalem), **`departure_time?`** (±2 שעות או תחילת טווח עם `departure_time_to`), **`departure_time_to?`**, `limit` (ברירת מחדל 20, עד 50), `after` (**opaque cursor**), **`group_id?`** — רק אם המשתמש מחובר וחבר בקבוצה. **הדדיות** בין `departure_date` לבין זוג הזמנים → **422**. **Pagination**: `items`, `next_cursor`, `has_more`. |
+| DELETE | /passengers/{request_id}/cancel | כן | ביטול בקשת נסיעה ושחרור שריונים (204). בקאנד: **`CRUDBooking.bulk_cancel_bookings_for_request`** — אגרגציה + נעילת נסיעות + עדכון bulk של bookings (במקום לולאה פר־booking; ראו **`DATABASE.md`** race + migration **019**). |
+| GET | /passengers/{request_id}/matches | כן | התאמות עדכניות לבקשה קיימת (**עד 20** — אותו תקרה כמו בהתאמה מיידית ביצירת בקשה). |
 | GET | /passengers/all | כן | כל הנסיעות במערכת — **רק `is_admin`**; query: `filter_status`. |
 
 ---
@@ -152,9 +154,13 @@ Authorization: Bearer <access_token>
 | POST | /{booking_id}/location | כן | **GPS נהג**: body: lat, lng, heading?, speed?. דורש: משתמש=נהג הנסיעה, נסיעה ב-ACTIVE. מפיץ מיקום לנוסעים המאושרים (204). לוגיקה ב־`BookingLocationService.broadcast_driver_location` (`location_service.py`). |
 | POST | /{booking_id}/passenger-location | כן | **GPS נוסע**: body: lat, lng, heading?, speed?. דורש: משתמש=נוסע הבוקינג. מפיץ מיקום לנהג בערוץ ride_{ride_id}:passenger_locations (204). לוגיקה ב־`BookingLocationService.broadcast_passenger_location` (`location_service.py`). |
 | GET | /my-bookings | לא (query) | query: user_id, status?, page (default 1), limit (default 20, max 50). **Pagination**: page-based. תגובה: items, total, page, limit, has_more. |
-| GET | /driver-summary | כן | כל נסיעות הנהג עם נוסעים (pending/confirmed) בשאילתת DB אחת — `DriverSummaryResponse` (`BookingReadsService.get_driver_summary`). |
-| GET | /passenger-summary | כן | כל הזמנות הנוסע עם פרטי נסיעה ונהג (כשהנסיעה לא cancelled/completed) — `PassengerSummaryResponse` (`BookingReadsService.get_passenger_summary`). |
-| GET | /ride/{ride_id}/manifest | לא (query) | query: ride_id, driver_id. מניפסט נסיעה (`BookingReadsService.get_ride_manifest`). |
+| GET | /driver-summary | כן | **Deprecated** (OpenAPI): כל נסיעות הנהג עם נוסעים (pending/confirmed + מחזור נסיעה לפי מימוש legacy) — `DriverSummaryResponse` (`get_driver_summary`). עדיף ללקוחות חדשים: `/driver-summary/active` + `/driver-summary/history`. |
+| GET | /driver-summary/active | כן | נסיעות פעילות בלבד (`open` / `full` / `active`) עם נוסעים רלוונטיים — `DriverActiveResponse`; תקרה רכה **200** שורות בבקאנד. |
+| GET | /driver-summary/history | כן | נסיעות `completed` / `cancelled` עם דפדוף: query **`limit`** (ברירת מחדל 20, עד 100), **`after`** (cursor). `DriverHistoryResponse`: `rides`, `next_cursor`, `has_more`. קורסור: Base64 JSON ב־UTC דרך [`core/pagination/cursor.py`](../../backend/app/core/pagination/cursor.py). |
+| GET | /passenger-summary | כן | **Deprecated** (OpenAPI): כל הזמנות הנוסע עם ride+driver+group — `PassengerSummaryResponse` (`get_passenger_summary`). עדיף: `/passenger-summary/active` + `/passenger-summary/history`. |
+| GET | /passenger-summary/active | כן | הזמנות שאינן טרמינליות (כולל מחזור נסיעה) — `PassengerActiveResponse`; תקרה רכה **200**. |
+| GET | /passenger-summary/history | כן | הזמנות `completed` / `cancelled` / `rejected` + `limit` / `after`. `PassengerHistoryResponse`: `bookings`, `next_cursor`, `has_more`. |
+| GET | /ride/{ride_id}/manifest | לא (query) | query: ride_id, driver_id. מניפסט נסיעה (`BookingReadsService.get_ride_manifest`): עד **100** שורות; מיון **CONFIRMED** לפני **PENDING**; שדות `confirmed_total`, `pending_total`, `manifest_truncated`, `total_confirmed_passengers` (ספירת מאושרים ב-DB). |
 | GET | /ride/{ride_id}/pending | לא (query) | query: ride_id, driver_id. בקשות ממתינות (`BookingReadsService.get_pending_requests`). |
 | GET | /{booking_id} | לא | פרטי הזמנה. |
 | WS | /ws/{booking_id}/location | query token=JWT | WebSocket לעדכוני מיקום נהג (רק נוסע הבוקינג). ערוץ Redis: booking_{booking_id}. **שדות:** [REALTIME.md](REALTIME.md) (WebSocket JSON — מיקום). |
@@ -179,7 +185,7 @@ Authorization: Bearer <access_token>
 | GET | /me | כן | הפרופיל שלי (UserRead). |
 | PATCH | /me/last-seen | כן | עדכון `last_active_at` (204). |
 | GET | /{user_id}/last-seen | כן | מקור ל-`last_seen` ב-UI צ'אט; נקרא מ-chat-ws ב-`GET /presence/{id}` כשצריך. |
-| GET | /me/notifications | כן | כל ההתראות שלי (כנהג/נוסע) — `BookingReadsService.get_notifications_for_user`. |
+| GET | /me/notifications | כן | פיד התראות cursor-based: query `limit` (default 20, max 100), `after` (cursor). תגובה: `items`, `next_cursor`, `has_more`, `limit`. מקורות מאוחדים: בקשות הצטרפות ממתינות לנהג + עדכוני הזמנות כנוסע; מיון keyset יציב `created_at DESC, booking_id DESC`. |
 | PATCH | /fcm-token | כן | body: `FCMTokenUpdate` — `fcm_token` מחרוזת (רישום) או **`null`** (ניקוי ב-DB, למשל logout). |
 | POST | /me/test-push | כן | בדיקת FCM (דורש `fcm_token` בפרופיל). |
 | GET | /me/avatar/upload-url | כן | query: filename?. מחזיר presigned URL + staging_key. |
@@ -197,10 +203,11 @@ Authorization: Bearer <access_token>
 |--------|------|------|--------|
 | POST | /conversations | כן | body: ConversationCreate (other_user_id). יוצר או מחזיר שיחה. מחזיר ConversationDetail (201). |
 | POST | /conversations/by-booking/{booking_id} | כן | שיחה לפי booking (נהג–נוסע). |
-| GET | /conversations | כן | רשימת השיחות שלי. |
+| GET | /conversations | כן | אינבוקס (רשימת שיחות): query **`limit`** (ברירת מחדל 30, עד 100), **`after`** (cursor אטום מ־`next_cursor`). תגובה: **`items`**, **`has_more`**, **`next_cursor`**. מיון בשרת: לפי `COALESCE(conversations.last_message_at, conversations.created_at)` (זמן הודעה אחרונה persisted, או `created_at` לשיחה בלי הודעות). **422** אם `after` פגום (`CHAT_INVALID_INBOX_CURSOR`). |
 | GET | /conversations/{conversation_id} | כן | פרטי שיחה. `ConversationDetail` כולל גם `partner_last_read_at` וגם `partner_read_up_to_message_id` (cursor מונוטוני ל-read receipts). |
 | POST | /conversations/{conversation_id}/messages | כן | body: MessageCreate (body). שליחת הודעה (**201**). אופציונלי **`Idempotency-Key`** (מומלץ בלקוח): אותו מפתח + אותה כוונה (`conversation_id` + `body`) → תגובת 201 ממטמון; **409** + `Retry-After` בתהליך; **422** `idempotency_key_mismatch` אחרת. סעיף Idempotency למעלה ו-**ADR §25**. |
-| GET | /conversations/{conversation_id}/messages | כן | הודעות. query: limit (default 30), `before` (message_id לטעינת ישנות / המשך cursor אחרי `after`), `after` (message_id להשלמת missed messages — עמוד ראשון ב־reconnect). **Pagination**: cursor-based. תגובה: items, next_cursor, has_more. |
+| GET | /conversations/{conversation_id}/messages | כן | היסטוריית הודעות (scroll): query `limit` (default 30) + `after` (opaque cursor בלבד). מיון שרת: `created_at DESC, message_id DESC`, keyset stable tie-break. תגובה: `items`, `next_cursor`, `has_more`. שגיאת cursor פגום: `422` / `CHAT_INVALID_MESSAGE_CURSOR`. |
+| GET | /conversations/{conversation_id}/messages/gap | כן | Reconnect backfill ייעודי: query `since_message_id` (`>=0`). מחזיר הודעות עם `message_id > since_message_id` בסדר עולה. תגובה: `items`, `truncated`, `last_message_id` (חובה כאשר `truncated=true`). |
 | POST | /conversations/{conversation_id}/read | כן | סימון שיחה כנקראה (204). |
 הערת read receipts: `POST /conversations/{conversation_id}/read` מעדכן ב־DB גם `last_read_at` וגם `last_read_message_id` עבור המשתמש הקורא. לאחר מכן מתפרסם אירוע WebSocket מסוג `message_read` עם `read_up_to_message_id`, והפרונט מסמן כ־read כל הודעה יוצאת עם `message_id <= partner_read_up_to_message_id`.
 
@@ -222,7 +229,7 @@ Authorization: Bearer <access_token>
 | GET | /join/{invite_code} | כן | פרטי קבוצה לפי קוד הזמנה. |
 | POST | /join/{invite_code} | כן | הצטרפות לקבוצה. |
 | GET | /{group_id}/members | כן | רשימת חברים (חבר בלבד). |
-| GET | /{group_id}/rides | כן | נסיעות של הקבוצה (חבר בלבד). |
+| GET | /{group_id}/rides | כן | נסיעות של הקבוצה (חבר בלבד). **עד 200** נסיעות (ללא ביטולים ברירת מחדל), ממוינות לפי `departure_time` **יורד**. |
 | POST | /{group_id}/upload-image | כן | presigned URL להעלאת תמונת קבוצה (אדמין). |
 | POST | /{group_id}/confirm-image | כן | body: GroupImageConfirmRequest. אישור העלאה (אדמין). |
 | DELETE | /{group_id}/image | כן | מחיקת תמונת קבוצה (אדמין). |

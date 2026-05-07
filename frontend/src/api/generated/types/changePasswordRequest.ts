@@ -11,18 +11,18 @@ Same strength rules as registration; new fields must match.
  */
 export interface ChangePasswordRequest {
   /**
-     * Current password
-     * @minLength 1
+     * Confirm new password
+     * @minLength 8
      */
-  old_password: string;
+  confirm_password: string;
   /**
      * New password
      * @minLength 8
      */
   new_password: string;
   /**
-     * Confirm new password
-     * @minLength 8
+     * Current password
+     * @minLength 1
      */
-  confirm_password: string;
+  old_password: string;
 }

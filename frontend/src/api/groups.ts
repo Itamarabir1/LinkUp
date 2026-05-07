@@ -1,6 +1,5 @@
 import { api } from './client';
-import type { Group, GroupMember } from '../types/api';
-import type { Ride } from '../types/api';
+import type { Group, GroupMember, PaginatedRidesResponse } from '../types/api';
 
 // Create group (optional description; image upload after create)
 export async function createGroup(payload: {
@@ -98,7 +97,15 @@ export async function deleteGroupImage(groupId: string): Promise<Group> {
 }
 
 // Group rides (group screen tab)
-export async function getGroupRides(groupId: string): Promise<Ride[]> {
-  const { data } = await api.get<Ride[]>(`/groups/${groupId}/rides`);
+export async function getGroupRides(
+  groupId: string,
+  params?: { limit?: number; after?: string }
+): Promise<PaginatedRidesResponse> {
+  const { data } = await api.get<PaginatedRidesResponse>(`/groups/${groupId}/rides`, {
+    params: {
+      limit: params?.limit ?? 20,
+      after: params?.after,
+    },
+  });
   return data;
 }

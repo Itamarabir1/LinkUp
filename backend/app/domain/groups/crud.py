@@ -170,3 +170,14 @@ async def close_group(db: AsyncSession, group: Group) -> Group:
 async def get_member_count(db: AsyncSession, group_id: UUID) -> int:
     result = await db.execute(select(func.count()).select_from(GroupMember).where(GroupMember.group_id == group_id))
     return result.scalar_one()
+
+
+async def get_member_counts_batch(db: AsyncSession, group_ids: list[UUID]) -> dict[UUID, int]:
+    """One GROUP BY query for member counts; missing groups get 0."""
+    if not group_ids:
+        return {}
+    result = await db.execute(
+        select(GroupMember.group_id, func.count()).where(GroupMember.group_id.in_(group_ids)).group_by(GroupMember.group_id),
+    )
+    found = {row[0]: int(row[1]) for row in result.all()}
+    return {gid: found.get(gid, 0) for gid in group_ids}

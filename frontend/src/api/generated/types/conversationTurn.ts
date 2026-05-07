@@ -10,7 +10,7 @@ import type { ConversationTurnRole } from './conversationTurnRole';
  * Single turn in conversation history.
  */
 export interface ConversationTurn {
-  role: ConversationTurnRole;
   /** @maxLength 500 */
   content: string;
+  role: ConversationTurnRole;
 }

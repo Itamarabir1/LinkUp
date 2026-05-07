@@ -8,7 +8,8 @@ type MyGroup = { group_id: string; name: string };
 
 export interface DriverBookingsTabProps {
   loading: boolean;
-  items: DriverBookingItem[];
+  activeItems: DriverBookingItem[];
+  historyItems: DriverBookingItem[];
   myGroups: MyGroup[];
   sharingRideId: string | null;
   setSharingRideId: React.Dispatch<React.SetStateAction<string | null>>;
@@ -21,11 +22,15 @@ export interface DriverBookingsTabProps {
   onOpenChat: (bookingId: string) => void;
   onApprove: (bookingId: string) => void;
   onReject: (bookingId: string) => void;
+  onLoadMoreHistory?: () => void;
+  hasMoreHistory?: boolean;
+  loadingMoreHistory?: boolean;
 }
 
 export default function DriverBookingsTab({
   loading,
-  items,
+  activeItems,
+  historyItems,
   myGroups,
   sharingRideId,
   setSharingRideId,
@@ -38,15 +43,11 @@ export default function DriverBookingsTab({
   onOpenChat,
   onApprove,
   onReject,
+  onLoadMoreHistory,
+  hasMoreHistory = false,
+  loadingMoreHistory = false,
 }: DriverBookingsTabProps) {
   const { t } = useTranslation(['bookings', 'common']);
-  const activeItems = items.filter(
-    (item) => item.ride.status !== 'cancelled' && item.ride.status !== 'completed'
-  );
-  const pastItems = items.filter(
-    (item) => item.ride.status === 'cancelled' || item.ride.status === 'completed'
-  );
-
   const handlers: DriverRideBlockHandlers = {
     onSharingToggle: (rideId) => setSharingRideId((prev) => (prev === rideId ? null : rideId)),
     onShareStart,
@@ -58,11 +59,14 @@ export default function DriverBookingsTab({
     onReject,
   };
 
+  const isEmpty =
+    !loading && activeItems.length === 0 && historyItems.length === 0 && !hasMoreHistory;
+
   return (
     <div className={styles.cardList}>
       {loading ? (
         <p className={styles.pageLoading}>{t('common:loading')}</p>
-      ) : items.length === 0 ? (
+      ) : isEmpty ? (
         <p className={styles.emptyText}>{t('bookings:noDriverBookings')}</p>
       ) : (
         <>
@@ -77,9 +81,9 @@ export default function DriverBookingsTab({
               handlers={handlers}
             />
           ))}
-          {pastItems.length > 0 ? (
+          {(historyItems.length > 0 || hasMoreHistory) && (
             <HistorySection title={t('bookings:driverHistoryTitle')}>
-              {pastItems.map((item) => (
+              {historyItems.map((item) => (
                 <DriverRideBlock
                   key={item.ride.ride_id}
                   item={item}
@@ -90,8 +94,20 @@ export default function DriverBookingsTab({
                   handlers={handlers}
                 />
               ))}
+              {hasMoreHistory && onLoadMoreHistory ? (
+                <div className={styles.historyLoadMore}>
+                  <button
+                    type="button"
+                    className={styles.historyLoadMoreBtn}
+                    disabled={loadingMoreHistory}
+                    onClick={() => onLoadMoreHistory()}
+                  >
+                    {loadingMoreHistory ? t('common:loading') : t('bookings:loadMoreHistory')}
+                  </button>
+                </div>
+              ) : null}
             </HistorySection>
-          ) : null}
+          )}
         </>
       )}
     </div>

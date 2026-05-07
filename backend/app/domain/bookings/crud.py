@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections import defaultdict
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, with_loader_criteria
@@ -14,6 +16,57 @@ from app.domain.passengers.enum import PassengerStatus
 from app.domain.passengers.model import PassengerRequest
 from app.domain.rides.enum import RideStatus
 from app.domain.rides.model import Ride
+
+_BOOKINGS_SUMMARY_ACTIVE_SOFT_LIMIT = 200
+
+_DRIVER_ACTIVE_BOOKING_STATUSES = (
+    BookingStatus.PENDING,
+    BookingStatus.CONFIRMED,
+    BookingStatus.EN_ROUTE,
+    BookingStatus.ARRIVED,
+    BookingStatus.TRIP_IN_PROGRESS,
+)
+
+_PASSENGER_ACTIVE_BOOKING_STATUSES = _DRIVER_ACTIVE_BOOKING_STATUSES
+
+# Statuses where the booking has actually consumed seats on the ride
+# (PENDING does not — seats are decremented only at approval).
+_SEAT_RESERVING_BOOKING_STATUSES = (
+    BookingStatus.CONFIRMED,
+    BookingStatus.EN_ROUTE,
+    BookingStatus.ARRIVED,
+    BookingStatus.TRIP_IN_PROGRESS,
+)
+
+_DRIVER_HISTORY_BOOKING_STATUSES = (
+    BookingStatus.CONFIRMED,
+    BookingStatus.CANCELLED,
+    BookingStatus.COMPLETED,
+    BookingStatus.REJECTED,
+)
+
+
+def _status_from_bookings_list(bookings: list[Booking]) -> PassengerStatus:
+    """Derive PassengerRequest status from bookings (single source of truth; no DB)."""
+    if not bookings:
+        return PassengerStatus.ACTIVE
+
+    has_confirmed = any(b.status == BookingStatus.CONFIRMED for b in bookings)
+    if has_confirmed:
+        all_completed = all(b.status == BookingStatus.COMPLETED for b in bookings)
+        if all_completed:
+            return PassengerStatus.COMPLETED
+        return PassengerStatus.APPROVED
+
+    has_pending = any(b.status == BookingStatus.PENDING for b in bookings)
+    if has_pending:
+        return PassengerStatus.PENDING
+
+    all_rejected = all(b.status == BookingStatus.REJECTED for b in bookings)
+    if all_rejected:
+        return PassengerStatus.REJECTED
+
+    return PassengerStatus.ACTIVE
 
 
 class CRUDBooking:
@@ -188,6 +241,64 @@ class CRUDBooking:
         if booking.request_id:
             await self.update_passenger_request_status_from_bookings(db, booking.request_id)
 
+    async def bulk_cancel_bookings_for_request(self, db: AsyncSession, request_id: UUID) -> int:
+        """
+        Cancel all non-cancelled bookings for a passenger request in bulk.
+
+        Replaces the legacy O(N²) loop:
+        - Aggregates seats to restore per ride (status in CONFIRMED/EN_ROUTE/ARRIVED/TRIP_IN_PROGRESS).
+        - Locks affected rides FOR UPDATE (race-safe vs. approve_booking).
+        - Restores seats and resets ride.status to OPEN, preserving CANCELLED.
+        - Bulk-updates booking rows to CANCELLED in a single statement.
+
+        Caller is responsible for committing and for setting PassengerRequest.status.
+        Returns number of bookings cancelled.
+        """
+        if request_id is None:
+            return 0
+        reqid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
+
+        seats_stmt = (
+            select(Booking.ride_id, func.sum(Booking.num_seats).label("delta"))
+            .where(
+                Booking.request_id == reqid,
+                Booking.status.in_(_SEAT_RESERVING_BOOKING_STATUSES),
+            )
+            .group_by(Booking.ride_id)
+        )
+        rows = (await db.execute(seats_stmt)).all()
+
+        if rows:
+            ride_ids = [r.ride_id for r in rows]
+            await db.execute(
+                select(Ride.ride_id).where(Ride.ride_id.in_(ride_ids)).with_for_update(),
+            )
+            for ride_id, delta in rows:
+                await db.execute(
+                    text(
+                        "UPDATE rides "
+                        "SET available_seats = available_seats + :delta, "
+                        "    status = CASE WHEN status = CAST(:cancelled AS ride_status) "
+                        "                 THEN status "
+                        "                 ELSE CAST(:open AS ride_status) END, "
+                        "    updated_at = now() "
+                        "WHERE ride_id = :rid",
+                    ),
+                    {
+                        "delta": int(delta),
+                        "cancelled": RideStatus.CANCELLED.value,
+                        "open": RideStatus.OPEN.value,
+                        "rid": ride_id,
+                    },
+                )
+
+        res = await db.execute(
+            sa_update(Booking)
+            .where(Booking.request_id == reqid, Booking.status != BookingStatus.CANCELLED)
+            .values(status=BookingStatus.CANCELLED.value),
+        )
+        return int(res.rowcount or 0)
+
     async def cancel_all_bookings_for_ride(self, db: AsyncSession, ride_id: UUID):
         """
         Broad ride cancellation:
@@ -244,8 +355,14 @@ class CRUDBooking:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_user_bookings_with_relations(self, db: AsyncSession, user_id: UUID) -> list[Booking]:
-        """Passenger bookings with ride and driver loaded (notifications UI)."""
+    async def get_user_bookings_with_relations(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        limit: int,
+        after: tuple[datetime, UUID] | None = None,
+    ) -> list[Booking]:
+        """Passenger bookings with ride and driver loaded (notifications UI), keyset paginated."""
         uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
         stmt = (
             select(Booking)
@@ -254,10 +371,16 @@ class CRUDBooking:
                 joinedload(Booking.passenger_request).joinedload(PassengerRequest.user),
             )
             .where(Booking.passenger_id == uid)
-            .order_by(Booking.created_at.desc())
+            .order_by(Booking.created_at.desc(), Booking.booking_id.desc())
+            .limit(limit + 1)
         )
+        if after is not None:
+            ct, bid = after
+            stmt = stmt.where(
+                or_(Booking.created_at < ct, and_(Booking.created_at == ct, Booking.booking_id < bid))
+            )
         result = await db.execute(stmt)
-        return list(result.scalars().all())
+        return list(result.scalars().unique().all())
 
     async def get_ride_bookings_by_status_async(self, db: AsyncSession, ride_id: UUID, booking_status: str) -> list[Booking]:
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
@@ -265,7 +388,13 @@ class CRUDBooking:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
-    async def get_all_pending_bookings_for_driver(self, db: AsyncSession, driver_id: UUID) -> list[Booking]:
+    async def get_all_pending_bookings_for_driver(
+        self,
+        db: AsyncSession,
+        driver_id: UUID,
+        limit: int,
+        after: tuple[datetime, UUID] | None = None,
+    ) -> list[Booking]:
         """All pending approval requests for the driver’s rides (notifications UI)."""
         did = UUID(str(driver_id)) if isinstance(driver_id, str) else driver_id
         stmt = (
@@ -276,10 +405,16 @@ class CRUDBooking:
                 joinedload(Booking.ride),
                 joinedload(Booking.passenger_request).joinedload(PassengerRequest.user),
             )
-            .order_by(Booking.created_at.desc())
+            .order_by(Booking.created_at.desc(), Booking.booking_id.desc())
+            .limit(limit + 1)
         )
+        if after is not None:
+            ct, bid = after
+            stmt = stmt.where(
+                or_(Booking.created_at < ct, and_(Booking.created_at == ct, Booking.booking_id < bid))
+            )
         result = await db.execute(stmt)
-        return list(result.scalars().all())
+        return list(result.scalars().unique().all())
 
     async def get_request_ids_for_ride(self, db: AsyncSession, ride_id: UUID) -> list:
         rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
@@ -316,11 +451,20 @@ class CRUDBooking:
 
         await self.bulk_update_bookings_status(db, ride_id, BookingStatus.CANCELLED)
 
-        # After cancelling ride bookings, recompute status per passenger request
+        # After cancelling ride bookings, recompute PassengerRequest status in bulk
         # (same request may have bookings on other rides)
-        if req_ids:
-            for rid in sorted(set([r for r in req_ids if r is not None])):
-                await self.update_passenger_request_status_from_bookings(db, rid)
+        unique_req_ids = sorted({r for r in req_ids if r is not None})
+        if unique_req_ids:
+            res = await db.execute(select(Booking).where(Booking.request_id.in_(unique_req_ids)))
+            by_req: dict[UUID, list[Booking]] = defaultdict(list)
+            for b in res.scalars().all():
+                if b.request_id is not None:
+                    by_req[b.request_id].append(b)
+            by_status: dict[PassengerStatus, list[UUID]] = defaultdict(list)
+            for req_uid in unique_req_ids:
+                by_status[_status_from_bookings_list(by_req.get(req_uid, []))].append(req_uid)
+            for st, ids in by_status.items():
+                await self.bulk_update_requests_status(db, ids, st)
 
         ride.status = RideStatus.CANCELLED
         await db.flush()
@@ -336,32 +480,8 @@ class CRUDBooking:
         """
         reqid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
         result = await db.execute(select(Booking).where(Booking.request_id == reqid))
-        bookings = result.scalars().all()
-
-        if not bookings:
-            return PassengerStatus.ACTIVE
-
-        # At least one confirmed booking?
-        has_confirmed = any(b.status == BookingStatus.CONFIRMED for b in bookings)
-        if has_confirmed:
-            # All bookings completed?
-            all_completed = all(b.status == BookingStatus.COMPLETED for b in bookings)
-            if all_completed:
-                return PassengerStatus.COMPLETED
-            return PassengerStatus.APPROVED
-
-        # Any booking still pending approval?
-        has_pending = any(b.status == BookingStatus.PENDING for b in bookings)
-        if has_pending:
-            return PassengerStatus.PENDING
-
-        # All bookings rejected?
-        all_rejected = all(b.status == BookingStatus.REJECTED for b in bookings)
-        if all_rejected:
-            return PassengerStatus.REJECTED
-
-        # All cancelled or no active bookings
-        return PassengerStatus.ACTIVE
+        bookings = list(result.scalars().all())
+        return _status_from_bookings_list(bookings)
 
     async def update_passenger_request_status_from_bookings(self, db: AsyncSession, request_id: UUID) -> None:
         """Updates PassengerRequest status based on its bookings."""
@@ -385,38 +505,103 @@ class CRUDBooking:
             .values(status=BookingStatus.COMPLETED.value),
         )
 
-    async def get_driver_rides_with_passengers(self, db: AsyncSession, driver_id: UUID) -> list[Ride]:
-        """Driver rides with pending/confirmed bookings and group in one round-trip."""
+    async def get_driver_active_rides(self, db: AsyncSession, driver_id: UUID) -> list[Ride]:
+        """OPEN/FULL/ACTIVE rides with in-flight bookings loaded (cap 200)."""
         did = UUID(str(driver_id)) if isinstance(driver_id, str) else driver_id
         stmt = (
             select(Ride)
-            .where(Ride.driver_id == did)
+            .where(
+                Ride.driver_id == did,
+                Ride.status.in_([RideStatus.OPEN, RideStatus.FULL, RideStatus.ACTIVE]),
+            )
             .options(
                 joinedload(Ride.bookings).joinedload(Booking.passenger_request).joinedload(PassengerRequest.user),
                 joinedload(Ride.group),
-                with_loader_criteria(
-                    Booking,
-                    Booking.status.in_([BookingStatus.PENDING, BookingStatus.CONFIRMED]),
-                ),
+                with_loader_criteria(Booking, Booking.status.in_(list(_DRIVER_ACTIVE_BOOKING_STATUSES))),
             )
             .order_by(Ride.departure_time.asc())
+            .limit(_BOOKINGS_SUMMARY_ACTIVE_SOFT_LIMIT)
         )
         result = await db.execute(stmt)
         return list(result.scalars().unique().all())
 
-    async def get_passenger_bookings_with_rides(self, db: AsyncSession, passenger_id: UUID) -> list[Booking]:
-        """Passenger bookings with ride, driver, and group in one round-trip."""
+    async def get_driver_history_rides(
+        self,
+        db: AsyncSession,
+        driver_id: UUID,
+        limit: int,
+        after: tuple[datetime, UUID] | None = None,
+    ) -> list[Ride]:
+        """Completed/cancelled rides; bookings loaded for manifest (history statuses). ORDER BY departure_time DESC."""
+        did = UUID(str(driver_id)) if isinstance(driver_id, str) else driver_id
+        stmt = (
+            select(Ride)
+            .where(
+                Ride.driver_id == did,
+                Ride.status.in_([RideStatus.COMPLETED, RideStatus.CANCELLED]),
+            )
+            .options(
+                joinedload(Ride.bookings).joinedload(Booking.passenger_request).joinedload(PassengerRequest.user),
+                joinedload(Ride.group),
+                with_loader_criteria(Booking, Booking.status.in_(list(_DRIVER_HISTORY_BOOKING_STATUSES))),
+            )
+            .order_by(Ride.departure_time.desc(), Ride.ride_id.desc())
+            .limit(limit + 1)
+        )
+        if after is not None:
+            ct, cid = after
+            stmt = stmt.where(
+                or_(Ride.departure_time < ct, and_(Ride.departure_time == ct, Ride.ride_id < cid))
+            )
+        result = await db.execute(stmt)
+        return list(result.scalars().unique().all())
+
+    async def get_passenger_active_bookings(self, db: AsyncSession, passenger_id: UUID) -> list[Booking]:
         pid = UUID(str(passenger_id)) if isinstance(passenger_id, str) else passenger_id
         stmt = (
             select(Booking)
             .join(Booking.ride)
-            .where(Booking.passenger_id == pid)
+            .where(
+                Booking.passenger_id == pid,
+                Booking.status.in_(list(_PASSENGER_ACTIVE_BOOKING_STATUSES)),
+            )
             .options(
                 joinedload(Booking.ride).joinedload(Ride.driver),
                 joinedload(Booking.ride).joinedload(Ride.group),
             )
             .order_by(Ride.departure_time.asc())
+            .limit(_BOOKINGS_SUMMARY_ACTIVE_SOFT_LIMIT)
         )
+        result = await db.execute(stmt)
+        return list(result.scalars().unique().all())
+
+    async def get_passenger_history_bookings(
+        self,
+        db: AsyncSession,
+        passenger_id: UUID,
+        limit: int,
+        after: tuple[datetime, UUID] | None = None,
+    ) -> list[Booking]:
+        pid = UUID(str(passenger_id)) if isinstance(passenger_id, str) else passenger_id
+        stmt = (
+            select(Booking)
+            .join(Ride)
+            .where(
+                Booking.passenger_id == pid,
+                Booking.status.in_([BookingStatus.COMPLETED, BookingStatus.CANCELLED, BookingStatus.REJECTED]),
+            )
+            .options(
+                joinedload(Booking.ride).joinedload(Ride.driver),
+                joinedload(Booking.ride).joinedload(Ride.group),
+            )
+            .order_by(Ride.departure_time.desc(), Booking.booking_id.desc())
+            .limit(limit + 1)
+        )
+        if after is not None:
+            ct, bid = after
+            stmt = stmt.where(
+                or_(Ride.departure_time < ct, and_(Ride.departure_time == ct, Booking.booking_id < bid))
+            )
         result = await db.execute(stmt)
         return list(result.scalars().unique().all())
 

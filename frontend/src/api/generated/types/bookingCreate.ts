@@ -6,8 +6,8 @@
  */
 
 export interface BookingCreate {
-  ride_id: string;
-  request_id: string;
   /** @minimum 1 */
   num_seats?: number;
+  request_id: string;
+  ride_id: string;
 }

@@ -12,11 +12,7 @@ export type ListConversationMessagesApiV1ChatConversationsConversationIdMessages
  */
 limit?: number;
 /**
- * לפני message_id (טעינת הודעות ישנות יותר)
+ * Opaque cursor from previous page next_cursor
  */
-before?: number | null;
-/**
- * after message_id
- */
-after?: number | null;
+after?: string | null;
 };

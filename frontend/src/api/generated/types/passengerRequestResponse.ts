@@ -10,15 +10,15 @@ import type { PassengerStatus } from './passengerStatus';
  * Core passenger request fields as stored in the database.
  */
 export interface PassengerRequestResponse {
-  request_id: string;
-  passenger_id: string;
-  group_id?: string | null;
-  num_passengers: number;
-  pickup_name: string;
+  booking_id?: string | null;
+  created_at: string;
   destination_name: string;
+  group_id?: string | null;
+  is_notification_active: boolean;
+  num_passengers: number;
+  passenger_id: string;
+  pickup_name: string;
+  request_id: string;
   requested_departure_time: string;
   status: PassengerStatus;
-  created_at: string;
-  booking_id?: string | null;
-  is_notification_active: boolean;
 }

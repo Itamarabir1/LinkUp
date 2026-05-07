@@ -17,7 +17,7 @@ To avoid missing anything, the section below includes an exhaustive checklist ma
 ## Open Prerequisites (Must Be Closed Early)
 
 1. `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` are now wired for frontend sourcemap upload in `publish-image`; remaining S.1 work is post-deploy verification/tuning.
-2. **OpenAPI → Orval codegen** is enforced in CI (`contract-codegen` job: `npm run gen:api` + `git diff --exit-code` on `frontend/src/api/generated/`).
+2. **OpenAPI → Orval codegen** is enforced via the dedicated [`openapi-contract.yml`](../.github/workflows/openapi-contract.yml) workflow: exports fresh from `app.openapi()` (no committed snapshot), runs `gen:api`, fails on drift in `frontend/src/api/generated/`. The snapshot file is gitignored — single source of truth is FastAPI. See [ADR Frontend §17 Stage 2](adr/ARCHITECTURE_DECISIONS_FRONTEND.md#17-openapi-snapshot-codegen-with-orval-committed-generated-client).
 3. Run post-deploy verification for **TLS edge + WebSocket** stability in production (`nginx` → backend/chat-ws; if you enable **`http2`** on `listen 443 ssl`, re-verify upgrades).
 
 ---
@@ -34,8 +34,8 @@ Legend:
 - `[x]` `stage-1-adr` - RQ infrastructure and Stage 3+ migration decisions documented (**ADR Frontend §13+**, Stage 3b §15).
 - `[~]` `stage-3a-auth` - finish full auth query ownership — **logout / session-expired / bootstrap-failed teardown semantics shipped** (`tearDownSession`, `auth:session-expired`, RQ **`captureExceptionOnce`** + 401-only Sentry skip); remaining: deeper “auth query ownership” refactors if still desired per product scope
 - `[ ]` `stage-3b-groups` - full groups queries/mutations migration + `GroupContext` slimming
-- `[x]` `stage-3b-rides` - **`MyRides.tsx`**: `useQuery` (`qk.rides.list`), `useMutation` לביטול, invalidation מ־`useUserEvent` + `useRideWebSocket`.
-- `[x]` `stage-3b-bookings` - **`useMyBookingsDriver`** / **`useMyBookingsPassenger`**: `useQuery` לסיכומים, `useMutation` לאשר/לדחות/לבטל + אירועי WS/user-event.
+- `[x]` `stage-3b-rides` - **`MyRides.tsx`**: `useInfiniteQuery` (`qk.rides.list`) מול cursor pagination של `/rides/me` + `useMutation` לביטול, invalidation מ־`useUserEvent` + `useRideWebSocket`.
+- `[x]` `stage-3b-bookings` - **`useMyBookingsDriver`** / **`useMyBookingsPassenger`**: `useQuery` לפעיל + `useInfiniteQuery` להיסטוריה (`/driver-summary/active|history`, passenger מקביל), `useMutation` + invalidate כפול; WS/user-event.
 - `[x]` `stage-3b-passengers` - **`useMyRequests`** + **`useSearchRides`** (mutations לחיפוש/load-more/alert) + **`useJoinRide`** עם Idempotency-Key כמתועד ב־Highlights.
 - `[ ]` `stage-3b-uploads` - presigned upload flow migration + readiness polling query
 - `[~]` `stage-3b-createride` - migrate `useCreateRide` operation-token workflow to RQ mutations/signal
@@ -122,7 +122,7 @@ This is why the first version looked short: it grouped these into macro mileston
 Safe subset shipped (completed):
 - `useChatUnreadMessages` moved from manual `setInterval` to `useQuery` polling (`qk.chat.unread`) with invalidate-based refresh API.
 - `useChatNotificationsFeed` moved from manual `setInterval` to `useQuery` polling (`qk.notifications.all`) with invalidate-based refresh API and preserved reducer contracts.
-- `Messages.tsx` moved from manual `useState/useEffect` fetch lifecycle to `useQuery` (`qk.chat.conversations`) with preserved sort/render semantics.
+- `Messages.tsx` inbox list uses **`useInfiniteQuery`** against **`GET /chat/conversations?limit&after`** (`PaginatedConversationsResponse`), key **`qk.chat.conversations(limit)`**, **`IntersectionObserver`** sentinel inside the scrollable sidebar for `fetchNextPage` — sorting is entirely server-side (no client reorder).
 - **WebSocket reconnect hardening:** **`computeReconnectDelayMs`** ([`frontend/src/utils/reconnectBackoff.ts`](../frontend/src/utils/reconnectBackoff.ts)) wired into **`useChatWebSocket`**, **`useReconnectingWebSocket`**, **`useReconnectingWebSocketState`** — base **3s**, cap **30s**, **±20%** jitter; documented in [`docs/architecture/REALTIME.md`](architecture/REALTIME.md), [`docs/FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff).
 
 Remaining under `stage-3d-chat`:

@@ -8,12 +8,12 @@ import type { BookingStatus } from './bookingStatus';
 
 export interface BookingResponse {
   booking_id: string;
-  ride_id: string;
-  request_id?: string | null;
-  passenger_id: string;
-  num_seats: number;
-  status: BookingStatus;
   created_at: string;
+  num_seats: number;
+  passenger_id: string;
   passenger_name?: string | null;
   phone?: string | null;
+  request_id?: string | null;
+  ride_id: string;
+  status: BookingStatus;
 }

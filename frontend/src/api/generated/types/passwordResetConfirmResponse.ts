@@ -9,10 +9,10 @@
  * Structured success payload after password reset confirmation.
  */
 export interface PasswordResetConfirmResponse {
+  /** Optional extra detail for clients */
+  detail?: string | null;
   /** Success message */
   message: string;
   /** Response status flag */
   status?: string;
-  /** Optional extra detail for clients */
-  detail?: string | null;
 }

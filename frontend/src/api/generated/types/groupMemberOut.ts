@@ -6,10 +6,10 @@
  */
 
 export interface GroupMemberOut {
-  id: string;
-  group_id: string;
-  user_id: string;
-  role: string;
-  joined_at: string;
   full_name?: string | null;
+  group_id: string;
+  id: string;
+  joined_at: string;
+  role: string;
+  user_id: string;
 }

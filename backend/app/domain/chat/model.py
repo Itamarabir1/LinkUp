@@ -35,6 +35,7 @@ class Conversation(Base):
     user_id_1 = Column(PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     user_id_2 = Column(PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_message_at = Column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         UniqueConstraint("user_id_1", "user_id_2", name="uq_conversation_pair"),

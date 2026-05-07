@@ -10,8 +10,8 @@ import type { AppDomainChatSchemaMessageResponse } from './appDomainChatSchemaMe
  * Cursor-paginated message list.
  */
 export interface PaginatedMessagesResponse {
-  items?: AppDomainChatSchemaMessageResponse[];
-  /** Oldest message_id for next page (before=) */
-  next_cursor?: string | null;
   has_more?: boolean;
+  items?: AppDomainChatSchemaMessageResponse[];
+  /** Opaque cursor — pass as `after` query param. */
+  next_cursor?: string | null;
 }

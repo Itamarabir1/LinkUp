@@ -6,9 +6,9 @@
  */
 
 export interface UserUpdate {
-  full_name?: string | null;
   email?: string | null;
-  phone_number?: string | null;
-  password?: string | null;
+  full_name?: string | null;
   new_password?: string | null;
+  password?: string | null;
+  phone_number?: string | null;
 }

@@ -53,7 +53,8 @@ export default function MyBookings() {
         {vm.activeTab === 'passenger' && (
           <PassengerBookingsTab
             loading={vm.passenger.loading}
-            items={vm.passenger.list}
+            activeItems={vm.passenger.activeItems}
+            historyItems={vm.passenger.historyItems}
             myGroups={vm.myGroups}
             sharingLocationBookingId={vm.passenger.sharingLocationBookingId}
             onSharingChange={(id) => vm.passenger.setSharingLocationBookingId(id)}
@@ -62,13 +63,17 @@ export default function MyBookings() {
             cancelling={vm.passenger.cancelling}
             chatLoading={vm.chat.loading}
             onOpenChat={vm.chat.onOpen}
+            onLoadMoreHistory={vm.passenger.fetchMorePassengerHistory}
+            hasMoreHistory={vm.passenger.hasMorePassengerHistory}
+            loadingMoreHistory={vm.passenger.isFetchingPassengerHistory}
           />
         )}
 
         {vm.activeTab === 'driver' && (
           <DriverBookingsTab
             loading={vm.driver.loading}
-            items={vm.driver.list}
+            activeItems={vm.driver.activeItems}
+            historyItems={vm.driver.historyItems}
             myGroups={vm.myGroups}
             sharingRideId={vm.driver.sharingRideId}
             setSharingRideId={vm.driver.setSharingRideId}
@@ -81,6 +86,9 @@ export default function MyBookings() {
             onOpenChat={vm.chat.onOpen}
             onApprove={vm.driver.handleApprove}
             onReject={vm.driver.handleReject}
+            onLoadMoreHistory={vm.driver.fetchMoreDriverHistory}
+            hasMoreHistory={vm.driver.hasMoreDriverHistory}
+            loadingMoreHistory={vm.driver.isFetchingDriverHistory}
           />
         )}
       </div>

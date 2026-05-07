@@ -134,7 +134,8 @@ class CRUDPassenger:
         d_lon: float,
         radius: int,
         limit: int | None = None,
-        after_ride_id: UUID | None = None,
+        after: tuple[datetime, UUID] | None = None,
+        destination_radius_m: int | None = None,
         *,
         departure_day_start_utc: datetime | None = None,
         departure_day_end_exclusive_utc: datetime | None = None,
@@ -161,7 +162,7 @@ class CRUDPassenger:
             func.ST_DWithin(
                 cast(Ride.route_coords, Geography),
                 cast(dest_geo, Geography),
-                radius,
+                destination_radius_m if destination_radius_m is not None else radius,
             ),
             func.ST_LineLocatePoint(cast(Ride.route_coords, Geometry), cast(pickup_geo, Geometry))
             < func.ST_LineLocatePoint(cast(Ride.route_coords, Geometry), cast(dest_geo, Geometry)),
@@ -186,16 +187,15 @@ class CRUDPassenger:
                 Ride.departure_time >= earliest,
                 Ride.departure_time <= latest,
             )
-        if after_ride_id is not None:
-            after_ride = (await db.execute(select(Ride).where(Ride.ride_id == after_ride_id))).scalars().first()
-            if after_ride is not None:
-                filters = and_(
-                    filters,
-                    (
-                        (Ride.departure_time > after_ride.departure_time)
-                        | ((Ride.departure_time == after_ride.departure_time) & (Ride.ride_id > after_ride_id))
-                    ),
-                )
+        if after is not None:
+            after_t, after_id = after
+            filters = and_(
+                filters,
+                (
+                    (Ride.departure_time > after_t)
+                    | ((Ride.departure_time == after_t) & (Ride.ride_id > after_id))
+                ),
+            )
         stmt = (
             select(Ride, Booking.status.label("user_booking_status"))
             .outerjoin(
