@@ -65,6 +65,16 @@ class PassengerRequestResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PaginatedPassengerRequestsResponse(BaseModel):
+    """Paginated passenger requests for GET /passengers/me."""
+
+    items: list[PassengerRequestResponse] = Field(default_factory=list)
+    next_cursor: str | None = None
+    has_more: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # --- Response including immediate matches ---
 
 

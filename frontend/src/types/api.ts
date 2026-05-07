@@ -87,6 +87,12 @@ export interface ConversationListItem {
   has_unread?: boolean;
 }
 
+export interface PaginatedConversationsResponse {
+  items: ConversationListItem[];
+  has_more: boolean;
+  next_cursor: string | null;
+}
+
 export interface PaginatedBookingsResponse {
   items: Booking[];
   total: number;
@@ -106,6 +112,12 @@ export interface PassengerRequest {
   status: string;
   created_at: string;
   is_notification_active: boolean;
+}
+
+export interface PaginatedPassengerRequestsResponse {
+  items: PassengerRequest[];
+  next_cursor: string | null;
+  has_more: boolean;
 }
 
 export interface RidePreviewResponse {
@@ -173,10 +185,6 @@ export interface RideWithPassengers {
   passengers: BookingManifestPassenger[];
 }
 
-export interface DriverSummaryResponse {
-  rides: RideWithPassengers[];
-}
-
 export interface PassengerBookingSummary {
   booking_id: string;
   booking_status: string;
@@ -191,8 +199,24 @@ export interface PassengerBookingSummary {
   driver: { full_name: string; phone_number: string | null } | null;
 }
 
-export interface PassengerSummaryResponse {
+export interface DriverActiveResponse {
+  rides: RideWithPassengers[];
+}
+
+export interface DriverHistoryResponse {
+  rides: RideWithPassengers[];
+  next_cursor: string | null;
+  has_more: boolean;
+}
+
+export interface PassengerActiveResponse {
   bookings: PassengerBookingSummary[];
+}
+
+export interface PassengerHistoryResponse {
+  bookings: PassengerBookingSummary[];
+  next_cursor: string | null;
+  has_more: boolean;
 }
 
 /** Notification types used for UI display/mapping. */
@@ -221,6 +245,13 @@ export interface NotificationItem {
   id?: string;
   is_read?: boolean;
   action_url?: string;
+}
+
+export interface PaginatedNotificationsResponse {
+  items: NotificationItem[];
+  next_cursor: string | null;
+  has_more: boolean;
+  limit: number;
 }
 
 export interface Group {

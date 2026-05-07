@@ -1,6 +1,6 @@
 import type { AxiosResponse } from 'axios';
 import { api } from './client';
-import type { PassengerRequest, RideSearchResponse } from '../types/api';
+import type { PaginatedPassengerRequestsResponse, PassengerRequest, RideSearchResponse } from '../types/api';
 
 export type ConversationTurn = {
   role: 'user' | 'assistant';
@@ -46,8 +46,12 @@ export function saveSearchAlert(body: SaveSearchAlertBody) {
   return api.post<PassengerRequest>('/passenger/passengers/', body);
 }
 
-export function fetchMyPassengerRequests() {
-  return api.get<PassengerRequest[]>('/passenger/passengers/me');
+export function fetchMyPassengerRequests(params?: {
+  cursor?: string;
+  limit?: number;
+  request_status?: string | null;
+}) {
+  return api.get<PaginatedPassengerRequestsResponse>('/passenger/passengers/me', { params });
 }
 
 export function cancelPassengerRequest(requestId: string) {

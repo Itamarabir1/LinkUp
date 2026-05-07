@@ -9,7 +9,7 @@ from uuid import UUID
 from geoalchemy2 import Geography, Geometry
 from geoalchemy2.shape import from_shape
 from shapely.geometry import LineString
-from sqlalchemy import and_, cast, func, select, update
+from sqlalchemy import and_, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
@@ -57,13 +57,33 @@ class CRUDPassenger:
         db: AsyncSession,
         passenger_id: UUID,
         status: PassengerStatus | None = None,
+        *,
+        limit: int,
+        after: tuple[datetime, UUID] | None = None,
     ) -> list[PassengerRequest]:
-        """List requests for a passenger (e.g. my-requests screen)."""
+        """Keyset-paginated requests for a passenger."""
         pid = UUID(str(passenger_id)) if isinstance(passenger_id, str) else passenger_id
-        stmt = select(PassengerRequest).where(PassengerRequest.passenger_id == pid)
+        filters = [PassengerRequest.passenger_id == pid]
         if status is not None:
-            stmt = stmt.where(PassengerRequest.status == status)
-        stmt = stmt.order_by(PassengerRequest.requested_departure_time.desc())
+            filters.append(PassengerRequest.status == status)
+        if after is not None:
+            cursor_t, cursor_id = after
+            filters.append(
+                or_(
+                    PassengerRequest.requested_departure_time < cursor_t,
+                    and_(
+                        PassengerRequest.requested_departure_time == cursor_t,
+                        PassengerRequest.request_id < cursor_id,
+                    ),
+                )
+            )
+
+        stmt = (
+            select(PassengerRequest)
+            .where(*filters)
+            .order_by(PassengerRequest.requested_departure_time.desc(), PassengerRequest.request_id.desc())
+            .limit(limit + 1)
+        )
         result = await db.execute(stmt)
         return list(result.scalars().all())
 

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies.auth import get_current_user, get_current_user_optional
 from app.api.dependencies.group_membership import require_group_member
+from app.core.constants import PASSENGER_REQUESTS_DEFAULT_LIMIT, PASSENGER_REQUESTS_MAX_LIMIT
 from app.core.exceptions.booking import (
     BookingAlreadyExistsError,
     ForbiddenRideActionError,
@@ -28,8 +29,8 @@ from app.domain.passengers.ride_join_idempotency import (
     request_fingerprint,
 )
 from app.domain.passengers.schema import (
+    PaginatedPassengerRequestsResponse,
     PassengerRequestCreate,
-    PassengerRequestResponse,
     PassengerRequestWithMatches,
     RequestRideFromSearch,
     RideSearchRequest,
@@ -47,7 +48,7 @@ passenger_rides_router = APIRouter(prefix="/rides", tags=["Passenger"])
 
 
 # 0. My requests (passenger)
-@router.get("/me", response_model=list[PassengerRequestResponse])
+@router.get("/me", response_model=PaginatedPassengerRequestsResponse)
 async def get_my_requests(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -55,9 +56,22 @@ async def get_my_requests(
         None,
         description="סנן לפי סטטוס: pending, approved, cancelled, matched, expired, completed, rejected",
     ),
+    cursor: str | None = Query(None, description="cursor אטום להמשך העמוד הבא"),
+    limit: int = Query(
+        PASSENGER_REQUESTS_DEFAULT_LIMIT,
+        ge=1,
+        le=PASSENGER_REQUESTS_MAX_LIMIT,
+        description="פריטים לעמוד",
+    ),
 ):
-    """List the current user's passenger requests."""
-    return await PassengerService.get_my_requests(db, current_user.user_id, status=request_status)
+    """List the current user's passenger requests (paginated)."""
+    return await PassengerService.get_my_requests(
+        db,
+        current_user.user_id,
+        status=request_status,
+        cursor=cursor,
+        limit=limit,
+    )
 
 
 # 1. Create official request (smart flow)

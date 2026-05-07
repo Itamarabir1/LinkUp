@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { cancelPassengerRequest, fetchMyPassengerRequests } from '../api/passengers';
 import { mk, qk } from '../api/queryKeys';
-import type { PassengerRequest } from '../types/api';
+import type { PaginatedPassengerRequestsResponse, PassengerRequest } from '../types/api';
 import { getApiErrorMessage } from '../utils/apiError';
 import { apiErr } from '../utils/i18nError';
 import { useUserEvent } from '../hooks/useUserEvent';
@@ -11,15 +11,17 @@ export function useMyRequests() {
   const queryClient = useQueryClient();
   const [error, setError] = useState('');
   const [requestToCancel, setRequestToCancel] = useState<PassengerRequest | null>(null);
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useInfiniteQuery({
     queryKey: qk.passengers.requests(),
-    queryFn: async () => {
-      const { data } = await fetchMyPassengerRequests();
-      return Array.isArray(data) ? data : [];
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) => {
+      const { data: page } = await fetchMyPassengerRequests({ cursor: pageParam, limit: 100 });
+      return page ?? { items: [], next_cursor: null, has_more: false };
     },
+    getNextPageParam: (page) => page.next_cursor ?? undefined,
     staleTime: 30_000,
   });
-  const requests = data ?? [];
+  const requests = data?.pages.flatMap((p) => p.items) ?? [];
 
   const { mutate: mutateCancel, isPending: cancelling } = useMutation({
     mutationKey: mk.rides.cancel('request'),
@@ -27,10 +29,19 @@ export function useMyRequests() {
     onSuccess: (_, requestId) => {
       queryClient.setQueryData(
         qk.passengers.requests(),
-        (old: PassengerRequest[] = []) =>
-          old.map((r) =>
-            r.request_id === requestId ? { ...r, status: 'cancelled' } : r
-          )
+        (old: InfiniteData<PaginatedPassengerRequestsResponse> | undefined) =>
+          old
+            ? {
+                ...old,
+                pages: old.pages.map((page) => ({
+                  ...page,
+                  items: page.items.map((r) =>
+                    r.request_id === requestId ? { ...r, status: 'cancelled' as const } : r
+                  ),
+                })),
+                pageParams: old.pageParams,
+              }
+            : old
       );
       setRequestToCancel(null);
     },
@@ -45,10 +56,21 @@ export function useMyRequests() {
       if (!detail.request_id) return;
       queryClient.setQueryData(
         qk.passengers.requests(),
-        (old: PassengerRequest[] = []) =>
-          old.map((r) =>
-            r.request_id === detail.request_id ? { ...r, status: 'expired' } : r
-          )
+        (old: InfiniteData<PaginatedPassengerRequestsResponse> | undefined) =>
+          old
+            ? {
+                ...old,
+                pages: old.pages.map((page) => ({
+                  ...page,
+                  items: page.items.map((r) =>
+                    r.request_id === detail.request_id
+                      ? { ...r, status: 'expired' as const }
+                      : r
+                  ),
+                })),
+                pageParams: old.pageParams,
+              }
+            : old
       );
     }, [queryClient])
   );

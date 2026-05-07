@@ -4,18 +4,20 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from geoalchemy2.shape import to_shape
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.constants import IMMEDIATE_MATCH_LIMIT, PASSENGER_REQUESTS_DEFAULT_LIMIT, PASSENGER_REQUESTS_MAX_LIMIT
 from app.core.exceptions.base import LinkUpError
 from app.core.exceptions.booking import ForbiddenRideActionError, PassengerRequestNotFoundError
 from app.core.exceptions.infrastructure import GeocodingError
 from app.core.exceptions.ride import InvalidRideStatusError, RideNotFoundError
+from app.core.exceptions.validation import BadRequestError
+from app.core.pagination.cursor import CursorDecodeError, decode_cursor, encode_cursor
 from app.domain.bookings.crud import crud_booking
-from app.domain.bookings.model import Booking
 from app.domain.passengers.crud import crud_passenger
 from app.domain.passengers.enum import PassengerStatus
 from app.domain.passengers.schema import (
+    PaginatedPassengerRequestsResponse,
     PassengerRequestCreate,
     PassengerRequestResponse,
     RideSearchRequest,
@@ -84,6 +86,7 @@ class PassengerService:
                 d_lat,
                 d_lon,
                 _radius_km_to_meters(request_in.search_radius),
+                limit=IMMEDIATE_MATCH_LIMIT,
                 passenger_id=passenger_id,
             )
 
@@ -109,12 +112,10 @@ class PassengerService:
         if p_req.passenger_id != passenger_id:
             raise ForbiddenRideActionError("גישה חסומה")
 
-        # 1. Cancel bookings and free seats
-        bookings = list((await db.execute(select(Booking).where(Booking.request_id == request_id))).scalars().all())
-        for b in bookings:
-            await crud_booking.execute_booking_cancellation(db, b)
+        # Bulk-cancel all bookings, restore seats on rides with active holds.
+        # Single aggregate SELECT + per-affected-ride UPDATE + single bookings UPDATE.
+        await crud_booking.bulk_cancel_bookings_for_request(db, request_id)
 
-        # 2. Update request status (cancel = CANCELLED, not just muting alerts)
         p_req.status = PassengerStatus.CANCELLED
 
         await db.commit()
@@ -125,11 +126,38 @@ class PassengerService:
         db: AsyncSession,
         passenger_id: UUID,
         status: str | None = None,
-    ) -> list[PassengerRequestResponse]:
-        """List passenger requests for the given user."""
+        *,
+        cursor: str | None = None,
+        limit: int = PASSENGER_REQUESTS_DEFAULT_LIMIT,
+    ) -> PaginatedPassengerRequestsResponse:
+        """List passenger requests for the given user (cursor-paginated)."""
         status_enum = PassengerStatus(status) if status else None
-        requests = await crud_passenger.get_by_passenger_id(db, passenger_id, status_enum)
-        return [PassengerRequestResponse.model_validate(r) for r in requests]
+        lim = max(1, min(limit, PASSENGER_REQUESTS_MAX_LIMIT))
+        after: tuple[datetime, UUID] | None = None
+        if cursor:
+            try:
+                after = decode_cursor(cursor)
+            except CursorDecodeError as e:
+                raise BadRequestError("מסמן עמוד לא תקין") from e
+        rows = await crud_passenger.get_by_passenger_id(
+            db,
+            passenger_id,
+            status_enum,
+            limit=lim,
+            after=after,
+        )
+        has_more = len(rows) > lim
+        page_rows = rows[:lim]
+        items = [PassengerRequestResponse.model_validate(r) for r in page_rows]
+        next_cursor = None
+        if has_more and items:
+            last = items[-1]
+            next_cursor = encode_cursor(last.requested_departure_time, last.request_id)
+        return PaginatedPassengerRequestsResponse(
+            items=items,
+            next_cursor=next_cursor,
+            has_more=has_more,
+        )
 
     @staticmethod
     async def get_matches_by_request_id(db: AsyncSession, request_id: UUID, current_user_id: UUID):
@@ -158,6 +186,7 @@ class PassengerService:
             d_lat,
             d_lon,
             radius,
+            limit=IMMEDIATE_MATCH_LIMIT,
             passenger_id=p_req.passenger_id,
         )
         return matches
