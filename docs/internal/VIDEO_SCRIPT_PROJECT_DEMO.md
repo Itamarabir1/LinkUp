@@ -12,7 +12,7 @@
 
 - האתר רץ בפרודקשן על `https://linkup.itamarabir.com`.
 - פריסה רציפה בלי downtime על EC2 (rolling + rollback).
-- Billing + RabbitMQ DLQ/self-healing + PgBouncer + Redis HA.
+- Billing + RabbitMQ DLQ/self-healing + PgBouncer + Redis persistence/DB split.
 - Frontend runtime config בזמן startup (לא build-time bake).
 
 ## 0:00–0:25 — פתיח ומה זה LinkUp

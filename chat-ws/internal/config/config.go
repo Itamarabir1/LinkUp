@@ -10,8 +10,10 @@ import (
 type Config struct {
 	Port              int      // WS server port (default 8081)
 	RedisURL          string   // e.g. redis://localhost:6379/0
+	RedisAddr         string   // direct redis host:port (default redis:6379)
+	UseSentinel       bool     // true when REDIS_SENTINEL_ADDR is provided
 	RedisMasterName   string   // sentinel master name (default mymaster)
-	RedisSentinelAddr string   // sentinel host:port (default redis-sentinel:26379)
+	RedisSentinelAddr string   // sentinel host:port (optional)
 	SecretKey         string   // JWT secret (same as Python SECRET_KEY)
 	JWTAlg            string   // HS256
 	BackendURL        string   // e.g. http://localhost:8000
@@ -30,14 +32,16 @@ func LoadConfig() Config {
 	if redisURL == "" {
 		redisURL = "redis://localhost:6379/1"
 	}
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "redis:6379"
+	}
 	redisMasterName := os.Getenv("REDIS_MASTER_NAME")
 	if redisMasterName == "" {
 		redisMasterName = "mymaster"
 	}
 	redisSentinelAddr := os.Getenv("REDIS_SENTINEL_ADDR")
-	if redisSentinelAddr == "" {
-		redisSentinelAddr = "redis-sentinel:26379"
-	}
+	useSentinel := strings.TrimSpace(redisSentinelAddr) != ""
 	secret := os.Getenv("SECRET_KEY")
 	if secret == "" {
 		secret = os.Getenv("JWT_SECRET")
@@ -61,6 +65,8 @@ func LoadConfig() Config {
 	return Config{
 		Port:              port,
 		RedisURL:          redisURL,
+		RedisAddr:         redisAddr,
+		UseSentinel:       useSentinel,
 		RedisMasterName:   redisMasterName,
 		RedisSentinelAddr: redisSentinelAddr,
 		SecretKey:         secret,

@@ -6,7 +6,7 @@
 
 ## Prerequisites
 
-- **Docker** ו-Docker Compose (להרצת db, **pgbouncer**, `redis-primary`/`redis-replica`/`redis-sentinel`, rabbitmq, backend, notification-worker, task-worker, ai-worker, chat-ws).
+- **Docker** ו-Docker Compose (להרצת db, **pgbouncer**, `redis`, rabbitmq, backend, notification-worker, task-worker, ai-worker, chat-ws).
 - **Python** 3.11+ (להרצת backend/worker לוקאלית בלי Docker).
 - **Node** (אם מריצים פרונט — לא מפורט כאן).
 - **Go** 1.x (אם בונים chat-ws ידנית).
@@ -59,15 +59,12 @@
 | DB pooling runtime path | — | runtime services דרך `pgbouncer`; migrations ישירות ל-`db` |
 | DATABASE_URL | אופציונלי | override מלא (למשל פרודקשן / K8s / CI); נטען ל־`DATABASE_URL_RAW` ב־Settings דרך **`validation_alias`** (גם **`DATABASE_URL_RAW`** תקף כשם env) |
 | REDIS_URL | אופציונלי | override מלא ל-Redis; נטען ל־`REDIS_URL_RAW` (גם **`REDIS_URL_RAW`** תקף) |
-| REDIS_HOST | — | localhost / redis (alias ל-master ב-Compose) |
+| REDIS_HOST | — | localhost / redis |
 | REDIS_PORT | — | 6379 |
 | REDIS_DB | — | 0 |
 | REDIS_PASSWORD | — | אם Redis דורש סיסמה |
 | REDIS_CHAT_DB | — | 1 (לצ'אט) |
 | BACKEND_IMAGE | — | override ל-image של backend בפריסה (למשל `ghcr.io/<owner>/linkup/backend:<sha>`) |
-| REDIS_SENTINEL_HOST | — | redis-sentinel (מפעיל נתיב Sentinel במקום URL רגיל) |
-| REDIS_SENTINEL_PORT | — | 26379 |
-| REDIS_MASTER_NAME | — | mymaster |
 | RABBITMQ_HOST | — | localhost / rabbitmq |
 | RABBITMQ_USER | כן | |
 | RABBITMQ_PASSWORD | כן | |
@@ -132,6 +129,7 @@ Recommended senior setup: use a dedicated local OAuth client ID and wire it via 
 |----------|--------|
 | PORT | 8081 |
 | REDIS_URL | redis://[:password@]host:6379/1 |
+| REDIS_ADDR | direct Redis host:port (`redis:6379` ב-Compose, `localhost:6379` בלוקאלי ידני) |
 | SECRET_KEY / JWT_SECRET | אותו ערך כמו ב-backend (לאימות JWT) |
 
 ---
@@ -192,7 +190,7 @@ cd backend && k6 run k6/scripts/load_test_auth.js
 | [`scripts/ops/check-migration-head.sh`](../../scripts/ops/check-migration-head.sh) | מאמת ש־**`uv run alembic current`** מסתיים ב־**`(head)`** — משמש **`backend-ci.yml`** אחרי upgrade. |
 | [`scripts/ops/rabbitmq-dlq-replay.py`](../../scripts/ops/rabbitmq-dlq-replay.py) | replay מבוקד מ DLQ חזרה לתור ראשי (`--dry-run`, `--limit`) — מתועד ב־[**`EVENTS.md`**](EVENTS.md#dlq-replay-tooling). |
 | [`scripts/ops/pgbouncer-smoke.sh`](../../scripts/ops/pgbouncer-smoke.sh) | מחכה ש־קונטיינר **`linkup_pgbouncer`** יסומן **`healthy`**, ואז מריץ **`SHOW POOLS`** דרך admin (דרוש **`PGB_ADMIN_PASSWORD`**). |
-| [`scripts/ops/redis-sentinel-smoke.sh`](../../scripts/ops/redis-sentinel-smoke.sh) | בודק פרוסת **Redis + Sentinel** (חיבורים/מצב) לפי הפריסה המקומית/CI. |
+| [`scripts/ops/redis-smoke.sh`](../../scripts/ops/redis-smoke.sh) | בודק Redis יחיד עם סיסמה, חיבורי backend pub/sub/cache, ו-health בסיסי. |
 | [`scripts/ops/firebase-modelb-smoke.sh`](../../scripts/ops/firebase-modelb-smoke.sh) | מוודא **`FIREBASE_CREDENTIALS_JSON`** ב־**`backend/.env`**, recreation של שירותים תלויי Firebase, טעינת **firebase_admin**, **`/readyz`**, והתאמת **`REDIS_URL`** ל־**chat-ws** — לפני/אחרי deploys Model B. |
 
 ---

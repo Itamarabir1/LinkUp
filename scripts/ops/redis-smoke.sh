@@ -4,19 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
-echo "== Redis Sentinel smoke test =="
+echo "== Redis smoke test =="
 
-docker compose exec -T redis-sentinel redis-cli -p 26379 sentinel get-master-addr-by-name mymaster >/tmp/sentinel-master.out
-if ! grep -q "172.20.0.10\|6379" /tmp/sentinel-master.out; then
-  echo "❌ Sentinel does not report redis-primary:6379 as master"
+if [[ -z "${REDIS_PASSWORD:-}" ]]; then
+  echo "❌ REDIS_PASSWORD is not set (load backend/.env into the shell or export it)"
   exit 1
 fi
 
-docker compose exec -T redis-sentinel redis-cli -p 26379 sentinel ckquorum mymaster >/tmp/sentinel-quorum.out
-if ! grep -q "OK" /tmp/sentinel-quorum.out; then
-  echo "❌ Sentinel quorum check failed"
-  exit 1
-fi
+docker compose exec -T redis redis-cli -a "${REDIS_PASSWORD}" ping | grep -q PONG
 
 python - <<'PY'
 import asyncio
@@ -34,12 +29,12 @@ async def main() -> None:
     await redis_client.connect()
     await redis_chat_pubsub.connect()
     await broadcast.connect()
-    await redis_client.save("smoke:sentinel:cache", {"ok": True}, expire=30)
-    got = await redis_client.get("smoke:sentinel:cache")
+    await redis_client.save("smoke:redis:cache", {"ok": True}, expire=30)
+    got = await redis_client.get("smoke:redis:cache")
     if not got or not got.get("ok"):
         raise RuntimeError("redis_client read/write failed")
-    await redis_chat_pubsub.publish("smoke:sentinel:chat", "ok")
-    await broadcast.publish("smoke:sentinel:broadcast", "ok")
+    await redis_chat_pubsub.publish("smoke:redis:chat", "ok")
+    await broadcast.publish("smoke:redis:broadcast", "ok")
     await broadcast.disconnect()
     await redis_chat_pubsub.close()
     await redis_client.close()
@@ -54,4 +49,4 @@ if [[ "$STATUS_CODE" != "200" ]]; then
   exit 1
 fi
 
-echo "✅ Redis Sentinel smoke test passed"
+echo "✅ Redis smoke test passed"

@@ -62,14 +62,36 @@ services:
     networks:
       - linkup_network
 
-  # --- Cache & Pub/Sub: Redis HA (Primary + Replica + Sentinel) ---
+  # --- Cache & Pub/Sub: Redis (single-node) ---
   # DB 0 -> backend + compatibility outbox-worker
   # DB 1 -> chat-ws pub/sub + chat completion listener
-  redis-primary:
-    image: redis/redis-stack:7.2.0-v10
-    container_name: linkup_redis_primary
+  redis:
+    image: redis:7.2-alpine
+    container_name: linkup_redis
     restart: unless-stopped
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    command:
+      [
+        "redis-server",
+        "--requirepass",
+        "${REDIS_PASSWORD}",
+        "--appendonly",
+        "yes",
+        "--appendfsync",
+        "everysec",
+        "--save",
+        "900",
+        "1",
+        "--save",
+        "300",
+        "10",
+        "--maxmemory",
+        "400mb",
+        "--maxmemory-policy",
+        "allkeys-lru",
+      ]
+    mem_limit: 512m
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
@@ -79,63 +101,6 @@ services:
       linkup_network:
         aliases:
           - redis
-        ipv4_address: 172.20.0.10
-
-  redis-replica:
-    image: redis:7.2-alpine
-    container_name: linkup_redis_replica
-    restart: unless-stopped
-    command:
-      [
-        "redis-server",
-        "--replicaof",
-        "redis-primary",
-        "6379",
-        "--masterauth",
-        "${REDIS_PASSWORD}",
-        "--requirepass",
-        "${REDIS_PASSWORD}",
-      ]
-    depends_on:
-      redis-primary:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - linkup_network
-
-  redis-sentinel:
-    image: redis:7.2-alpine
-    container_name: linkup_redis_sentinel
-    restart: unless-stopped
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-    command:
-      - sh
-      - -c
-      - |
-        {
-          printf 'port 26379\ndir /tmp\nsentinel monitor mymaster 172.20.0.10 6379 1\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\n'
-          if [ -n "$$REDIS_PASSWORD" ]; then
-            printf 'sentinel auth-pass mymaster %s\n' "$$REDIS_PASSWORD"
-          fi
-        } > /tmp/sentinel.conf
-        redis-server /tmp/sentinel.conf --sentinel
-    depends_on:
-      redis-primary:
-        condition: service_healthy
-      redis-replica:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "redis-cli", "-p", "26379", "sentinel", "masters"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - linkup_network
 
   # --- Message Broker: RabbitMQ ---
   rabbitmq:
@@ -145,6 +110,7 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    mem_limit: 256m
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -208,12 +174,12 @@ services:
       - POSTGRES_HOST=pgbouncer
       - POSTGRES_PORT=6432
       - REDIS_HOST=redis
-      - REDIS_SENTINEL_HOST=redis-sentinel
       - REDIS_DB=0
       - REDIS_CHAT_DB=1
       - RABBITMQ_HOST=rabbitmq
       - DB_POOL_SIZE=3
       - DB_MAX_OVERFLOW=5
+    mem_limit: 256m
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -223,9 +189,7 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      redis-primary:
-        condition: service_healthy
-      redis-sentinel:
+      redis:
         condition: service_healthy
       email-renderer:
         condition: service_healthy
@@ -247,12 +211,12 @@ services:
       - POSTGRES_HOST=pgbouncer
       - POSTGRES_PORT=6432
       - REDIS_HOST=redis
-      - REDIS_SENTINEL_HOST=redis-sentinel
       - REDIS_DB=0
       - REDIS_CHAT_DB=1
       - RABBITMQ_HOST=rabbitmq
       - DB_POOL_SIZE=3
       - DB_MAX_OVERFLOW=3
+    mem_limit: 256m
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -262,9 +226,7 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      redis-primary:
-        condition: service_healthy
-      redis-sentinel:
+      redis:
         condition: service_healthy
     networks:
       - linkup_network
@@ -284,11 +246,11 @@ services:
       - POSTGRES_HOST=pgbouncer
       - POSTGRES_PORT=6432
       - REDIS_HOST=redis
-      - REDIS_SENTINEL_HOST=redis-sentinel
       - REDIS_DB=0
       - REDIS_CHAT_DB=1
       - DB_POOL_SIZE=3
       - DB_MAX_OVERFLOW=3
+    mem_limit: 256m
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -296,9 +258,7 @@ services:
         condition: service_healthy
       pgbouncer:
         condition: service_healthy
-      redis-primary:
-        condition: service_healthy
-      redis-sentinel:
+      redis:
         condition: service_healthy
     networks:
       - linkup_network
@@ -319,10 +279,10 @@ services:
       - POSTGRES_HOST=pgbouncer
       - POSTGRES_PORT=6432
       - REDIS_HOST=redis
-      - REDIS_SENTINEL_HOST=redis-sentinel
       - REDIS_DB=0
       - REDIS_CHAT_DB=1
       - RABBITMQ_HOST=rabbitmq
+    mem_limit: 256m
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -330,9 +290,7 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      redis-primary:
-        condition: service_healthy
-      redis-sentinel:
+      redis:
         condition: service_healthy
       email-renderer:
         condition: service_healthy
@@ -354,7 +312,6 @@ services:
       - POSTGRES_HOST=pgbouncer
       - POSTGRES_PORT=6432
       - REDIS_HOST=redis
-      - REDIS_SENTINEL_HOST=redis-sentinel
       - REDIS_DB=0 # explicit: DB 0 for backend
       - REDIS_CHAT_DB=1 # same DB as chat-ws for chat/user pubsub
       - RABBITMQ_HOST=rabbitmq
@@ -363,6 +320,7 @@ services:
       - DB_MAX_OVERFLOW=10
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - LOG_FORMAT=${LOG_FORMAT:-json}
+    mem_limit: 512m
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -370,9 +328,7 @@ services:
         condition: service_healthy
       pgbouncer:
         condition: service_healthy
-      redis-primary:
-        condition: service_healthy
-      redis-sentinel:
+      redis:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
@@ -408,11 +364,8 @@ services:
       - BACKEND_URL=http://backend:8000
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
       - REDIS_MASTER_NAME=mymaster
-      - REDIS_SENTINEL_ADDR=redis-sentinel:26379
     depends_on:
-      redis-primary:
-        condition: service_healthy
-      redis-sentinel:
+      redis:
         condition: service_healthy
     networks:
       - linkup_network
@@ -495,5 +448,6 @@ networks:
 
 volumes:
   postgres_data:
+  redis_data:
   rabbitmq_data:
   grafana_data:

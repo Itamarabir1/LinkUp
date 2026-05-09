@@ -22,7 +22,7 @@ Also surfaced in the repo root [`README.md`](../README.md#architecture).
 ## Architecture deep-dive by domain
 
 - [`docs/architecture/API.md`](architecture/API.md) — FastAPI routes, auth, middleware, health contracts (**Billing:** checkout + **`X-Idempotency-Key`**, webhook, admin reconcile/stale-pending — סעיף Billing / Admin); זרימת preview גיאוגרף: קואורדינטות טקסט דרך **geocode cache**; **`GET …/passengers/me`** במודל **cursor pagination**; מניפסט נסיעה לנהג בתקרת שורות + טוטלים — ראו **FEATURE_DECISIONS** **`#geo-manifest-passenger-reads`**
-- [`docs/architecture/DATABASE.md`](architecture/DATABASE.md) — PostgreSQL/PostGIS schema, indexes, and migrations
+- [`docs/architecture/DATABASE.md`](architecture/DATABASE.md) — PostgreSQL/PostGIS schema, indexes, migrations, PgBouncer, and Redis single-instance DB0/DB1 topology
 - [`docs/architecture/EVENTS.md`](architecture/EVENTS.md) — Outbox, RabbitMQ topology, retry/DLQ flow
 - [`docs/architecture/REALTIME.md`](architecture/REALTIME.md) — WebSocket architecture, Redis pub/sub, GPS/presence
 - [`docs/architecture/NOTIFICATIONS.md`](architecture/NOTIFICATIONS.md) — Outbox → workers, email (Brevo + **circuit breaker**), push (FCM + DB ניקוי טוקן על רישום לא תקף), in-app (**REST** + **`invalidate`/`UserEvent`** על **`user:{id}:events`**, מאזין ב־**`ChatContext`**); **`AsyncSession`** ב־`provider.send(..., db)`

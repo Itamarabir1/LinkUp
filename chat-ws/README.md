@@ -32,7 +32,8 @@ chat-ws/
 1. **Redis** — **אותו שרת** כמו ה-backend; בדרך כלל **DB 1** לצ'אט (pub/sub, `presence:*`, ערוצים **`user:online`** / **`user:offline`**). DB 0 משמש את ה-API לדברים אחרים.
 2. **משתני סביבה** (אותם כמו ב־backend, או ב־`.env` בשורש):
    - `SECRET_KEY` – אותו סוד כמו ב־Python (לאימות JWT).
-   - `REDIS_URL` – למשל `redis://localhost:6379/1` (DB 1 לצ'אט).
+   - `REDIS_URL` – למשל `redis://localhost:6379/1` (משמש ל-password ול-DB; DB 1 לצ'אט).
+   - `REDIS_ADDR` – host:port לחיבור Redis ישיר (`redis:6379` ב-Compose, `localhost:6379` בהרצה ידנית).
    - `PORT` – פורט לשרת ה־WS (ברירת מחדל 8081).
 
 ### 1. שרת Go WebSocket

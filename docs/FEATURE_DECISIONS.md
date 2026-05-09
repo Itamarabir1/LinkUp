@@ -568,20 +568,20 @@
 
 ---
 
-<a id="redis-sentinel"></a>
+<a id="redis-single-node"></a>
 
-## Redis Sentinel HA (EC2 + Docker Compose)
+## Redis single-node reliability (EC2 + Docker Compose)
 
 | | |
 |--|--|
-| **בעיה** | Redis single-node הוא SPOF: נפילה/ריסטארט בזמן אמת שוברת cache, denylist, idempotency, ו-pub/sub לצ'אט עד התאוששות ידנית. |
-| **החלטה** | לעבור לטופולוגיית `redis-primary` + `redis-replica` + `redis-sentinel`, עם clients Sentinel-aware ב-Python (`redis.asyncio.Sentinel`) וב-Go (`go-redis` failover). |
-| **אלטרנטיבות** | (1) ElastiCache/Managed Redis — עדיף בפרודקשן מנוהל אבל לא תמיד זמין מיד תקציבית. (2) Redis Cluster — מורכב יותר מהצורך הנוכחי (שימוש כ-key/value + pub/sub). (3) להישאר single-node עם restart policy — לא פותר failover אמיתי. |
-| **מה סניור עושה (לא טריוויאלי)** | (1) שומר `REDIS_HOST=redis` כ-alias ל-master כדי לא לשבור קונפיג קיים. (2) מוסיף fallback ל-URL רגיל ללוקאל/dev. (3) מחליף `broadcaster` ב-adapter פנימי ששומר API זהה לראוטרים (`event.message`). (4) ב-`subscribe()` מבצע cleanup שקט על `WebSocketDisconnect` בלי לדלוף pubsub handles. |
-| **יתרון** | זמינות גבוהה יותר ל-real-time ו-state infra בלי שינוי בדומיין העסקי; failover שקוף יחסית לאפליקציה. |
-| **Trade-off** | יותר מורכבות תפעולית (3 שירותי Redis, smoke checks, observability), ו-footprint גדול יותר על EC2 קטן. |
-| **Interview pitch (≈30s)** | *"העברתי את Redis מ-single instance ל-Sentinel HA. השארתי alias `redis` כדי לא לשבור env קיים, הוספתי Sentinel-aware clients ב-Python וב-Go, והחלפתי broadcaster ב-adapter פנימי עם אותו חוזה לראוטרים. התוצאה: failover תפעולי בלי לגעת ב-domain logic."* |
-| **הפניה** | `docker-compose.yml`, `infrastructure/redis/sentinel.conf`, `backend/app/infrastructure/redis/{client.py,chat_pubsub.py,broadcast.py}`, `chat-ws/cmd/server/main.go`, `scripts/ops/redis-sentinel-smoke.sh` |
+| **בעיה** | Redis מחזיק cache, denylist, idempotency, rate-limit ו-pub/sub לצ'אט. על single-host EC2, Sentinel בתוך אותו host לא מספק HA אמיתי מול נפילת המכונה, אבל כן מוסיף footprint, קונפיג ונתיבי failover שקשה לתפעל. |
+| **החלטה** | לחזור לטופולוגיית Redis יחידה (`redis`) עם persistence (`appendonly yes`, `appendfsync everysec`, RDB snapshots), healthcheck ו-smoke ייעודי; לשמר הפרדת DB לוגית: **DB 0** ל-cache/rate-limit/idempotency/denylist ו-**DB 1** לצ'אט/pubsub/presence. |
+| **אלטרנטיבות** | (1) ElastiCache/Managed Redis — עדיף כשעוברים ל-managed infra או multi-AZ. (2) failover מקומי בתוך אותו host — failover תהליכי בלבד, לא פותר host failure. (3) Redis Cluster — מורכב יותר מהצורך הנוכחי (key/value + pub/sub, בלי sharding אמיתי). |
+| **מה סניור עושה (לא טריוויאלי)** | (1) מפשט topology במקום להציג HA מדומה. (2) שומר DB split כדי לא לערבב chat/pubsub עם cache/rate-limit. (3) מחבר `chat-ws` ב-`go-redis` `NewClient` דרך `REDIS_ADDR`, תוך שימוש ב-`REDIS_URL` לפרטי password/DB. (4) משאיר Redis clients fail-open איפה שההגנה היא defense-in-depth, כמו rate limit/geo cache. |
+| **יתרון** | פחות שירותים, פחות drift בפריסה, קל יותר לתפעול על `t3.medium`, ועדיין יש durability בסיסית לנתונים זמניים/אופרטיביים. |
+| **Trade-off** | Redis נשאר תלוי ב-host יחיד; HA אמיתי ידרוש managed Redis / multi-node מחוץ לשרת היחיד. |
+| **Interview pitch (≈30s)** | *"בהתחלה בדקתי Sentinel, אבל על EC2 יחיד זה HA מדומה: אם ה-host נופל גם Sentinel נופל. לכן פישטתי ל-Redis יחיד עם AOF/RDB, healthcheck ו-smoke, ושמרתי DB split בין cache/rate-limit לבין chat pub/sub. זו החלטה תפעולית שמעדיפה אמינות אמיתית ופחות מורכבות עד מעבר ל-managed Redis."* |
+| **הפניה** | `docker-compose.yml`, `backend/app/infrastructure/redis/{client.py,chat_pubsub.py,broadcast.py}`, `chat-ws/cmd/server/main.go`, `scripts/ops/redis-smoke.sh` |
 
 ---
 
@@ -689,13 +689,13 @@
 | | |
 |--|--|
 | **בעיה** | המימוש הקודם השתמש ב-`INCR + EXPIRE` בשתי פקודות נפרדות. בגבול חלון אפשר היה לשלוח **פי 2** מהמותר: לדחוף `max_count` בקצה החלון, ה-counter מתאפס באלפית שנייה לאחר מכן, ולשלוח `max_count` נוספים מיד. בנוסף, אותו אלגוריתם שירת גם auth (anti-bruteforce) וגם chat (API throttle) — שתי דרישות סותרות. |
-| **החלטה** | להחליף ב-**שני** Lua scripts אטומיים שונים, מותאמים לאיום: <ul><li>**Auth** (`rate_limit_auth`) → **Sliding-Window Log** (`sliding_window.lua`, sorted-set פר IP). אין burst, חלון מתגלגל אמיתי. תוקף ששתק 10 דקות לא מקבל "קופונים" — כל ניסיון נכנס לחלון הנוכחי בלבד.</li><li>**Chat** (`rate_limit_chat`) → **Token Bucket** (`token_bucket.lua`, hash פר משתמש). Burst עד `capacity` מותר ואף רצוי ל-API; refill חלק (`refill_per_sec`).</li></ul> שני ה-scripts רצים אטומית בתוך Redis, נטענים פעם אחת דרך `register_script` של redis-py (שמטפל אוטומטית ב-`EVALSHA` ו-fallback ל-`EVAL` על `NOSCRIPT` אחרי Sentinel failover או `SCRIPT FLUSH`). |
+| **החלטה** | להחליף ב-**שני** Lua scripts אטומיים שונים, מותאמים לאיום: <ul><li>**Auth** (`rate_limit_auth`) → **Sliding-Window Log** (`sliding_window.lua`, sorted-set פר IP). אין burst, חלון מתגלגל אמיתי. תוקף ששתק 10 דקות לא מקבל "קופונים" — כל ניסיון נכנס לחלון הנוכחי בלבד.</li><li>**Chat** (`rate_limit_chat`) → **Token Bucket** (`token_bucket.lua`, hash פר משתמש). Burst עד `capacity` מותר ואף רצוי ל-API; refill חלק (`refill_per_sec`).</li></ul> שני ה-scripts רצים אטומית בתוך Redis, נטענים פעם אחת דרך `register_script` של redis-py (שמטפל אוטומטית ב-`EVALSHA` ו-fallback ל-`EVAL` על `NOSCRIPT` אחרי `SCRIPT FLUSH` או reconnect). |
 | **API ל-clients** | החריג `RateLimitExceeded` מועשר ל-`{retry_after, limit, remaining}`, וה-handler המרכזי פולט 4 כותרות סטנדרטיות (Stripe / GitHub convention): `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` (epoch seconds), `Retry-After`. בלי זה, ה-client לא יודע מתי לנסות שוב → retry loop אגרסיבי → DDoS עצמי. |
 | **אלטרנטיבות שנפסלו** | (1) Token Bucket אחד לשניהם — נחלש מול attacker שמקבץ "קופונים" בעת שקט ואז יורה ב-burst. (2) Leaky bucket — overkill לתרחיש שלנו. (3) `redis.call('TIME')` במקום זמן מהקליינט — דורש `replicate_commands()` ו-non-determinism; זמן מ-EC2 (chrony NTP) מספיק מדויק. (4) wrapper לאחור על `rate_limit_check` — leaky abstraction; עדיף למחוק (יש רק 2 call sites בפרויקט). |
 | **Fail-open** | כל `RedisError` או `register_script` שנכשל → `RateLimitResult.fail_open` → הבקשה עוברת. הגנה היא defense-in-depth, ולא כדאי שתפיל login/chat בזמן outage של Redis. נמדד ב-`rate_limit_redis_errors_total{endpoint}`. |
 | **Trade-offs (מודעים)** | (1) זמן wall clock מועבר מהקליינט ל-Lua → drift אפשרי בקנה מידה NTP (≪10ms ב-EC2 עם chrony) — מקובל ל-rate limiting. (2) Lua 5.1 לא מבחין int/float; precision של refill תקין לסקאלות שעון אנושיות (שניות-דקות). (3) Sliding-window log שומר entry per request → memory `O(max_count)` לכל מפתח — סביר לעשרות בקשות בחלון. |
 | **מטריקות** | `rate_limit_rejected_total{algorithm,endpoint}`, `rate_limit_redis_errors_total{endpoint}`, `rate_limit_evaluation_seconds{algorithm}` (Histogram). |
-| **Interview pitch (≈45s)** | *"זיהיתי ש-`INCR+EXPIRE` בשתי פקודות מאפשר 2x burst בגבול החלון. ההחלטה הסניורית הייתה לא רק לתקן עם Lua, אלא להפריד לשני אלגוריתמים: sliding window log ל-auth כי שם burst הוא בדיוק הבעיה (anti-bruteforce), ו-token bucket ל-chat כי שם burst רצוי. שני scripts אטומיים, נטענים פעם אחת דרך register_script של redis-py שמטפל ב-EVALSHA וב-NOSCRIPT אחרי Sentinel failover. ההחזרה היא typed result עם limit/remaining/retry_after_ms שמתורגם ל-X-RateLimit-* headers — זה מה ש-Stripe ו-GitHub עושים, וזה מונע retry storms של clients."* |
+| **Interview pitch (≈45s)** | *"זיהיתי ש-`INCR+EXPIRE` בשתי פקודות מאפשר 2x burst בגבול החלון. ההחלטה הסניורית הייתה לא רק לתקן עם Lua, אלא להפריד לשני אלגוריתמים: sliding window log ל-auth כי שם burst הוא בדיוק הבעיה (anti-bruteforce), ו-token bucket ל-chat כי שם burst רצוי. שני scripts אטומיים, נטענים פעם אחת דרך register_script של redis-py שמטפל ב-EVALSHA וב-NOSCRIPT אחרי reconnect או SCRIPT FLUSH. ההחזרה היא typed result עם limit/remaining/retry_after_ms שמתורגם ל-X-RateLimit-* headers — זה מה ש-Stripe ו-GitHub עושים, וזה מונע retry storms של clients."* |
 | **הפניה** | [`../backend/app/infrastructure/redis/lua/token_bucket.lua`](../backend/app/infrastructure/redis/lua/token_bucket.lua) · [`../backend/app/infrastructure/redis/lua/sliding_window.lua`](../backend/app/infrastructure/redis/lua/sliding_window.lua) · [`../backend/app/infrastructure/rate_limiter.py`](../backend/app/infrastructure/rate_limiter.py) · [`../backend/app/api/dependencies/rate_limit.py`](../backend/app/api/dependencies/rate_limit.py) · [`../backend/app/core/exceptions/handlers.py`](../backend/app/core/exceptions/handlers.py) · ADR §23 |
 
 ---

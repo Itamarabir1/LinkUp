@@ -24,7 +24,7 @@ Related operations docs:
 - `email-renderer` (Node — React Email **`POST /render`**)
 - `notification-worker`, `task-worker`, `ai-worker`
 - `migrate` — Job חד־פעמי (`alembic upgrade head`) לפני עליית ה-API וה-workers
-- Infra: `db`, `pgbouncer`, `rabbitmq`, `redis-primary`, `redis-replica`, `redis-sentinel`
+- Infra: `db`, `pgbouncer`, `rabbitmq`, `redis`
 
 ## CI/CD Flow (GitHub Actions)
 
@@ -42,7 +42,7 @@ Production deploy is centralized in **`deploy-ec2.yml`**, triggered by **`workfl
 1. SSH to EC2 (`appleboy/ssh-action`); image tag = triggering workflow’s **`head_sha`** (fallback to **`backend:latest`** if that tag is missing from GHCR).
 2. Pull latest git + sync `*.env.production` → compose env files; sync **`JWT_SECRET`** in **`chat-ws/.env`** from **`SECRET_KEY`**. Render **`nginx/nginx.conf`** from template using **`SENTRY_REPORT_URI`** from **`backend/.env`**.
 3. Pull images from GHCR (backend prefers the workflow commit SHA tag, then **`…/backend:latest`** if that tag is absent).
-4. Bring up infra (`db`, Redis Sentinel topology, RabbitMQ), **`pgbouncer`**, run **`migrate`**, then **`email-renderer`**, workers, **`chat-ws`**, **`frontend` + `nginx`** (force-recreate **`nginx`** when nginx/frontend-related files changed in `HEAD`).
+4. Bring up infra (`db`, single persistent Redis, RabbitMQ), **`pgbouncer`**, run **`migrate`**, then **`email-renderer`**, workers, **`chat-ws`**, **`frontend` + `nginx`** (force-recreate **`nginx`** when nginx/frontend-related files changed in `HEAD`).
 5. **Smoke** from inside containers: **`linkup_frontend`** → **`http://localhost:80/config.js`**, **`linkup_email_renderer`** → **`http://localhost:3001/health`**.
 6. Roll out **`backend`** with **`--wait`**, then run mandatory checks (Firebase, Redis URL in **`chat-ws`**, **`/readyz`**, public **`/livez`** and **`/config.js`** through TLS).
 7. On failure: roll back **`backend`** to the previous tag from **`.deploy_state/backend_prev_tag`**; if **`docker pull`** for that image fails (e.g. old digest removed), fall back to **`…/backend:latest`**.

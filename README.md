@@ -62,7 +62,7 @@ Open **frontend** upgrade checklist (React Query backlog, Tier-1/2 items): **[do
 - **Auth session teardown (web):** **`tearDownSession({ reason })`** (`frontend/src/context/AuthContext.tsx`) keeps UI/state in sync on **logout**, **bootstrap failure**, and **refresh failure**; **`client.ts`** fires **`auth:session-expired`** after **`clearTokens`** (reentrancy guard); **`queryClient`** **`captureExceptionOnce`** skips Sentry only for **401** (keeps **403** for RBAC signal). **`docs/FEATURE_DECISIONS.md#auth-session-teardown`**, **ADR Frontend §21**.
 - Frontend sourcemap upload hardening shipped: Vite integrates `@sentry/vite-plugin` behind production+env guards (`SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`), CI injects secrets only in `publish-image`, and uploaded sourcemaps are deleted from `dist` after upload.
 - Frontend runtime config via startup `envsubst` (`window.__APP_CONFIG__`).
-- Redis Sentinel HA + PgBouncer runtime pooling + direct migrate path.
+- Single Redis runtime (AOF+RDB) + PgBouncer runtime pooling + direct migrate path.
 - Automated JWT secret sync between backend and chat-ws during deploy.
 - OAuth popup compatibility headers in nginx (`COOP` / `COEP`).
 - Nginx probe routing hardening: exact-match `/livez` and loopback-only `/readyz` to prevent frontend fallback and readiness information exposure.
@@ -173,7 +173,7 @@ flowchart LR
 - ✅ **PgBouncer (transaction pooling, internal-only):** backend + workers connect via `pgbouncer` service (no public port), `migrate` stays direct to `db`, asyncpg statement cache is disabled at engine connect for compatibility, and PgBouncer runtime now uses a custom image (`infrastructure/pgbouncer/Dockerfile`) so mounted config is not overridden by third-party entrypoints.
 - ✅ **RabbitMQ client/channel topology:** `rabbit_client` (API publish), `outbox_rabbit_client` (Outbox publish), ו-`worker_rabbit_client` (worker consume/scheduler) מופרדים; ה-consumers משתמשים בחיבור worker משותף עם channel מבודד לכל queue. הגדרות התורים מרוכזות ב-`backend/app/infrastructure/rabbitmq/topology.py`.
 - ✅ **RabbitMQ operability tooling:** `notification-worker` כולל `run_dlq_monitor` (warning/critical thresholds ל-DLQ depth) ונוסף כלי replay אופרטיבי `scripts/ops/rabbitmq-dlq-replay.py` להחזרת הודעות מ-`.dlq` לתור הראשי בצורה מבוקרת.
-- ✅ **Redis Sentinel HA:** compose now runs `redis-primary` + `redis-replica` + `redis-sentinel`; Python Redis clients use `redis.asyncio.Sentinel` (with URL fallback), and `chat-ws` connects via `go-redis` failover client.
+- ✅ **Single Redis (Stage 2, `t3.medium` single-host):** compose runs a single `redis` service with persistence (`appendonly yes`, `appendfsync everysec`, RDB snapshots), while keeping logical DB split (**DB 0** cache/rate-limit/idempotency/denylist, **DB 1** chat/pubsub). Sentinel was removed because it did not provide meaningful host-level HA on a single node and added operational complexity.
 - ✅ **Redis reconnect hardening:** reconnect loop uses retry with exponential backoff for resilient long-lived pub/sub connections.
 - ✅ **Geocode retry hardening:** Google geocoding flow includes bounded retries via `tenacity` for transient failures/timeouts.
 - ✅ **Notification worker (async):** [`notification_tasks.py`](backend/app/workers/tasks/notification_tasks.py) uses `await db.execute(select(...))` for ride-cancel fan-out (no `run_sync` in app code paths); **`ride.cancelled_by_driver`** notifies only bookings still **PENDING** or **CONFIRMED** (not already cancelled by the passenger).
@@ -324,7 +324,7 @@ make admin-revoke EMAIL=user@example.com  # הסרת אדמין לפי אימי�
 
 - **Go for chat-ws (not Python).** WebSocket servers benefit from low per-connection overhead and high concurrency. Go’s goroutines and small footprint fit many idle connections; the service does no DB or business logic—only subscribe to Redis and push to clients. Keeping it in Go avoids pulling the full Python stack into the real-time path.
 
-- **Redis HA + DB separation.** Runtime Redis is deployed as Sentinel topology (`redis-primary` + `redis-replica` + `redis-sentinel`). Logical DB split still applies: DB=0 for cache/rate-limit/idempotency/denylist and DB=1 for chat/pub-sub, so failover improves availability without changing domain contracts.
+- **Redis single-node reliability + DB separation.** Runtime Redis uses a single persistent instance (AOF + RDB). Logical DB split still applies: DB=0 for cache/rate-limit/idempotency/denylist and DB=1 for chat/pub-sub. On single-host `t3.medium`, this reduces failure modes and operational drift versus local Sentinel topology.
 
 - **Single-EC2 rolling CD (senior pragmatic).** Instead of full blue/green infra, production deploy runs on the same host via **[`deploy-ec2.yml`](.github/workflows/deploy-ec2.yml)** (`workflow_run` after green **Backend / Frontend / Chat-WS / Email renderer** CI on `main`): prefer immutable GHCR tag (`sha`, with fallback to `latest` if missing), internal smokes for `frontend` and `email-renderer` before the backend gate, then post-deploy checks for backend readiness (`/readyz`), Firebase env presence, and public nginx reachability (`/livez`, `/config.js`); rollback to the previous tag, with pull fallback to `backend:latest` when the old digest is gone. This keeps ops robust on `t3.medium` without extra AWS cost.
 

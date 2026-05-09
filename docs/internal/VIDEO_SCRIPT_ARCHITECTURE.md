@@ -10,7 +10,7 @@
 
 - **Billing (Stripe):** flow מלא עם webhook idempotency ו-payment integrity.
 - **RabbitMQ reliability:** DLQ broker-native + consumer self-healing + metrics (`rabbitmq_consumer_iterator_restarts_total`).
-- **PgBouncer + Redis Sentinel HA:** backend/workers דרך pooler ו-failover ל-Redis.
+- **PgBouncer + Redis reliability:** backend/workers דרך pooler; Redis יחיד עם AOF/RDB וחלוקת DB0/DB1 במקום Sentinel מקומי על host יחיד.
 - **Single-EC2 rolling deploy:** health-gated deploy + rollback אוטומטי ב-**`deploy-ec2.yml`** (אחרי CI מוצלח על `main`).
 - **Frontend runtime config (12-factor):** `config.js` ו-`firebase-messaging-sw.js` נוצרים ב-startup עם `envsubst`.
 - **Ops hardening:** multi `--env-file`, JWT sync backend/chat-ws, ו-fail-fast guards בסקריפט deploy.

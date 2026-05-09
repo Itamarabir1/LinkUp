@@ -32,19 +32,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("redis URL parsing failed: %v", err)
 	}
-	newFailover := func() *redisv9.Client {
-		return redisv9.NewFailoverClient(&redisv9.FailoverOptions{
-			MasterName:    cfg.RedisMasterName,
-			SentinelAddrs: []string{cfg.RedisSentinelAddr},
-			Password:      redisPassword,
-			DB:            redisDB,
-		})
-	}
-	redisClient := newFailover()
+	redisClient := newRedisClient(cfg, redisPassword, redisDB)
 	defer redisClient.Close()
-	redisOfflineSub := newFailover()
+	redisOfflineSub := newRedisClient(cfg, redisPassword, redisDB)
 	defer redisOfflineSub.Close()
-	redisOnlineSub := newFailover()
+	redisOnlineSub := newRedisClient(cfg, redisPassword, redisDB)
 	defer redisOnlineSub.Close()
 
 	h := hub.NewHub(redisClient)
@@ -72,6 +64,14 @@ func main() {
 	<-quit
 	slog.Info("shutting down", "component", "server")
 	cancel()
+}
+
+func newRedisClient(cfg config.Config, password string, db int) *redisv9.Client {
+	return redisv9.NewClient(&redisv9.Options{
+		Addr:     cfg.RedisAddr,
+		Password: password,
+		DB:       db,
+	})
 }
 
 func parseRedisURL(raw string) (string, int, error) {

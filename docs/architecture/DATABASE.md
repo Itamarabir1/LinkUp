@@ -40,10 +40,11 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 
 קבצי קונפיג: `infrastructure/pgbouncer/pgbouncer.ini`, `infrastructure/pgbouncer/userlist.txt.template`, `infrastructure/pgbouncer/entrypoint.sh` (הקובץ `userlist.txt` נוצר **בתוך הקונטיינר** בזמן startup מ־`POSTGRES_USER`/`POSTGRES_PASSWORD`/`PGBOUNCER_ADMIN_PASSWORD`; לא נשמר ב-git ולא נוצר ב-CI על host).
 
-### Redis topology (HA)
+### Redis topology (single persistent instance)
 
-- Compose runtime: `redis-primary` (master), `redis-replica` (replication), `redis-sentinel` (failover detection).
-- Python clients (`RedisClient`, `RedisChatPubSub`, `RedisBroadcast`) משתמשים ב-`redis.asyncio.Sentinel` כש-`REDIS_SENTINEL_HOST` מוגדר; אחרת fallback ל-`REDIS_URL`.
+- Compose runtime: service יחיד `redis` עם persistence (`appendonly yes`, `appendfsync everysec`, RDB snapshots).
+- Python clients (`RedisClient`, `RedisChatPubSub`, `RedisBroadcast`) מתחברים דרך `REDIS_URL`; `chat-ws` משתמש ב-`REDIS_ADDR` לחיבור ישיר וב-`REDIS_URL` רק לפרטי password/DB.
+- ב-single-host EC2, Sentinel הוסר כי הוא לא מגן מפני נפילת host ומוסיף מורכבות תפעולית ביחס לשלב הסקייל הנוכחי.
 - DB split נשאר: **DB 0** ל-cache/rate-limit/denylist/idempotency, **DB 1** לצ'אט/pubsub.
 
 ---
