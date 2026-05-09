@@ -33,8 +33,8 @@ async def test_get_my_rides_returns_only_for_driver(db_session: AsyncSession):
 
     svc = RideService()
     mine = await svc.get_my_rides(db_session, driver_a.user_id, status=None)
-    assert len(mine) == 1
-    assert str(mine[0].driver_id) == str(driver_a.user_id)
+    assert len(mine.rides) == 1
+    assert str(mine.rides[0].driver_id) == str(driver_a.user_id)
 
 
 @pytest.mark.asyncio
@@ -45,8 +45,8 @@ async def test_get_my_rides_filters_by_status(db_session: AsyncSession):
 
     svc = RideService()
     open_only = await svc.get_my_rides(db_session, driver.user_id, status="open")
-    assert len(open_only) == 1
-    assert open_only[0].status == RideStatus.OPEN
+    assert len(open_only.rides) == 1
+    assert open_only.rides[0].status == RideStatus.OPEN
 
 
 @pytest.mark.asyncio
