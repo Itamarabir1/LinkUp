@@ -203,11 +203,7 @@ class PassengerService:
             d_lat, d_lon = dest_coords
 
             radius = _radius_km_to_meters(getattr(search_data, "search_radius", None) or getattr(search_data, "radius", _DEFAULT_SEARCH_RADIUS_KM))
-            destination_radius_m = (
-                _radius_km_to_meters(search_data.destination_radius)
-                if search_data.destination_radius is not None
-                else None
-            )
+            destination_radius_m = _radius_km_to_meters(search_data.destination_radius) if search_data.destination_radius is not None else None
             after_tuple: tuple[datetime, UUID] | None = None
             if search_data.after:
                 try:

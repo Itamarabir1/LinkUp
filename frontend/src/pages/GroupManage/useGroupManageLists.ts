@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getGroupMembers, getGroupRides } from '../../api/groups';
-import type { GroupMember, Ride } from '../../types/api';
+import type { GroupMember, RideResponse } from '../../types/api';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { apiErr } from '../../utils/i18nError';
 import type { GroupTab } from './groupManage.types';
@@ -14,7 +14,7 @@ export function useGroupManageLists(
   setError: (message: string) => void
 ) {
   const [members, setMembers] = useState<GroupMember[]>([]);
-  const [rides, setRides] = useState<Ride[]>([]);
+  const [rides, setRides] = useState<RideResponse[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [loadingRides, setLoadingRides] = useState(false);
 

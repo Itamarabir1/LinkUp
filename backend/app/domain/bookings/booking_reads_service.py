@@ -210,9 +210,7 @@ class BookingReadsService:
             except CursorDecodeError as e:
                 raise BadRequestError("מסמן עמוד לא תקין") from e
 
-        bookings = await crud_booking.get_passenger_history_bookings(
-            db, passenger_id, limit, after=cursor_tuple
-        )
+        bookings = await crud_booking.get_passenger_history_bookings(db, passenger_id, limit, after=cursor_tuple)
         has_more = len(bookings) > limit
         page = bookings[:limit]
         next_cursor = None

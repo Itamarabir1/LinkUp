@@ -330,12 +330,7 @@ async def get_messages(
     Returns (list in chronological order oldest→newest, has_more).
     """
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
-    q = (
-        select(Message)
-        .where(Message.conversation_id == cid)
-        .order_by(desc(Message.created_at), desc(Message.message_id))
-        .limit(limit + 1)
-    )
+    q = select(Message).where(Message.conversation_id == cid).order_by(desc(Message.created_at), desc(Message.message_id)).limit(limit + 1)
     if after is not None:
         ct, message_id = after
         q = q.where(

@@ -191,10 +191,7 @@ class CRUDPassenger:
             after_t, after_id = after
             filters = and_(
                 filters,
-                (
-                    (Ride.departure_time > after_t)
-                    | ((Ride.departure_time == after_t) & (Ride.ride_id > after_id))
-                ),
+                ((Ride.departure_time > after_t) | ((Ride.departure_time == after_t) & (Ride.ride_id > after_id))),
             )
         stmt = (
             select(Ride, Booking.status.label("user_booking_status"))

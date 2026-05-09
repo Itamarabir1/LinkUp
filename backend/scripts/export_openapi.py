@@ -37,6 +37,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
 
+    # Ensure the backend root is on sys.path so `from app.main import app`
+    # works when this script is invoked from the repo root in CI (where the
+    # working directory is not necessarily backend/).
+    if str(_BACKEND_DIR) not in sys.path:
+        sys.path.insert(0, str(_BACKEND_DIR))
+
     # Importing inside main keeps argparse fast and lets --help work without
     # paying the FastAPI import cost.
     from app.main import app

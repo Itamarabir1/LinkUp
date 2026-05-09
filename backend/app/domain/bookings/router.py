@@ -128,9 +128,7 @@ async def get_passenger_history_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await BookingReadsService.get_passenger_history_summary(
-        db, current_user.user_id, limit=limit, after=after
-    )
+    return await BookingReadsService.get_passenger_history_summary(db, current_user.user_id, limit=limit, after=after)
 
 
 @router.get("/ride/{ride_id}/manifest", response_model=RideManifestResponse)

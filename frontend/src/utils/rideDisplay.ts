@@ -1,4 +1,3 @@
-import type { Ride } from '../types/api';
 import i18n from '../i18n';
 
 /** Groups for display-name mapping (ride/request source). */
@@ -15,7 +14,14 @@ export function getRideSourceLabel(
   return g?.name ?? i18n.t('common:public');
 }
 
-export function getRideStatusLabel(r: Ride): string {
+// Structural subset shared by both the hand-written `Ride` and the generated
+// `RideResponse` types — only the fields this label function actually reads.
+type RideStatusInfo = {
+  status: string;
+  available_seats?: number | null;
+};
+
+export function getRideStatusLabel(r: RideStatusInfo): string {
   if (r.status === 'cancelled') return i18n.t('rides:status_cancelled');
   if (r.status === 'completed') return i18n.t('rides:status_completed');
   if (r.status === 'active') return i18n.t('rides:status_active');

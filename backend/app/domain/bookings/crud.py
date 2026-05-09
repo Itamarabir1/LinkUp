@@ -376,9 +376,7 @@ class CRUDBooking:
         )
         if after is not None:
             ct, bid = after
-            stmt = stmt.where(
-                or_(Booking.created_at < ct, and_(Booking.created_at == ct, Booking.booking_id < bid))
-            )
+            stmt = stmt.where(or_(Booking.created_at < ct, and_(Booking.created_at == ct, Booking.booking_id < bid)))
         result = await db.execute(stmt)
         return list(result.scalars().unique().all())
 
@@ -410,9 +408,7 @@ class CRUDBooking:
         )
         if after is not None:
             ct, bid = after
-            stmt = stmt.where(
-                or_(Booking.created_at < ct, and_(Booking.created_at == ct, Booking.booking_id < bid))
-            )
+            stmt = stmt.where(or_(Booking.created_at < ct, and_(Booking.created_at == ct, Booking.booking_id < bid)))
         result = await db.execute(stmt)
         return list(result.scalars().unique().all())
 
@@ -550,9 +546,7 @@ class CRUDBooking:
         )
         if after is not None:
             ct, cid = after
-            stmt = stmt.where(
-                or_(Ride.departure_time < ct, and_(Ride.departure_time == ct, Ride.ride_id < cid))
-            )
+            stmt = stmt.where(or_(Ride.departure_time < ct, and_(Ride.departure_time == ct, Ride.ride_id < cid)))
         result = await db.execute(stmt)
         return list(result.scalars().unique().all())
 
@@ -599,9 +593,7 @@ class CRUDBooking:
         )
         if after is not None:
             ct, bid = after
-            stmt = stmt.where(
-                or_(Ride.departure_time < ct, and_(Ride.departure_time == ct, Booking.booking_id < bid))
-            )
+            stmt = stmt.where(or_(Ride.departure_time < ct, and_(Ride.departure_time == ct, Booking.booking_id < bid)))
         result = await db.execute(stmt)
         return list(result.scalars().unique().all())
 
