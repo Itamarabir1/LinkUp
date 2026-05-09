@@ -130,7 +130,7 @@ jobs:
             export EMAIL_RENDERER_IMAGE="ghcr.io/$OWNER_LOWER/linkup-email-renderer:latest"
 
             $COMPOSE --profile prod up -d --wait --wait-timeout 120 \
-              db redis-primary redis-replica redis-sentinel rabbitmq
+              db redis rabbitmq
 
             $COMPOSE up -d --wait --wait-timeout 60 --no-deps pgbouncer
 
