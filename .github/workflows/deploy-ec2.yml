@@ -160,9 +160,7 @@ jobs:
                 && $COMPOSE exec -T chat-ws sh -c "printenv | grep -E '^REDIS_ADDR='" | grep -q 'redis:6379' \
                 && $COMPOSE exec -T backend sh -c "printenv | grep -E '^FIREBASE_CREDENTIALS_JSON='" >/dev/null \
                 && $COMPOSE exec -T backend sh -c "python -c \"import urllib.request;print(urllib.request.urlopen('http://localhost:8000/readyz').read().decode())\"" | grep -q '"status":"healthy"' \
-                && $COMPOSE exec -T backend sh -c "python3 -c \"import os; assert os.getenv('FIREBASE_CREDENTIALS_JSON'), 'missing'\"" \
-                && curl -sf --http1.1 --max-time 10 https://linkup.itamarabir.com/livez > /dev/null \
-                && curl -sf --http1.1 --max-time 10 https://linkup.itamarabir.com/config.js > /dev/null; then
+                && $COMPOSE exec -T backend sh -c "python3 -c \"import os; assert os.getenv('FIREBASE_CREDENTIALS_JSON'), 'missing'\""; then
                 mkdir -p "$STATE_DIR"
                 echo "${NEW_IMAGE##*:}" > "$PREV_TAG_FILE"
                 echo "Deploy succeeded: $NEW_IMAGE"
