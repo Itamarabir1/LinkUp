@@ -4,7 +4,7 @@ Adds `conversations.last_message_at` and backfills from the latest message times
 per conversation (fallback to conversation `created_at` when no messages exist).
 Also adds an index for inbox ordering.
 
-Revision ID: 020_add_conversations_last_message_at
+Revision ID: 020_conv_last_msg_at
 Revises: 019_booking_lifecycle_enum
 Create Date: 2026-05-07
 """
@@ -12,7 +12,7 @@ Create Date: 2026-05-07
 import sqlalchemy as sa
 from alembic import op
 
-revision = "020_add_conversations_last_message_at"
+revision = "020_conv_last_msg_at"
 down_revision = "019_booking_lifecycle_enum"
 branch_labels = None
 depends_on = None
