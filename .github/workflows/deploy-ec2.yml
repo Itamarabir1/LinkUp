@@ -157,7 +157,7 @@ jobs:
 
             if BACKEND_IMAGE="$NEW_IMAGE" $COMPOSE up -d --no-deps --wait --wait-timeout 90 backend; then
               if grep -E '^FIREBASE_CREDENTIALS_JSON=' backend/.env >/dev/null \
-                && $COMPOSE exec -T chat-ws sh -c "printenv | grep -E '^REDIS_URL='" | grep -q 'redis://:.*@redis:6379/1' \
+                && $COMPOSE exec -T chat-ws sh -c "printenv | grep -E '^REDIS_ADDR='" | grep -q 'redis:6379' \
                 && $COMPOSE exec -T backend sh -c "printenv | grep -E '^FIREBASE_CREDENTIALS_JSON='" >/dev/null \
                 && $COMPOSE exec -T backend sh -c "python -c \"import urllib.request;print(urllib.request.urlopen('http://localhost:8000/readyz').read().decode())\"" | grep -q '"status":"healthy"' \
                 && $COMPOSE exec -T backend sh -c "python3 -c \"import os; assert os.getenv('FIREBASE_CREDENTIALS_JSON'), 'missing'\"" \
