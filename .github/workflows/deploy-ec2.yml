@@ -156,6 +156,7 @@ jobs:
               || { echo "Email-renderer smoke FAILED"; exit 1; }
 
             if BACKEND_IMAGE="$NEW_IMAGE" $COMPOSE up -d --no-deps --wait --wait-timeout 90 backend; then
+              sleep 10
               if grep -E '^FIREBASE_CREDENTIALS_JSON=' backend/.env >/dev/null \
                 && $COMPOSE exec -T chat-ws sh -c "printenv | grep -E '^REDIS_ADDR='" | grep -q 'redis:6379' \
                 && $COMPOSE exec -T backend sh -c "printenv | grep -E '^FIREBASE_CREDENTIALS_JSON='" >/dev/null \
