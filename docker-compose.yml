@@ -12,12 +12,10 @@ services:
     image: postgis/postgis:15-3.3
     container_name: linkup_db
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+    env_file:
+      - ./backend/.env
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -42,19 +40,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
-      PGBOUNCER_ADMIN_PASSWORD: ${PGBOUNCER_ADMIN_PASSWORD}
+    env_file:
+      - ./backend/.env
     volumes:
       - ./infrastructure/pgbouncer/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "[ -n \"$$POSTGRES_USER\" ] && [ -n \"$$POSTGRES_DB\" ] && [ -n \"$$PGPASSWORD\" ] && psql -h 127.0.0.1 -p 6432 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -c 'SELECT 1' -q 2>/dev/null || exit 1",
+          "[ -n \"$$POSTGRES_USER\" ] && [ -n \"$$POSTGRES_DB\" ] && [ -n \"$$POSTGRES_PASSWORD\" ] && PGPASSWORD=\"$$POSTGRES_PASSWORD\" psql -h 127.0.0.1 -p 6432 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -c 'SELECT 1' -q 2>/dev/null || exit 1",
         ]
       interval: 5s
       timeout: 5s
@@ -69,31 +63,19 @@ services:
     image: redis:7.2-alpine
     container_name: linkup_redis
     restart: unless-stopped
+    env_file:
+      - ./backend/.env
     command:
       [
-        "redis-server",
-        "--requirepass",
-        "${REDIS_PASSWORD}",
-        "--appendonly",
-        "yes",
-        "--appendfsync",
-        "everysec",
-        "--save",
-        "900",
-        "1",
-        "--save",
-        "300",
-        "10",
-        "--maxmemory",
-        "400mb",
-        "--maxmemory-policy",
-        "allkeys-lru",
+        "sh",
+        "-c",
+        "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes --appendfsync everysec --save 900 1 --save 300 10 --maxmemory 400mb --maxmemory-policy allkeys-lru",
       ]
     mem_limit: 512m
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -107,9 +89,15 @@ services:
     image: rabbitmq:3-management
     container_name: linkup_rabbitmq
     restart: unless-stopped
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    env_file:
+      - ./backend/.env
+    # RabbitMQ image consumes RABBITMQ_DEFAULT_USER/PASS, but backend/.env
+    # ships RABBITMQ_USER/PASSWORD. Remap at container start instead of
+    # duplicating keys in the .env file.
+    entrypoint:
+      - sh
+      - -c
+      - 'export RABBITMQ_DEFAULT_USER="$$RABBITMQ_USER" RABBITMQ_DEFAULT_PASS="$$RABBITMQ_PASSWORD" && exec docker-entrypoint.sh rabbitmq-server'
     mem_limit: 256m
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
@@ -288,6 +276,8 @@ services:
         condition: service_completed_successfully
       db:
         condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       redis:
@@ -318,8 +308,6 @@ services:
       - DOCKER_MODE=true
       - DB_POOL_SIZE=5
       - DB_MAX_OVERFLOW=10
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - LOG_FORMAT=${LOG_FORMAT:-json}
     mem_limit: 512m
     depends_on:
       migrate:
@@ -331,8 +319,6 @@ services:
       redis:
         condition: service_healthy
       rabbitmq:
-        condition: service_healthy
-      email-renderer:
         condition: service_healthy
     healthcheck:
       test:
@@ -358,12 +344,12 @@ services:
     container_name: linkup_chat_ws
     restart: unless-stopped
     env_file:
+      - ./backend/.env
       - ./chat-ws/.env
     environment:
       - PORT=8081
       - BACKEND_URL=http://backend:8000
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
-      - REDIS_MASTER_NAME=mymaster
+      - REDIS_ADDR=redis:6379
     depends_on:
       redis:
         condition: service_healthy
