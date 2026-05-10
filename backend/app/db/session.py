@@ -3,16 +3,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.config import settings
 
 # DATABASE_URL must use postgresql+asyncpg://
-# Effective statement_timeout is applied per session via asyncpg server_settings.
-# Alembic migration 017 sets a higher role-level ceiling (60s) as defense-in-depth.
+# Role-level statement_timeout is set by Alembic migration 017 (PgBouncer does not support it as a startup GUC here).
+# statement_cache_size=0 is required for asyncpg behind PgBouncer transaction pooling.
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
     connect_args={
         "statement_cache_size": 0,
-        "server_settings": {
-            "statement_timeout": f"{settings.DB_STATEMENT_TIMEOUT_MS}ms",
-        },
     },
     pool_size=settings.DB_POOL_SIZE,
     max_overflow=settings.DB_MAX_OVERFLOW,
