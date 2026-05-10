@@ -155,7 +155,7 @@ jobs:
               && echo "Email-renderer smoke OK" \
               || { echo "Email-renderer smoke FAILED"; exit 1; }
 
-            if BACKEND_IMAGE="$NEW_IMAGE" $COMPOSE up -d --no-deps --wait --wait-timeout 90 backend; then
+            if BACKEND_IMAGE="$NEW_IMAGE" $COMPOSE up -d --no-deps --wait --wait-timeout 150 backend; then
               sleep 10
               if grep -E '^FIREBASE_CREDENTIALS_JSON=' backend/.env >/dev/null \
                 && $COMPOSE exec -T chat-ws sh -c "printenv | grep -E '^REDIS_ADDR='" | grep -q 'redis:6379' \
@@ -178,7 +178,7 @@ jobs:
               docker pull "$ROLLBACK_IMAGE" || { echo "Rollback pull of latest also failed"; exit 1; }
             fi
 
-            if BACKEND_IMAGE="$ROLLBACK_IMAGE" $COMPOSE up -d --no-deps --wait --wait-timeout 90 backend; then
+            if BACKEND_IMAGE="$ROLLBACK_IMAGE" $COMPOSE up -d --no-deps --wait --wait-timeout 150 backend; then
               echo "Rollback succeeded (rolled back to $ROLLBACK_IMAGE)"
               exit 1
             fi
