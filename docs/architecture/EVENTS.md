@@ -1,16 +1,21 @@
 # Event System
 
-Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/events/routing.py`.
+Outbox → Dispatcher → (RabbitMQ / Redis) → Workers/Realtime. מקור אמת ל-routing של RabbitMQ: `backend/app/domain/events/routing.py`.
 
 ---
 
-## Pattern: Outbox → RabbitMQ → Worker
+## Pattern: Outbox → Dispatcher → Targets
 
 1. **Backend** כותב אירוע ל-tבלת `outbox_events` (status=PENDING) באותה transaction עם שינוי עסקי.
-2. **notification-worker** מריץ `run_outbox_worker`, קורא רשומות PENDING ומפרסם ל-RabbitMQ לפי `get_routing_metadata(event_name)`, ואז מעדכן status ל-DONE (או retry). ה-fetch של **PENDING** משתמש ב-**`SELECT ... FOR UPDATE SKIP LOCKED`** ([`OutboxRepository.get_pending_events`](../../backend/app/infrastructure/outbox/repository.py)) — כך **כמה מופעי worker** יכולים לרוץ במקביל בלי נעילה הדדית על אותה שורה (מדלגים לשורה הבאה הזמינה).
-3. **Consumers** רצים ב-workers הייעודיים (notification/task) ומפעילים handlers (מייל, פוש, S3, וכו').
+2. **notification-worker** מריץ `run_outbox_worker`, קורא רשומות PENDING ומפעיל `EventDispatcher` לפי `targets` של האירוע:
+   - `RABBITMQ` -> `RabbitMQPublisher` (עם `get_routing_metadata(event_name)`),
+   - `REDIS` -> `RedisChatPublisher` (למשל `chat.message_sent` -> `chat:conversation:{id}`).
+   לאחר dispatch מוצלח, status מתעדכן ל-PROCESSED (או retry במקרה כשל). ה-fetch של **PENDING** משתמש ב-**`SELECT ... FOR UPDATE SKIP LOCKED`** ([`OutboxRepository.get_pending_events`](../../backend/app/infrastructure/outbox/repository.py)) — כך **כמה מופעי worker** יכולים לרוץ במקביל בלי נעילה הדדית על אותה שורה (מדלגים לשורה הבאה הזמינה).
+3. **Consumers/realtime**:
+   - RabbitMQ consumers רצים ב-workers הייעודיים (notification/task),
+   - Redis chat channels נצרכים ע"י `chat-ws`.
 
-יתרון: at-least-once, אין איבוד אירועים אם RabbitMQ נופל.
+יתרון: at-least-once, אין איבוד אירועים אם יעד dispatch נופל (RabbitMQ/Redis).
 
 ---
 
@@ -86,6 +91,7 @@ Outbox → RabbitMQ → Worker. מקור אמת ל-routing: `backend/app/domain/
 | Event | Exchange | Routing Key | Triggered By | Payload |
 |-------|----------|-------------|--------------|---------|
 | chat.conversation.completed | user | chat.conversation.completed | סיום שיחה (מ-chat-ws/backend → Redis → worker) | conversation_id, trigger_user_id |
+| chat.message_sent | — (Redis target) | — | `chat.service.send_message` (Outbox) | message_id, conversation_id, sender_id, recipient_id, body, created_at |
 
 ### Scheduled (נשלח ע"י Scheduler ל-RabbitMQ, לא מ-Outbox)
 

@@ -314,8 +314,6 @@ async def create_message(
             "cid": cid,
         },
     )
-    await db.commit()
-    await db.refresh(msg)
     return msg
 
 

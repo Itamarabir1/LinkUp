@@ -9,9 +9,11 @@ import app.db.models  # noqa: F401
 # Firebase Admin SDK init (side-effect import; safe idempotent)
 import app.infrastructure.firebase_core.firebase  # noqa: F401
 from app.core.logging import setup_logging
+from app.domain.events.enum import DispatchTarget
 from app.domain.events.routing import NOTIFICATION_EXCHANGES
 from app.infrastructure.events.dispatcher.factory import DispatcherFactory
 from app.infrastructure.events.publishers.rabbitmq import RabbitMQPublisher
+from app.infrastructure.events.publishers.redis_outbox import RedisChatPublisher
 from app.infrastructure.rabbitmq.client import outbox_rabbit_client, worker_rabbit_client
 from app.infrastructure.rabbitmq.consumer import RabbitMQConsumer
 from app.infrastructure.rabbitmq.dlq_monitor import run_dlq_monitor
@@ -65,7 +67,11 @@ async def main():
             logger.warning("Redis chat pubsub unavailable: %s", e)
 
         rmq_publisher = RabbitMQPublisher(rabbit_client=outbox_rabbit_client)
-        dispatcher = DispatcherFactory.create_standard_dispatcher(publishers=[rmq_publisher])
+        redis_publisher = RedisChatPublisher(pubsub=redis_chat_pubsub)
+        dispatcher = DispatcherFactory.create_standard_dispatcher(
+            publishers=[rmq_publisher, redis_publisher],
+            critical_targets={DispatchTarget.RABBITMQ, DispatchTarget.REDIS},
+        )
 
         notifications_consumer = RabbitMQConsumer(
             worker_rabbit_client,

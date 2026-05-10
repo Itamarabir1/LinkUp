@@ -111,7 +111,6 @@ yarn-debug.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-docker-compose.override.yml
 prod_config.txt
 infrastructure/pgbouncer/userlist.txt
 # Compose edge nginx — generated from nginx/nginx.conf.template (SENTRY_REPORT_URI); see scripts/ops/render-nginx-conf.sh

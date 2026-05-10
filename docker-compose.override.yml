@@ -1,0 +1,12 @@
+# Dev-only overrides — loaded automatically by Docker Compose locally.
+# Production deploy explicitly passes -f flags to skip this file.
+services:
+  backend:
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      API_DOCS_ENABLED: "true"
+
+  chat-ws:
+    ports:
+      - "127.0.0.1:8081:8081"

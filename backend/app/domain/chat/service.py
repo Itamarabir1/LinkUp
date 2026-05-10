@@ -26,6 +26,8 @@ from app.domain.bookings.enum import BookingStatus
 from app.domain.bookings.model import Booking
 from app.domain.chat import crud as chat_crud
 from app.domain.chat.model import ConversationParticipant
+from app.domain.events.enum import DispatchTarget
+from app.domain.events.outbox import publish_to_outbox
 from app.core.pagination.cursor import CursorDecodeError, decode_cursor_int, encode_cursor, encode_cursor_int
 from app.domain.chat.schema import (
     ConversationDetail,
@@ -38,7 +40,6 @@ from app.domain.chat.schema import (
 )
 from app.domain.rides.model import Ride
 from app.domain.users.crud import crud_user
-from app.infrastructure.events.publishers.redis import publish_chat_message
 from app.infrastructure.s3.service import storage_service
 from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 
@@ -251,13 +252,18 @@ async def send_message(
     body: str,
 ) -> MessageResponse:
     """
-    Sends a message: persist in DB + publish to Redis (Go WS server listens).
+    Sends a message: persist in DB + enqueue outbox event (same transaction).
+    Outbox worker publishes to Redis -> chat-ws -> WebSocket.
     """
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, sender_id)
     if not conv:
         raise ChatRoomNotFound()
-    msg = await chat_crud.create_message(db, conversation_id=conversation_id, sender_id=sender_id, body=body)
+
+    msg = await chat_crud.create_message(
+        db, conversation_id=conversation_id, sender_id=sender_id, body=body
+    )
     recipient_id = conv.user_id_2 if conv.user_id_1 == sender_id else conv.user_id_1
+
     payload = {
         "message_id": msg.message_id,
         "conversation_id": str(msg.conversation_id),
@@ -266,16 +272,23 @@ async def send_message(
         "body": msg.body,
         "created_at": msg.created_at.isoformat() if msg.created_at else None,
     }
-    await publish_chat_message(conversation_id, payload)
+
+    await publish_to_outbox(
+        db,
+        event_name="chat.message_sent",
+        payload=payload,
+        targets=[DispatchTarget.REDIS.value],
+    )
+
+    await db.commit()
+    await db.refresh(msg)
 
     # Publish unread-count notification to recipient (for instant badge updates via chat-ws).
     try:
         unread = await chat_crud.get_unread_conversations_count(db, recipient_id)
         await redis_chat_pubsub.publish(
             f"user:{recipient_id}:events",
-            json.dumps(
-                {"type": "invalidate", "resource": "unread_messages", "count": unread},
-            ),
+            json.dumps({"type": "invalidate", "resource": "unread_messages", "count": unread}),
         )
     except Exception as e:
         logger.warning("Publish unread_count failed: %s", e, exc_info=True)

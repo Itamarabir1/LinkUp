@@ -328,7 +328,7 @@
 
 - **Backend stateless** — כל הלוגיקה העסקית ב-FastAPI; אפשר להרחיב replicas; **Redis משותף** ל־**JWT denylist** + **Idempotency-Key** (מטמון POST) בין מופעים; WebSocket לצ’אט **לא** על אותו process (מפורק ל-Go).
 - **הפרדת שירותים**: REST + DB ב-Python; **מאות אלפי חיבורי WS** יכולים לרוץ על מופעי `chat-ws` נפרדים מאחורי load balancer (sticky או shared Redis).
-- **Redis Pub/Sub** — publish מה-API, subscribe ב-Go; לא דוחפים הודעות דרך Python WS.
+- **Redis Pub/Sub** — delivery לצ׳אט מתבצע דרך Outbox (`chat.message_sent`) ואז publish ל-`chat:conversation:*`; chat-ws (Go) ממשיך להיות שכבת fan-out ל-WS.
 - **Connection pool** ל-Postgres: `pool_size`, `max_overflow`, **`pool_timeout`**, **`pool_recycle`**, `pool_pre_ping` — מוגדרים מ-**`settings` / `.env`** (`DB_POOL_*`); מפחית חיבורים מתים והמתנה אינסופית לחיבור פנוי.
 - **Cursor pagination** לחיפוש נסיעות ולהודעות צ’אט — עמידות בנתונים גדולים לעומת offset גדול.
 
@@ -338,7 +338,8 @@
 
 ### זרימה כללית
 
-1. שליחת הודעה: **POST** ל-API → שמירה ב-DB → **PUBLISH** ל-`chat:conversation:{id}`.
+1. שליחת הודעה: **POST** ל-API → שמירה ב-DB + כתיבת Outbox event (`chat.message_sent`) באותה טרנזקציה.
+2. **notification-worker / outbox-worker** מפרסם ל-Redis `chat:conversation:{id}` דרך `RedisChatPublisher`.
 2. **chat-ws (Go)** מאזין ל-pattern, מעביר ללקוח לפי נמען.
 
 ### פיצ’רים על החיבור
@@ -383,7 +384,7 @@
 | סינכרוני (הלקוח מקבל תשובה מיד / בזמן הבקשה) | אסינכרוני (ממשיכים ברקע; הלקוח לא מחכה) |
 |-----------------------------------------------|------------------------------------------|
 | **REST**: login, שליחת הודעת צ’אט (POST), אישור הזמנה, חיפוש נסיעות | **מייל / Push** אחרי אירוע עסקי — דרך Outbox → RabbitMQ → consumer |
-| **תשובת 200** אחרי commit ל-DB (והפעלת publish ל-Redis לצ’אט) | **עיבוד אווטאר** (S3 resize) — נכנס לתור, ה-API רק מחזיר “התקבל” |
+| **תשובת 200** אחרי commit ל-DB + כתיבת Outbox (למשל `chat.message_sent`) | **עיבוד אווטאר** (S3 resize) — נכנס לתור, ה-API רק מחזיר “התקבל” |
 | **GET /presence** ב-chat-ws (online + last_seen מ-DB דרך backend) | **ניתוח AI לשיחה** — עיקרית **`task-worker`** (timeout); מאזין **`ai-worker`** ל־`chat:completion:*` (אופציונלי) — [`architecture/AI.md`](architecture/AI.md) |
 | **PATCH last-seen** — נקרא מה-worker ב-Go אחרי disconnect (לא מהדפדפן של המשתמש המנותק) | **משימות מתוזמנות** (תזכורות, chat timeout, וכו’) — RabbitMQ `scheduled` |
 | | **Redis Pub/Sub** — publish לא “מחכה” למנויים; מי שלא מחובר לא מקבל — זה push חד-כיווני |
@@ -684,7 +685,7 @@ ADR: **`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §18**.
 
 | דגש | פירוט קצר |
 |-----|-----------|
-| **Unread צ’אט (בזמן אמת)** | אחרי **`send_message`** — פרסום ל־**`user:{recipient_id}:events`** עם **`invalidate`** + **`resource: unread_messages`** + **`count`**; **`useUserEventStream`** + **`setUnreadDirect`** ב־`ChatContext` מעדכנים את מטמון React Query בלי חובה ל־HTTP עד רפרש הבא (polling נשאר גיבוי ~30 שניות). |
+| **Unread צ’אט (בזמן אמת)** | אחרי commit של `send_message` — פרסום invalidate ל־**`user:{recipient_id}:events`** עם **`resource: unread_messages`** + **`count`**; **`useUserEventStream`** + **`setUnreadDirect`** ב־`ChatContext` מעדכנים מטמון RQ בלי חובה ל־HTTP עד רפרש הבא (polling נשאר גיבוי). |
 | **Presence בצ’אט** | טעינה חד־פעמית ל-`GET /presence/{id}`; **`user_online` / `user_offline`** ב-WS לעדכון מיידי. |
 | **קבוצות + הזמנה** | `invite_code` ייחודי, תפוגה אופציונלית, endpoint הצטרפות; העברת admin בקבוצה. |
 | **SQLAdmin** | ממשק **ניהול DB** (FastAPI-SQLAdmin): משתמשים, נסיעות, הזמנות, בקשות — תפעול ודיבוג (נפרד ממסך האדמין ב־React). |

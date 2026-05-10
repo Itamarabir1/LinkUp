@@ -45,7 +45,7 @@
 
 ### Redis DB 1 (chat-ws + ai-worker)
 
-- **הודעות צ'אט**: ערוץ `chat:conversation:{conversation_id}`. Backend (או שירות שכותב הודעות) מפרסם; chat-ws מנוי ל-pattern `chat:conversation:*` ומעביר ל-clients מחוברים.
+- **הודעות צ'אט**: ערוץ `chat:conversation:{conversation_id}`. ה-API כותב `chat.message_sent` ל-`outbox_events` באותה טרנזקציה של ההודעה; `notification-worker` (`run_outbox_worker`) מפעיל `RedisChatPublisher` ומפרסם ל-Redis, ו-`chat-ws` מנוי ל-pattern `chat:conversation:*` ומעביר ל-clients מחוברים.
 - **אירועים per-user על אותו namespace (DB1)**: pattern **`user:*:events`** — מאחד:
   - **`publish_user_event`** (דומיין נסיעות/בוקינגים וכו') → JSON בפורмат **`UserEvent`**;
   - אחרי שליחת התראות outbox, **[`WebSocketProvider`](../../backend/app/domain/notifications/providers/websocket_provider.py)** מפרסם **`{ type: "invalidate", resource: "notifications", event, user_id }`** לרענון פיד in-app;
@@ -74,16 +74,17 @@
 ## Chat Flow
 
 ```
-Client A (נהג)                Backend API                    Redis DB 1              chat-ws (Go)              Client B (נוסע)
-     |                              |                              |                          |                          |
-     |  POST /chat/.../messages     |                              |                          |                          |
-     | -------------------------->  |  PUBLISH chat:conversation:X |                          |                          |
-     |                              | -------------------------->  |  PMESSAGE                |                          |
-     |                              |                              | -----------------------> |  forward to Client B      |
-     |                              |                              |                          | -------------------------->|
+Client A (נהג)                Backend API               Outbox Worker               Redis DB 1              chat-ws (Go)              Client B (נוסע)
+     |                              |                              |                          |                          |                          |
+     |  POST /chat/.../messages     |                              |                          |                          |                          |
+     | -------------------------->  |  DB write + outbox event     |                          |                          |                          |
+     |                              | -------------------------->  |  PUBLISH chat:conversation:X |                      |                          |
+     |                              |                              | -----------------------> |  PMESSAGE                |                          |
+     |                              |                              |                          | -----------------------> |  forward to Client B      |
+     |                              |                              |                          |                          | -------------------------->|
 ```
 
-- **כתיבת הודעה**: POST ל-FastAPI → שמירה ב-DB → publish ל-Redis `chat:conversation:{id}` → chat-ws מקבל ומעביר ל-clients המנויים.
+- **כתיבת הודעה**: POST ל-FastAPI → שמירה ב-DB + Outbox event (`chat.message_sent`) באותה טרנזקציה → outbox worker מפרסם ל-Redis `chat:conversation:{id}` → chat-ws מקבל ומעביר ל-clients המנויים.
 - **קבלת הודעה**: Client מחובר ל-chat-ws עם JWT; chat-ws נרשם ל-conversation הרלוונטי; הודעות מגיעות ב-WebSocket.
 - **קריאה (read receipt)**: כניסה לשיחה או קבלת הודעה מפעילות `mark_conversation_read`, שמעכנת גם `last_read_at` וגם `last_read_message_id`. לאחר מכן backend מפרסם `message_read` עם `read_up_to_message_id`, והצד השני צובע כ־read כל הודעה יוצאת עד ה־cursor הזה.
 - **השלמת הודעות אחרי ניתוק / פתיחה מחדש של ה־WS**: REST עם **`after`** לעמוד הראשון, ואחר כך (**אם צריך**) **`before=next_cursor`** לפי חוזה ה־API (ראו **`docs/architecture/API.md`**) עד שהפער נסגר או שנפגע **תקרת עמודים בצד הלקוח** (~50 בקשות). העוגן הוא מקסימום ה־`message_id` שכבר ב־state, או **`after=0`** כשאין עדיין עוגן מקומי (אז השרת מחזיר הודעות עם **`message_id > 0`** לפי אותו מסנן ב־CRUD).
