@@ -121,7 +121,7 @@ See `docs/architecture/API.md` and `docs/architecture/DATABASE.md`.
 Alembic lives in `alembic/`.
 
 - **Locally (repo + `uv`):** from **`backend/`** run **`uv run alembic upgrade head`** — same binary resolution as **`make migrate`** / CI.
-- **Docker Compose:** the **`migrate`** image uses **`ENTRYPOINT ["alembic"]`**; the service runs **`alembic upgrade head`** once before **backend** and workers (`notification-worker`, `task-worker`, `ai-worker`). The API **Dockerfile** `CMD` does **not** run migrations (`gunicorn` / `uvicorn` only). Off Compose (raw image / K8s): run migrations as a Job/init step — see **`docs/architecture/DEVELOPMENT.md`**.
+- **Docker Compose:** the **`migrate`** image uses **`ENTRYPOINT ["alembic"]`**; the service runs **`alembic upgrade head`** once before **backend** and workers (`notification-worker`, `task-worker`, `ai-worker`). The API **Dockerfile** `CMD` does **not** run migrations (`gunicorn` / `uvicorn` only). Off Compose (container image alone or another orchestrator): run migrations as a Job/init step — see **`docs/architecture/DEVELOPMENT.md`**.
 
 Canonical migration table + merge note (**`016_merge015_heads`**, **`015_billing_idem`**): **`docs/architecture/DATABASE.md`**.
 

@@ -57,7 +57,7 @@
 | DB_POOL_RECYCLE | — | מחזור חיבורים בשניות (ברירת מחדל 1800) |
 | DB_STATEMENT_TIMEOUT_MS | — | מגבלת זמן לשאילתה (מילישניות); ברירת מחדל 30000. **מיושם ברמת session** דרך `connect_args.server_settings` ב-[`app/db/session.py`](../../backend/app/db/session.py) — שינוי `.env` + restart מיד תקף. Alembic **017** קובע ceiling דיפנסיבי קשיח של 60000ms ברמת role (literal, ללא תלות ב-`settings`). |
 | DB pooling runtime path | — | runtime services דרך `pgbouncer`; migrations ישירות ל-`db` |
-| DATABASE_URL | אופציונלי | override מלא (למשל פרודקשן / K8s / CI); נטען ל־`DATABASE_URL_RAW` ב־Settings דרך **`validation_alias`** (גם **`DATABASE_URL_RAW`** תקף כשם env) |
+| DATABASE_URL | אופציונלי | override מלא (למשל פרודקשן / CI); נטען ל־`DATABASE_URL_RAW` ב־Settings דרך **`validation_alias`** (גם **`DATABASE_URL_RAW`** תקף כשם env) |
 | REDIS_URL | אופציונלי | override מלא ל-Redis; נטען ל־`REDIS_URL_RAW` (גם **`REDIS_URL_RAW`** תקף) |
 | REDIS_HOST | — | localhost / redis |
 | REDIS_PORT | — | 6379 |

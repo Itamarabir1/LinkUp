@@ -10,8 +10,6 @@ This document describes the edge hardening policy for Compose **edge nginx** and
 bash scripts/ops/render-nginx-conf.sh
 ```
 
-If you deploy the **Kubernetes** frontend bundle, keep **[`k8s/frontend/nginx-configmap.yaml`](../k8s/frontend/nginx-configmap.yaml)** aligned with the same CSP/connect/frame rules (currently easy to drift).
-
 ---
 
 ## Relation to XSS mitigation
@@ -82,7 +80,7 @@ Canonical template: [`nginx/nginx.conf.template`](../nginx/nginx.conf.template) 
 ## CSP origins: how to add a new third-party
 
 1. Identify exact endpoint(s) used by runtime (`script-src`, `connect-src`, `img-src`, `frame-src`, etc.).
-2. Add the minimal required origin to the correct directive in **`nginx/nginx.conf.template`**, rerun **`scripts/ops/render-nginx-conf.sh`**, then retest Compose edge (and **`k8s/frontend/nginx-configmap.yaml`** if applicable).
+2. Add the minimal required origin to the correct directive in **`nginx/nginx.conf.template`**, rerun **`scripts/ops/render-nginx-conf.sh`**, then retest the Compose edge nginx server.
 3. After a policy change: smoke **login**, **maps**, **chat**, **uploads**, **billing/Stripe**, **push/analytics**.
 4. Verify no wildcard can be replaced by a specific host where practical.
 5. Document why this origin is required and who owns it.

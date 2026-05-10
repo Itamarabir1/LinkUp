@@ -54,7 +54,7 @@
 | שירות רינדור HTML למיילים | [`email-renderer/`](../../email-renderer/) — `src/server.ts` (**Express**), `POST /render`, `GET /health`. |
 | תבניות React Email | `email-renderer/src/emails/templates/`, `registry.ts`, רכיבים ב-`components/`. |
 | אינטגרציה מהבקאנד | משתני סביבה כמו `EMAIL_RENDERER_URL`; worker/backend קוראים לרינדור לפני שליחה (Brevo) — ראו גם [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](../adr/ARCHITECTURE_DECISIONS_BACKEND.md) §5. |
-| פריסה | שירות `email-renderer` ב-[`docker-compose.yml`](../../docker-compose.yml); מניפסטים תחת [`k8s/email-renderer/`](../../k8s/email-renderer/); CI: [`.github/workflows/email-renderer-ci.yml`](../../.github/workflows/email-renderer-ci.yml). |
+| פריסה | שירות `email-renderer` ב-[`docker-compose.yml`](../../docker-compose.yml); CI: [`.github/workflows/email-renderer-ci.yml`](../../.github/workflows/email-renderer-ci.yml). |
 
 ---
 
@@ -169,15 +169,14 @@
 
 ---
 
-## 18. CI/CD + Docker + Kubernetes
+## 18. CI/CD + Docker Compose
 
 | בקורות חיים | בפרויקט |
 |-------------|---------|
 | Docker Compose (מקומי / אינטגרציה) | [`docker-compose.yml`](../../docker-compose.yml) — db, redis, rabbitmq, migrate, **email-renderer**, backend, **notification-worker**, **task-worker**, **ai-worker**, **chat-ws**; פרופיל prod עם frontend + nginx. |
 | Edge nginx — TLS, headers, **CSP מאוכף** (`script-src` ללא `'unsafe-inline'`; bootstrap ב־[`frontend/public/bootstrap.js`](../../frontend/public/bootstrap.js) נטען ב־[`frontend/index.html`](../../frontend/index.html) **לפני** `/config.js`), `report-uri` מ־**`SENTRY_REPORT_URI`** (`backend/.env`) | [`nginx/nginx.conf.template`](../../nginx/nginx.conf.template) + [`scripts/ops/render-nginx-conf.sh`](../../scripts/ops/render-nginx-conf.sh) → `nginx/nginx.conf` (לא ב־Git); **`listen 443 ssl`** (בטמפלייט: HTTP/1.1 מעל TLS אלא אם מוסיפים `http2`); מדריך [`docs/SECURITY_HEADERS.md`](../SECURITY_HEADERS.md), החלטה [`FEATURE_DECISIONS.md`](../FEATURE_DECISIONS.md#browser-csp-edge). |
-| GitHub Actions | [`.github/workflows/`](../../.github/workflows/) — `backend-ci` / `frontend-ci` / `chat-ws-ci` / `email-renderer-ci` (בנייה + push ל-GHCR לפי `paths`); **`deploy-ec2.yml`** (`workflow_run`) — פריסת Compose ל-EC2 אחרי CI ירוק על `main`. מניפסטי GKE תחת [`k8s/`](../../k8s/) בלי **`deploy-gke.yml`** — [`docs/FUTURE_WORK.md`](../FUTURE_WORK.md). |
+| GitHub Actions | [`.github/workflows/`](../../.github/workflows/) — `backend-ci` / `frontend-ci` / `chat-ws-ci` / `email-renderer-ci` (בנייה + push ל-GHCR לפי `paths`); **`deploy-ec2.yml`** (`workflow_run`) — פריסת Compose ל-EC2 אחרי CI ירוק על `main` — [`docs/FUTURE_WORK.md`](../FUTURE_WORK.md). |
 | Dependabot | [`.github/dependabot.yml`](../../.github/dependabot.yml) — npm **`/frontend`**, pip **`/backend`**, Docker **`/backend`**, **`/frontend`**, **`/infrastructure/pgbouncer`**. |
-| Kubernetes | [`k8s/`](../../k8s/) — base, overlays, infra (Postgres, Redis, RabbitMQ), שירותים נפרדים ל-backend, worker, chat-ws, email-renderer, frontend. |
 
 ---
 

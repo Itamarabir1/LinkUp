@@ -1,16 +1,9 @@
 # Future Work
 
-## GKE Migration Path (Deferred)
+## GKE / Kubernetes (not in repo)
 
-- **Decision:** Keep Kubernetes manifests in `k8s/`, but remove `.github/workflows/deploy-gke.yml` for now.
-- **Current state:** Production deploy path is EC2 + Docker Compose via **[`deploy-ec2.yml`](../.github/workflows/deploy-ec2.yml)** (after successful service CI on `main`). GCP secrets/vars are not configured in GitHub Actions for GKE.
-- **Why now:**
-  - Prevent noisy CI/workflow validation failures from an inactive deployment path.
-  - Preserve migration-ready assets (`k8s/`) without pretending the pipeline is operational.
-  - Keep the repository aligned with the currently supported production topology.
-- **When to revisit:**
-  - After deciding to migrate runtime to GKE and provisioning required GCP credentials/secrets.
-  - When CI ownership includes a tested GKE rollout + rollback path.
+- **Current state:** Production is **EC2 + Docker Compose** via **[`deploy-ec2.yml`](../.github/workflows/deploy-ec2.yml)** (after successful service CI on `main`). Kubernetes manifests and `deploy-gke.yml` are **not** maintained in this repository.
+- **If revisiting a move to GKE:** add fresh manifests (or GitOps) plus a tested rollout/rollback workflow and GCP credentials in CI — do not assume historical layout on `main`.
 
 ## Near-Term, High-Value (Implement Next)
 

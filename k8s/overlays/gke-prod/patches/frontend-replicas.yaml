@@ -1,6 +1,0 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: linkup-frontend
-spec:
-  replicas: 2

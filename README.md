@@ -146,7 +146,7 @@ flowchart LR
 | **Real-time** | Go (chat-ws), Redis Pub/Sub |
 | **Frontend**  | React, TypeScript, Vite, Google Maps |
 | **Mobile**    | React Native, Expo, TypeScript |
-| **Infrastructure** | Docker, Docker Compose, Kubernetes (manifests in repo) |
+| **Infrastructure** | Docker, Docker Compose |
 | **Cloud / CI** | GitHub Actions, GHCR (GitHub Container Registry), Docker |
 | **Scaling & reliability** | Request ID (X-Request-ID), structured JSON logging (**python-json-logger** v3+); unified **`LinkupError`** JSON responses — **[docs/ERRORS.md](docs/ERRORS.md)**; RabbitMQ broker-native retry (DLX/TTL + `x-death`) + DLQ; pessimistic locking (booking approve/cancel); **configurable SQLAlchemy async pool** (`DB_POOL_*` in `.env`), DB indexes |
 
@@ -165,7 +165,7 @@ flowchart LR
 - ✅ **WebSocket reconnect pacing (frontend):** **`frontend/src/utils/reconnectBackoff.ts`** (`computeReconnectDelayMs`) drives chat + generic WS hooks (**`useChatWebSocket`**, **`useReconnectingWebSocket`**, **`useReconnectingWebSocketState`**) — **3s→6s→12s→24s→30s cap** with **±20% jitter** and reset on **`onopen`** / resource key change (**`docs/architecture/REALTIME.md`**, **`reconnectBackoff.test.ts`**).
 - ✅ **Inbox chat N+1 fix + pagination:** [`list_my_conversations`](backend/app/domain/chat/service.py) pages via [`list_conversations_paginated`](backend/app/domain/chat/crud.py) and uses batched aggregates (`get_inbox_aggregates`) **per page only** — no per-row N+1; sort key is persisted on `conversations.last_message_at` (fallback `created_at`) and `after` cursor stays server-side via shared cursor core ([`backend/app/core/pagination/cursor.py`](backend/app/core/pagination/cursor.py)).
 - ✅ **Unified WebSocket notifications via `chat-ws`:** user-domain refresh events (`user:*:events`) are delivered over the same `chat-ws` connection to reduce concurrent sockets per client.
-- ✅ **Worker split + autoscaling:** legacy monolith worker was split into `notification-worker`, `task-worker`, `ai-worker`; each has dedicated K8s deployment/HPA.
+- ✅ **Worker split:** legacy monolith worker was split into `notification-worker`, `task-worker`, `ai-worker`; each runs as its own Compose service with a dedicated runtime entrypoint.
 - ✅ **Task worker safety:** `task-worker` is pinned to one replica to avoid duplicate scheduled task publishing.
 - ✅ **Per-worker DB connection caps:** explicit `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` per worker keeps total DB usage below Postgres defaults.
 - ✅ **Postgres `statement_timeout` (layered):** Effective per-session timeout from **`DB_STATEMENT_TIMEOUT_MS`** (`.env`, default 30000ms) is applied via asyncpg `server_settings` in [`backend/app/db/session.py`](backend/app/db/session.py) — `.env` change + restart actually takes effect. Alembic **017** sets a deterministic role-level **ceiling of 60000ms** (literal, no env dependency) as defense-in-depth. Helps fail long queries before worker timeouts; details in **`docs/architecture/DATABASE.md`**.
@@ -196,7 +196,6 @@ flowchart LR
 - ✅ Outbox pattern for reliable event publishing to RabbitMQ
 - ✅ **Internal admin dashboard (web):** lazy-loaded routes under **`/admin`** — stats, health, users (toggle active/admin), rides (list + cancel), groups, outbox (inspect + requeue FAILED), ride/booking lookup; gated by **`user.is_admin`** (מ-JWT / תשובת login); מעטפת **דסקטופ** (סיידבר קבוע, בלי drawer מובייל); mutations behind confirm + toasts; backend **`/api/v1/admin/*`** + `[admin_audit]` logging — see **[ADMIN_DASHBOARD.md](ADMIN_DASHBOARD.md)**
 - ✅ **Admin modernization phase shipped:** dedicated admin pages/routes for **Bookings**, **Billing**, **Audit**, and **Ops** (`/admin/bookings`, `/admin/billing`, `/admin/audit`, `/admin/ops`) with new backend read endpoints, server-side pagination contracts, and capability-aware guards for sensitive reads.
-- ✅ Kubernetes-ready (manifests in `k8s/`)
 - ✅ **API errors:** מערכת שגיאות אחידה (`error_code`, `trace_id`, payload אופציונלי), handlers ל-validation/DB/`LinkupError` — **[docs/ERRORS.md](docs/ERRORS.md)**
 - ✅ **i18n, לוקאליזציה וטיפוגרפיה (ווב):** **i18next** עם משאבים ב־`frontend/src/i18n/locales/{he,en}/` (למשל `common.json`, `nav.json`). **`LangContext`** מגדיר `dir` על `<html>` ומעדכן **`--font-primary`** (עברית: Heebo, אנגלית: DM Sans). פורמט תאריכים/שעות לפי שפת הממשק דרך **`frontend/src/utils/date.ts`** ו־**`getLocale()`** — בלי `he-IL` קשיח ברוב הזרימות. ב־hooks ובלוגיקה מחוץ ל־React, fallback לטקסטי שגיאת API אחרי **`getApiErrorMessage`** עובר דרך **`apiErr('err_*')`** ב־[`frontend/src/utils/i18nError.ts`](frontend/src/utils/i18nError.ts) (מפתחות **`common:err_*`**). **CSS Modules:** `font-family: var(--font-primary)` / `var(--font-numeric)`; חריג מכוון לכפתור שפה — **`LangToggle`** (מונוספייס). פירוט החלטות: **[docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md](docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md)** (סעיפים 10–12).
 - ✅ **S.7 Asset hardening (ווב):** lazy/eager loading הוגדר נקודתית ל-`img` קריטיים מול רשימות, נוספו hints ב-`index.html` (`preconnect` ל-`linkup-uploads.s3.amazonaws.com` + locale preloads), ו-`i18n` הועבר ל-hybrid loading: `common`/`nav` נשארים bundled inline, בעוד `auth`/`rides`/`bookings`/`groups`/`profile`/`billing` נטענים עצלנית דרך `i18next-http-backend` מ-`/locales/{{lng}}/{{ns}}.json` עם קבצי runtime תחת `frontend/public/locales/`.
@@ -290,7 +289,6 @@ make admin-revoke EMAIL=user@example.com  # הסרת אדמין לפי אימי�
 | `frontend/`| React (Vite) web app; Dockerfile + `nginx.conf` לתוך image סטטי; מודול אדמין ב־`src/features/admin/` (מסלולים `/admin/*`); WebSocket — [`frontend/README.md`](frontend/README.md), חוזי JSON ב־[`docs/architecture/REALTIME.md`](docs/architecture/REALTIME.md) |
 | `nginx/`   | קונפיג Nginx ל־Compose — reverse proxy ל־API/chat-ws/frontend, TLS ב־443 (**`listen 443 ssl`** — HTTP/1.1 אלא אם מוסיפים `http2`), security headers ו־**CSP מאוכף** + `report-uri` (מתועד ב־[`docs/SECURITY_HEADERS.md`](docs/SECURITY_HEADERS.md)) |
 | `mobile/`  | React Native (Expo) app |
-| `k8s/`     | Kubernetes base, backend, chat-ws, frontend, email-renderer (Node), workers (`notification-worker`, `task-worker`, `ai-worker`, legacy compatibility worker), infra (Postgres, Redis, RabbitMQ) |
 | `db/`      | Reference schema (`schema.sql`) and utility scripts; migrations live in `backend/alembic/` |
 | `docs/`    | Architecture: `docs/architecture/` — API.md, DATABASE.md, EVENTS.md, REALTIME.md, NOTIFICATIONS.md, AI.md, STORAGE.md, DEVELOPMENT.md; ADR תחת `docs/adr/`; ops תחת `docs/operations/`; internal interview/video assets תחת `docs/internal/` |
 | `email-renderer/` | Node microservice (Express + React Email): `GET /health`, `POST /render`; תבניות ב־`src/emails/`; נקרא מ־backend/notification-worker דרך `EMAIL_RENDERER_URL` |

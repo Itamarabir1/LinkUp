@@ -151,4 +151,4 @@ cp frontend/.env.example frontend/.env
 
 **Backlog פרונט (checklist מעודכן):** [`docs/FRONTEND_UPGRADE_ROADMAP.md`](../docs/FRONTEND_UPGRADE_ROADMAP.md).
 
-למידע רחב יותר על הארכיטקטורה וההרצה הכוללת (Docker, Kubernetes, chat-ws, mobile) ראו את ה-`README` בשורש הפרויקט.
+למידע רחב יותר על הארכיטקטורה וההרצה הכוללת (Docker Compose, chat-ws, mobile) ראו את ה-`README` בשורש הפרויקט.

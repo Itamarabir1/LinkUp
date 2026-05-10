@@ -51,11 +51,11 @@ class Settings(BaseSettings):
         ),
     )
 
-    # Optional: full Postgres URL from env (e.g. K8s / production)
+    # Optional: full Postgres URL from env (e.g. managed DB / production)
     DATABASE_URL_RAW: str | None = Field(
         default=None,
         validation_alias=AliasChoices("DATABASE_URL", "DATABASE_URL_RAW"),
-        description="Optional full database URL (e.g. from Kubernetes secret). If set, overrides pieces above.",
+        description="Optional full database URL (e.g. from a secret manager or env injection). If set, overrides pieces above.",
     )
 
     @computed_field
@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     REDIS_MASTER_NAME: str = Field("mymaster")
     # Separate Redis DB for chat events (Pub/Sub completion)
     REDIS_CHAT_DB: int = Field(1)
-    # Optional: full Redis URL (e.g. K8s / production)
+    # Optional: full Redis URL (e.g. managed Redis / production)
     REDIS_URL_RAW: str | None = Field(
         default=None,
         validation_alias=AliasChoices("REDIS_URL", "REDIS_URL_RAW"),
@@ -154,7 +154,7 @@ class Settings(BaseSettings):
     BREVO_SENDER_NAME: str = Field("LinkUp", description="Sender display name in emails")
     EMAIL_RENDERER_URL: str = Field(
         "http://email-renderer:3001",
-        description="React Email HTTP service (Compose service name; K8s: http://linkup-email-renderer:3001).",
+        description="React Email HTTP service (Compose: default http://email-renderer:3001).",
     )
 
     # --- EIA (U.S. fuel prices API) ---

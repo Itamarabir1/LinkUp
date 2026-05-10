@@ -24,12 +24,6 @@ LinkUp/
 ├── .gitignore
 ├── .env.example                   # דוגמה ל-.env בשורש (docker-compose: Postgres/Redis/RabbitMQ)
 ├── docker-compose.yml             # כולל frontend + nginx עם profile prod
-├── k8s/                           # הגדרות Kubernetes
-│   ├── base/
-│   ├── backend/
-│   ├── chat-ws/
-│   ├── frontend/
-│   └── infra/
 ├── README.md
 ├── RUN.md
 ├── backend/
@@ -319,36 +313,6 @@ mobile/
 
 ---
 
-## k8s/
-
-```
-k8s/
-├── base/
-│   ├── namespace.yaml
-│   └── kustomization.yaml
-├── backend/
-│   ├── configmap.yaml
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   └── kustomization.yaml
-├── chat-ws/
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   └── kustomization.yaml
-├── frontend/
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   └── kustomization.yaml
-└── infra/
-    ├── configmap.yaml
-    ├── postgres.yaml
-    ├── redis.yaml
-    ├── rabbitmq.yaml
-    └── kustomization.yaml
-```
-
----
-
 ## הערות
 
 - **backend**: שרת API ב‑Python (FastAPI), עם Alembic למיגרציות, workers, ותשתיות (Redis, RabbitMQ, S3, Firebase).
@@ -358,7 +322,6 @@ k8s/
 - **frontend**: אפליקציית ווב ב‑React + TypeScript + Vite.
 - **mobile**: אפליקציית מובייל (Expo/React Native) ב‑TypeScript.
 - **.github/workflows**: CI — `backend-ci`, `frontend-ci`, `chat-ws-ci`, **`email-renderer-ci`** (paths לפי שירות); **`deploy-ec2.yml`** — פריסה ל-EC2 (`workflow_run`).
-- **k8s**: הגדרות Kubernetes (base, backend, chat-ws, frontend, infra).
 - **node_modules** (ב‑frontend ו‑mobile) ו־**.venv** (בסביבות Python) לא פורטו – אלה תלויות שנוצרות בהתקנה.
 - קבצי **.env** לא נכללו בתיאור מפורש מטעמי אבטחה; הם קיימים לפי .env.example.
 

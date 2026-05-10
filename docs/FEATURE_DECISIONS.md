@@ -659,9 +659,9 @@
 | **החלטה** | **`nginx/nginx.conf.template`** (במאגר) + **`nginx/nginx.conf`** שנוצר בזמן ריצה (`gitignore`; פרופיל prod ב־Compose) מחזירים **`Content-Security-Policy`** מאוכפת עם allowlists צרות לפי צרכי המוצר (Firebase, Sentry, GA/GTM, maps, uploads, Stripe, Google Sign-In). **`report-uri`** מוזן מ־**`SENTRY_REPORT_URI`** ב־**`backend/.env`** (לא URL קשיח ב־Git). **`frame-src`** כולל `https://accounts.google.com` לצד Stripe. **בשכבת הסקריפטים:** הוסר **`'unsafe-inline'`** מ־**`script-src`**; Bootstrap לפני React (`linkup-lang` / `linkup-theme`) הועבר ל־**[`frontend/public/bootstrap.js`](../frontend/public/bootstrap.js)** והוא נטען ב־[`index.html`](../frontend/index.html) **לפני** **`/config.js`**. |
 | **אלטרנטיבות** | (1) להישאר ב-Report-Only — בטוח יותר לגלגל אבל לא מגביל exploitability. (2) CSP דרך meta tag ב-HTML — פחות שליטה מרכזית מול edge. (3) nonces בלי SSR על ה-entry module — דורש rewrite דינמי של `index.html` או שירות edge (ראו **`docs/SECURITY_HEADERS.md`**). |
 | **יתרון** | Defense-in-depth מול XSS לצד **`sanitizeHtml`**, **`react/no-danger`**, ודחיית HTML בצ'אט ב-API. |
-| **Trade-off** | **`style-src`** עדיין כולל **`'unsafe-inline'`** (Vite/CSS); כל **inline script** חדש ב־HTML ידרוש hash או העברה לקובץ תחת **`'self'`**. סנכרון ידני נדרש אם מסלול **K8s** משתמש ב־**`k8s/frontend/nginx-configmap.yaml`**. |
+| **Trade-off** | **`style-src`** עדיין כולל **`'unsafe-inline'`** (Vite/CSS); כל **inline script** חדש ב־HTML ידרוש hash או העברה לקובץ תחת **`'self'`**. |
 | **Interview pitch (≈30s)** | *"הקשחנו XSS בשלוש שכבות: קלט טקסט בלבד בצ'אט, sanitization בפרונט, ו-CSP מאוכף ב-nginx עם דיווחים ל-Sentry — ומודעים שב-SPA בלי SSR, nonces דורשים עוד שכבה ב-edge."* |
-| **הפניה** | `nginx/nginx.conf.template`, **`scripts/ops/render-nginx-conf.sh`**, **`docs/SECURITY_HEADERS.md`**, **`k8s/frontend/nginx-configmap.yaml`** |
+| **הפניה** | `nginx/nginx.conf.template`, **`scripts/ops/render-nginx-conf.sh`**, **`docs/SECURITY_HEADERS.md`** |
 
 ---
 
