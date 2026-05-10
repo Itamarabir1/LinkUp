@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = Field("")
     POSTGRES_HOST: str = Field("localhost")
     POSTGRES_PORT: str = Field("5432")
+    POSTGRES_HOST_DIRECT: str = Field("db", description="Direct Postgres host (bypasses PgBouncer). Used for LISTEN/NOTIFY.")
+    POSTGRES_PORT_DIRECT: int = Field(5432, description="Direct Postgres port (bypasses PgBouncer).")
 
     # --- DB Connection Pool ---
     DB_POOL_SIZE: int = Field(5, description="SQLAlchemy pool_size (persistent connections)")
@@ -76,6 +78,17 @@ class Settings(BaseSettings):
             return url
 
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+    @computed_field
+    @property
+    def DATABASE_URL_DIRECT(self) -> str:
+        """
+        Direct PostgreSQL connection URL — bypasses PgBouncer.
+        Required for LISTEN/NOTIFY (OutboxListener): PgBouncer transaction pooling
+        does not deliver NOTIFY to clients.
+        """
+        auth = f"{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@" if self.POSTGRES_PASSWORD else f"{self.POSTGRES_USER}@"
+        return f"postgresql+asyncpg://{auth}{self.POSTGRES_HOST_DIRECT}:{self.POSTGRES_PORT_DIRECT}/{self.POSTGRES_DB}"
 
     # --- Redis ---
     REDIS_HOST: str = Field("localhost")

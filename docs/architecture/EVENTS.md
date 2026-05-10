@@ -11,6 +11,7 @@ Outbox → Dispatcher → (RabbitMQ / Redis) → Workers/Realtime. מקור אמ
    - `RABBITMQ` -> `RabbitMQPublisher` (עם `get_routing_metadata(event_name)`),
    - `REDIS` -> `RedisChatPublisher` (למשל `chat.message_sent` -> `chat:conversation:{id}`).
    לאחר dispatch מוצלח, status מתעדכן ל-PROCESSED (או retry במקרה כשל). ה-fetch של **PENDING** משתמש ב-**`SELECT ... FOR UPDATE SKIP LOCKED`** ([`OutboxRepository.get_pending_events`](../../backend/app/infrastructure/outbox/repository.py)) — כך **כמה מופעי worker** יכולים לרוץ במקביל בלי נעילה הדדית על אותה שורה (מדלגים לשורה הבאה הזמינה).
+   - **`OutboxListener`** ב-[`run_outbox_worker`](../../backend/app/workers/outbox_worker.py) מתחבר עם **`settings.DATABASE_URL_DIRECT`** ([`app/core/config.py`](../../backend/app/core/config.py)) — חיבור **ישיר** ל-Postgres (`POSTGRES_HOST_DIRECT` / `POSTGRES_PORT_DIRECT`, ברירת מחדל `db:5432`), **לא** דרך PgBouncer: במצב transaction pooling ה-NOTIFY לא מגיע ללקוח, ולכן LISTEN דרך ה-pooler נכשל בשקט ונופל ל-polling (~30s). שאר ה-worker וה-API ממשיכים להשתמש ב-`DATABASE_URL` הרגיל דרך PgBouncer.
 3. **Consumers/realtime**:
    - RabbitMQ consumers רצים ב-workers הייעודיים (notification/task),
    - Redis chat channels נצרכים ע"י `chat-ws`.

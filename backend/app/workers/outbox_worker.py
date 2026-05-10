@@ -15,7 +15,7 @@ FALLBACK_POLL_INTERVAL = 30.0
 async def run_outbox_worker(dispatcher: EventDispatcher):
     service = OutboxService(repo=OutboxRepository(), dispatcher=dispatcher)
     listener: OutboxListener | None = OutboxListener()
-    dsn = settings.DATABASE_URL_RAW or settings.DATABASE_URL
+    dsn = settings.DATABASE_URL_DIRECT
 
     try:
         try:

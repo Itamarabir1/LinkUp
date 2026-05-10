@@ -14,7 +14,7 @@
 | | |
 |--|--|
 | **בעיה** | אחרי `commit` ב-DB רוצים לאירוע חיצוני (מייל, FCM) — `publish` ישיר אחרי commit או אם הברוקר/שרת נופלים = אובדן או כפילות. |
-| **החלטה** | שורה ב-`outbox_events` **באותה טרנזקציה** עם שינוי עסקי; worker מפרסם ל-RabbitMQ (LISTEN/NOTIFY + מנגנון fallback). |
+| **החלטה** | שורה ב-`outbox_events` **באותה טרנזקציה** עם שינוי עסקי; worker מפרסם ליעדי dispatch (RabbitMQ / Redis לפי `targets`) עם **LISTEN/NOTIFY** על חיבור Postgres ישיר (`DATABASE_URL_DIRECT`, לא PgBouncer) + מנגנון fallback polling. |
 | **אלטרנטיבות** | (1) Publish ישיר — פשוט אבל fragile. (2) Kafka — כבד יותר לסקייל נוכחי. (3) SQS — vendor lock, דורש מודל mental שונה. |
 | **יתרון** | **at-least-once** + עקביות DB/אירוע; ה-API לא מחכה ל-latency של הברוקר. |
 | **Trade-off** | צריך idempotency בצרכנים; מורכבות תפעול (worker + monitoring). |
@@ -560,11 +560,11 @@
 | **בעיה** | כמה services (backend + workers) עם pools נפרדים יוצרים fan-out לחיבורי Postgres תחת עומס/redeploy. ב-EC2 בינוני זה פוגע בזיכרון/latency לפני CPU saturation. |
 | **החלטה** | להוסיף `pgbouncer` כ-service פנימי ב-Compose (transaction mode), ולהעביר runtime services ל-`POSTGRES_HOST=pgbouncer`. |
 | **אלטרנטיבות** | (1) להגדיל רק `max_connections` ב-Postgres — מטפל סימפטום ולא שורש. (2) בלי pooler, רק להקטין `DB_POOL_*` — עוזר חלקית. (3) RDS Proxy/managed pooler — עדיף בענן מנוהל אבל לא quickest win ב-EC2 קיים. |
-| **מה סניור עושה (לא טריוויאלי)** | (1) `migrate` נשאר direct ל-`db` ולא דרך pooler. (2) asyncpg statement cache מנוטרל (`statement_cache_size=0`) לתאימות transaction pooling. (3) PgBouncer internal-only בלי פתיחת `6432` לציבור. (4) right-size ל-SQLAlchemy pools כדי להימנע מ-double-pooling אגרסיבי. (5) אם images ציבוריים דורסים config דרך entrypoint — עוברים ל-custom image מבוקר במקום workaround שביר. (6) מבטלים bind-mount ל-`userlist.txt`: הקובץ נוצר בתוך הקונטיינר בזמן startup מ-`POSTGRES_*` + `PGBOUNCER_ADMIN_PASSWORD`, וכך אין תלות UID/GID מול host. |
+| **מה סניור עושה (לא טריוויאלי)** | (1) `migrate` נשאר direct ל-`db` ולא דרך pooler. (2) asyncpg statement cache מנוטרל (`statement_cache_size=0`) לתאימות transaction pooling. (3) PgBouncer internal-only בלי פתיחת `6432` לציבור. (4) right-size ל-SQLAlchemy pools כדי להימנע מ-double-pooling אגרסיבי. (5) אם images ציבוריים דורסים config דרך entrypoint — עוברים ל-custom image מבוקר במקום workaround שביר. (6) מבטלים bind-mount ל-`userlist.txt`: הקובץ נוצר בתוך הקונטיינר בזמן startup מ-`POSTGRES_*` + `PGBOUNCER_ADMIN_PASSWORD`, וכך אין תלות UID/GID מול host. (7) **LISTEN/NOTIFY ל-outbox** לא דרך PgBouncer: `OutboxListener` ב-`run_outbox_worker` משתמש ב-**`DATABASE_URL_DIRECT`** (`POSTGRES_HOST_DIRECT` / `POSTGRES_PORT_DIRECT`) כי transaction pooling לא מעביר NOTIFY ללקוח — אחרת נשארים על polling איטי. |
 | **יתרון** | connection storms נבלמים מוקדם, יותר יציבות בזמן deploys, ו-headroom להמשך scaling בלי שינוי לוגיקה דומיינית. |
 | **Trade-off** | עוד רכיב תפעולי לנטר (health/config/auth), אבל זרימת הסודות פשוטה ועמידה יותר כי יצירת `userlist` עברה לתוך הקונטיינר במקום CI/host. |
 | **Interview pitch (≈30s)** | *"במקום שכל service יפציץ את Postgres בחיבורים, הוספתי PgBouncer כ-layer פנימי. השארתי migrations direct ל-db, כיביתי statement cache ב-asyncpg, והקטנתי pools אפליקטיביים — זה בדיוק ההבדל בין 'להוסיף container' לבין rollout יציב ברמת production."* |
-| **הפניה** | `docker-compose.yml`, `backend/app/db/session.py`, `infrastructure/pgbouncer/{Dockerfile,pgbouncer.ini,userlist.txt.template,entrypoint.sh}`, `.github/workflows/backend-ci.yml`, `scripts/ops/pgbouncer-smoke.sh`, `backend/.env.example` (שדות `PGBOUNCER_ADMIN_PASSWORD`, `SENTRY_REPORT_URI`) |
+| **הפניה** | `docker-compose.yml`, `backend/app/db/session.py`, `backend/app/core/config.py` (`DATABASE_URL_DIRECT`), `backend/app/workers/outbox_worker.py`, `infrastructure/pgbouncer/{Dockerfile,pgbouncer.ini,userlist.txt.template,entrypoint.sh}`, `.github/workflows/backend-ci.yml`, `scripts/ops/pgbouncer-smoke.sh`, `backend/.env.example` (שדות `PGBOUNCER_ADMIN_PASSWORD`, `SENTRY_REPORT_URI`, `POSTGRES_HOST_DIRECT`, `POSTGRES_PORT_DIRECT`) |
 
 ---
 

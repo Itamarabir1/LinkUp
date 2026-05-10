@@ -40,6 +40,8 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 
 קבצי קונפיג: `infrastructure/pgbouncer/pgbouncer.ini`, `infrastructure/pgbouncer/userlist.txt.template`, `infrastructure/pgbouncer/entrypoint.sh` (הקובץ `userlist.txt` נוצר **בתוך הקונטיינר** בזמן startup מ־`POSTGRES_USER`/`POSTGRES_PASSWORD`/`PGBOUNCER_ADMIN_PASSWORD`; לא נשמר ב-git ולא נוצר ב-CI על host).
 
+**Outbox LISTEN/NOTIFY:** טריגר `010_outbox_notify_trigger` שולח `NOTIFY`; ה-**`OutboxListener`** ב-`run_outbox_worker` חייב חיבור **ישיר** ל-Postgres (`DATABASE_URL_DIRECT` ב-`app/core/config.py`, משתני env `POSTGRES_HOST_DIRECT` / `POSTGRES_PORT_DIRECT`) — לא דרך PgBouncer, כי במצב transaction pooling ה-`NOTIFY` לא מגיע ללקוח דרך ה-pooler וה-worker נופל ל-fallback polling (~30 שניות).
+
 ### Redis topology (single persistent instance)
 
 - Compose runtime: service יחיד `redis` עם persistence (`appendonly yes`, `appendfsync everysec`, RDB snapshots).

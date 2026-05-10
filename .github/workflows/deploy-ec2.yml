@@ -55,6 +55,10 @@ jobs:
             BACKEND_SECRET="$(grep -E '^SECRET_KEY=' backend/.env | head -1 | cut -d= -f2-)"
             sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$BACKEND_SECRET|" chat-ws/.env
             [ -n "$BACKEND_SECRET" ] || { echo "ERROR: SECRET_KEY missing in backend/.env"; exit 1; }
+            BACKEND_REDIS_PASSWORD="$(grep -E '^REDIS_PASSWORD=' backend/.env | head -1 | cut -d= -f2-)"
+            [ -n "$BACKEND_REDIS_PASSWORD" ] || { echo "ERROR: REDIS_PASSWORD missing in backend/.env"; exit 1; }
+            sed -i "s|^REDIS_URL=.*|REDIS_URL=redis://:${BACKEND_REDIS_PASSWORD}@redis:6379/1|" chat-ws/.env
+            sed -i '/^REDIS_SENTINEL_HOST=/d' backend/.env
             cp frontend/.env.production frontend/.env
 
             [ -f backend/.env ]  || { echo "ERROR: backend/.env missing on EC2";  exit 1; }
