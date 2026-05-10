@@ -259,9 +259,7 @@ async def send_message(
     if not conv:
         raise ChatRoomNotFound()
 
-    msg = await chat_crud.create_message(
-        db, conversation_id=conversation_id, sender_id=sender_id, body=body
-    )
+    msg = await chat_crud.create_message(db, conversation_id=conversation_id, sender_id=sender_id, body=body)
     recipient_id = conv.user_id_2 if conv.user_id_1 == sender_id else conv.user_id_1
 
     payload = {
