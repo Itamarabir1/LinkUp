@@ -119,8 +119,8 @@ Two probe endpoints live at FastAPI **root** (not under `/api/v1/`) on purpose: 
 
 | Endpoint | Exposure | Payload | Intended consumers |
 |---|---|---|---|
-| `GET /livez` | **Public** (via nginx) | `{"status": "alive"}` | External uptime monitors (UptimeRobot / Pingdom / Datadog synthetic), Docker healthcheck (`localhost:8000/livez` inside container) |
-| `GET /readyz` | **Internal only** (loopback-restricted at nginx) | DB / Redis / RabbitMQ / circuit-breaker status | Operators on the EC2 host, internal scripts |
+| `GET /livez` | **Public** (via nginx) | `{"status": "alive"}` | External uptime monitors (UptimeRobot / Pingdom / Datadog synthetic) |
+| `GET /readyz` | **Internal only** (loopback-restricted at nginx) | DB / Redis / RabbitMQ / circuit-breaker status | Operators on the EC2 host, internal scripts; Docker Compose **`backend`** healthcheck (`http://localhost:8000/readyz` inside the container, bypassing nginx) |
 
 ### Why `/readyz` is not public
 

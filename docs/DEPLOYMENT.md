@@ -35,7 +35,7 @@ Production deploy is centralized in **`deploy-ec2.yml`**, triggered by **`workfl
 | Workflow | When it runs | What it does |
 |----------|----------------|--------------|
 | [`backend-ci.yml`](../.github/workflows/backend-ci.yml) | Push/PR with path filters for backend, infra, nginx, compose, or this workflow file | Lint, tests, migrations, Docker build → push **`backend`**, **`worker`**, **`migrate`**, **`pgbouncer`** to GHCR on push to `main` (does **not** deploy by itself). |
-| [`deploy-ec2.yml`](../.github/workflows/deploy-ec2.yml) | After **Backend CI**, **Frontend CI**, **Chat-WS CI**, or **Email renderer CI** completes successfully on `main` (`workflow_run`) | Full stack on EC2: git sync, env sync, `envsubst` for edge **`nginx/nginx.conf`**, pull GHCR images, bring up infra → migrate → app services → **`frontend` + `nginx`**, **smokes** (`config.js` in **`linkup_frontend`**, `/health` in **`linkup_email_renderer`**) **before** backend rollout gate, health-gated backend deploy (`/readyz`, Firebase env, public `/livez` + `/config.js`), write resolved backend tag to **`.deploy_state/backend_prev_tag`**, rollback on failure. |
+| [`deploy-ec2.yml`](../.github/workflows/deploy-ec2.yml) | After **Backend CI**, **Frontend CI**, **Chat-WS CI**, or **Email renderer CI** completes successfully on `main` (`workflow_run`) | Full stack on EC2: git sync, env sync, `envsubst` for edge **`nginx/nginx.conf`**, pull GHCR images, bring up infra → migrate → app services → **`frontend` + `nginx`**, **smokes** (`config.js` in **`linkup_frontend`**, `/health` in **`linkup_email_renderer`**) **before** backend rollout gate, health-gated backend deploy (`docker compose … --wait` on **`backend`**, then internal **`/readyz`** + Firebase env + Redis wiring in **`chat-ws`**), write resolved backend tag to **`.deploy_state/backend_prev_tag`**, rollback on failure. |
 
 ### Deploy (`deploy-ec2.yml`) — high-level flow
 
@@ -44,7 +44,7 @@ Production deploy is centralized in **`deploy-ec2.yml`**, triggered by **`workfl
 3. Pull images from GHCR (backend prefers the workflow commit SHA tag, then **`…/backend:latest`** if that tag is absent).
 4. Bring up infra (`db`, single persistent Redis, RabbitMQ), **`pgbouncer`**, run **`migrate`**, then **`email-renderer`**, workers, **`chat-ws`**, **`frontend` + `nginx`** (force-recreate **`nginx`** when nginx/frontend-related files changed in `HEAD`).
 5. **Smoke** from inside containers: **`linkup_frontend`** → **`http://localhost:80/config.js`**, **`linkup_email_renderer`** → **`http://localhost:3001/health`**.
-6. Roll out **`backend`** with **`--wait`**, then run mandatory checks (Firebase, Redis URL in **`chat-ws`**, **`/readyz`**, public **`/livez`** and **`/config.js`** through TLS).
+6. Roll out **`backend`** with **`--wait`**, **`sleep 10`**, then run mandatory checks (Firebase, Redis URL in **`chat-ws`**, internal **`/readyz`** from inside **`linkup_backend`**).
 7. On failure: roll back **`backend`** to the previous tag from **`.deploy_state/backend_prev_tag`**; if **`docker pull`** for that image fails (e.g. old digest removed), fall back to **`…/backend:latest`**.
 
 ### Rollback behavior

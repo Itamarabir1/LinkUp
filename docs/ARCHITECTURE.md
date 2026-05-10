@@ -38,7 +38,7 @@ Also surfaced in the repo root [`README.md`](../README.md#architecture).
 ## Operations docs
 
 - [`docs/operations/RUNBOOK.md`](operations/RUNBOOK.md) — incident handling for common production failures
-- [`docs/operations/MONITORING.md`](operations/MONITORING.md) — dashboards חיצוניים בפרודקשן (**Sentry**, **Better Stack**), Prometheus/Grafana, SLO baseline, probe exposure policy (`/livez` public, `/readyz` internal-only), ומטריקות **billing** (`billing_reconciler_*`, …)
+- [`docs/operations/MONITORING.md`](operations/MONITORING.md) — dashboards חיצוניים בפרודקשן (**Sentry**, **Better Stack**), Prometheus/Grafana, SLO baseline, probe exposure policy (`/livez` public ל-synthetics, `/readyz` internal-only ב-nginx; ב־**`docker-compose.yml`** ה־**`backend`** healthcheck פוגע ב־`/readyz` ישירות בתוך הקונטיינר), ומטריקות **billing** (`billing_reconciler_*`, …)
 
 ## ADRs
 
