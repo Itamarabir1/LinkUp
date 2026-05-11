@@ -59,6 +59,9 @@ jobs:
             [ -n "$BACKEND_REDIS_PASSWORD" ] || { echo "ERROR: REDIS_PASSWORD missing in backend/.env"; exit 1; }
             sed -i "s|^REDIS_URL=.*|REDIS_URL=redis://:${BACKEND_REDIS_PASSWORD}@redis:6379/1|" chat-ws/.env
             sed -i '/^REDIS_SENTINEL_HOST=/d' backend/.env
+            grep -q '^POSTGRES_HOST_DIRECT=' backend/.env || echo 'POSTGRES_HOST_DIRECT=db' >> backend/.env
+            grep -q '^POSTGRES_PORT_DIRECT=' backend/.env || echo 'POSTGRES_PORT_DIRECT=5432' >> backend/.env
+            awk -F= '/^PGBOUNCER_ADMIN_PASSWORD=/ && seen++ { next } 1' backend/.env > backend/.env.tmp && mv backend/.env.tmp backend/.env
             cp frontend/.env.production frontend/.env
 
             [ -f backend/.env ]  || { echo "ERROR: backend/.env missing on EC2";  exit 1; }
@@ -133,7 +136,7 @@ jobs:
             export FRONTEND_IMAGE="$GHCR_BASE/frontend:latest"
             export EMAIL_RENDERER_IMAGE="ghcr.io/$OWNER_LOWER/linkup-email-renderer:latest"
 
-            $COMPOSE --profile prod up -d --wait --wait-timeout 120 \
+            $COMPOSE --profile prod up -d --remove-orphans --wait --wait-timeout 120 \
               db redis rabbitmq
 
             $COMPOSE up -d --wait --wait-timeout 60 --no-deps pgbouncer
