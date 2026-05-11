@@ -14,6 +14,7 @@ from app.domain.events.routing import (
     ROUTING_KEY_REMINDERS,
     SCHEDULED_EXCHANGE,
 )
+from app.workers.tasks.fuel_price_task import FUEL_SCAN_INTERVAL
 from app.workers.tasks.scheduled_tasks import (
     CHECK_INTERVAL,
     INTERVAL_CHAT_TIMEOUT,
@@ -100,22 +101,17 @@ async def test_publisher_publishes_all_tasks_on_first_iteration():
     rabbitmq_client.publish = AsyncMock()
 
     iteration_count = {"n": 0}
-    original_sleep = asyncio.sleep
 
     async def fake_sleep(seconds):
         iteration_count["n"] += 1
         if iteration_count["n"] >= 1:
             raise asyncio.CancelledError()
 
+    elapsed = FUEL_SCAN_INTERVAL + 1
+
     with patch("app.workers.tasks.scheduled_tasks.asyncio.sleep", side_effect=fake_sleep), patch(
         "app.workers.tasks.scheduled_tasks.time.monotonic",
-        side_effect=[
-            0,
-            INTERVAL_CHAT_TIMEOUT + 1,
-            INTERVAL_CHAT_TIMEOUT + 1,
-            INTERVAL_CHAT_TIMEOUT + 1,
-            INTERVAL_CHAT_TIMEOUT + 1,
-        ],
+        side_effect=[0, elapsed],
     ):
         with pytest.raises(asyncio.CancelledError):
             await run_scheduled_tasks_publisher(rabbitmq_client)
@@ -139,13 +135,16 @@ async def test_publisher_uses_scheduled_exchange():
     async def fake_sleep(seconds):
         raise asyncio.CancelledError()
 
+    elapsed = FUEL_SCAN_INTERVAL + 1
+
     with patch("app.workers.tasks.scheduled_tasks.asyncio.sleep", side_effect=fake_sleep), patch(
         "app.workers.tasks.scheduled_tasks.time.monotonic",
-        side_effect=[0, INTERVAL_CHAT_TIMEOUT + 1, INTERVAL_CHAT_TIMEOUT + 1, INTERVAL_CHAT_TIMEOUT + 1, INTERVAL_CHAT_TIMEOUT + 1],
+        side_effect=[0, elapsed],
     ):
         with pytest.raises(asyncio.CancelledError):
             await run_scheduled_tasks_publisher(rabbitmq_client)
 
+    assert rabbitmq_client.publish.await_count == 4
     for call in rabbitmq_client.publish.call_args_list:
         assert call.args[2] == SCHEDULED_EXCHANGE
 
@@ -182,9 +181,11 @@ async def test_publisher_exception_does_not_crash_loop():
         if call_count["n"] >= 2:
             raise asyncio.CancelledError()
 
+    elapsed = FUEL_SCAN_INTERVAL + 1
+
     with patch("app.workers.tasks.scheduled_tasks.asyncio.sleep", side_effect=fake_sleep), patch(
         "app.workers.tasks.scheduled_tasks.time.monotonic",
-        side_effect=[0, INTERVAL_CHAT_TIMEOUT + 1, INTERVAL_CHAT_TIMEOUT + 1, INTERVAL_CHAT_TIMEOUT + 1, INTERVAL_CHAT_TIMEOUT + 1, INTERVAL_CHAT_TIMEOUT + 2, 0],
+        side_effect=[0, elapsed, elapsed + 1],
     ):
         with pytest.raises(asyncio.CancelledError):
             await run_scheduled_tasks_publisher(rabbitmq_client)

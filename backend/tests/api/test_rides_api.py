@@ -25,7 +25,8 @@ async def seeded_ride_confirmed_booking(e2e_session_factory: async_sessionmaker)
 
 @pytest.mark.asyncio
 async def test_get_ride_by_id_returns_200(seeded_ride_confirmed_booking, api_client_with_overrides):
-    client, _ = api_client_with_overrides
+    client, auth_ctx = api_client_with_overrides
+    auth_ctx["user"] = seeded_ride_confirmed_booking["driver"]
     ride = seeded_ride_confirmed_booking["ride"]
     res = await client.get(f"/api/v1/rides/{ride.ride_id}")
     assert res.status_code == 200, res.text

@@ -2,10 +2,10 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { MessageResponse } from '../../types/api';
 import { fetchMissedGap } from './fetchMissedGap';
 
-const getMessages = vi.fn();
+const getMessagesGap = vi.fn();
 
 vi.mock('../../api/chat', () => ({
-  getMessages: (...args: unknown[]) => getMessages(...args),
+  getMessagesGap: (...args: unknown[]) => getMessagesGap(...args),
 }));
 
 function msg(id: number): MessageResponse {
@@ -20,71 +20,71 @@ function msg(id: number): MessageResponse {
 
 describe('fetchMissedGap', () => {
   beforeEach(() => {
-    getMessages.mockReset();
+    getMessagesGap.mockReset();
   });
 
   it('returns empty when first page has no items', async () => {
-    getMessages.mockResolvedValue({ data: { items: [], has_more: false, next_cursor: null } });
+    getMessagesGap.mockResolvedValue({ data: { items: [], truncated: false, last_message_id: null } });
     const r = await fetchMissedGap('conv-1', 100);
     expect(r.messages).toEqual([]);
     expect(r.incomplete).toBe(false);
-    expect(getMessages).toHaveBeenCalledTimes(1);
-    expect(getMessages).toHaveBeenCalledWith('conv-1', { limit: 30, after: 100 });
+    expect(getMessagesGap).toHaveBeenCalledTimes(1);
+    expect(getMessagesGap).toHaveBeenCalledWith('conv-1', 100);
   });
 
-  it('fetches one page when has_more is false', async () => {
-    getMessages.mockResolvedValue({
+  it('fetches one page when truncated is false', async () => {
+    getMessagesGap.mockResolvedValue({
       data: {
         items: [msg(101), msg(102)],
-        has_more: false,
-        next_cursor: null,
+        truncated: false,
+        last_message_id: null,
       },
     });
     const r = await fetchMissedGap('conv-1', 100);
     expect(r.messages.map((m) => m.message_id)).toEqual([101, 102]);
     expect(r.incomplete).toBe(false);
-    expect(getMessages).toHaveBeenCalledTimes(1);
+    expect(getMessagesGap).toHaveBeenCalledTimes(1);
   });
 
-  it('paginates with before=next_cursor until has_more is false', async () => {
-    getMessages
+  it('paginates with last_message_id until truncated is false', async () => {
+    getMessagesGap
       .mockResolvedValueOnce({
         data: {
           items: [msg(130), msg(129)],
-          has_more: true,
-          next_cursor: '128',
+          truncated: true,
+          last_message_id: 130,
         },
       })
       .mockResolvedValueOnce({
         data: {
           items: [msg(128), msg(127)],
-          has_more: false,
-          next_cursor: null,
+          truncated: false,
+          last_message_id: null,
         },
       });
     const r = await fetchMissedGap('conv-1', 100);
     expect(r.messages.map((m) => m.message_id)).toEqual([127, 128, 129, 130]);
     expect(r.incomplete).toBe(false);
-    expect(getMessages).toHaveBeenCalledTimes(2);
-    expect(getMessages).toHaveBeenNthCalledWith(1, 'conv-1', { limit: 30, after: 100 });
-    expect(getMessages).toHaveBeenNthCalledWith(2, 'conv-1', { limit: 30, before: 128 });
+    expect(getMessagesGap).toHaveBeenCalledTimes(2);
+    expect(getMessagesGap).toHaveBeenNthCalledWith(1, 'conv-1', 100);
+    expect(getMessagesGap).toHaveBeenNthCalledWith(2, 'conv-1', 130);
   });
 
   it('dedupes message_id across pages', async () => {
     const shared = msg(128);
-    getMessages
+    getMessagesGap
       .mockResolvedValueOnce({
         data: {
           items: [msg(130), shared],
-          has_more: true,
-          next_cursor: '128',
+          truncated: true,
+          last_message_id: 130,
         },
       })
       .mockResolvedValueOnce({
         data: {
           items: [shared, msg(127)],
-          has_more: false,
-          next_cursor: null,
+          truncated: false,
+          last_message_id: null,
         },
       });
     const r = await fetchMissedGap('conv-1', 100);
@@ -92,55 +92,58 @@ describe('fetchMissedGap', () => {
   });
 
   it('sets incomplete when maxPages is reached while server still has more', async () => {
-    getMessages.mockResolvedValue({
+    getMessagesGap.mockResolvedValue({
       data: {
         items: [msg(201)],
-        has_more: true,
-        next_cursor: '200',
+        truncated: true,
+        last_message_id: 201,
       },
     });
     const r = await fetchMissedGap('conv-1', 100, { maxPages: 1 });
     expect(r.messages.map((m) => m.message_id)).toEqual([201]);
     expect(r.incomplete).toBe(true);
-    expect(getMessages).toHaveBeenCalledTimes(1);
+    expect(getMessagesGap).toHaveBeenCalledTimes(1);
   });
 
   it('stops before next page when shouldAbort returns true after first chunk', async () => {
-    const shouldAbort = vi.fn().mockReturnValueOnce(false).mockReturnValue(true);
-    getMessages.mockResolvedValueOnce({
+    const shouldAbort = vi.fn()
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(false)
+      .mockReturnValue(true);
+    getMessagesGap.mockResolvedValueOnce({
       data: {
         items: [msg(201)],
-        has_more: true,
-        next_cursor: '200',
+        truncated: true,
+        last_message_id: 201,
       },
     });
     const r = await fetchMissedGap('conv-1', 100, { shouldAbort });
     expect(r.messages.map((m) => m.message_id)).toEqual([201]);
     expect(r.incomplete).toBe(true);
-    expect(getMessages).toHaveBeenCalledTimes(1);
+    expect(getMessagesGap).toHaveBeenCalledTimes(1);
   });
 
   it('retries failed page then succeeds', async () => {
-    getMessages
+    getMessagesGap
       .mockRejectedValueOnce(new Error('network'))
       .mockResolvedValueOnce({
         data: {
           items: [msg(301)],
-          has_more: false,
-          next_cursor: null,
+          truncated: false,
+          last_message_id: null,
         },
       });
     const r = await fetchMissedGap('conv-1', 200);
     expect(r.messages.map((m) => m.message_id)).toEqual([301]);
     expect(r.incomplete).toBe(false);
-    expect(getMessages).toHaveBeenCalledTimes(2);
+    expect(getMessagesGap).toHaveBeenCalledTimes(2);
   });
 
   it('returns incomplete empty when first page fails after retries', async () => {
-    getMessages.mockRejectedValue(new Error('network'));
+    getMessagesGap.mockRejectedValue(new Error('network'));
     const r = await fetchMissedGap('conv-1', 50);
     expect(r.messages).toEqual([]);
     expect(r.incomplete).toBe(true);
-    expect(getMessages).toHaveBeenCalledTimes(3);
+    expect(getMessagesGap).toHaveBeenCalledTimes(3);
   });
 });

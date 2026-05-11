@@ -6,7 +6,9 @@
  *
  * @vitest-environment jsdom
  */
+import React from 'react';
 import { renderHook, act } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import type { AISearchResult } from '../../api/passengers';
 
@@ -47,6 +49,14 @@ import { parseRideSearchWithAI } from '../../api/passengers';
 
 const mockParseAI = parseRideSearchWithAI as ReturnType<typeof vi.fn>;
 
+function createWrapper() {
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return ({ children }: { children: React.ReactNode }) =>
+    React.createElement(QueryClientProvider, { client: qc }, children);
+}
+
 const makeResult = (
   overrides: Partial<AISearchResult> = {}
 ): AISearchResult => ({
@@ -74,7 +84,7 @@ describe('useSearchRides — AI search', () => {
   it('prefills pickup and destination on successful parse', async () => {
     mockParseAI.mockResolvedValueOnce({ data: makeResult() });
 
-    const { result } = renderHook(() => useSearchRides());
+    const { result } = renderHook(() => useSearchRides(), { wrapper: createWrapper() });
 
     await act(async () => {
       result.current.setAiQuery('טרמפ מתל אביב לחיפה מחר');
@@ -92,7 +102,7 @@ describe('useSearchRides — AI search', () => {
     const res = makeResult();
     mockParseAI.mockResolvedValueOnce({ data: res });
 
-    const { result } = renderHook(() => useSearchRides());
+    const { result } = renderHook(() => useSearchRides(), { wrapper: createWrapper() });
 
     await act(async () => {
       result.current.setAiQuery('שאלה');
@@ -113,7 +123,7 @@ describe('useSearchRides — AI search', () => {
       }),
     });
 
-    const { result } = renderHook(() => useSearchRides());
+    const { result } = renderHook(() => useSearchRides(), { wrapper: createWrapper() });
 
     await act(async () => {
       result.current.setAiQuery('לחיפה מחר');
@@ -128,7 +138,7 @@ describe('useSearchRides — AI search', () => {
   it('does not clear textarea when parse succeeds (no follow_up)', async () => {
     mockParseAI.mockResolvedValueOnce({ data: makeResult() });
 
-    const { result } = renderHook(() => useSearchRides());
+    const { result } = renderHook(() => useSearchRides(), { wrapper: createWrapper() });
 
     await act(async () => {
       result.current.setAiQuery('טרמפ מתל אביב לחיפה מחר');
@@ -150,7 +160,7 @@ describe('useSearchRides — AI search', () => {
       }),
     });
 
-    const { result } = renderHook(() => useSearchRides());
+    const { result } = renderHook(() => useSearchRides(), { wrapper: createWrapper() });
 
     await act(async () => {
       result.current.setAiQuery('לחיפה מחר');
@@ -177,7 +187,7 @@ describe('useSearchRides — AI search', () => {
       }),
     });
 
-    const { result } = renderHook(() => useSearchRides());
+    const { result } = renderHook(() => useSearchRides(), { wrapper: createWrapper() });
 
     await act(async () => {
       result.current.setAiQuery('לחיפה מחר');
@@ -203,7 +213,7 @@ describe('useSearchRides — AI search', () => {
   it('sets aiError on API failure', async () => {
     mockParseAI.mockRejectedValueOnce(new Error('Network error'));
 
-    const { result } = renderHook(() => useSearchRides());
+    const { result } = renderHook(() => useSearchRides(), { wrapper: createWrapper() });
 
     await act(async () => {
       result.current.setAiQuery('שאלה');
@@ -219,7 +229,7 @@ describe('useSearchRides — AI search', () => {
   it('resetAI clears all AI state', async () => {
     mockParseAI.mockResolvedValueOnce({ data: makeResult() });
 
-    const { result } = renderHook(() => useSearchRides());
+    const { result } = renderHook(() => useSearchRides(), { wrapper: createWrapper() });
 
     await act(async () => {
       result.current.setAiQuery('שאלה');
@@ -239,7 +249,7 @@ describe('useSearchRides — AI search', () => {
   });
 
   it('does nothing when aiQuery is empty', async () => {
-    const { result } = renderHook(() => useSearchRides());
+    const { result } = renderHook(() => useSearchRides(), { wrapper: createWrapper() });
 
     await act(async () => {
       await result.current.parseWithAI();
@@ -253,7 +263,7 @@ describe('useSearchRides — AI search', () => {
       data: makeResult({ departure_time: null }),
     });
 
-    const { result } = renderHook(() => useSearchRides());
+    const { result } = renderHook(() => useSearchRides(), { wrapper: createWrapper() });
     const dateBefore = result.current.selectedDate;
 
     await act(async () => {
@@ -272,7 +282,7 @@ describe('useSearchRides — AI search', () => {
       data: makeResult({ search_radius: 47.8 }),
     });
 
-    const { result } = renderHook(() => useSearchRides());
+    const { result } = renderHook(() => useSearchRides(), { wrapper: createWrapper() });
 
     await act(async () => {
       result.current.setAiQuery('לאזור חיפה');

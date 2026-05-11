@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -107,7 +107,7 @@ async def test_listener_subscribes_to_correct_pattern():
     mock_pubsub.psubscribe = AsyncMock()
     mock_pubsub.get_message = AsyncMock(return_value=None)
 
-    mock_client = AsyncMock()
+    mock_client = MagicMock()
     mock_client.pubsub.return_value = mock_pubsub
     mock_client.close = AsyncMock()
 
@@ -149,7 +149,7 @@ async def test_listener_processes_pmessage():
     mock_pubsub.psubscribe = AsyncMock()
     mock_pubsub.get_message = AsyncMock(side_effect=get_message_side_effect)
 
-    mock_client = AsyncMock()
+    mock_client = MagicMock()
     mock_client.pubsub.return_value = mock_pubsub
     mock_client.close = AsyncMock()
 
@@ -181,7 +181,7 @@ async def test_listener_ignores_non_pmessage_types():
     mock_pubsub.psubscribe = AsyncMock()
     mock_pubsub.get_message = AsyncMock(side_effect=get_message_side_effect)
 
-    mock_client = AsyncMock()
+    mock_client = MagicMock()
     mock_client.pubsub.return_value = mock_pubsub
     mock_client.close = AsyncMock()
 
@@ -213,7 +213,7 @@ async def test_listener_handles_timeout_gracefully():
     mock_pubsub.psubscribe = AsyncMock()
     mock_pubsub.get_message = AsyncMock(side_effect=get_message_side_effect)
 
-    mock_client = AsyncMock()
+    mock_client = MagicMock()
     mock_client.pubsub.return_value = mock_pubsub
     mock_client.close = AsyncMock()
 
@@ -251,7 +251,7 @@ async def test_listener_handles_processing_error_and_continues():
     mock_pubsub.psubscribe = AsyncMock()
     mock_pubsub.get_message = AsyncMock(side_effect=get_message_side_effect)
 
-    mock_client = AsyncMock()
+    mock_client = MagicMock()
     mock_client.pubsub.return_value = mock_pubsub
     mock_client.close = AsyncMock()
 
@@ -275,7 +275,7 @@ async def test_listener_closes_client_on_cancellation():
     mock_pubsub = AsyncMock()
     mock_pubsub.psubscribe = AsyncMock(side_effect=asyncio.CancelledError())
 
-    mock_client = AsyncMock()
+    mock_client = MagicMock()
     mock_client.pubsub.return_value = mock_pubsub
     mock_client.close = AsyncMock()
 
@@ -295,7 +295,7 @@ async def test_listener_closes_client_on_redis_connection_error():
     mock_pubsub = AsyncMock()
     mock_pubsub.psubscribe = AsyncMock(side_effect=ConnectionError("Redis unreachable"))
 
-    mock_client = AsyncMock()
+    mock_client = MagicMock()
     mock_client.pubsub.return_value = mock_pubsub
     mock_client.close = AsyncMock()
 
