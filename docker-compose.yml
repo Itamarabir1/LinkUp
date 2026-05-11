@@ -367,6 +367,12 @@ services:
     restart: unless-stopped
     env_file:
       - ./frontend/.env
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/config.js"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     networks:
       - linkup_network
 
@@ -384,7 +390,7 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       frontend:
-        condition: service_started
+        condition: service_healthy
       backend:
         condition: service_healthy
       chat-ws:
