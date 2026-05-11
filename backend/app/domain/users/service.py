@@ -61,16 +61,10 @@ class UserService:
             )
             raise PermissionDeniedError(message="מפתח העלאה לא תואם למשתמש המחובר")
 
-        # Do not set avatar_key to staging — avoids flicker when worker removes staging objects.
-        # Keep staging_key separate and mark processing until finalize succeeds.
-        await self.crud.update(
-            db,
-            db_obj=user,
-            obj_in={
-                "avatar_staging_key": staging_key,
-                "avatar_status": "processing",
-            },
-        )
+        user.avatar_staging_key = staging_key
+        user.avatar_status = "processing"
+        db.add(user)
+        await db.flush()
 
         await publish_to_outbox(
             db,
@@ -97,15 +91,12 @@ class UserService:
             logger.info("Avatar already empty for user %s", user_id)
             return
 
-        await self.crud.update(
-            db,
-            db_obj=user,
-            obj_in={
-                "avatar_key": None,
-                "avatar_staging_key": None,
-                "avatar_status": "none",
-            },
-        )
+        user.avatar_key = None
+        user.avatar_staging_key = None
+        user.avatar_status = "none"
+        db.add(user)
+        await db.flush()
+
         await publish_to_outbox(db, "user.avatar_remove", {"user_id": str(user.user_id)})
         await db.commit()
         logger.info("Avatar removed for user %s (outbox user.avatar_remove)", user_id)

@@ -2,6 +2,7 @@
 Service לזיהוי סיום שיחה, ניתוח AI, ושמירת תוצאות.
 """
 
+import asyncio
 import logging
 from uuid import UUID
 
@@ -52,7 +53,7 @@ async def handle_conversation_completion(
             return False
 
         # AI analysis
-        ride_summary = analyze_conversation(chat_text)
+        ride_summary = await asyncio.to_thread(analyze_conversation, chat_text)
         if not ride_summary:
             logger.error(f"AI analysis failed for conversation {conversation_id}")
             return False

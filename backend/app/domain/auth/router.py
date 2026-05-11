@@ -164,6 +164,7 @@ async def verify_email(
     request: Request,
     db: AsyncSession = Depends(get_db),
     response: Response = Response(),
+    _: None = Depends(rate_limit_auth),
     auth_svc: AuthService = Depends(get_auth_service),
 ):
     """
@@ -218,6 +219,7 @@ async def request_password_reset(
 async def confirm_password_reset(
     data: PasswordResetConfirm,
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(rate_limit_auth),
     auth_svc: AuthService = Depends(get_auth_service),
 ):
     """Password reset step 2: email + OTP + new password (twice)."""

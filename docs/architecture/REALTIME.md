@@ -66,7 +66,7 @@
   - **Disconnect**: מחיקת `presence:{user_id}`; `PUBLISH user:offline` → WS `user_offline`.
   - **חיבור מחדש** מנקה debounce/hold/token — מבטל PATCH מיותר.
 - **Chat completion / AI לאחר סיום שיחה:**
-  - **מסלול מתוזמן (מימוש בשורות Python הנוכחי):** משימות מתוך **`task-worker`** (למשל `execute_chat_timeout_job` ב־`chat_timeout_task.py`) קוראות **ישירות** ל־`handle_conversation_completion` עם DB — ניתוח **Groq**, כתיבה ל־`chat_analysis`, ואז **`publish_to_outbox`** לאירוע התראות. פירוט: [`AI.md`](AI.md).
+  - **מסלול מתוזמן (מימוש בשורות Python הנוכחי):** משימות מתוך **`task-worker`** (למשל `execute_chat_timeout_job` ב־`chat_timeout_task.py`) קוראות **ישירות** ל־`handle_conversation_completion` עם DB — ניתוח **Groq** דרך `asyncio.to_thread` (non-blocking, לא חוסם את ה-event loop), כתיבה ל־`chat_analysis`, ואז **`publish_to_outbox`** לאירוע התראות. פירוט: [`AI.md`](AI.md).
   - **מסלול Redis (מימוש מאזין בלבד):** `ai-worker` רץ **`run_chat_completion_redis_listener`** על תבנית **`chat:completion:*`** (`REDIS_CHAT_URL`). **לא זוהה ב־`backend/` פרסום** לערוץ זה — אם מוסיפים טריגר Redis בעתיד, יישור הניסוח עם `chat-ws`/`REALTIME.md` חובה.
 - **AI ride parsing endpoint**: `POST /api/v1/passenger/passengers/ai-parse-search` (ל-SearchRides/CreateRide) הוא REST בלבד דרך backend ואינו חלק מנתיבי WS/PubSub של chat-ws.
 

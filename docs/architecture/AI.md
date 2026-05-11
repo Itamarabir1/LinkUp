@@ -8,7 +8,7 @@
 
 1. משימת **`execute_chat_timeout_job`** (`app/workers/tasks/chat_timeout_task.py`) רצה מהלולאה המתוזמנת ב־`task_worker`.
 2. לכל שיחה שעברה idle — קריאה **ישירה** (באותו תהליך) ל־`handle_conversation_completion` ב־`app/domain/chat/completion/service.py` עם `AsyncSession`.
-3. השירות מריץ Groq דרך `app/domain/chat/ai/analyzer.py` / `client.py`, כותב ל־**`chat_analysis`**, ואז **`publish_to_outbox`** עם `chat.conversation.completed` (ראו [`EVENTS.md`](EVENTS.md)).
+3. השירות מריץ Groq דרך `app/domain/chat/ai/analyzer.py` / `client.py` ב-**`asyncio.to_thread`** (non-blocking — לא חוסם את ה-event loop של ה-worker), כותב ל־**`chat_analysis`**, ואז **`publish_to_outbox`** עם `chat.conversation.completed` (ראו [`EVENTS.md`](EVENTS.md)).
 
 ### נתיב B — מאזין Redis ל־`chat:completion:*` (subscriber בקוד)
 
