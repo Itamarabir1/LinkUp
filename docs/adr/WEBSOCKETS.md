@@ -60,6 +60,14 @@
 
 ---
 
+## Token freshness gate + visibility-aware reconnect
+
+**בעיה:** Access token (TTL 30 דקות) מועבר כ-`?token=` ב-WS URL. כשלשונית ברקע, הדפדפן מצמצם timers → pong לא מגיע בזמן (60s deadline ב-Go) → השרת סוגר חיבור. reconnect loop קורא token ישן מ-`localStorage` — שום HTTP request לא רענן אותו → לולאת כשלון אינסופית.
+
+**פתרון:** **`ensureFreshToken()`** ב-[`tokenRefresh.ts`](../../frontend/src/api/tokenRefresh.ts) — לפני כל `new WebSocket(url)`: פענוח `exp` client-side ([`tokenUtils.ts`](../../frontend/src/utils/tokenUtils.ts)); אם < 60s לתפוגה → `POST /auth/refresh` (HttpOnly cookie), single-flight queue משותף ל-Axios interceptor ול-WS hooks. **`visibilitychange`** listener: חזרה מרקע + אין WS פתוח → reconnect מיידי (attempt=0) עם token טרי. פירוט: [`FEATURE_DECISIONS.md#frontend-ws-token-freshness`](../FEATURE_DECISIONS.md#frontend-ws-token-freshness).
+
+---
+
 ## אימות ב-WS
 
 - **chat-ws ו-FastAPI WS:** JWT ב-query (או מנגנון מוסכם); ב-FastAPI חלק מה-handshakes **ללא DB** — ראו [ARCHITECTURE_DECISIONS_BACKEND.md](ARCHITECTURE_DECISIONS_BACKEND.md) סעיף 12.

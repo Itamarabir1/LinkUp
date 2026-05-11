@@ -173,6 +173,20 @@
 
 ---
 
+<a id="frontend-ws-token-freshness"></a>
+
+## Frontend — WebSocket token freshness gate + visibility-aware reconnect
+
+| | |
+|--|--|
+| **בעיה** | Access token (TTL 30 דקות) מועבר כ-`?token=` ב-WebSocket URL. כשלשונית הדפדפן ברקע, Chrome/Edge מצמצמים timers; ה-pong לא מגיע בזמן (60s deadline בצד Go) → השרת סוגר חיבור. בניתוק, ה-reconnect loop קורא token מ-`localStorage` — אך שום בקשת HTTP לא נשלחה בזמן ה-idle ולכן ה-Axios interceptor לא רענן אותו. התוצאה: לולאת reconnect אינסופית עם token פג תוקף. |
+| **החלטה** | (1) **`ensureFreshToken()`** ב-[`tokenRefresh.ts`](../frontend/src/api/tokenRefresh.ts) — gateway משותף ל-Axios interceptor ול-WS hooks: פענוח `exp` מ-JWT ללא crypto (`atob`); אם < 60s לתפוגה → `POST /auth/refresh` (HttpOnly cookie) עם coordinated single-flight (אותו `isRefreshing` queue שמטפל בכמה callers במקביל). (2) **`visibilitychange`** listener בכל hook: כשלשונית חוזרת לפוקוס ואין WS פתוח → reconnect מיידי (attempt=0) דרך `ensureFreshToken`. (3) **`isTokenExpiredOrNearExpiry`** ב-[`tokenUtils.ts`](../frontend/src/utils/tokenUtils.ts) — פונקציה טהורה שמפענחת payload בלבד (base64). |
+| **Trade-off** | ייתכן refresh HTTP מיותר כשהטוקן קרוב ל-60s אבל עדיין תקף; לעומת זאת — WS reconnect לעולם לא יישלח עם token שפג. |
+| **Interview pitch (≈30s)** | *"Access token פג אחרי 30 דקות, אבל ה-WS hook קרא אותו מ-localStorage בלי לבדוק exp. הוספתי שער freshness ששותף גם עם Axios interceptor — אם JWT < 60s לתפוגה, refresh חד-פעמי מרוכז רץ לפני כל ניסיון חיבור. בנוסף, visibilitychange listener מזהה חזרה מרקע ומפעיל reconnect מיידי עם token טרי."* |
+| **הפניה** | [architecture/REALTIME.md](architecture/REALTIME.md), [ENGINEERING_HIGHLIGHTS.md](ENGINEERING_HIGHLIGHTS.md), [`tokenRefresh.ts`](../frontend/src/api/tokenRefresh.ts), [`tokenUtils.ts`](../frontend/src/utils/tokenUtils.ts), [`useReconnectingWebSocket.ts`](../frontend/src/hooks/useReconnectingWebSocket.ts), [`useChatWebSocket.ts`](../frontend/src/pages/MessageThread/useChatWebSocket.ts) |
+
+---
+
 <a id="chat-optimistic-outbound"></a>
 
 ## Chat — optimistic outbound UI (frontend)

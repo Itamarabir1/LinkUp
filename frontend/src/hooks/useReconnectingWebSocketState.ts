@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getWsToken } from '../config/wsUrls';
+import { ensureFreshToken } from '../api/tokenRefresh';
 import { computeReconnectDelayMs } from '../utils/reconnectBackoff';
 
 interface Options {
@@ -59,22 +59,34 @@ export function useReconnectingWebSocketState({
     let cancelled = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let ws: WebSocket | null = null;
+    let connecting = false;
 
-    const connect = () => {
+    const scheduleReconnect = () => {
       if (cancelled) return;
-      const token = getWsToken();
-      if (!token) return;
+      const delay = computeReconnectDelayMs(attempt, { baseMs: reconnectDelayMs });
+      attempt++;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        void connect();
+      }, delay);
+    };
+
+    const connect = async () => {
+      if (cancelled || connecting) return;
+      connecting = true;
+
+      const token = await ensureFreshToken();
+      if (cancelled) { connecting = false; return; }
+      if (!token) { connecting = false; return; }
 
       try {
         ws = new WebSocket(buildUrlRef.current(token));
       } catch {
-        if (!cancelled) {
-          const delay = computeReconnectDelayMs(attempt, { baseMs: reconnectDelayMs });
-          attempt++;
-          reconnectTimer = setTimeout(connect, delay);
-        }
+        connecting = false;
+        scheduleReconnect();
         return;
       }
+      connecting = false;
 
       ws.onopen = () => {
         setError(null);
@@ -85,11 +97,7 @@ export function useReconnectingWebSocketState({
       ws.onclose = () => {
         setConnected(false);
         ws = null;
-        if (!cancelled) {
-          const delay = computeReconnectDelayMs(attempt, { baseMs: reconnectDelayMs });
-          attempt++;
-          reconnectTimer = setTimeout(connect, delay);
-        }
+        if (!cancelled) scheduleReconnect();
       };
       ws.onerror = () => {
         if (connectionErrorLabel) setError(connectionErrorLabel);
@@ -97,9 +105,21 @@ export function useReconnectingWebSocketState({
       };
     };
 
-    connect();
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (ws && ws.readyState === WebSocket.OPEN) return;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+      attempt = 0;
+      void connect();
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    void connect();
+
     return () => {
       cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       ws?.close();
       onResetRef.current?.();

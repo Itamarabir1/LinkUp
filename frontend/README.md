@@ -64,6 +64,10 @@ cp frontend/.env.example frontend/.env
 
 עיכוב בין ניסיונות reconnect אחרי **`onclose`** / שגיאת ctor: **`computeReconnectDelayMs`** ב־[`src/utils/reconnectBackoff.ts`](src/utils/reconnectBackoff.ts) (מעריכה, תקרת 30s, ±20% jitter) — **`useChatWebSocket`**, **`useReconnectingWebSocket`**, **`useReconnectingWebSocketState`**. ראו [`docs/architecture/REALTIME.md`](../docs/architecture/REALTIME.md) ו־[`docs/FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff`](../docs/FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff).
 
+### WebSocket — token freshness gate + visibility-aware reconnect
+
+לפני כל ניסיון חיבור מחדש, **`ensureFreshToken()`** ב־[`src/api/tokenRefresh.ts`](src/api/tokenRefresh.ts) בודק אם ה-access token (TTL 30 דקות) פג תוקף או קרוב לתפוגה (< 60s) ע"י פענוח `exp` מ-JWT ([`src/utils/tokenUtils.ts`](src/utils/tokenUtils.ts)). אם צריך — רענון מרוכז (single-flight) דרך `POST /auth/refresh` (HttpOnly cookie), משותף גם ל-Axios 401 interceptor. בנוסף, **`visibilitychange`** listener מזהה חזרה מלשונית ברקע ומפעיל reconnect מיידי (attempt=0) עם token טרי — ללא המתנה ל-backoff. ראו [`docs/FEATURE_DECISIONS.md#frontend-ws-token-freshness`](../docs/FEATURE_DECISIONS.md#frontend-ws-token-freshness).
+
 ---
 
 ## סקריפטים שימושיים

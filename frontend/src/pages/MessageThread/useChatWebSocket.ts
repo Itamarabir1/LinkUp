@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ChatListRow } from '../../types/chatList';
-import { STORAGE_KEYS } from '../../config/constants';
 import { getChatWebSocketUrl } from '../../config/env';
 import type { PartnerPresence } from '../../api/presence';
+import { ensureFreshToken } from '../../api/tokenRefresh';
 import { TYPING_THROTTLE_MS } from './messageThread.constants';
 import { processChatWebSocketMessage } from './processChatWebSocketMessage';
 import { computeReconnectDelayMs } from '../../utils/reconnectBackoff';
@@ -64,6 +64,7 @@ export function useChatWebSocket(options: {
     let attempt = 0;
     let cancelled = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let connecting = false;
 
     const scheduleReconnect = () => {
       if (cancelled) return;
@@ -71,22 +72,28 @@ export function useChatWebSocket(options: {
       attempt++;
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
-        connect();
+        void connect();
       }, delay);
     };
 
-    const connect = () => {
-      const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-      if (!token || cancelled) return;
+    const connect = async () => {
+      if (cancelled || connecting) return;
+      connecting = true;
+
+      const token = await ensureFreshToken();
+      if (cancelled) { connecting = false; return; }
+      if (!token) { connecting = false; return; }
 
       const url = getChatWebSocketUrl(token);
       let ws: WebSocket;
       try {
         ws = new WebSocket(url);
       } catch {
+        connecting = false;
         scheduleReconnect();
         return;
       }
+      connecting = false;
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -132,10 +139,21 @@ export function useChatWebSocket(options: {
       };
     };
 
-    connect();
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+      attempt = 0;
+      void connect();
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    void connect();
 
     return () => {
       cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;

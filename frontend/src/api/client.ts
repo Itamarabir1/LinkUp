@@ -1,8 +1,15 @@
 import * as Sentry from '@sentry/react';
 import axios, { type AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios';
-import { STORAGE_KEYS } from '../config/constants';
 import { API_BASE_URL, API_TIMEOUT_MS } from '../config/env';
 import { throttle } from './throttle';
+import {
+  getStoredAccessToken,
+  setTokens,
+  clearTokens,
+  coordinatedRefresh,
+} from './tokenRefresh';
+
+export { setTokens, clearTokens };
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -24,64 +31,6 @@ export const apiMutator = <T>(
     ...options,
   }).then(({ data }) => data as T);
 };
-
-function getStoredAccessToken(): string | null {
-  return localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-}
-
-export function setTokens(access: string): void {
-  localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, access);
-}
-
-export function clearTokens(): void {
-  localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-  localStorage.removeItem('linkup_refresh_token');
-}
-
-let sessionExpiredEmitted = false;
-function emitSessionExpired(): void {
-  if (typeof window === 'undefined') return;
-  if (sessionExpiredEmitted) return;
-  sessionExpiredEmitted = true;
-  queueMicrotask(() => {
-    window.dispatchEvent(new Event('auth:session-expired'));
-    queueMicrotask(() => {
-      sessionExpiredEmitted = false;
-    });
-  });
-}
-
-async function refreshAccessToken(): Promise<string | null> {
-  try {
-    const { data } = await axios.post<{
-      access_token: string;
-    }>(`${API_BASE_URL}/auth/refresh`, {}, {
-      headers: { 'Content-Type': 'application/json' },
-      timeout: API_TIMEOUT_MS,
-      withCredentials: true,
-    });
-    const newAccess = data.access_token;
-    if (newAccess) {
-      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, newAccess);
-      return newAccess;
-    }
-  } catch {
-    clearTokens();
-    emitSessionExpired();
-  }
-  return null;
-}
-
-let isRefreshing = false;
-const failedQueue: Array<{
-  resolve: (token: string | null) => void;
-  reject: (err: AxiosError) => void;
-}> = [];
-
-function processQueue(error: AxiosError | null, token: string | null) {
-  failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token)));
-  failedQueue.length = 0;
-}
 
 api.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
@@ -126,27 +75,12 @@ api.interceptors.response.use(
     if (err.response?.status !== 401 || original._retry) {
       return Promise.reject(err);
     }
-    if (isRefreshing) {
-      return new Promise<void>((resolve, reject) => {
-        failedQueue.push({
-          resolve: (t) => {
-            if (t) original.headers.Authorization = `Bearer ${t}`;
-            resolve();
-          },
-          reject,
-        });
-      }).then(() => api(original));
-    }
     original._retry = true;
-    isRefreshing = true;
-    const newToken = await refreshAccessToken();
-    isRefreshing = false;
-    processQueue(null, newToken);
+    const newToken = await coordinatedRefresh();
     if (newToken) {
       original.headers.Authorization = `Bearer ${newToken}`;
       return api(original);
     }
-    processQueue(err, null);
     if (err.response?.status === 401) {
       (err as { __sentryCaptured?: boolean }).__sentryCaptured = true;
     }
