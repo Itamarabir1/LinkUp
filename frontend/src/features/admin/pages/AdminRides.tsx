@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Bar,
   BarChart,
@@ -19,6 +20,7 @@ import { RIDE_STATUS_COLORS, RIDE_STATUS_LABELS } from '../adminConstants';
 import page from '../styles/AdminPage.module.css';
 
 export default function AdminRides() {
+  const { t } = useTranslation('admin');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [cancelTarget, setCancelTarget] = useState<AdminRideRow | null>(null);
   const { chart: chartTheme } = useAdminTheme();
@@ -61,16 +63,16 @@ export default function AdminRides() {
 
   return (
     <div>
-      <h2 className={page.pageTitle}>נסיעות</h2>
+      <h2 className={page.pageTitle}>{t('rides')}</h2>
 
       {!statsData && (
-        <p className={page.muted}>טוען חלוקה לפי סטטוס…</p>
+        <p className={page.muted}>{t('loading_status_chart')}</p>
       )}
       {statsData && (
         <div className={page.chartMiniWrap}>
           <div dir="ltr">
             {barTotal === 0 ? (
-              <p className={page.chartMiniEmpty}>אין נתונים</p>
+              <p className={page.chartMiniEmpty}>{t('no_data')}</p>
             ) : (
               <ResponsiveContainer width="100%" height={120}>
                 <BarChart data={barData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -88,7 +90,7 @@ export default function AdminRides() {
                     contentStyle={tooltipStyle}
                     formatter={(value) => {
                       const n = typeof value === 'number' ? value : Number(value);
-                      return [Number.isFinite(n) ? n : 0, 'נסיעות'];
+                      return [Number.isFinite(n) ? n : 0, t('rides_tooltip')];
                     }}
                   />
                   <Bar dataKey="count" radius={[4, 4, 0, 0]}>
@@ -108,35 +110,35 @@ export default function AdminRides() {
 
       <div className={page.toolbar}>
         <label className={page.muted}>
-          סטטוס:{' '}
+          {t('status_label')}{' '}
           <select
             className={page.select}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="">הכל</option>
-            <option value="active">פעיל</option>
-            <option value="completed">הושלם</option>
-            <option value="cancelled">בוטל</option>
+            <option value="">{t('all')}</option>
+            <option value="active">{t('active')}</option>
+            <option value="completed">{t('completed')}</option>
+            <option value="cancelled">{t('cancelled')}</option>
           </select>
         </label>
       </div>
 
-      {status === 'loading' && <p className={page.muted}>טוען…</p>}
-      {status === 'error' && <p className={page.error}>שגיאה בטעינה.</p>}
+      {status === 'loading' && <p className={page.muted}>{t('loading_short')}</p>}
+      {status === 'error' && <p className={page.error}>{t('load_error')}</p>}
       {status === 'ready' && (
         <div className={page.tableWrap}>
           <table className={page.table}>
             <thead>
               <tr>
-                <th>מזהה</th>
-                <th>נהג</th>
-                <th>מוצא</th>
-                <th>יעד</th>
-                <th>יציאה</th>
-                <th>סטטוס</th>
-                <th>מושבים</th>
-                <th>פעולות</th>
+                <th>{t('id')}</th>
+                <th>{t('driver')}</th>
+                <th>{t('origin')}</th>
+                <th>{t('destination')}</th>
+                <th>{t('departure')}</th>
+                <th>{t('status')}</th>
+                <th>{t('seats')}</th>
+                <th>{t('actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -161,7 +163,7 @@ export default function AdminRides() {
                       disabled={r.status === 'cancelled' || cancelRide.isPending}
                       onClick={() => setCancelTarget(r)}
                     >
-                      ביטול נסיעה
+                      {t('cancel_ride')}
                     </button>
                   </td>
                 </tr>
@@ -174,13 +176,16 @@ export default function AdminRides() {
       <ConfirmModal
         open={cancelTarget !== null}
         onClose={() => !cancelRide.isPending && setCancelTarget(null)}
-        title="ביטול נסיעה"
+        title={t('cancel_ride')}
         description={
           cancelTarget
-            ? `לבטל נסיעה מ-${cancelTarget.origin_name ?? '?'} ל-${cancelTarget.destination_name ?? '?'}?`
+            ? t('cancel_ride_from', {
+                origin: cancelTarget.origin_name ?? '?',
+                destination: cancelTarget.destination_name ?? '?',
+              })
             : undefined
         }
-        confirmLabel="בטל נסיעה"
+        confirmLabel={t('confirm_cancel_ride')}
         variant="danger"
         loading={cancelRide.isPending}
         onConfirm={confirmCancel}

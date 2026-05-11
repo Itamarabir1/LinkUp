@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import ConfirmModal from '../../../components/ConfirmModal/ConfirmModal';
 import {
   useAdminOutbox,
@@ -8,6 +9,7 @@ import { useRequeueOutbox } from '../mutations/useAdminOutboxMutations';
 import page from '../styles/AdminPage.module.css';
 
 export default function AdminOutbox() {
+  const { t } = useTranslation('admin');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [requeueId, setRequeueId] = useState<string | null>(null);
@@ -40,13 +42,13 @@ export default function AdminOutbox() {
       <h2 className={page.pageTitle}>Outbox</h2>
       <div className={page.toolbar}>
         <label className={page.muted}>
-          סטטוס:{' '}
+          {t('status_label')}{' '}
           <select
             className={page.select}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="">הכל</option>
+            <option value="">{t('all')}</option>
             <option value="PENDING">PENDING</option>
             <option value="PROCESSED">PROCESSED</option>
             <option value="FAILED">FAILED</option>
@@ -54,23 +56,23 @@ export default function AdminOutbox() {
         </label>
         {selectedId && (
           <button type="button" className={page.btnSm} onClick={() => setSelectedId(null)}>
-            נקה בחירה
+            {t('clear_selection')}
           </button>
         )}
       </div>
 
-      {listStatus === 'loading' && <p className={page.muted}>טוען…</p>}
-      {listStatus === 'error' && <p className={page.error}>שגיאה בטעינה.</p>}
+      {listStatus === 'loading' && <p className={page.muted}>{t('loading_short')}</p>}
+      {listStatus === 'error' && <p className={page.error}>{t('load_error')}</p>}
       {listStatus === 'ready' && (
         <div className={page.grid2}>
           <div className={page.tableWrap}>
             <table className={page.table}>
               <thead>
                 <tr>
-                  <th>נוצר</th>
-                  <th>אירוע</th>
-                  <th>סטטוס</th>
-                  <th>ניסיונות</th>
+                  <th>{t('created')}</th>
+                  <th>{t('event')}</th>
+                  <th>{t('status')}</th>
+                  <th>{t('attempts')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -99,10 +101,10 @@ export default function AdminOutbox() {
             </table>
           </div>
           <div>
-            <h3 className={page.subheading}>פרטים</h3>
-            {!selectedId && <p className={page.muted}>בחר שורה מהטבלה.</p>}
-            {selectedId && detailLoading && <p className={page.muted}>טוען…</p>}
-            {selectedId && detailError && <p className={page.error}>שגיאה בטעינת פרטים.</p>}
+            <h3 className={page.subheading}>{t('outbox_detail')}</h3>
+            {!selectedId && <p className={page.muted}>{t('outbox_select_row')}</p>}
+            {selectedId && detailLoading && <p className={page.muted}>{t('loading_short')}</p>}
+            {selectedId && detailError && <p className={page.error}>{t('outbox_detail_error')}</p>}
             {!!detailItem && (
               <>
                 {canRequeueDetail && (
@@ -112,7 +114,7 @@ export default function AdminOutbox() {
                       className={page.btnSmPrimary}
                       onClick={() => setRequeueId(detailItem.id)}
                     >
-                      החזר לתור (requeue)
+                      {t('outbox_requeue')}
                     </button>
                   </div>
                 )}
@@ -126,9 +128,9 @@ export default function AdminOutbox() {
       <ConfirmModal
         open={requeueId !== null}
         onClose={() => !requeue.isPending && setRequeueId(null)}
-        title="החזרת אירוע לתור"
-        description="לאשר החזרת אירוע שנכשל לסטטוס PENDING?"
-        confirmLabel="אישור"
+        title={t('outbox_requeue_title')}
+        description={t('outbox_requeue_confirm')}
+        confirmLabel={t('confirm_label')}
         variant="primary"
         loading={requeue.isPending}
         onConfirm={confirmRequeue}

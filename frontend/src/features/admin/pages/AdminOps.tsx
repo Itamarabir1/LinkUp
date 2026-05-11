@@ -1,7 +1,9 @@
+import { useTranslation } from 'react-i18next';
 import { useAdminQueues, useAdminSystemOverview, useAdminWorkers } from '../queries/useAdminOps';
 import page from '../styles/AdminPage.module.css';
 
 export default function AdminOps() {
+  const { t } = useTranslation('admin');
   const system = useAdminSystemOverview();
   const queues = useAdminQueues();
   const workers = useAdminWorkers();
@@ -12,8 +14,8 @@ export default function AdminOps() {
   return (
     <div>
       <h2 className={page.pageTitle}>Admin Ops</h2>
-      {isLoading && <p className={page.muted}>טוען…</p>}
-      {hasError && <p className={page.error}>שגיאה בטעינת נתוני תפעול.</p>}
+      {isLoading && <p className={page.muted}>{t('loading_short')}</p>}
+      {hasError && <p className={page.error}>{t('ops_error')}</p>}
       {!isLoading && !hasError && (
         <div className={page.grid2}>
           <div className={page.tableWrap}>

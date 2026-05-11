@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAdminBilling } from '../queries/useAdminBilling';
 import page from '../styles/AdminPage.module.css';
 
 export default function AdminBilling() {
+  const { t } = useTranslation('admin');
   const [statusFilter, setStatusFilter] = useState('');
   const [offset, setOffset] = useState(0);
   const limit = 100;
@@ -18,7 +20,7 @@ export default function AdminBilling() {
       <h2 className={page.pageTitle}>Billing</h2>
       <div className={page.toolbar}>
         <label className={page.muted}>
-          סטטוס:{' '}
+          {t('status_label')}{' '}
           <select
             className={page.select}
             value={statusFilter}
@@ -27,7 +29,7 @@ export default function AdminBilling() {
               setOffset(0);
             }}
           >
-            <option value="">הכל</option>
+            <option value="">{t('all')}</option>
             <option value="pending">pending</option>
             <option value="succeeded">succeeded</option>
             <option value="failed">failed</option>
@@ -36,8 +38,8 @@ export default function AdminBilling() {
         </label>
       </div>
 
-      {isLoading && <p className={page.muted}>טוען…</p>}
-      {isError && <p className={page.error}>שגיאה בטעינה.</p>}
+      {isLoading && <p className={page.muted}>{t('loading_short')}</p>}
+      {isError && <p className={page.error}>{t('load_error')}</p>}
       {!isLoading && !isError && (
         <>
           <div className={page.tableWrap}>
@@ -48,9 +50,9 @@ export default function AdminBilling() {
                   <th>User</th>
                   <th>Amount</th>
                   <th>Currency</th>
-                  <th>Status</th>
+                  <th>{t('status')}</th>
                   <th>Session</th>
-                  <th>Created</th>
+                  <th>{t('created')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -75,7 +77,7 @@ export default function AdminBilling() {
               disabled={offset === 0}
               onClick={() => setOffset((v) => Math.max(0, v - limit))}
             >
-              הקודם
+              {t('prev')}
             </button>
             <button
               type="button"
@@ -83,10 +85,10 @@ export default function AdminBilling() {
               disabled={data?.next_offset == null}
               onClick={() => setOffset(data?.next_offset ?? offset)}
             >
-              הבא
+              {t('next')}
             </button>
             <span className={page.muted}>
-              {offset + 1}-{offset + items.length} מתוך {data?.total ?? 0}
+              {t('pagination', { from: offset + 1, to: offset + items.length, total: data?.total ?? 0 })}
             </span>
           </div>
         </>

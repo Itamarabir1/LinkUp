@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAdminBookings } from '../queries/useAdminBookings';
 import page from '../styles/AdminPage.module.css';
 
 export default function AdminBookings() {
+  const { t } = useTranslation('admin');
   const [statusFilter, setStatusFilter] = useState('');
   const [offset, setOffset] = useState(0);
   const limit = 100;
@@ -15,10 +17,10 @@ export default function AdminBookings() {
 
   return (
     <div>
-      <h2 className={page.pageTitle}>Bookings</h2>
+      <h2 className={page.pageTitle}>{t('bookings')}</h2>
       <div className={page.toolbar}>
         <label className={page.muted}>
-          סטטוס:{' '}
+          {t('status_label')}{' '}
           <select
             className={page.select}
             value={statusFilter}
@@ -27,7 +29,7 @@ export default function AdminBookings() {
               setOffset(0);
             }}
           >
-            <option value="">הכל</option>
+            <option value="">{t('all')}</option>
             <option value="pending">pending</option>
             <option value="confirmed">confirmed</option>
             <option value="rejected">rejected</option>
@@ -35,21 +37,21 @@ export default function AdminBookings() {
           </select>
         </label>
       </div>
-      {isLoading && <p className={page.muted}>טוען…</p>}
-      {isError && <p className={page.error}>שגיאה בטעינה.</p>}
+      {isLoading && <p className={page.muted}>{t('loading_short')}</p>}
+      {isError && <p className={page.error}>{t('load_error')}</p>}
       {!isLoading && !isError && (
         <>
           <div className={page.tableWrap}>
             <table className={page.table}>
               <thead>
                 <tr>
-                  <th>Booking</th>
-                  <th>Ride</th>
+                  <th>{t('booking_label')}</th>
+                  <th>{t('ride_label')}</th>
                   <th>Passenger</th>
-                  <th>Seats</th>
+                  <th>{t('seats')}</th>
                   <th>Pickup</th>
-                  <th>Status</th>
-                  <th>Created</th>
+                  <th>{t('status')}</th>
+                  <th>{t('created')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -74,7 +76,7 @@ export default function AdminBookings() {
               disabled={offset === 0}
               onClick={() => setOffset((v) => Math.max(0, v - limit))}
             >
-              הקודם
+              {t('prev')}
             </button>
             <button
               type="button"
@@ -82,10 +84,10 @@ export default function AdminBookings() {
               disabled={data?.next_offset == null}
               onClick={() => setOffset(data?.next_offset ?? offset)}
             >
-              הבא
+              {t('next')}
             </button>
             <span className={page.muted}>
-              {offset + 1}-{offset + items.length} מתוך {data?.total ?? 0}
+              {t('pagination', { from: offset + 1, to: offset + items.length, total: data?.total ?? 0 })}
             </span>
           </div>
         </>

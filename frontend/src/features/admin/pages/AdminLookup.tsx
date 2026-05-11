@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useMutation } from '@tanstack/react-query';
 import { fetchAdminBooking, fetchAdminRide } from '../api/lookup';
 import page from '../styles/AdminPage.module.css';
 import styles from './AdminLookup.module.css';
 
 export default function AdminLookup() {
+  const { t } = useTranslation('admin');
   const [rideId, setRideId] = useState('');
   const [bookingId, setBookingId] = useState('');
   const [activeKind, setActiveKind] = useState<'ride' | 'booking' | null>(null);
@@ -36,10 +38,10 @@ export default function AdminLookup() {
 
   return (
     <div>
-      <h2 className={page.pageTitle}>חיפוש לפי מזהה</h2>
+      <h2 className={page.pageTitle}>{t('lookup_title')}</h2>
       <div className={styles.grid}>
         <div>
-          <h3 className={styles.blockTitle}>נסיעה</h3>
+          <h3 className={styles.blockTitle}>{t('ride_label')}</h3>
           <input
             className={styles.field}
             value={rideId}
@@ -53,12 +55,12 @@ export default function AdminLookup() {
               onClick={() => void run('ride')}
               disabled={!rideId.trim()}
             >
-              שליפה
+              {t('fetch')}
             </button>
           </div>
         </div>
         <div>
-          <h3 className={styles.blockTitle}>הזמנה</h3>
+          <h3 className={styles.blockTitle}>{t('booking_label')}</h3>
           <input
             className={styles.field}
             value={bookingId}
@@ -72,15 +74,15 @@ export default function AdminLookup() {
               onClick={() => void run('booking')}
               disabled={!bookingId.trim()}
             >
-              שליפה
+              {t('fetch')}
             </button>
           </div>
         </div>
       </div>
-      <h3 className={styles.resultTitle}>תוצאה</h3>
-      {isIdle && <p className={page.muted}>הזן מזהה ולחץ שליפה.</p>}
-      {isLoading && <p className={page.muted}>טוען…</p>}
-      {isError && <p className={page.error}>לא נמצא או שגיאה.</p>}
+      <h3 className={styles.resultTitle}>{t('result')}</h3>
+      {isIdle && <p className={page.muted}>{t('lookup_idle')}</p>}
+      {isLoading && <p className={page.muted}>{t('loading_short')}</p>}
+      {isError && <p className={page.error}>{t('lookup_error')}</p>}
       {!isIdle && !isLoading && !isError && (
         <pre className={page.preJson}>{JSON.stringify(data, null, 2)}</pre>
       )}

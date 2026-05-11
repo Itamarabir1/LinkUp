@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   CartesianGrid, Cell, Line, LineChart,
   Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -29,6 +30,7 @@ function pieLabel(props: { name?: string; percent?: number }) {
 }
 
 function HealthStrip() {
+  const { t } = useTranslation('admin');
   const { data, isLoading } = useAdminHealth();
   if (isLoading || !data) return null;
   const pills = [
@@ -44,7 +46,7 @@ function HealthStrip() {
           className={`${page.healthPill} ${p.ok ? page.healthPillOk : page.healthPillErr}`}
         >
           <div className={page.healthDot} />
-          {p.label} {p.ok ? 'תקין' : 'שגיאה'}
+          {p.label} {p.ok ? t('ok') : t('error')}
         </div>
       ))}
     </div>
@@ -52,6 +54,7 @@ function HealthStrip() {
 }
 
 export default function AdminHome() {
+  const { t } = useTranslation('admin');
   const { data, isLoading, isError } = useAdminStats();
   const status = isLoading ? 'loading' : isError ? 'error' : 'ready';
   const { chart } = useAdminTheme();
@@ -76,22 +79,22 @@ export default function AdminHome() {
     <div>
       <HealthStrip />
 
-      <div className={page.sectionTitle}>סטטיסטיקות</div>
+      <div className={page.sectionTitle}>{t('statistics')}</div>
       <div className={page.statsGrid}>
         <Link to="/admin/users" className={page.statCard}>
-          <div className={page.statLabel}>סה"כ משתמשים</div>
+          <div className={page.statLabel}>{t('total_users')}</div>
           <div className={page.statValue}>{data?.users_total ?? '—'}</div>
-          <div className={page.statHint}>כל הזמן</div>
+          <div className={page.statHint}>{t('all_time')}</div>
         </Link>
         <Link to="/admin/users" className={`${page.statCard} ${page.statCardToday}`}>
           <div className={page.statLabel}>
-            חדשים היום <span className={page.badgeToday}>היום</span>
+            {t('new_today')} <span className={page.badgeToday}>{t('today_badge')}</span>
           </div>
           <div className={page.statValue}>{data?.users_new_today ?? '—'}</div>
-          <div className={page.statChangeUp}>↑ משתמשים חדשים</div>
+          <div className={page.statChangeUp}>↑ {t('new_users')}</div>
         </Link>
         <Link to="/admin/rides" className={page.statCard}>
-          <div className={page.statLabel}>נסיעות פעילות</div>
+          <div className={page.statLabel}>{t('active_rides')}</div>
           <div className={page.statValue}>{data?.rides_active ?? '—'}</div>
           <div className={page.statHint}>open / full / active</div>
         </Link>
@@ -99,49 +102,49 @@ export default function AdminHome() {
           to="/admin/lookup"
           className={`${page.statCard} ${(data?.bookings_pending ?? 0) > 0 ? page.statCardWarn : ''}`}
         >
-          <div className={page.statLabel}>הזמנות ממתינות</div>
+          <div className={page.statLabel}>{t('pending_bookings')}</div>
           <div className={`${page.statValue} ${(data?.bookings_pending ?? 0) > 0 ? page.statValueWarn : ''}`}>
             {data?.bookings_pending ?? '—'}
           </div>
-          <div className={page.statChangeWarn}>⚠ דורש טיפול</div>
+          <div className={page.statChangeWarn}>⚠ {t('needs_attention')}</div>
         </Link>
         <Link to="/admin/outbox" className={page.statCard}>
-          <div className={page.statLabel}>Outbox ממתינים</div>
+          <div className={page.statLabel}>{t('outbox_pending')}</div>
           <div className={page.statValue}>{data?.outbox_pending ?? '—'}</div>
-          <div className={page.statHint}>תור אירועים</div>
+          <div className={page.statHint}>{t('event_queue')}</div>
         </Link>
         <Link
           to="/admin/outbox"
           className={`${page.statCard} ${(data?.outbox_failed ?? 0) > 0 ? page.statCardDanger : ''}`}
         >
-          <div className={page.statLabel}>Outbox נכשל</div>
+          <div className={page.statLabel}>{t('outbox_failed')}</div>
           <div className={`${page.statValue} ${(data?.outbox_failed ?? 0) > 0 ? page.statValueDanger : ''}`}>
             {data?.outbox_failed ?? '—'}
           </div>
-          <div className={page.statHint}>דורש בדיקה</div>
+          <div className={page.statHint}>{t('needs_review')}</div>
         </Link>
         <Link to="/admin/users" className={page.statCard}>
-          <div className={page.statLabel}>פעילים 7 ימים</div>
+          <div className={page.statLabel}>{t('active_7_days')}</div>
           <div className={page.statValue}>{data?.active_users_last_7_days ?? '—'}</div>
-          <div className={page.statHint}>לפי פעילות אחרונה</div>
+          <div className={page.statHint}>{t('by_recent_activity')}</div>
         </Link>
         <Link to="/admin/rides" className={page.statCard}>
-          <div className={page.statLabel}>סה"כ נסיעות</div>
+          <div className={page.statLabel}>{t('total_rides')}</div>
           <div className={page.statValue}>{data?.rides_total ?? '—'}</div>
-          <div className={page.statHint}>כל הסטטוסים</div>
+          <div className={page.statHint}>{t('all_statuses')}</div>
         </Link>
       </div>
 
-      {status === 'loading' && <p className={page.muted}>טוען נתונים...</p>}
-      {status === 'error' && <p className={page.error}>לא ניתן לטעון סטטיסטיקות.</p>}
+      {status === 'loading' && <p className={page.muted}>{t('loading_data')}</p>}
+      {status === 'error' && <p className={page.error}>{t('could_not_load_stats')}</p>}
 
       {status === 'ready' && data && (
         <>
-          <div className={page.sectionTitle} style={{ marginTop: 24 }}>משתמשים חדשים — 7 ימים</div>
+          <div className={page.sectionTitle} style={{ marginTop: 24 }}>{t('new_users_7_days')}</div>
           <div className={page.chartCard} style={{ marginBottom: 16 }}>
             <div className={`${page.chartLtr}`} style={{ height: 200 }}>
               {data.users_per_day.every((d) => d.count === 0) ? (
-                <p className={page.chartEmpty}>אין נתונים</p>
+                <p className={page.chartEmpty}>{t('no_data')}</p>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data.users_per_day} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
@@ -149,8 +152,8 @@ export default function AdminHome() {
                     <XAxis dataKey="date" tick={{ fill: chart.axis, fontSize: 10 }} />
                     <YAxis tick={{ fill: chart.axis, fontSize: 10 }} allowDecimals={false} />
                     <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: chart.tooltipColor }}
-                      formatter={(v) => [`${Number(v)} משתמשים`, '']}
-                      labelFormatter={(l) => `תאריך: ${l}`}
+                      formatter={(v) => [`${Number(v)} ${t('users_tooltip')}`, '']}
+                      labelFormatter={(l) => t('date_label', { date: l })}
                     />
                     <Line type="monotone" dataKey="count" stroke="#4f6ef7" strokeWidth={2} dot={{ r: 3, fill: '#4f6ef7' }} />
                   </LineChart>
@@ -161,10 +164,10 @@ export default function AdminHome() {
 
           <div className={page.grid2} style={{ marginBottom: 16 }}>
             <div className={page.chartCard}>
-              <div className={page.chartTitle}>נסיעות לפי סטטוס</div>
+              <div className={page.chartTitle}>{t('rides_by_status')}</div>
               <div className={page.chartLtr} style={{ height: 220 }}>
                 {ridePie.length === 0 ? (
-                  <p className={page.chartEmpty}>אין נתונים</p>
+                  <p className={page.chartEmpty}>{t('no_data')}</p>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -173,17 +176,17 @@ export default function AdminHome() {
                         {ridePie.map((e, i) => <Cell key={i} fill={e.fill} />)}
                       </Pie>
                       <Tooltip contentStyle={tooltipStyle}
-                        formatter={(v) => [Number(v), 'נסיעות']} />
+                        formatter={(v) => [Number(v), t('rides_tooltip')]} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
               </div>
             </div>
             <div className={page.chartCard}>
-              <div className={page.chartTitle}>הזמנות לפי סטטוס</div>
+              <div className={page.chartTitle}>{t('bookings_by_status')}</div>
               <div className={page.chartLtr} style={{ height: 220 }}>
                 {bookingPie.length === 0 ? (
-                  <p className={page.chartEmpty}>אין נתונים</p>
+                  <p className={page.chartEmpty}>{t('no_data')}</p>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -192,7 +195,7 @@ export default function AdminHome() {
                         {bookingPie.map((e, i) => <Cell key={i} fill={e.fill} />)}
                       </Pie>
                       <Tooltip contentStyle={tooltipStyle}
-                        formatter={(v) => [Number(v), 'הזמנות']} />
+                        formatter={(v) => [Number(v), t('bookings_tooltip')]} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
@@ -200,11 +203,11 @@ export default function AdminHome() {
             </div>
           </div>
 
-          <div className={page.sectionTitle}>קישורים מהירים</div>
+          <div className={page.sectionTitle}>{t('quick_links')}</div>
           <div className={page.quickLinks}>
-            <Link to="/admin/health" className={page.quickLink}>בריאות מערכת</Link>
-            <Link to="/admin/groups" className={page.quickLink}>קבוצות</Link>
-            <Link to="/admin/lookup" className={page.quickLink}>חיפוש נסיעה / הזמנה</Link>
+            <Link to="/admin/health" className={page.quickLink}>{t('system_health')}</Link>
+            <Link to="/admin/groups" className={page.quickLink}>{t('groups')}</Link>
+            <Link to="/admin/lookup" className={page.quickLink}>{t('search_ride_booking')}</Link>
             <Link to="/admin/outbox" className={page.quickLink}>Outbox</Link>
           </div>
         </>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import ConfirmModal from '../../../components/ConfirmModal/ConfirmModal';
 import type { AdminUserRow } from '../api/users';
 import { useAdminUsers } from '../queries/useAdminUsers';
@@ -18,6 +19,7 @@ function stringToColor(str: string): string {
 }
 
 export default function AdminUsers() {
+  const { t } = useTranslation('admin');
   const [q, setQ] = useState('');
   const [modal, setModal] = useState<PendingModal>(null);
 
@@ -58,23 +60,26 @@ export default function AdminUsers() {
 
   return (
     <div>
-      <h2 className={page.pageTitle}>משתמשים</h2>
+      <h2 className={page.pageTitle}>{t('users')}</h2>
       <div className={page.toolbar}>
         <input
           className={page.searchInput}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="חיפוש אימייל / טלפון / שם"
+          placeholder={t('search_placeholder')}
           type="search"
         />
       </div>
 
-      {status === 'loading' && <p className={page.muted}>טוען…</p>}
-      {status === 'error' && <p className={page.error}>שגיאה בטעינה.</p>}
+      {status === 'loading' && <p className={page.muted}>{t('loading_short')}</p>}
+      {status === 'error' && <p className={page.error}>{t('load_error')}</p>}
       {status === 'ready' && listSummary && (
         <p className={`${page.muted} ${page.usersSummary}`}>
-          בתוצאות המוצגות: {listSummary.shown} משתמשים | {listSummary.activeCount} פעילים |{' '}
-          {listSummary.adminCount} אדמינים
+          {t('users_summary', {
+            shown: listSummary.shown,
+            active: listSummary.activeCount,
+            admins: listSummary.adminCount,
+          })}
         </p>
       )}
       {status === 'ready' && (
@@ -82,14 +87,14 @@ export default function AdminUsers() {
           <table className={page.table}>
             <thead>
               <tr>
-                <th>שם</th>
-                <th>אימייל</th>
-                <th>טלפון</th>
-                <th>פעיל</th>
-                <th>אדמין</th>
-                <th>מאומת</th>
-                <th>התחברות אחרונה</th>
-                <th>פעולות</th>
+                <th>{t('name')}</th>
+                <th>{t('email')}</th>
+                <th>{t('phone')}</th>
+                <th>{t('is_active')}</th>
+                <th>{t('is_admin')}</th>
+                <th>{t('is_verified')}</th>
+                <th>{t('last_login')}</th>
+                <th>{t('actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -112,16 +117,16 @@ export default function AdminUsers() {
                   <td>{u.email ?? '—'}</td>
                   <td>{u.phone_number}</td>
                   <td>
-                    {u.is_active ? <span className={`${page.badge} ${page.badgeOk}`}>כן</span>
-                      : <span className={`${page.badge} ${page.badgeErr}`}>לא</span>}
+                    {u.is_active ? <span className={`${page.badge} ${page.badgeOk}`}>{t('yes')}</span>
+                      : <span className={`${page.badge} ${page.badgeErr}`}>{t('no')}</span>}
                   </td>
                   <td>
-                    {u.is_admin ? <span className={`${page.badge} ${page.badgeInfo}`}>כן</span>
-                      : <span className={`${page.badge} ${page.badgeGray}`}>לא</span>}
+                    {u.is_admin ? <span className={`${page.badge} ${page.badgeInfo}`}>{t('yes')}</span>
+                      : <span className={`${page.badge} ${page.badgeGray}`}>{t('no')}</span>}
                   </td>
                   <td>
-                    {u.is_verified ? <span className={`${page.badge} ${page.badgeOk}`}>כן</span>
-                      : <span className={`${page.badge} ${page.badgeGray}`}>לא</span>}
+                    {u.is_verified ? <span className={`${page.badge} ${page.badgeOk}`}>{t('yes')}</span>
+                      : <span className={`${page.badge} ${page.badgeGray}`}>{t('no')}</span>}
                   </td>
                   <td>{u.last_login ?? '—'}</td>
                   <td className={page.actionsCell}>
@@ -131,7 +136,7 @@ export default function AdminUsers() {
                       disabled={mutating && mutatingId === u.user_id}
                       onClick={() => setModal({ kind: 'active', user: u })}
                     >
-                      {u.is_active ? 'השבת' : 'הפעל'}
+                      {u.is_active ? t('deactivate') : t('activate')}
                     </button>
                     <button
                       type="button"
@@ -139,7 +144,7 @@ export default function AdminUsers() {
                       disabled={mutating && mutatingId === u.user_id}
                       onClick={() => setModal({ kind: 'admin', user: u })}
                     >
-                      {u.is_admin ? 'הסר אדמין' : 'הפוך לאדמין'}
+                      {u.is_admin ? t('remove_admin') : t('make_admin')}
                     </button>
                   </td>
                 </tr>
@@ -152,14 +157,17 @@ export default function AdminUsers() {
       <ConfirmModal
         open={modal !== null}
         onClose={() => !mutating && setModal(null)}
-        title={modal?.kind === 'active' ? 'שינוי פעילות משתמש' : 'שינוי הרשאת אדמין'}
+        title={modal?.kind === 'active' ? t('toggle_active_title') : t('toggle_admin_title')}
         description={
           modal
-            ? `האם לבצע את השינוי עבור ${modal.user.full_name} (${modal.user.email ?? modal.user.phone_number})?`
+            ? t('confirm_user_change', {
+                name: modal.user.full_name,
+                identifier: modal.user.email ?? modal.user.phone_number,
+              })
             : undefined
         }
-        confirmLabel="אישור"
-        cancelLabel="ביטול"
+        confirmLabel={t('confirm_label')}
+        cancelLabel={t('cancel_label')}
         variant="primary"
         loading={mutating}
         onConfirm={runMutation}

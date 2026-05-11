@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAdminAudit } from '../queries/useAdminAudit';
 import page from '../styles/AdminPage.module.css';
 
 export default function AdminAudit() {
+  const { t } = useTranslation('admin');
   const [action, setAction] = useState('');
   const [resourceType, setResourceType] = useState('');
   const [offset, setOffset] = useState(0);
@@ -43,8 +45,8 @@ export default function AdminAudit() {
         />
       </div>
 
-      {isLoading && <p className={page.muted}>טוען…</p>}
-      {isError && <p className={page.error}>שגיאה בטעינה.</p>}
+      {isLoading && <p className={page.muted}>{t('loading_short')}</p>}
+      {isError && <p className={page.error}>{t('load_error')}</p>}
       {!isLoading && !isError && (
         <>
           <div className={page.tableWrap}>
@@ -80,7 +82,7 @@ export default function AdminAudit() {
               disabled={offset === 0}
               onClick={() => setOffset((v) => Math.max(0, v - limit))}
             >
-              הקודם
+              {t('prev')}
             </button>
             <button
               type="button"
@@ -88,10 +90,10 @@ export default function AdminAudit() {
               disabled={data?.next_offset == null}
               onClick={() => setOffset(data?.next_offset ?? offset)}
             >
-              הבא
+              {t('next')}
             </button>
             <span className={page.muted}>
-              {offset + 1}-{offset + items.length} מתוך {data?.total ?? 0}
+              {t('pagination', { from: offset + 1, to: offset + items.length, total: data?.total ?? 0 })}
             </span>
           </div>
         </>

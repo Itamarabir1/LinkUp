@@ -1,23 +1,25 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAdminHealth } from '../queries/useAdminHealth';
 import { useAdminSystemOverview } from '../queries/useAdminOps';
 import page from '../styles/AdminPage.module.css';
 
-function ServiceStatus({ ok }: { ok: boolean }) {
+function ServiceStatus({ ok, okLabel, errLabel }: { ok: boolean; okLabel: string; errLabel: string }) {
   return (
     <span className={page.healthRow}>
       <span className={`${page.healthDot} ${ok ? page.healthDotOk : page.healthDotErr}`} aria-hidden />
-      {ok ? 'תקין' : 'שגיאה'}
+      {ok ? okLabel : errLabel}
     </span>
   );
 }
 
 export default function AdminHealth() {
+  const { t } = useTranslation('admin');
   const health = useAdminHealth();
   const overview = useAdminSystemOverview();
   const { data, isLoading, isError } = health;
-  if (isLoading) return <p className={page.muted}>טוען…</p>;
-  if (isError || !data) return <p className={page.error}>שגיאה בטעינת בריאות.</p>;
+  if (isLoading) return <p className={page.muted}>{t('loading_short')}</p>;
+  if (isError || !data) return <p className={page.error}>{t('health_load_error')}</p>;
   const healthy = data.status === 'healthy';
   const lastUpdated = health.dataUpdatedAt ? new Date(health.dataUpdatedAt).toLocaleString('he-IL') : '—';
   const outboxPending = overview.data?.outbox.pending ?? 0;
@@ -27,36 +29,36 @@ export default function AdminHealth() {
   return (
     <div>
       <div className={page.healthTitleRow}>
-        <h2 className={page.healthPageTitle}>בריאות מערכת</h2>
+        <h2 className={page.healthPageTitle}>{t('system_health')}</h2>
         <span className={`${page.healthBadge} ${healthy ? page.healthBadgeOk : page.healthBadgeBad}`}>
           <span className={`${page.healthDot} ${healthy ? page.healthDotOk : page.healthDotErr}`} aria-hidden />
-          {healthy ? 'הכל תקין' : 'יש תקלה'}
+          {healthy ? t('health_all_ok') : t('health_has_issue')}
         </span>
         <button type="button" className={page.btnSm} onClick={() => void Promise.all([health.refetch(), overview.refetch()])}>
-          רענון
+          {t('refresh')}
         </button>
-        <Link to="/admin/ops" className={page.quickLink}>מעבר ל-Ops</Link>
+        <Link to="/admin/ops" className={page.quickLink}>{t('go_to_ops')}</Link>
       </div>
-      <p className={page.muted}>עודכן לאחרונה: {lastUpdated}</p>
+      <p className={page.muted}>{t('last_updated', { time: lastUpdated })}</p>
       <div className={page.tableWrap}>
         <table className={page.table}>
           <tbody>
             <tr>
-              <td>מסד נתונים</td>
+              <td>{t('database')}</td>
               <td>
-                <ServiceStatus ok={data.database === 'ok'} />
+                <ServiceStatus ok={data.database === 'ok'} okLabel={t('ok')} errLabel={t('error')} />
               </td>
             </tr>
             <tr>
               <td>Redis</td>
               <td>
-                <ServiceStatus ok={data.redis === 'ok'} />
+                <ServiceStatus ok={data.redis === 'ok'} okLabel={t('ok')} errLabel={t('error')} />
               </td>
             </tr>
             <tr>
               <td>RabbitMQ</td>
               <td>
-                <ServiceStatus ok={data.rabbitmq === 'ok'} />
+                <ServiceStatus ok={data.rabbitmq === 'ok'} okLabel={t('ok')} errLabel={t('error')} />
               </td>
             </tr>
             <tr>
@@ -68,7 +70,7 @@ export default function AdminHealth() {
             <tr>
               <td>Worker Connection</td>
               <td>
-                <ServiceStatus ok={workerConnected} />
+                <ServiceStatus ok={workerConnected} okLabel={t('ok')} errLabel={t('error')} />
               </td>
             </tr>
           </tbody>
