@@ -5,7 +5,7 @@ Canonical overview of how outbound notifications are produced, rendered, and del
 ## Pipeline (high level)
 
 1. **Domain / Outbox** — business code writes `outbox_events` in the same DB transaction as the state change (see [`EVENTS.md`](EVENTS.md)).
-2. **`notification-worker`** (`python -m app.workers.notification_worker`) — dispatches **Outbox → RabbitMQ** (וערכי `REDIS` דרך `RedisChatPublisher` כשמוגדרים ב-`targets`), then consumes **`notifications_queue`**, runs `notification_tasks` handlers (async SQLAlchemy), resolves templates and channels. In Compose the legacy service name **`outbox-worker`** (profile **`compat`**) is an alias for the same process.
+2. **`notification-worker`** (`python -m app.workers.notification_worker`) — dispatches **Outbox → RabbitMQ** (וערכי `REDIS` דרך `RedisChatPublisher` כשמוגדרים ב-`targets`), then consumes **`notifications_queue`**, runs `notification_tasks` handlers (async SQLAlchemy), resolves templates and channels.
    - **Outbox wake path:** `run_outbox_worker` uses **`OutboxListener`** with **`DATABASE_URL_DIRECT`** (direct Postgres; env `POSTGRES_HOST_DIRECT` / `POSTGRES_PORT_DIRECT`, defaults `db` / `5432`) because **PgBouncer transaction pooling does not deliver `NOTIFY` to clients** — using the pooled DSN would silently fall back to ~30s polling. Application SQLAlchemy sessions still use the normal `DATABASE_URL` through PgBouncer.
 3. **Channels**
    - **Email:** HTML from **`email-renderer`** (`POST /render` with React Email templates), then SMTP send via **Brevo** transactional API (`sib_api_v3_sdk`).

@@ -117,7 +117,7 @@ See `docs/architecture/API.md` and `docs/architecture/DATABASE.md`.
 - **[`alembic/env.py`](alembic/env.py)** imports `app.db.models` after `Base` so **`target_metadata`** includes all tables for **`alembic revision --autogenerate`**.
 - **`main.py`** may still import `app.db.models` before `api_router` for clarity; duplicate import is harmless.
 
-**Ruff:** side-effect imports are allowed via **`[tool.ruff.lint.per-file-ignores]`** for **`F401`** on `api_router.py`, `app/db/models.py`, `alembic/env.py`, and `app/workers/main_worker.py` — see [`pyproject.toml`](pyproject.toml).
+**Ruff:** side-effect imports are allowed via **`[tool.ruff.lint.per-file-ignores]`** for **`F401`** on `api_router.py`, `app/db/models.py`, and `alembic/env.py` — see [`pyproject.toml`](pyproject.toml).
 
 ## Migrations
 

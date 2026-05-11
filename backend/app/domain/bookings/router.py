@@ -13,6 +13,7 @@ from app.domain.bookings.schema import (
     BookingResponse,
     DriverActiveResponse,
     DriverHistoryResponse,
+    PaginatedBookingsResponse,
     PassengerActiveResponse,
     PassengerHistoryResponse,
     RideManifestResponse,
@@ -84,14 +85,15 @@ async def cancel_booking(
     return await BookingService.cancel_booking(db, booking_id, current_user.user_id)
 
 
-@router.get("/my-bookings", response_model=list[BookingResponse])
+@router.get("/my-bookings", response_model=PaginatedBookingsResponse)
 async def get_user_bookings(
     status: str | None = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await BookingReadsService.get_user_bookings(db, user_id=current_user.user_id, status=status, page=1, limit=50)
-    return result.items
+    return await BookingReadsService.get_user_bookings(db, user_id=current_user.user_id, status=status, page=page, limit=limit)
 
 
 @router.get("/driver-summary/active", response_model=DriverActiveResponse)

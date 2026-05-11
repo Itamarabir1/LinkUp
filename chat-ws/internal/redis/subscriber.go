@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
 	"linkup/chat-ws/internal/hub"
+	"linkup/chat-ws/internal/safego"
 )
 
 const (
@@ -17,6 +19,7 @@ const (
 )
 
 func RunSubscriber(ctx context.Context, client *redis.Client, h *hub.Hub) {
+	defer safego.RecoverPanic("redis", "RunSubscriber")
 	backoff := time.Second
 	const maxBackoff = 30 * time.Second
 	for {
@@ -44,6 +47,7 @@ func runOnce(ctx context.Context, client *redis.Client, h *hub.Hub) {
 	pubsub := client.PSubscribe(ctx, ChatChannelPattern, TypingChannelPattern, UserEventPattern)
 	defer pubsub.Close()
 	ch := pubsub.Channel()
+	h.MarkSubAlive(hub.SubChat)
 	for {
 		select {
 		case <-ctx.Done():

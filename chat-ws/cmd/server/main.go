@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	redisv9 "github.com/redis/go-redis/v9"
 
@@ -50,11 +51,30 @@ func main() {
 
 	http.HandleFunc("/ws", h.HandleWS(cfg))
 	http.HandleFunc("/presence/", api.HandlePresence(cfg, redisClient))
-	addr := ":" + strconv.Itoa(cfg.Port)
-	slog.Info("chat-ws listening", "component", "server", "addr", addr, "ws", "/ws", "presence", "/presence/{userID}")
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		pingCtx, pingCancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer pingCancel()
+		if err := redisClient.Ping(pingCtx).Err(); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"status":"unhealthy","detail":"redis unreachable"}`))
+			return
+		}
+		if !h.SubscribersHealthy() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"status":"unhealthy","detail":"subscriber stale"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+	})
 
+	addr := ":" + strconv.Itoa(cfg.Port)
+	slog.Info("chat-ws listening", "component", "server", "addr", addr, "ws", "/ws", "presence", "/presence/{userID}", "healthz", "/healthz")
+
+	srv := &http.Server{Addr: addr}
 	go func() {
-		if err := http.ListenAndServe(addr, nil); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)
 		}
 	}()
@@ -64,6 +84,13 @@ func main() {
 	<-quit
 	slog.Info("shutting down", "component", "server")
 	cancel()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		slog.Error("http server shutdown error", "component", "server", "err", err)
+	}
+	slog.Info("server stopped", "component", "server")
 }
 
 func newRedisClient(cfg config.Config, password string, db int) *redisv9.Client {

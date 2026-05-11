@@ -86,7 +86,6 @@ backend/
 │   │   # see `backend/app/infrastructure/` for dispatcher, Lua rate limits (auth/chat), DLQ tooling
 │   └── workers/
 │       ├── ai_worker.py, notification_worker.py, task_worker.py
-│       ├── main_worker.py               # legacy entry
 │       ├── outbox_worker.py             # run_outbox_worker (invoked by notification worker)
 │       └── tasks/                         # notifications, avatar, scheduled, chat summary/timeout, …
 └── tests/                                # api/, domain/, infrastructure/, core_flows/ (+ root tests) — `git ls-files backend/tests`
@@ -119,8 +118,10 @@ chat-ws/
 │   │   ├── handler.go
 │   │   ├── hub.go
 │   │   └── message.go
-│   └── redis/
-│       └── subscriber.go
+│   ├── redis/
+│   │   └── subscriber.go
+│   └── safego/
+│       └── safego.go                  # panic recovery for goroutines (RecoverPanic)
 ```
 
 ---
@@ -308,7 +309,8 @@ mobile/
     ├── chat-ws-ci.yml
     ├── deploy-ec2.yml
     ├── email-renderer-ci.yml
-    └── frontend-ci.yml
+    ├── frontend-ci.yml
+    └── openapi-contract.yml           # backend↔frontend OpenAPI schema drift detection
 ```
 
 ---
@@ -321,7 +323,7 @@ mobile/
 - **db**: סכמה (schema.sql) וסקריפטים שימושיים; מיגרציות ב-backend/alembic/.
 - **frontend**: אפליקציית ווב ב‑React + TypeScript + Vite.
 - **mobile**: אפליקציית מובייל (Expo/React Native) ב‑TypeScript.
-- **.github/workflows**: CI — `backend-ci`, `frontend-ci`, `chat-ws-ci`, **`email-renderer-ci`** (paths לפי שירות); **`deploy-ec2.yml`** — פריסה ל-EC2 (`workflow_run`).
+- **.github/workflows**: CI — `backend-ci`, `frontend-ci`, `chat-ws-ci`, **`email-renderer-ci`**, **`openapi-contract`** (paths לפי שירות); **`deploy-ec2.yml`** — פריסה ל-EC2 (`workflow_run`).
 - **node_modules** (ב‑frontend ו‑mobile) ו־**.venv** (בסביבות Python) לא פורטו – אלה תלויות שנוצרות בהתקנה.
 - קבצי **.env** לא נכללו בתיאור מפורש מטעמי אבטחה; הם קיימים לפי .env.example.
 

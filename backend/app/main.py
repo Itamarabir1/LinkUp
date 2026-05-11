@@ -34,10 +34,7 @@ from app.infrastructure.health.health_service import check_health, check_livenes
 setup_logging()
 
 if settings.ENVIRONMENT.lower() == "production" and getattr(settings, "DEBUG", False):
-    raise RuntimeError(
-        "DEBUG=True is not allowed in production. "
-        "Set DEBUG=False in backend/.env.production."
-    )
+    raise RuntimeError("DEBUG=True is not allowed in production. Set DEBUG=False in backend/.env.production.")
 
 logger = structlog.get_logger(__name__)
 

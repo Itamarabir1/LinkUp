@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import WsUser, get_current_user, get_current_user_ws
 from app.api.dependencies.group_membership import verify_group_membership
+from app.api.dependencies.rate_limit import rate_limit_rides
 from app.api.dependencies.services import get_ride_service
 from app.core.exceptions.ride import RideNotFoundError
 from app.db.session import get_db
@@ -39,8 +40,9 @@ router = APIRouter()
 async def preview_ride_options(
     preview_in: RidePreviewCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),  # הוספנו את המשתמש המחובר
+    current_user: User = Depends(get_current_user),
     ride_svc: RideService = Depends(get_ride_service),
+    _: None = Depends(rate_limit_rides),
 ):
     """Step 1: route options and metrics for ride preview."""
     return await ride_svc.get_ride_preview(preview_in)
@@ -52,6 +54,7 @@ async def create_new_ride(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     ride_svc: RideService = Depends(get_ride_service),
+    _: None = Depends(rate_limit_rides),
 ):
     if ride_in.group_id is not None:
         await verify_group_membership(db, ride_in.group_id, current_user.user_id)

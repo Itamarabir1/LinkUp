@@ -226,6 +226,8 @@ class Settings(BaseSettings):
     )
     RATE_LIMIT_CHAT_BUCKET_CAPACITY: int = Field(30, description="Token-bucket capacity for chat per user")
     RATE_LIMIT_CHAT_REFILL_PER_SEC: float = Field(0.5, description="Tokens added per second to chat bucket (0.5 = 30/min)")
+    RATE_LIMIT_RIDES_WINDOW_SECONDS: int = Field(3600, description="Ride-creation sliding-window length (seconds)")
+    RATE_LIMIT_RIDES_MAX_PER_WINDOW: int = Field(10, description="Max ride creations per user per sliding window")
 
     # --- Cloud (AWS & Firebase) — optional in local dev ---
     AWS_ACCESS_KEY_ID: str = Field("")
@@ -252,9 +254,7 @@ class Settings(BaseSettings):
     def validate_production_secrets(self) -> "Settings":
         if self.ENVIRONMENT.lower() == "production":
             if len(self.SECRET_KEY) < 32:
-                raise ValueError(
-                    "SECRET_KEY must be at least 32 characters in production"
-                )
+                raise ValueError("SECRET_KEY must be at least 32 characters in production")
         return self
 
     # --- Upload temp directory (staging before S3 upload) ---

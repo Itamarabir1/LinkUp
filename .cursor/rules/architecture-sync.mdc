@@ -9,7 +9,7 @@ globs:
   - backend/app/api/v1/api_router.py
   - backend/app/api/v1/routers/*.py
   - backend/app/domain/events/routing.py
-  - backend/app/workers/main_worker.py
+  - backend/app/workers/notification_worker.py
   - docs/architecture/*.md
   - docs/ARCHITECTURE.md
   - ARCHITECTURE.md
@@ -31,7 +31,7 @@ alwaysApply: false
 - **backend/app/domain/*/model*.py** (מודלים/טבלאות) — `ARCHITECTURE.md` (סעיף מודלים) + `docs/architecture/DATABASE.md` (Tables, Indexes).
 - **backend/alembic/versions/** — migration חדש → `docs/architecture/DATABASE.md` (Migrations History + Indexes אם רלוונטי).
 - **backend/app/api/v1/api_router.py** או **routers/*.py** — endpoint/router חדש או שינוי → `docs/architecture/API.md`.
-- **backend/app/domain/events/routing.py** או **backend/app/workers/main_worker.py** — אירוע/תור/worker חדש → `docs/architecture/EVENTS.md`.
+- **backend/app/domain/events/routing.py** או **backend/app/workers/notification_worker.py** — אירוע/תור/worker חדש → `docs/architecture/EVENTS.md`.
 - **פרונט — i18n / לוקאל / שגיאות / טיפוגרפיה** (`frontend/src/i18n/**`, `utils/date.ts`, `utils/i18nError.ts`, `LangContext.tsx`, שינוי נרחב ב־`*.module.css`) → `docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md` (§10–12), `docs/ENGINEERING_HIGHLIGHTS.md` (סעיף 14), `README.md` / `ARCHITECTURE.md` (סעיף Frontend i18n).
 
 סיכום קבצי תיעוד:

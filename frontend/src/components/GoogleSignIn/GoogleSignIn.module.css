@@ -16,3 +16,36 @@
   opacity: 0.6;
   pointer-events: none;
 }
+
+.fallbackButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 300px;
+  height: 40px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  background: #fff;
+  color: #3c4043;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.fallbackButton:hover:not(:disabled) {
+  background: #f7f8f8;
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.15);
+}
+
+.fallbackButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fallbackIcon {
+  width: 18px;
+  height: 18px;
+}

@@ -106,6 +106,8 @@
 | FIREBASE_CREDENTIALS_JSON | כן (פרודקשן) | מקור אמת יחיד לפרודקשן (Model B, בלי mount קובץ) |
 | RATE_LIMIT_AUTH_WINDOW_SECONDS | — | 60 |
 | RATE_LIMIT_AUTH_MAX_REQUESTS | — | 10 |
+| RATE_LIMIT_RIDES_WINDOW_SECONDS | — | 3600 (1 שעה) — חלון Sliding Window ליצירת נסיעות |
+| RATE_LIMIT_RIDES_MAX_PER_WINDOW | — | 10 — מקסימום יצירות נסיעה פר-משתמש בחלון |
 | FORCE_HTTPS_REDIRECT | — | false (true מאחורי proxy); also controls `Secure` flag on the **refresh token HttpOnly cookie** (`linkup_refresh_token`) |
 | DOCKER_MODE | — | true ב-Docker |
 
@@ -288,6 +290,7 @@ LinkUp/
 - **למה PostgreSQL ולא MongoDB**: טרנזקציות, שלמות referential, PostGIS לגיאו, התאמה ל-ORM (SQLAlchemy).
 - **Cursor-based vs Page-based Pagination**: נסיעות והודעות — זרימה אינסופית ויציבות עם cursor; הזמנות — מספור עמודים ו-total לממשק "הזמנות שלי".
 - **למה refresh token ב-HttpOnly cookie (H19)**: localStorage חשוף ל-XSS; `HttpOnly; Secure; SameSite=lax; Path=/api/v1/auth` cookie לא נגיש מ-JS, מוגן מ-CSRF (lax + POST-only), ו-path-scoped כך שלא נשלח לנתיבי API אחרים. Frontend שולח `withCredentials: true`; לא דרוש CSRF token נפרד.
+- **למה refresh token hashed at rest (M4)**: `users.refresh_token` שומר SHA-256 hash — לא plaintext. SHA-256 נבחר כי הטוקנים הם JWTs עם אנטרופיה גבוהה (bcrypt מיותר). Hash ב-CRUD layer, verify ב-`hmac.compare_digest` (constant-time); `refresh_token` ב-`protected_fields` נגד bypass. Migration **021** — null-ify קיימים.
 - **למה PgBouncer עכשיו**: connection storms ב-EC2 קטן קורים לפני שנגמר CPU; pooler פנימי נותן שיפור מהיר בלי שינוי קוד דומיין.
 - **מה לא טריוויאלי (senior)**: `migrate` נשאר direct ל-`db`, `statement_cache_size=0` ל-asyncpg, ו-PgBouncer נשאר internal-only בלי פתיחת פורט ציבורי.
 - **Secrets ל-PgBouncer בפריסה**: אין יצירת `userlist.txt` על host/CI. ה-deploy רק מוודא ש־`POSTGRES_*` ו־`PGBOUNCER_ADMIN_PASSWORD` קיימים ב-`backend/.env`; הקובץ נוצר בתוך קונטיינר PgBouncer בזמן startup עם הרשאות פנימיות.

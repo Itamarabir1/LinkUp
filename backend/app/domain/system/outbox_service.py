@@ -28,7 +28,9 @@ class OutboxService:
             await db.commit()
             logger.error(
                 "[NOTIF] Outbox: event_id=%s permanently failed after %d retries event_name=%s",
-                db_event.id, MAX_RETRIES, db_event.event_name,
+                db_event.id,
+                MAX_RETRIES,
+                db_event.event_name,
             )
             return
 

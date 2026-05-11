@@ -21,7 +21,8 @@ chat-ws/
 │   ├── hub/            # WebSocket Hub (מפוצל: hub.go, conn.go, handler.go, message.go)
 │   ├── redis/          # Redis subscriber
 │   ├── auth/           # JWT validation
-│   └── config/         # Configuration
+│   ├── config/         # Configuration
+│   └── safego/         # Panic recovery for goroutines (RecoverPanic)
 └── README.md
 ```
 
@@ -112,6 +113,7 @@ import (
     "linkup/chat-ws/internal/config"
     "linkup/chat-ws/internal/hub"
     "linkup/chat-ws/internal/redis"
+    "linkup/chat-ws/internal/safego"
 )
 ```
 

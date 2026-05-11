@@ -386,6 +386,20 @@ class CRUDBooking:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_ride_bookings_by_status_with_relations(self, db: AsyncSession, ride_id: UUID, booking_status: str) -> list[Booking]:
+        """Same filter as get_ride_bookings_by_status_async but with passenger relationships loaded."""
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
+        stmt = (
+            select(Booking)
+            .options(
+                joinedload(Booking.passenger_request).joinedload(PassengerRequest.user),
+                joinedload(Booking.passenger),
+            )
+            .where(Booking.ride_id == rid, Booking.status == booking_status)
+        )
+        result = await db.execute(stmt)
+        return list(result.scalars().unique().all())
+
     async def get_all_pending_bookings_for_driver(
         self,
         db: AsyncSession,

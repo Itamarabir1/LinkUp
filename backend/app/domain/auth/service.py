@@ -351,10 +351,10 @@ class AuthService:
         access_token = create_access_token(data={"sub": str(user.user_id)})
         refresh_token = create_refresh_token(data={"sub": str(user.user_id)})
 
-        # 5+6. Save refresh token + last_login in one commit
-        user.refresh_token = refresh_token
+        # 5+6. Save refresh token (hashed via CRUD) + last_login in one commit
         user.last_login = datetime.now(UTC)
         db.add(user)
+        await self.crud_user.update_refresh_token(db, user=user, refresh_token=refresh_token)
         await db.commit()
 
         logger.info(f"User {email} authenticated via Google successfully.")
@@ -387,7 +387,7 @@ class AuthService:
         user = await self.crud_user.get_by_id(db, id=UUID(str(user_id)))
         if not user or not user.is_active:
             raise InvalidRefreshTokenError()
-        if user.refresh_token != refresh_token:
+        if not self.crud_user.verify_refresh_token(user, refresh_token):
             raise InvalidRefreshTokenError()
 
         new_access_token = create_access_token(data={"sub": str(user.user_id)})

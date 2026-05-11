@@ -81,6 +81,20 @@
 
 ---
 
+## 8. הקשחה תפעולית — `/healthz`, graceful shutdown, read deadline, panic recovery (H7–H10)
+
+| | |
+|--|--|
+| **בעיה** | (H7) אין endpoint `/healthz` — docker-compose healthcheck מחזיר 404; chat-ws יכול להיראות חי בזמן שה-subscribers מתים. (H8) `http.ListenAndServe` בלי `Shutdown` — SIGTERM הורג חיבורים WS מיידית. (H9) אין `SetReadDeadline`/`SetPongHandler` — לקוחות מתים מחזיקים goroutines לנצח. (H10) אין `recover()` — panic בגורוטינה אחת מפיל את כל התהליך. |
+| **החלטה** | **H7:** `/healthz` בודק Redis PING + `Hub.SubscribersHealthy()` — שלוש `atomic.Int64` timestamps (chat/offline/online), מעודכנות ב-`(P)Subscribe` מוצלח, threshold 2 דקות; seeded ל-`now` ב-`NewHub` (grace window). **H8:** `*http.Server` + `srv.Shutdown(10s)` אחרי `cancel()`. **H9:** `conn.SetReadDeadline(pongWait)` + `SetPongHandler` לפני read loop. **H10:** `internal/safego/safego.go` עם `RecoverPanic(component, op)` — `defer` בכל goroutine עצמאית. |
+| **אלטרנטיבות** | (H7) Redis PING בלבד — לא תופס subscriber מת. (H10) inline `recover()` בכל פונקציה — code duplication. |
+| **יתרון** | docker-compose healthcheck עובד באמת; deploy graceful; אין דליפת goroutines; panic לא הורג תהליך. |
+| **Trade-off** | H7 subscriber liveness תלוי בהצלחת subscribe, לא בקבלת הודעה (שתיקה לגיטימית לא נתפסת); H10 recovery בולע את ה-panic — ה-goroutine נעצרת בשקט (מתועד בלוג). |
+| **בקצרה לראיון** | "הוספתי healthz שבודק לא רק Redis PING אלא גם שכל subscriber goroutine באמת subscribed — עם atomic timestamps. Graceful shutdown, read deadline לזיהוי לקוחות מתים, ו-panic recovery שמשותף ב-internal/safego כדי שקריסה של goroutine אחת לא תפיל את כל התהליך." |
+| **קוד** | [`cmd/server/main.go`](../../chat-ws/cmd/server/main.go), [`internal/hub/hub.go`](../../chat-ws/internal/hub/hub.go), [`internal/hub/handler.go`](../../chat-ws/internal/hub/handler.go), [`internal/hub/conn.go`](../../chat-ws/internal/hub/conn.go), [`internal/safego/safego.go`](../../chat-ws/internal/safego/safego.go), [`internal/redis/subscriber.go`](../../chat-ws/internal/redis/subscriber.go) |
+
+---
+
 ## קישורים
 
 - [../../README.md](../../README.md) — Architecture Decisions  

@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import hashlib
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -96,6 +97,11 @@ def decode_access_token(token: str) -> dict:
     except Exception as e:
         logger.error(f"Unexpected token decode error: {e!s}")
         return None
+
+
+def hash_refresh_token(token: str) -> str:
+    """SHA-256 hash of refresh token for secure DB storage."""
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def decode_refresh_token(token: str) -> dict | None:

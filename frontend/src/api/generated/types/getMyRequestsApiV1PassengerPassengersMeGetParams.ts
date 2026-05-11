@@ -10,14 +10,4 @@ export type GetMyRequestsApiV1PassengerPassengersMeGetParams = {
  * סנן לפי סטטוס: pending, approved, cancelled, matched, expired, completed, rejected
  */
 request_status?: string | null;
-/**
- * cursor אטום להמשך העמוד הבא
- */
-cursor?: string | null;
-/**
- * פריטים לעמוד
- * @minimum 1
- * @maximum 200
- */
-limit?: number;
 };

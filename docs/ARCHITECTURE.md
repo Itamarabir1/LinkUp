@@ -22,7 +22,7 @@ Also surfaced in the repo root [`README.md`](../README.md#architecture).
 ## Architecture deep-dive by domain
 
 - [`docs/architecture/API.md`](architecture/API.md) — FastAPI routes, auth, middleware, health contracts (**Billing:** checkout + **`X-Idempotency-Key`**, webhook, admin reconcile/stale-pending — סעיף Billing / Admin); זרימת preview גיאוגרף: קואורדינטות טקסט דרך **geocode cache**; **`GET …/passengers/me`** במודל **cursor pagination**; מניפסט נסיעה לנהג בתקרת שורות + טוטלים — ראו **FEATURE_DECISIONS** **`#geo-manifest-passenger-reads`**
-- [`docs/architecture/DATABASE.md`](architecture/DATABASE.md) — PostgreSQL/PostGIS schema, indexes, migrations, PgBouncer, and Redis single-instance DB0/DB1 topology
+- [`docs/architecture/DATABASE.md`](architecture/DATABASE.md) — PostgreSQL/PostGIS schema, indexes, migrations (incl. **021** — hashed refresh tokens, **022** — composite/partial indexes for hot CRUD queries), PgBouncer, Redis single-instance DB0/DB1 topology, and N+1 query elimination patterns (chat inbox aggregates, chat detail redundant re-fetch, pending bookings eager loading)
 - [`docs/architecture/EVENTS.md`](architecture/EVENTS.md) — Outbox, RabbitMQ topology, retry/DLQ flow
 - [`docs/architecture/REALTIME.md`](architecture/REALTIME.md) — WebSocket architecture, Redis pub/sub, GPS/presence
 - [`docs/architecture/NOTIFICATIONS.md`](architecture/NOTIFICATIONS.md) — Outbox → workers, email (Brevo + **circuit breaker**), push (FCM + DB ניקוי טוקן על רישום לא תקף), in-app (**REST** + **`invalidate`/`UserEvent`** על **`user:{id}:events`**, מאזין ב־**`ChatContext`**); **`AsyncSession`** ב־`provider.send(..., db)`
@@ -33,7 +33,7 @@ Also surfaced in the repo root [`README.md`](../README.md#architecture).
 ## Supply chain & automation
 
 - [`.github/dependabot.yml`](../.github/dependabot.yml) — scheduled PRs: npm (`/frontend`), pip על **`/backend`** (מעקב אחר **`backend/pyproject.toml`** + **`backend/uv.lock`**; אין `requirements.txt` ב-backend), Docker (`/backend`, `/frontend`, `/infrastructure/pgbouncer`)
-- **CI/CD:** [`backend-ci.yml`](../.github/workflows/backend-ci.yml), [`frontend-ci.yml`](../.github/workflows/frontend-ci.yml), [`chat-ws-ci.yml`](../.github/workflows/chat-ws-ci.yml), [`email-renderer-ci.yml`](../.github/workflows/email-renderer-ci.yml) (בנייה ו־push ל־GHCR לפי path filters); פריסת EC2 מרוכזת ב־[`deploy-ec2.yml`](../.github/workflows/deploy-ec2.yml) (`workflow_run` אחרי CI מוצלח על `main`) — טבלה ופירוט ב־[`docs/DEPLOYMENT.md`](DEPLOYMENT.md)
+- **CI/CD:** [`backend-ci.yml`](../.github/workflows/backend-ci.yml), [`frontend-ci.yml`](../.github/workflows/frontend-ci.yml), [`chat-ws-ci.yml`](../.github/workflows/chat-ws-ci.yml), [`email-renderer-ci.yml`](../.github/workflows/email-renderer-ci.yml) (בנייה ו־push ל־GHCR לפי path filters); [`openapi-contract.yml`](../.github/workflows/openapi-contract.yml) (backend↔frontend OpenAPI schema drift detection); פריסת EC2 מרוכזת ב־[`deploy-ec2.yml`](../.github/workflows/deploy-ec2.yml) (`workflow_run` אחרי CI מוצלח על `main`) — טבלה ופירוט ב־[`docs/DEPLOYMENT.md`](DEPLOYMENT.md)
 
 ## Operations docs
 
@@ -45,4 +45,4 @@ Also surfaced in the repo root [`README.md`](../README.md#architecture).
 - [`docs/adr/README.md`](adr/README.md)
 - [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](adr/ARCHITECTURE_DECISIONS_BACKEND.md)
 - [`docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md`](adr/ARCHITECTURE_DECISIONS_FRONTEND.md)
-- [`docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`](adr/ARCHITECTURE_DECISIONS_CHAT_WS.md)
+- [`docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`](adr/ARCHITECTURE_DECISIONS_CHAT_WS.md) — §1–§8 (כולל §8: הקשחה תפעולית H7–H10 — `/healthz` + subscriber liveness, graceful shutdown, pong/read deadline, panic recovery)

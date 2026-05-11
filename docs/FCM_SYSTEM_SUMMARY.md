@@ -89,7 +89,7 @@ FCM delivery has two connected paths:
 ### 3.2 Outbox → worker → push
 
 - Mappings: [`backend/app/domain/notifications/config/mappings.py`](../backend/app/domain/notifications/config/mappings.py)
-- Worker entrypoint: [`backend/app/workers/notification_worker.py`](../backend/app/workers/notification_worker.py) (+ [`backend/app/workers/tasks/notification_tasks.py`](../backend/app/workers/tasks/notification_tasks.py)); legacy monolith shim remains as [`backend/app/workers/main_worker.py`](../backend/app/workers/main_worker.py)
+- Worker entrypoint: [`backend/app/workers/notification_worker.py`](../backend/app/workers/notification_worker.py) (+ [`backend/app/workers/tasks/notification_tasks.py`](../backend/app/workers/tasks/notification_tasks.py))
 - Orchestration: [`backend/app/domain/notifications/core/handler.py`](../backend/app/domain/notifications/core/handler.py) (`NotificationHandler.handle_event` — אורקסטרציה קצרה + שלבי pipeline פרטיים `_resolve_*` / `_dispatch`), [`manager.py`](../backend/app/domain/notifications/manager.py)
 - **Session into providers:** [`NotificationCommand`](../backend/app/domain/notifications/manager.py) includes optional **`db`**; the handler sets it from the active **`AsyncSession`**. All providers implement **`send(..., db=None)`**; only push uses **`db`** for persistence side effects (see §3.4).
 

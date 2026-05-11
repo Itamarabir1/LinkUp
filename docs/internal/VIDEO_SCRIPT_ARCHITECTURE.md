@@ -78,7 +78,7 @@
 - JWT access + refresh ב-DB; WebSocket מאמת JWT ב-handshake **בלי** SELECT ל-DB כדי להגן על ה-connection pool.
 - bcrypt ב-thread pool; rate limit על auth; שגיאות אחידות עם `error_code` ו-`trace_id` — `docs/ERRORS.md`.
 - אדמין: `/api/v1/admin/*` + ממשק React ב-`/admin`.
-- פריסה: Docker Compose (כולל `migrate`, `pgbouncer`, `email-renderer`, `notification-worker`, `task-worker`, `ai-worker`, `backend`; **`outbox-worker`** רק בפרופיל **`compat`**).
+- פריסה: Docker Compose (כולל `migrate`, `pgbouncer`, `email-renderer`, `notification-worker`, `task-worker`, `ai-worker`, `backend`).
 
 ---
 
@@ -142,7 +142,7 @@
 |-----------|------|-------------------|
 | +1:00–2:00 | **מסד נתונים** | PostgreSQL + **PostGIS** — איפה נכנס הגיאו; טבלאות ליבה (`rides`, `bookings`, `passenger_requests`, `outbox_events`, …); למה אינדקסים חשובים לחיפוש ולהזמנות. מקור: `docs/architecture/DATABASE.md`. |
 | +0:45–1:15 | **מיגרציות וסכימה** | Alembic כמקור שינויי סכימה; שירות **`migrate`** ב-Docker Compose לפני עליית ה-API; `db/schema.sql` כעזר. |
-| +1:00–1:45 | **פריסה ב-Docker Compose** | **db**, **redis**, **rabbitmq**, **`pgbouncer`**, **`migrate`** (לפני API), **`email-renderer`**, **backend**, **`notification-worker`**, **`task-worker`**, **`ai-worker`**, **chat-ws**; `depends_on` + healthchecks; `UVICORN_WORKERS`. (**`outbox-worker`** — alias בפרופיל **`compat`**.) פרופיל **`prod`**: **frontend** + **nginx** על פורט 80. |
+| +1:00–1:45 | **פריסה ב-Docker Compose** | **db**, **redis**, **rabbitmq**, **`pgbouncer`**, **`migrate`** (לפני API), **`email-renderer`**, **backend**, **`notification-worker`**, **`task-worker`**, **`ai-worker`**, **chat-ws**; `depends_on` + healthchecks; `UVICORN_WORKERS`. פרופיל **`prod`**: **frontend** + **nginx** על פורט 80. |
 | +0:45–1:00 | **CI/CD** | **ארבעה** workflows שירות: `backend-ci`, `frontend-ci`, `chat-ws-ci`, **`email-renderer-ci`** — lint/tests/build; ב־`main` דוחפים ל-GHCR לפי `paths`. בנוסף **`deploy-ec2.yml`** — אחרי CI ירוק על `main`, פריסת Compose מלאה ל-EC2 (כולל smokes ו-rollback). |
 | +1:15–2:00 | **chat-ws לעומק** | למה **Go** ל-WS; `PSubscribe` ל-Redis; אין DB בשרת — רק forward; JWT; `presence` + debounce; קריאת `last_seen` מ-REST הבקאנד; **הגבלות נכנסות:** **`SetReadLimit`**, דילול פרסום **typing**. `chat-ws/../ARCHITECTURE.md`, `docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md` (כולל §7). |
 | +1:00–1:30 | **ערוצי התראות** | צ’אט על `chat:conversation:*`; **מאוחד** ל-unread והתראות על **`user:{id}:events`** (`invalidate` + `UserEvent`); רשימת התראות in-app ב-**REST** + רענון חי דרך chat-ws (`ChatContext`); Outbox → RabbitMQ → **Brevo** / **FCM**; **למה FCM רק מפת `data`** — `docs/FCM_SYSTEM_SUMMARY.md`, `docs/adr/FCM_AND_PUSH.md`. |

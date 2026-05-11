@@ -16,6 +16,10 @@
   - `presence:{user_id}` TTL 60s
   - `debounce:last_seen:{user_id}` + `last_seen:hold:{user_id}`
 - ✅ **הגנה על פריימים נכנסים (hub):** **`conn.SetReadLimit(int64(maxMessageSize))`** עם **`maxMessageSize = 2048`** ב־[`internal/hub/conn.go`](internal/hub/conn.go) — מגבלה על גודל מסר WebSocket מהלקוח; חריגה סוגרת את החיבור בצד gorilla עם `ErrReadLimit`. **Rate limit פר־חיבור** (`golang.org/x/time/rate`, **`rate.Limit(30)`/`Burst 60`**) על פרסום **`typing_start`/`typing_stop`** ל־Redis בלבד — פריים שחורגים נזרקים בשקט; **`ping`** לא נספר ולא נחסם.
+- ✅ **`/healthz` (H7):** בודק Redis PING + `Hub.SubscribersHealthy()` — שלוש `atomic.Int64` timestamps (chat/offline/online), threshold 2 דקות. Docker Compose healthcheck פוגע בנקודה הזו.
+- ✅ **Graceful HTTP shutdown (H8):** `*http.Server` + `srv.Shutdown(10s)` — ב-SIGTERM ניקוי subscribers ואז drain מסודר של חיבורים פעילים.
+- ✅ **Pong/read deadline (H9):** `SetReadDeadline(pongWait=60s)` + `SetPongHandler` — לקוחות מתים מזוהים ומנותקים תוך 60 שניות; אין דליפת goroutines.
+- ✅ **Panic recovery (H10):** `defer safego.RecoverPanic(...)` ([`internal/safego/safego.go`](internal/safego/safego.go)) על כל goroutine עצמאית — panic לא מפיל את התהליך.
 
 **מה לא:**
 - ❌ Calendar export

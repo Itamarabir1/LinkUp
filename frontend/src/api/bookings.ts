@@ -8,9 +8,21 @@ import type {
   PassengerHistoryResponse,
 } from '../types/api';
 
-export function fetchMyBookings(limit = 50, status?: string) {
-  return api.get<BookingRow[]>('/bookings/my-bookings', {
-    params: { limit, status },
+export interface PaginatedBookingsResponse {
+  items: BookingRow[];
+  total: number;
+  page: number;
+  limit: number;
+  has_more: boolean;
+}
+
+export function fetchMyBookings(params?: { page?: number; limit?: number; status?: string }) {
+  return api.get<PaginatedBookingsResponse>('/bookings/my-bookings', {
+    params: {
+      page: params?.page ?? 1,
+      limit: params?.limit ?? 20,
+      status: params?.status,
+    },
   });
 }
 

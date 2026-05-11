@@ -98,7 +98,7 @@ docker stop linkup_backend
 - **שגיאה על חוסר מודול (module)** – מתוך `backend/`: קודם **`uv sync`**; אם אין `uv` — **`pip install -e .`** (אותה תיקיה, לפי **`pyproject.toml`**)
 
 - **שגיאה על DB / Redis / RabbitMQ / chat-ws / worker** – להריץ את התשתית (למשל עם Docker) משורש הפרויקט (`LinkUp`):  
-  **`make up`** או `docker compose --env-file backend/.env up -d` — מרים `db`, `redis`, `rabbitmq`, **`migrate`** (**`alembic upgrade head`**), `chat-ws`, **`notification-worker`**, **`task-worker`**, **`ai-worker`**, **`backend`** (ללא **nginx**/frontend אלא עם `--profile prod`). שירות legacy **`outbox-worker`** עם profile **`compat`** — לא חלק מהסטאנדארד. אם **`migrate`** נכשל — `docker compose --env-file backend/.env logs migrate`; **backend** לא יעלה עד הצלחה.  
+  **`make up`** או `docker compose --env-file backend/.env up -d` — מרים `db`, `redis`, `rabbitmq`, **`migrate`** (**`alembic upgrade head`**), `chat-ws`, **`notification-worker`**, **`task-worker`**, **`ai-worker`**, **`backend`** (ללא **nginx**/frontend אלא עם `--profile prod`). אם **`migrate`** נכשל — `docker compose --env-file backend/.env logs migrate`; **backend** לא יעלה עד הצלחה.  
   אם מריצים רק חלק: `docker compose --env-file backend/.env up -d db redis rabbitmq chat-ws` — אז מתוך `backend/` הרץ **`uv run alembic upgrade head`** לפני API מקומי.
 
 - **פרופיל prod (nginx + frontend על פורט 80):** לפני `docker compose --env-file backend/.env --env-file frontend/.env --profile prod up ...` — **`SENTRY_REPORT_URI`** ב־`backend/.env` ואז **`bash scripts/ops/render-nginx-conf.sh`** (יוצר `nginx/nginx.conf` מה־template). פירוט: **`docs/architecture/DEVELOPMENT.md`**, **`docs/SECURITY_HEADERS.md`**.

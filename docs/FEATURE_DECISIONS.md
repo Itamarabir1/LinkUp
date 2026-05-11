@@ -126,7 +126,23 @@
 | **יתרון** | הפרדת "מסע real-time" משכבת REST/DB; גורוטינים זולים per connection. |
 | **Trade-off** | שני runtimes (Python + Go); אותו `SECRET_KEY` ל-WS. |
 | **Interview pitch (≈30s)** | *"צ'אט: FastAPI שומר ב-Postgres ומפרסם ל-Redis, chat-ws ב-Go מנוי ודוחף ללקוח. בחרתי Go כי אלפי חיבורים idle זולים שם ולא שולפים load על SQLAlchemy."* |
-| **הפניה** | [adr/ARCHITECTURE_DECISIONS_CHAT_WS.md](adr/ARCHITECTURE_DECISIONS_CHAT_WS.md) (כולל §7), HIGHLIGHTS §4 + Latest updates, [architecture/REALTIME.md](architecture/REALTIME.md), [chat-ws/README.md](../chat-ws/README.md) |
+| **הפניה** | [adr/ARCHITECTURE_DECISIONS_CHAT_WS.md](adr/ARCHITECTURE_DECISIONS_CHAT_WS.md) (כולל §7–§8), HIGHLIGHTS §4 + Latest updates, [architecture/REALTIME.md](architecture/REALTIME.md), [chat-ws/README.md](../chat-ws/README.md) |
+
+---
+
+<a id="chat-ws-operational-hardening"></a>
+
+## chat-ws operational hardening (H7–H10)
+
+| | |
+|--|--|
+| **בעיה** | (H7) `docker-compose.yml` healthcheck references `/healthz` but no handler existed — always 404; combined with subscriber death, chat-ws appears alive but delivers zero messages. (H8) raw `http.ListenAndServe` without `Shutdown` — SIGTERM instantly kills active WS connections. (H9) no `SetReadDeadline`/`SetPongHandler` — dead clients leak goroutines forever. (H10) zero `recover()` — any goroutine panic crashes the entire process. |
+| **החלטה** | **H7:** `/healthz` checks Redis PING **and** `Hub.SubscribersHealthy()` — three `atomic.Int64` timestamps (chat/offline/online) updated on each successful `(P)Subscribe`, with 2-min staleness threshold; seeded to `now` in `NewHub` for startup grace. **H8:** `*http.Server` + `srv.Shutdown(shutdownCtx)` with 10s timeout. **H9:** `conn.SetReadDeadline(pongWait)` + `SetPongHandler` before read loop. **H10:** shared `internal/safego/safego.go` with `RecoverPanic(component, op)` — `defer` in every independent goroutine. |
+| **אלטרנטיבות** | (H7) Redis PING only — doesn't catch dead subscribers. (H10) inline `recover()` per function — code duplication across `hub`/`redis` packages. |
+| **יתרון** | Healthcheck catches real failure mode (alive but deaf); deploy drains gracefully; dead clients detected in ≤60s; single goroutine crash doesn't take down process. |
+| **Trade-off** | H7 subscriber liveness tracks subscription success, not message receipt — legitimate silence doesn't trigger staleness (acceptable: if subscriber disconnects, `runOnce` returns and timestamp goes stale). H10 recovery swallows the panic — the goroutine stops silently (logged with full stack trace). |
+| **Interview pitch (≈35s)** | *"הוספתי healthz שבודק לא רק Redis PING אלא גם שכל subscriber goroutine באמת subscribed — עם atomic timestamps ו-2-minute threshold. Graceful shutdown, read deadline לזיהוי לקוחות מתים, ו-panic recovery שמשותף ב-internal/safego כדי שקריסה של goroutine אחת לא תפיל את כל התהליך."* |
+| **הפניה** | ADR chat-ws §8, [architecture/REALTIME.md](architecture/REALTIME.md), [`chat-ws/cmd/server/main.go`](../chat-ws/cmd/server/main.go), [`chat-ws/internal/hub/hub.go`](../chat-ws/internal/hub/hub.go), [`chat-ws/internal/safego/safego.go`](../chat-ws/internal/safego/safego.go) |
 
 ---
 
@@ -199,6 +215,22 @@
 | **Trade-off** | Redis למטה => fail-open לצורך זמינות (הגנה זמנית נחלשת). |
 | **Interview pitch (≈30s)** | *"הוספתי rate limit פר-משתמש לשליחת הודעות בצ'אט, 30 לדקה, באלגוריתם Token Bucket אטומי דרך Lua script. fail-open אם Redis נופל כדי לא לשבור את הצ'אט."* |
 | **הפניה** | [../backend/app/api/dependencies/rate_limit.py](../backend/app/api/dependencies/rate_limit.py), [../backend/app/domain/chat/router.py](../backend/app/domain/chat/router.py), [../ARCHITECTURE.md](../ARCHITECTURE.md), [#rate-limit-token-bucket](#rate-limit-token-bucket) |
+
+---
+
+<a id="rides-rate-limit"></a>
+
+## Ride creation rate limit (per-user)
+
+| | |
+|--|--|
+| **בעיה** | משתמש זדוני או באג בקליינט יכולים ליצור עשרות/מאות נסיעות בדקות — עומס DB, רעש בחיפוש נוסעים, ושריפת משאבי geocoding/routing. |
+| **החלטה** | Dependency `rate_limit_rides` בשכבת API: מפתח Redis פר-משתמש `ratelimit:rides:{user_id}`, **Sliding Window** (אותו Lua כמו auth), מקסימום **10 נסיעות לשעה**. מוחל על `POST /rides/` (יצירה) ו-`POST /rides/preview-routes` (preview — כי מפעיל Google Maps). |
+| **אלטרנטיבות** | (1) Token Bucket — מאפשר burst של 10 נסיעות ברצף, שלא מתאים ליצירת נסיעות (לא UX burst). (2) Rate limit על preview בלבד — לא חוסם יצירות abuse. (3) Rate limit משותף עם auth (IP) — לא מדויק, ולא שייך לאותו threat model. |
+| **יתרון** | אלגוריתם Sliding Window מונע burst abuse; per-user key ולא per-IP — הגנה מדויקת גם מאחורי NAT; אותה תשתית Lua/Redis כמו auth ו-chat. |
+| **Trade-off** | preview ו-create חולקים אותו counter — 10 previews יחסמו create באותה שעה; זה מודע — preview מפעיל Google Maps API ולכן גם הוא משאב מוגבל. Redis למטה → fail-open. |
+| **Interview pitch (≈25s)** | *"הגבלתי יצירת נסיעות ל-10 לשעה פר משתמש עם Sliding Window — אותו Lua כמו auth, אבל כאן per-user ולא per-IP. גם preview נכנס לאותו counter כי הוא מפעיל Google Maps."* |
+| **הפניה** | [`../backend/app/api/dependencies/rate_limit.py`](../backend/app/api/dependencies/rate_limit.py), [`../backend/app/domain/rides/router.py`](../backend/app/domain/rides/router.py), [`../backend/app/core/config.py`](../backend/app/core/config.py) (`RATE_LIMIT_RIDES_*`), [#rate-limit-token-bucket](#rate-limit-token-bucket) |
 
 ---
 
@@ -375,6 +407,20 @@
 
 ---
 
+<a id="chat-detail-redundant-refetch"></a>
+
+## Chat detail / booking-chat: redundant conversation re-fetch elimination
+
+| | |
+|--|--|
+| **בעיה** | `get_or_create_conversation`, `get_or_create_conversation_by_booking`, ו-`get_conversation_detail` (`chat/service.py`) — כל אחד קרא ל-`_get_partner_last_read_at` ול-`_get_partner_read_up_to_message_id`, ששניהם ביצעו `get_conversation_by_id` **מחדש** כדי לחשב `partner_id`, למרות שה-conversation כבר נטען. סה"כ **2 שאילתות SELECT מיותרות + 2 שאילתות participant** (שאפשר למזג) → 5–7 queries per endpoint במקום 2–4. |
+| **החלטה** | Helper יחיד `_get_partner_read_info(db, conversation_id, partner_id)` מחליף את שני ה-helpers; מקבל `partner_id` ישירות (שכבר זמין בשלושת ה-callers — `other_user_id` ב-2 הראשונים, `conv.user_id_2 if ... else conv.user_id_1` בשלישי) ומחזיר `(last_read_at, last_read_message_id)` ב-**שאילתה אחת** על `conversation_participants`. |
+| **אלטרנטיבות** | (1) להעביר את ה-conversation object ל-helpers — מורכב יותר ולא חוסך את השאילתה הכפולה. (2) cache ב-session level — מסכן data staleness. |
+| **יתרון** | 2 redundant `SELECT conversations + selectinload users` נעלמים + 2 participant queries מתמזגים ל-1 → מ-5–7 ל-2–4 queries per endpoint. |
+| **הפניה** | [`../backend/app/domain/chat/service.py`](../backend/app/domain/chat/service.py) (`_get_partner_read_info`, `get_or_create_conversation`, `get_or_create_conversation_by_booking`, `get_conversation_detail`) |
+
+---
+
 <a id="chat-inbox-cursor-pagination"></a>
 
 ## Chat inbox: cursor pagination (keyset)
@@ -475,6 +521,22 @@
 | **Trade-off** | בלי Redis אין dedup. |
 | **Interview pitch (≈30s)** | *“החלפתי את אותה מסגרת Stripe-style מנסיעות לצ’אט: מפתח פר-משתמש, fingerprint על conversation+body, שומרים רק תשובת הצלחה.”* |
 | **הפניה** | ADR §25, Frontend ADR §2, HIGHLIGHTS (Latest updates + §7ה); [Chat — optimistic outbound UI](#chat-optimistic-outbound); [`frontend/src/api/chat.ts`](../frontend/src/api/chat.ts), [`types/chatList.ts`](../frontend/src/types/chatList.ts), [`useMessageThread.ts`](../frontend/src/pages/MessageThread/useMessageThread.ts), [`useChatPopup.ts`](../frontend/src/components/ChatPopup/useChatPopup.ts), [`chatMessagesMerge.ts`](../frontend/src/utils/chatMessagesMerge.ts) |
+
+---
+
+<a id="refresh-token-hashed-storage"></a>
+
+## M4 — Refresh token hashed at rest (SHA-256)
+
+| | |
+|--|--|
+| **בעיה** | `users.refresh_token` שמר JWT refresh כ-plaintext ב-DB. דליפת DB = תוקף מחדש sessions ללא הגבלה. בנוסף, `authenticate_with_google` עקף את CRUD ישירות (`user.refresh_token = refresh_token`), וה-generic `update` לא חסם כתיבת plaintext ל-field. |
+| **החלטה** | (1) `hash_refresh_token(token)` ב-`security.py` — SHA-256 (מתאים לטוקנים עם אנטרופיה גבוהה; bcrypt מיותר). (2) `CRUDUser.update_refresh_token` שומר hash בלבד — נקודת כתיבה אחת. (3) `CRUDUser.verify_refresh_token` — `hmac.compare_digest` (constant-time) — **service layer לא מייבא hash ולא יודע על מנגנון האחסון**. (4) `refresh_token` נוסף ל-`protected_fields` ב-generic `update` נגד bypass. (5) Google auth עובר דרך CRUD במקום השמה ישירה. (6) Migration **021**: NULL-ify כל הטוקנים הקיימים (לא ניתן ל-hash plaintext ללא deploy מתואם). |
+| **אלטרנטיבות** | (1) bcrypt — overkill ו-latency מיותרת; refresh tokens הם JWTs עם 256+ bits entropy. (2) Hash existing tokens in migration — אפשרי אך דורש deploy מתואם (migration לפני קוד = breakage). (3) No hash — פשוט אבל "DB leak = game over". |
+| **יתרון** | DB leak לא חושף tokens; service layer decoupled מ-hashing; constant-time comparison. |
+| **Trade-off** | כל המשתמשים הקיימים מנותקים פעם אחת (re-login); SHA-256 לא מגן על tokens עם אנטרופיה נמוכה (לא רלוונטי — הם JWTs). |
+| **Interview pitch (≈30s)** | *"refresh tokens היו plaintext ב-DB. העברתי ל-SHA-256 hash ב-CRUD layer אחד, עם constant-time compare ו-protected_fields נגד bypass — ה-service layer לא יודע שיש hash. מיגרציה 021 מנלנת את הקיימים כי אי אפשר ל-hash בלי deploy מתואם."* |
+| **הפניה** | [`backend/app/core/security.py`](../backend/app/core/security.py) (`hash_refresh_token`), [`backend/app/domain/users/crud.py`](../backend/app/domain/users/crud.py) (`update_refresh_token`, `verify_refresh_token`, `protected_fields`), [`backend/app/domain/auth/service.py`](../backend/app/domain/auth/service.py), [`backend/alembic/versions/021_hash_existing_refresh_tokens.py`](../backend/alembic/versions/021_hash_existing_refresh_tokens.py) |
 
 ---
 
@@ -705,7 +767,7 @@
 | | |
 |--|--|
 | **בעיה** | המימוש הקודם השתמש ב-`INCR + EXPIRE` בשתי פקודות נפרדות. בגבול חלון אפשר היה לשלוח **פי 2** מהמותר: לדחוף `max_count` בקצה החלון, ה-counter מתאפס באלפית שנייה לאחר מכן, ולשלוח `max_count` נוספים מיד. בנוסף, אותו אלגוריתם שירת גם auth (anti-bruteforce) וגם chat (API throttle) — שתי דרישות סותרות. |
-| **החלטה** | להחליף ב-**שני** Lua scripts אטומיים שונים, מותאמים לאיום: <ul><li>**Auth** (`rate_limit_auth`) → **Sliding-Window Log** (`sliding_window.lua`, sorted-set פר IP). אין burst, חלון מתגלגל אמיתי. תוקף ששתק 10 דקות לא מקבל "קופונים" — כל ניסיון נכנס לחלון הנוכחי בלבד.</li><li>**Chat** (`rate_limit_chat`) → **Token Bucket** (`token_bucket.lua`, hash פר משתמש). Burst עד `capacity` מותר ואף רצוי ל-API; refill חלק (`refill_per_sec`).</li></ul> שני ה-scripts רצים אטומית בתוך Redis, נטענים פעם אחת דרך `register_script` של redis-py (שמטפל אוטומטית ב-`EVALSHA` ו-fallback ל-`EVAL` על `NOSCRIPT` אחרי `SCRIPT FLUSH` או reconnect). |
+| **החלטה** | להחליף ב-**שני** Lua scripts אטומיים שונים, מותאמים לאיום: <ul><li>**Auth** (`rate_limit_auth`) → **Sliding-Window Log** (`sliding_window.lua`, sorted-set פר IP). אין burst, חלון מתגלגל אמיתי. תוקף ששתק 10 דקות לא מקבל "קופונים" — כל ניסיון נכנס לחלון הנוכחי בלבד.</li><li>**Chat** (`rate_limit_chat`) → **Token Bucket** (`token_bucket.lua`, hash פר משתמש). Burst עד `capacity` מותר ואף רצוי ל-API; refill חלק (`refill_per_sec`).</li><li>**Rides** (`rate_limit_rides`) → **Sliding-Window Log** (אותו Lua כמו auth, פר משתמש). מקסימום 10 יצירות נסיעה לשעה — anti-abuse על `POST /rides/` ו-`POST /rides/preview-routes`.</li></ul> שני ה-scripts רצים אטומית בתוך Redis, נטענים פעם אחת דרך `register_script` של redis-py (שמטפל אוטומטית ב-`EVALSHA` ו-fallback ל-`EVAL` על `NOSCRIPT` אחרי `SCRIPT FLUSH` או reconnect). |
 | **API ל-clients** | החריג `RateLimitExceeded` מועשר ל-`{retry_after, limit, remaining}`, וה-handler המרכזי פולט 4 כותרות סטנדרטיות (Stripe / GitHub convention): `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` (epoch seconds), `Retry-After`. בלי זה, ה-client לא יודע מתי לנסות שוב → retry loop אגרסיבי → DDoS עצמי. |
 | **אלטרנטיבות שנפסלו** | (1) Token Bucket אחד לשניהם — נחלש מול attacker שמקבץ "קופונים" בעת שקט ואז יורה ב-burst. (2) Leaky bucket — overkill לתרחיש שלנו. (3) `redis.call('TIME')` במקום זמן מהקליינט — דורש `replicate_commands()` ו-non-determinism; זמן מ-EC2 (chrony NTP) מספיק מדויק. (4) wrapper לאחור על `rate_limit_check` — leaky abstraction; עדיף למחוק (יש רק 2 call sites בפרויקט). |
 | **Fail-open** | כל `RedisError` או `register_script` שנכשל → `RateLimitResult.fail_open` → הבקשה עוברת. הגנה היא defense-in-depth, ולא כדאי שתפיל login/chat בזמן outage של Redis. נמדד ב-`rate_limit_redis_errors_total{endpoint}`. |
@@ -746,3 +808,35 @@
 | **Trade-off** | עוד טבלת write-path בפרודקשן ונפח metadata שדורש משמעת; לכן metadata נשמר קומפקטי ולא payload מלא. |
 | **Interview pitch (≈30s)** | *"הוספתי audit persistence לדברים הרגישים באמת, וב-billing הקפדתי לכתוב audit לפני idempotency כדי שגם retries כפולים יהיו traceable. זה ההבדל בין log נוח לבין evidence אמין לחקירה."* |
 | **הפניה** | `backend/app/domain/admin/router.py`, `backend/app/domain/billing/service.py`, `backend/app/infrastructure/audit/{model.py,repo.py}`, `backend/alembic/versions/015_add_audit_log.py`, ADR §24 |
+
+
+---
+
+<a id="h20-google-signin-react-fallback"></a>
+
+## H20 — Google Sign-In: React state fallback + unified timeout detection
+
+| | |
+|--|--|
+| **בעיה** | `useGoogleSignIn` השתמש ב-55 שורות `createElement`/`appendChild`/`setAttribute` (`buildFallbackButton`) ליצירת כפתור fallback — אנטי-פטרן ב-React app. Triple-nested try/catch נשא מורכבות לא נדרשת. בדיקת timeout נוצרה inline במקום לעבוד עם util הקיים (`isTimeoutOrAbortError`). |
+| **החלטה** | (1) מחיקת `buildFallbackButton`; הוספת `const [fallback, setFallback] = useState(false)` ב-hook; כפתור fallback מרונדר כ-React component (`<GoogleFallbackButton />`) ב-`GoogleSignIn.tsx` לפי ה-flag. (2) שטוח של triple try/catch ל-single try/catch. (3) `isTimeoutOrAbortError(err)` מ-`utils/apiError.ts` — אותו util כבר בשימוש ב-`Login.tsx`. (4) `while(firstChild) removeChild` נשאר — Google GIS owns that DOM node, אין חלופה React-ית. |
+| **אלטרנטיבות** | (1) Portal-based rendering — overkill כש-fallback הוא inline בתוך אותו container. (2) `dangerouslySetInnerHTML` — מנוגד ל-XSS baseline של הפרויקט. (3) conditional `<script>` inject — legacy pattern, לא testable. |
+| **יתרון** | קוד עקבי עם שאר ה-React app; testable, type-safe; XSS-safe; DRY timeout detection. |
+| **Trade-off** | Fallback button לא מרונדר ע"י Google SDK — styling ידני שחייב להישאר מסונכרן ויזואלית עם כפתור Google המקורי. |
+| **Interview pitch (≈25s)** | *"כפתור fallback של Google Sign-In היה imperative DOM ב-hook (createElement ×55 שורות). העברתי ל-React state + component — zero innerHTML, DRY timeout util, ו-flat error handling. Google עדיין owns את ה-renderButton node, אז ה-removeChild נשאר, אבל כל שאר ה-UI הוא React."* |
+| **הפניה** | `frontend/src/components/GoogleSignIn/useGoogleSignIn.ts`, `frontend/src/components/GoogleSignIn/GoogleSignIn.tsx`, `frontend/src/utils/apiError.ts` |
+
+---
+
+<a id="m7-my-bookings-paginated-frontend"></a>
+
+## M7 — `/my-bookings` paginated response: frontend client alignment
+
+| | |
+|--|--|
+| **בעיה** | בקאנד שונה ל-`PaginatedBookingsResponse` (`{ items, total, page, limit, has_more }`) אבל `fetchMyBookings` בפרונט עדיין ציפה ל-`BookingRow[]` — breaking contract. |
+| **החלטה** | `fetchMyBookings` עודכן לקבל `{ page?, limit?, status? }` ולהחזיר `PaginatedBookingsResponse`; ברירות מחדל `page=1, limit=20` תואמות בקאנד. |
+| **אלטרנטיבות** | (1) להשאיר unwrap ב-client (`response.data.items`) — חלש, מסתיר את ה-pagination metadata מהצרכן. (2) להחזיר ל-`list[BookingResponse]` בבקאנד — מוותר על pagination. |
+| **יתרון** | Contract frontend↔backend מיושר; metadata (total, has_more) זמין ל-UI עתידי. |
+| **Trade-off** | צרכנים ישנים (אם היו) צריכים לגשת ל-`.items` — שינוי מינורי. |
+| **הפניה** | `frontend/src/api/bookings.ts`, `backend/app/domain/bookings/router.py`, `backend/app/domain/bookings/schema.py`, `docs/architecture/API.md` |

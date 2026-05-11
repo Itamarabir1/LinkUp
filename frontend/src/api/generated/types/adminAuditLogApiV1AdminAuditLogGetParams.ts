@@ -9,15 +9,9 @@ export type AdminAuditLogApiV1AdminAuditLogGetParams = {
 actor_user_id?: string | null;
 resource_type?: string | null;
 action?: string | null;
-created_from?: string | null;
-created_to?: string | null;
 /**
  * @minimum 1
  * @maximum 500
  */
 limit?: number;
-/**
- * @minimum 0
- */
-offset?: number;
 };

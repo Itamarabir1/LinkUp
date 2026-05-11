@@ -71,7 +71,7 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | is_admin | BOOLEAN DEFAULT FALSE | |
 | avatar_key | VARCHAR(255) | מפתח/-prefix S3 לתמונות אווטאר (מיגרציה 002: `avatar_url` → `avatar_key`). **מומלץ בזרימה הנוכחית:** prefix גרסתי **`avatars/{user_id}/v{version}/`** אחרי worker; ערכים ישנים ללא `v{version}/` עדיין תקפים עד העלאה מחדש. |
 | fcm_token | TEXT | Firebase push |
-| refresh_token | TEXT | JWT refresh |
+| refresh_token | TEXT | SHA-256 hash of JWT refresh token (plaintext never stored; migration **021**) |
 | last_location | GEOGRAPHY(POINT) | PostGIS |
 | last_login | TIMESTAMPTZ | התחברות אחרונה |
 | last_active_at | TIMESTAMPTZ | פעילות אחרונה (צ'אט / PATCH last-seen מ-chat-ws); אינדקס; מיגרציה **007** |
@@ -318,6 +318,17 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 | group_members | user_id | idx_group_members_user_id | קבוצות של משתמש |
 | passenger_requests | passenger_id | idx_passenger_requests_passenger_id | בקשות שלי |
 
+### מ-022_add_missing_indexes
+
+| טבלה | שדות | שם Index | סיבה |
+|------|------|----------|--------|
+| bookings | passenger_id, status | idx_bookings_passenger_status | `get_passenger_active_bookings` — סינון כפול |
+| bookings | ride_id, status | idx_bookings_ride_status | `get_ride_bookings_by_status_async` — סינון כפול |
+| passenger_requests | status | idx_passenger_requests_status | חיפוש בקשות לפי סטטוס |
+| passenger_requests | passenger_id, status | idx_passenger_requests_passenger_status | `get_my_requests` — סינון כפול |
+| outbox_events | status, created_at (WHERE status='PENDING') | idx_outbox_events_status_created | סריקת אירועים ממתינים (partial) |
+| users | last_active_at DESC (WHERE NOT NULL) | idx_users_last_active_at | שאילתות presence (partial) |
+
 ---
 
 ## Migrations History
@@ -345,6 +356,8 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 | 018_rides_composite_indexes (`018_rides_composite_indexes.py`) | אינדקסים `idx_rides_driver_departure`, `idx_rides_group_departure` (חלקי); מחיקת `idx_rides_driver_id` / `idx_rides_group_id` כפולים | 2026-05-06 |
 | 019_booking_lifecycle_enum (`019_booking_lifecycle_enum.py`) | הוספת **`en_route`**, **`arrived`**, **`trip_in_progress`** ל־enum **`booking_status`** — תואם ל־`BookingStatus` בקוד ול־`IN (...)` queries (סיכול bulk ביטול בקשה + צינור קריאות פעילות) | 2026-05-06 |
 | 020_conversation_last_message_at (`020_add_conversations_last_message_at.py`) | הוספת `conversations.last_message_at`, backfill מ־`MAX(messages.created_at)` (fallback ל־`conversations.created_at`) ואינדקס `idx_conversations_last_message_at` | 2026-05-07 |
+| 021_hash_refresh_tokens (`021_hash_existing_refresh_tokens.py`) | **M4 — Hashed refresh tokens:** NULL-ify כל ה-refresh tokens הקיימים (plaintext JWTs — אי אפשר ל-hash ללא deploy מתואם); משתמשים מתחברים מחדש ומקבלים token חדש שנשמר כ-SHA-256 hash. שינויים נלווים בקוד: `update_refresh_token` (CRUD) שומר hash בלבד; `verify_refresh_token` (CRUD) משווה עם `hmac.compare_digest`; `refresh_token` נוסף ל-`protected_fields` ב-generic `update` | 2026-05-11 |
+| 022_add_missing_indexes (`022_add_missing_indexes.py`) | 6 אינדקסים composite/partial לשאילתות חמות: `idx_bookings_passenger_status`, `idx_bookings_ride_status`, `idx_passenger_requests_status`, `idx_passenger_requests_passenger_status`, `idx_outbox_events_status_created` (partial), `idx_users_last_active_at` (partial DESC) | 2026-05-11 |
 
 **הערת Alembic:** רוויזיות **`015_add_audit_log`** ו־**`015_billing_idem`** מתפצלות מ־**014**; המיזוג הוא **`016_merge015_heads`** בקובץ **`016_merge_015_audit_and_billing_heads.py`** (מזהי רוויזיה חייבים להתאים ל־`VARCHAR(32)` בטבלת **`alembic_version`** — לכן הסט מקוצר עבור מיגרציית האידמפוטנטיות).
 
@@ -389,6 +402,8 @@ conversations ◄── messages (conversation_id), chat_analysis (conversation_
 No automated EXPLAIN ANALYZE pipeline exists. Manual review recommended on heavy paths (search, matching) using `pg_stat_statements` or Django-style query logging. דפוסי צמצום N+1 מתועדים ב-`ARCHITECTURE.md`:
 - **My Bookings** / `BookingReadsService` — `joinedload` + aggregate per screen.
 - **Chat inbox** / `get_inbox_aggregates` ([`backend/app/domain/chat/crud.py`](../../backend/app/domain/chat/crud.py)) — 3 `func.max` aggregate queries **למזהי השיחות בעמוד הנוכחי** (לא לכל האינבוקס), יחד עם `list_conversations_paginated`; מ-~3N ל-**4 קריאות קבועות לעמוד**. מיון העמוד עצמו עובר דרך `COALESCE(conversations.last_message_at, conversations.created_at)` (ללא correlated `MAX(...)` על כל שורה).
+- **Chat detail / booking-chat** — `_get_partner_read_info` ([`backend/app/domain/chat/service.py`](../../backend/app/domain/chat/service.py)) מחליף שני helpers שכל אחד ביצע `get_conversation_by_id` מיותר; שאילתה אחת על `conversation_participants` עם `partner_id` שכבר ידוע → מ-5–7 ל-2–4 queries per endpoint. פירוט: [`docs/FEATURE_DECISIONS.md#chat-detail-redundant-refetch`](../FEATURE_DECISIONS.md#chat-detail-redundant-refetch).
+- **Pending booking requests** — `get_ride_bookings_by_status_with_relations` ([`backend/app/domain/bookings/crud.py`](../../backend/app/domain/bookings/crud.py)) מוסיף `joinedload` על `passenger_request.user` + `passenger` כדי ש-`GET /bookings/ride/{id}/pending` יחזיר `passenger_name` במקום `null` (ה-method הקל `get_ride_bookings_by_status_async` נשאר לקריאות שלא צריכות relationships).
 - **Bookings / groups read paths** — `get_user_bookings_with_relations` מוגבל ל-**100** שורות (פיד התראות נוסע); `cancel_ride_and_bookings` מרכז עדכון סטטוס `passenger_requests` אחרי ביטול; `get_member_counts_batch` לרשימת קבוצות — [`docs/FEATURE_DECISIONS.md#api-read-caps-batch-status`](../FEATURE_DECISIONS.md#api-read-caps-batch-status).
 
-פירוט: `docs/ENGINEERING_HIGHLIGHTS.md`, [`docs/FEATURE_DECISIONS.md#chat-inbox-n1`](../FEATURE_DECISIONS.md#chat-inbox-n1), [`#chat-inbox-cursor-pagination`](../FEATURE_DECISIONS.md#chat-inbox-cursor-pagination).
+פירוט: `docs/ENGINEERING_HIGHLIGHTS.md`, [`docs/FEATURE_DECISIONS.md#chat-inbox-n1`](../FEATURE_DECISIONS.md#chat-inbox-n1), [`#chat-inbox-cursor-pagination`](../FEATURE_DECISIONS.md#chat-inbox-cursor-pagination), [`#chat-detail-redundant-refetch`](../FEATURE_DECISIONS.md#chat-detail-redundant-refetch).

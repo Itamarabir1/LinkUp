@@ -95,7 +95,13 @@ func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
 			close(c.done)
 		}()
 		go c.RunWritePump()
-		// Read client messages: typing_start/typing_stop -> publish to Redis; other types ignored for now.
+
+		conn.SetReadDeadline(time.Now().Add(pongWait))
+		conn.SetPongHandler(func(string) error {
+			conn.SetReadDeadline(time.Now().Add(pongWait))
+			return nil
+		})
+
 		for {
 			_, raw, err := conn.ReadMessage()
 			if err != nil {

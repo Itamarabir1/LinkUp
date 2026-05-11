@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
+	"linkup/chat-ws/internal/safego"
 )
 
 const (
@@ -32,6 +34,7 @@ type Conn struct {
 // RunWritePump pumps messages from the hub to the websocket connection.
 // A goroutine running RunWritePump is started for each connection.
 func (c *Conn) RunWritePump() {
+	defer safego.RecoverPanic("hub", "RunWritePump")
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()

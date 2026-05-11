@@ -26,6 +26,9 @@ docker system df
 ### Actions
 
 ```bash
+# Caution: -af removes ALL unused images including rollback tags.
+# For normal maintenance prefer: docker image prune -f (dangling only).
+# Use -af only when disk is critically low and you can re-pull.
 docker image prune -af
 docker container prune -f
 docker volume prune -f

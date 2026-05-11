@@ -113,8 +113,8 @@ Authorization: Bearer <access_token>
 
 | Method | Path | Auth | תיאור |
 |--------|------|------|--------|
-| POST | /preview-routes | כן | body: RidePreviewCreate. מחזיר אפשרויות מסלול ומחירים. |
-| POST | / | כן | יצירת נסיעה — body: RideCreate. מחזיר RideResponse (201). |
+| POST | /preview-routes | כן | body: RidePreviewCreate. מחזיר אפשרויות מסלול ומחירים. **Rate limited** (Redis, Sliding Window פר-משתמש — 10 לשעה). |
+| POST | / | כן | יצירת נסיעה — body: RideCreate. מחזיר RideResponse (201). **Rate limited** (Redis, Sliding Window פר-משתמש — 10 לשעה; אותו counter כמו preview). |
 | GET | /me | כן | נסיעות שלי כנהג. query: status (אופציונלי — open, full, active, completed, cancelled). **עד 200** נסיעות, ממוינות לפי `departure_time` **יורד** (מעבר לכך — נסיעות ישנות יותר לא יופיעו בתגובה). |
 | PATCH | /{ride_id} | כן | עדכון חלקי — body: RideUpdate (רק בעלים). |
 | POST | /{ride_id}/start | כן | התחלת נסיעה — מעביר לסטטוס ACTIVE. דורש לפחות נוסע מאושר אחד. מחזיר RideResponse. |
@@ -205,7 +205,7 @@ Authorization: Bearer <access_token>
 | POST | /conversations/by-booking/{booking_id} | כן | שיחה לפי booking (נהג–נוסע). |
 | GET | /conversations | כן | אינבוקס (רשימת שיחות): query **`limit`** (ברירת מחדל 30, עד 100), **`after`** (cursor אטום מ־`next_cursor`). תגובה: **`items`**, **`has_more`**, **`next_cursor`**. מיון בשרת: לפי `COALESCE(conversations.last_message_at, conversations.created_at)` (זמן הודעה אחרונה persisted, או `created_at` לשיחה בלי הודעות). **422** אם `after` פגום (`CHAT_INVALID_INBOX_CURSOR`). |
 | GET | /conversations/{conversation_id} | כן | פרטי שיחה. `ConversationDetail` כולל גם `partner_last_read_at` וגם `partner_read_up_to_message_id` (cursor מונוטוני ל-read receipts). |
-| POST | /conversations/{conversation_id}/messages | כן | body: MessageCreate (body). שליחת הודעה (**201**). אופציונלי **`Idempotency-Key`** (מומלץ בלקוח): אותו מפתח + אותה כוונה (`conversation_id` + `body`) → תגובת 201 ממטמון; **409** + `Retry-After` בתהליך; **422** `idempotency_key_mismatch` אחרת. סעיף Idempotency למעלה ו-**ADR §25**. |
+| POST | /conversations/{conversation_id}/messages | כן | body: MessageCreate (body). שליחת הודעה (**201**). **Rate limited** (Redis, Token Bucket פר-משתמש — 30 הודעות/דקה; fail-open אם Redis לא זמין). אופציונלי **`Idempotency-Key`** (מומלץ בלקוח): אותו מפתח + אותה כוונה (`conversation_id` + `body`) → תגובת 201 ממטמון; **409** + `Retry-After` בתהליך; **422** `idempotency_key_mismatch` אחרת. סעיף Idempotency למעלה ו-**ADR §25**. |
 | GET | /conversations/{conversation_id}/messages | כן | היסטוריית הודעות (scroll): query `limit` (default 30) + `after` (opaque cursor בלבד). מיון שרת: `created_at DESC, message_id DESC`, keyset stable tie-break. תגובה: `items`, `next_cursor`, `has_more`. שגיאת cursor פגום: `422` / `CHAT_INVALID_MESSAGE_CURSOR`. |
 | GET | /conversations/{conversation_id}/messages/gap | כן | Reconnect backfill ייעודי: query `since_message_id` (`>=0`). מחזיר הודעות עם `message_id > since_message_id` בסדר עולה. תגובה: `items`, `truncated`, `last_message_id` (חובה כאשר `truncated=true`). |
 | POST | /conversations/{conversation_id}/read | כן | סימון שיחה כנקראה (204). |

@@ -10,6 +10,11 @@
 - Notification refresh events are unified on `chat-ws` (`user:*:events`) to reduce parallel socket usage.
 - **Redis subscriber resilience (chat-ws):** all three Redis subscribers (`RunSubscriber` for chat/typing/user-events, `RunUserOfflineSubscriber`, `RunUserOnlineSubscriber`) wrap their subscribe logic in a **reconnect loop with exponential backoff** (1s initial, doubling to 30s cap). A transient Redis disconnect no longer kills the subscriber goroutine permanently — it logs a warning and reconnects automatically. Implementation: `subscriber.go` extracts `runOnce`; `hub.go` extracts `runUserOfflineOnce`/`runUserOnlineOnce`.
 - **Connection teardown safety (chat-ws):** each `Conn` carries a `done chan struct{}` closed on disconnect. `RunWritePump` listens on `done` (not `Send` close) to exit cleanly with a proper `CloseNormalClosure` frame. All senders (`SendToUser`, `broadcastOnline`, `broadcastOffline`) include `<-c.done` in their `select` — preventing send-on-closed-channel panics when a broadcast snapshot races with connection teardown.
+- **chat-ws operational hardening (H7–H10):**
+  - **`/healthz` endpoint** verifies Redis PING + subscriber goroutine liveness via atomic timestamps (`Hub.SubscribersHealthy()`). Each subscriber marks alive on successful `(P)Subscribe`; staleness threshold 2 min. Returns 503 with structured detail (`redis unreachable` or `subscriber stale`).
+  - **Graceful shutdown:** `*http.Server` + `srv.Shutdown(10s)` drains active connections on SIGTERM.
+  - **Pong/read deadline:** `SetReadDeadline(pongWait=60s)` + `SetPongHandler` on each connection. Dead clients that stop responding to pings are detected and cleaned up within 60s — no more leaked goroutines.
+  - **Panic recovery:** `defer safego.RecoverPanic(component, op)` on every independent goroutine via shared `internal/safego` package. Logs panic + stack trace without crashing the process.
 - **Frontend WebSocket reconnect:** delays use **`computeReconnectDelayMs`** in **[`reconnectBackoff.ts`](../../frontend/src/utils/reconnectBackoff.ts)** — exponential backoff from **3s** (±20% jitter), doubling each attempt, **30s** cap — wired in **[`useChatWebSocket.ts`](../../frontend/src/pages/MessageThread/useChatWebSocket.ts)**, **[`useReconnectingWebSocket.ts`](../../frontend/src/hooks/useReconnectingWebSocket.ts)**, **[`useReconnectingWebSocketState.ts`](../../frontend/src/hooks/useReconnectingWebSocketState.ts)**; the attempt counter resets on **`onopen`** and when **`cid` / `reconnectKey`** changes (new effect run).
 
 ---
@@ -24,6 +29,7 @@
 | פורט | 8081 (משתנה ב-PORT) |
 | Endpoint WS | `GET /ws?token=<JWT>` |
 | Endpoint HTTP (presence) | `GET /presence/{user_id}` — Header `Authorization: Bearer <JWT>` |
+| Endpoint HTTP (health) | `GET /healthz` — checks Redis PING + subscriber liveness (`SubscribersHealthy`); returns `200 {"status":"ok"}` or `503 {"status":"unhealthy","detail":"..."}` |
 
 **אימות**: אותו JWT (SECRET_KEY) כמו ה-backend. WebSocket: `token` ב-query. **Presence ב-UI**: טעינה חד־פעמית של `GET /presence/{partner_id}`; `online` מ-Redis `presence:{user_id}`; **`last_seen`** מ-`GET /api/v1/users/{id}/last-seen` (`users.last_active_at`, עם fallback ל-`last_login`). עדכון מיידי: WS `user_online` / `user_offline` (Pub/Sub `user:online` / `user:offline`).
 
@@ -75,7 +81,7 @@
 ## Chat Flow
 
 ```
-Client A (נהג)                Backend API               Outbox Worker               Redis DB 1              chat-ws (Go)              Client B (נוסע)
+Client A (נהג)                Backend API           notification-worker            Redis DB 1              chat-ws (Go)              Client B (נוסע)
      |                              |                              |                          |                          |                          |
      |  POST /chat/.../messages     |                              |                          |                          |                          |
      | -------------------------->  |  DB write + outbox event     |                          |                          |                          |
@@ -85,7 +91,7 @@ Client A (נהג)                Backend API               Outbox Worker        
      |                              |                              |                          |                          | -------------------------->|
 ```
 
-- **כתיבת הודעה**: POST ל-FastAPI → שמירה ב-DB + Outbox event (`chat.message_sent`) באותה טרנזקציה → outbox worker מפרסם ל-Redis `chat:conversation:{id}` → chat-ws מקבל ומעביר ל-clients המנויים.
+- **כתיבת הודעה**: POST ל-FastAPI → שמירה ב-DB + Outbox event (`chat.message_sent`) באותה טרנזקציה → notification-worker (`run_outbox_worker`) מפרסם ל-Redis `chat:conversation:{id}` → chat-ws מקבל ומעביר ל-clients המנויים.
 - **קבלת הודעה**: Client מחובר ל-chat-ws עם JWT; chat-ws נרשם ל-conversation הרלוונטי; הודעות מגיעות ב-WebSocket.
 - **קריאה (read receipt)**: כניסה לשיחה או קבלת הודעה מפעילות `mark_conversation_read`, שמעכנת גם `last_read_at` וגם `last_read_message_id`. לאחר מכן backend מפרסם `message_read` עם `read_up_to_message_id`, והצד השני צובע כ־read כל הודעה יוצאת עד ה־cursor הזה.
 - **השלמת הודעות אחרי ניתוק / פתיחה מחדש של ה־WS**: REST עם **`after`** לעמוד הראשון, ואחר כך (**אם צריך**) **`before=next_cursor`** לפי חוזה ה־API (ראו **`docs/architecture/API.md`**) עד שהפער נסגר או שנפגע **תקרת עמודים בצד הלקוח** (~50 בקשות). העוגן הוא מקסימום ה־`message_id` שכבר ב־state, או **`after=0`** כשאין עדיין עוגן מקומי (אז השרת מחזיר הודעות עם **`message_id > 0`** לפי אותו מסנן ב־CRUD).

@@ -692,54 +692,6 @@
         "title": "ConversationTurn",
         "type": "object"
       },
-      "DriverActiveResponse": {
-        "properties": {
-          "rides": {
-            "items": {
-              "$ref": "#/components/schemas/RideWithPassengersItem"
-            },
-            "title": "Rides",
-            "type": "array"
-          }
-        },
-        "required": [
-          "rides"
-        ],
-        "title": "DriverActiveResponse",
-        "type": "object"
-      },
-      "DriverHistoryResponse": {
-        "properties": {
-          "has_more": {
-            "default": false,
-            "title": "Has More",
-            "type": "boolean"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          },
-          "rides": {
-            "items": {
-              "$ref": "#/components/schemas/RideWithPassengersItem"
-            },
-            "title": "Rides",
-            "type": "array"
-          }
-        },
-        "required": [
-          "rides"
-        ],
-        "title": "DriverHistoryResponse",
-        "type": "object"
-      },
       "DriverInfoResponse": {
         "description": "Driver contact info for passengers (explicit reveal action).",
         "properties": {
@@ -832,6 +784,23 @@
           "full_name"
         ],
         "title": "DriverSummaryInfo",
+        "type": "object"
+      },
+      "DriverSummaryResponse": {
+        "description": "Aggregated driver view: all rides with passengers embedded.",
+        "properties": {
+          "rides": {
+            "items": {
+              "$ref": "#/components/schemas/RideWithPassengersItem"
+            },
+            "title": "Rides",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rides"
+        ],
+        "title": "DriverSummaryResponse",
         "type": "object"
       },
       "EmailOnlyRequest": {
@@ -1245,36 +1214,6 @@
         "title": "MessageCreate",
         "type": "object"
       },
-      "MessageGapResponse": {
-        "description": "Reconnect backfill messages since a known message id.",
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/app__domain__chat__schema__MessageResponse"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "last_message_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Last Message Id"
-          },
-          "truncated": {
-            "default": false,
-            "title": "Truncated",
-            "type": "boolean"
-          }
-        },
-        "title": "MessageGapResponse",
-        "type": "object"
-      },
       "NotificationItemResponse": {
         "properties": {
           "action_url": {
@@ -1377,37 +1316,6 @@
         "title": "NotificationItemResponse",
         "type": "object"
       },
-      "PaginatedConversationsResponse": {
-        "description": "Cursor-paginated inbox (conversation list).",
-        "properties": {
-          "has_more": {
-            "default": false,
-            "title": "Has More",
-            "type": "boolean"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/ConversationListItem"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Opaque cursor — pass as `after` query param.",
-            "title": "Next Cursor"
-          }
-        },
-        "title": "PaginatedConversationsResponse",
-        "type": "object"
-      },
       "PaginatedMessagesResponse": {
         "description": "Cursor-paginated message list.",
         "properties": {
@@ -1432,124 +1340,11 @@
                 "type": "null"
               }
             ],
-            "description": "Opaque cursor — pass as `after` query param.",
+            "description": "Oldest message_id for next page (before=)",
             "title": "Next Cursor"
           }
         },
         "title": "PaginatedMessagesResponse",
-        "type": "object"
-      },
-      "PaginatedNotificationsResponse": {
-        "description": "Cursor-paginated notifications for GET /users/me/notifications.",
-        "properties": {
-          "has_more": {
-            "default": false,
-            "title": "Has More",
-            "type": "boolean"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/NotificationItemResponse"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "limit": {
-            "default": 20,
-            "title": "Limit",
-            "type": "integer"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          }
-        },
-        "title": "PaginatedNotificationsResponse",
-        "type": "object"
-      },
-      "PaginatedPassengerRequestsResponse": {
-        "description": "Paginated passenger requests for GET /passengers/me.",
-        "properties": {
-          "has_more": {
-            "default": false,
-            "title": "Has More",
-            "type": "boolean"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/PassengerRequestResponse"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          }
-        },
-        "title": "PaginatedPassengerRequestsResponse",
-        "type": "object"
-      },
-      "PaginatedRidesResponse": {
-        "properties": {
-          "has_more": {
-            "default": false,
-            "title": "Has More",
-            "type": "boolean"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          },
-          "rides": {
-            "items": {
-              "$ref": "#/components/schemas/RideResponse"
-            },
-            "title": "Rides",
-            "type": "array"
-          }
-        },
-        "required": [
-          "rides"
-        ],
-        "title": "PaginatedRidesResponse",
-        "type": "object"
-      },
-      "PassengerActiveResponse": {
-        "properties": {
-          "bookings": {
-            "items": {
-              "$ref": "#/components/schemas/PassengerBookingSummaryItem"
-            },
-            "title": "Bookings",
-            "type": "array"
-          }
-        },
-        "required": [
-          "bookings"
-        ],
-        "title": "PassengerActiveResponse",
         "type": "object"
       },
       "PassengerBookingSummaryItem": {
@@ -1656,38 +1451,6 @@
           "ride_status"
         ],
         "title": "PassengerBookingSummaryItem",
-        "type": "object"
-      },
-      "PassengerHistoryResponse": {
-        "properties": {
-          "bookings": {
-            "items": {
-              "$ref": "#/components/schemas/PassengerBookingSummaryItem"
-            },
-            "title": "Bookings",
-            "type": "array"
-          },
-          "has_more": {
-            "default": false,
-            "title": "Has More",
-            "type": "boolean"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          }
-        },
-        "required": [
-          "bookings"
-        ],
-        "title": "PassengerHistoryResponse",
         "type": "object"
       },
       "PassengerLocationReport": {
@@ -2031,6 +1794,22 @@
         "title": "PassengerStatus",
         "type": "string"
       },
+      "PassengerSummaryResponse": {
+        "properties": {
+          "bookings": {
+            "items": {
+              "$ref": "#/components/schemas/PassengerBookingSummaryItem"
+            },
+            "title": "Bookings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "bookings"
+        ],
+        "title": "PassengerSummaryResponse",
+        "type": "object"
+      },
       "PasswordResetConfirm": {
         "properties": {
           "code": {
@@ -2308,17 +2087,6 @@
             "title": "Available Seats Left",
             "type": "integer"
           },
-          "confirmed_total": {
-            "description": "כל שורות confirmed לנסיעה (COUNT)",
-            "minimum": 0.0,
-            "title": "Confirmed Total",
-            "type": "integer"
-          },
-          "manifest_truncated": {
-            "description": "True אם confirmed_total + pending_total חורגים מ-manifest row limit והרשימה נחתכה",
-            "title": "Manifest Truncated",
-            "type": "boolean"
-          },
           "passengers": {
             "items": {
               "$ref": "#/components/schemas/BookingManifestItem"
@@ -2326,29 +2094,18 @@
             "title": "Passengers",
             "type": "array"
           },
-          "pending_total": {
-            "description": "כל שורות pending לנסיעה (COUNT)",
-            "minimum": 0.0,
-            "title": "Pending Total",
-            "type": "integer"
-          },
           "ride_id": {
             "format": "uuid",
             "title": "Ride Id",
             "type": "string"
           },
           "total_confirmed_passengers": {
-            "description": "תואם confirmed_total לתאימות לאחור; ספירת מאושרים ב-DB לאורך הנסיעה",
-            "minimum": 0.0,
             "title": "Total Confirmed Passengers",
             "type": "integer"
           }
         },
         "required": [
           "ride_id",
-          "confirmed_total",
-          "pending_total",
-          "manifest_truncated",
           "total_confirmed_passengers",
           "available_seats_left",
           "passengers"
@@ -3315,40 +3072,6 @@
           },
           {
             "in": "query",
-            "name": "created_from",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Created From"
-            }
-          },
-          {
-            "in": "query",
-            "name": "created_to",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Created To"
-            }
-          },
-          {
-            "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
@@ -3356,17 +3079,6 @@
               "maximum": 500,
               "minimum": 1,
               "title": "Limit",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "offset",
-            "required": false,
-            "schema": {
-              "default": 0,
-              "minimum": 0,
-              "title": "Offset",
               "type": "integer"
             }
           }
@@ -3397,344 +3109,6 @@
           }
         ],
         "summary": "Admin Audit Log",
-        "tags": [
-          "Admin",
-          "Admin"
-        ]
-      }
-    },
-    "/api/v1/admin/billing/payments": {
-      "get": {
-        "operationId": "admin_billing_payments_api_v1_admin_billing_payments_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "status",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Status"
-            }
-          },
-          {
-            "in": "query",
-            "name": "user_id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "User Id"
-            }
-          },
-          {
-            "in": "query",
-            "name": "currency",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Currency"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 100,
-              "maximum": 500,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "offset",
-            "required": false,
-            "schema": {
-              "default": 0,
-              "minimum": 0,
-              "title": "Offset",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Admin Billing Payments",
-        "tags": [
-          "Admin",
-          "Admin"
-        ]
-      }
-    },
-    "/api/v1/admin/billing/payments/{payment_id}": {
-      "get": {
-        "operationId": "admin_billing_payment_by_id_api_v1_admin_billing_payments__payment_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "payment_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Payment Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Admin Billing Payment By Id",
-        "tags": [
-          "Admin",
-          "Admin"
-        ]
-      }
-    },
-    "/api/v1/admin/billing/reconcile/{payment_id}": {
-      "post": {
-        "operationId": "admin_billing_reconcile_payment_api_v1_admin_billing_reconcile__payment_id__post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "payment_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Payment Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Admin Billing Reconcile Payment",
-        "tags": [
-          "Admin",
-          "Admin"
-        ]
-      }
-    },
-    "/api/v1/admin/billing/stale-pending": {
-      "get": {
-        "operationId": "admin_billing_stale_pending_api_v1_admin_billing_stale_pending_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Admin Billing Stale Pending",
-        "tags": [
-          "Admin",
-          "Admin"
-        ]
-      }
-    },
-    "/api/v1/admin/bookings": {
-      "get": {
-        "operationId": "admin_bookings_api_v1_admin_bookings_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "status",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Status"
-            }
-          },
-          {
-            "in": "query",
-            "name": "ride_id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Ride Id"
-            }
-          },
-          {
-            "in": "query",
-            "name": "passenger_id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Passenger Id"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 100,
-              "maximum": 500,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "offset",
-            "required": false,
-            "schema": {
-              "default": 0,
-              "minimum": 0,
-              "title": "Offset",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Admin Bookings",
         "tags": [
           "Admin",
           "Admin"
@@ -3983,18 +3357,6 @@
               "title": "Event Id",
               "type": "string"
             }
-          },
-          {
-            "description": "Include raw payload/metadata (audited sensitive read)",
-            "in": "query",
-            "name": "include_payload",
-            "required": false,
-            "schema": {
-              "default": false,
-              "description": "Include raw payload/metadata (audited sensitive read)",
-              "title": "Include Payload",
-              "type": "boolean"
-            }
           }
         ],
         "responses": {
@@ -4070,31 +3432,6 @@
           }
         ],
         "summary": "Admin Outbox Requeue",
-        "tags": [
-          "Admin",
-          "Admin"
-        ]
-      }
-    },
-    "/api/v1/admin/queues": {
-      "get": {
-        "operationId": "admin_queues_api_v1_admin_queues_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Admin Queues",
         "tags": [
           "Admin",
           "Admin"
@@ -4288,31 +3625,6 @@
         ]
       }
     },
-    "/api/v1/admin/system/overview": {
-      "get": {
-        "operationId": "admin_system_overview_api_v1_admin_system_overview_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Admin System Overview",
-        "tags": [
-          "Admin",
-          "Admin"
-        ]
-      }
-    },
     "/api/v1/admin/users": {
       "get": {
         "operationId": "admin_users_api_v1_admin_users_get",
@@ -4488,42 +3800,6 @@
               "title": "User Id",
               "type": "string"
             }
-          },
-          {
-            "description": "grant | revoke | toggle (default)",
-            "in": "query",
-            "name": "action",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "grant | revoke | toggle (default)",
-              "title": "Action"
-            }
-          },
-          {
-            "description": "Optional audit reason",
-            "in": "query",
-            "name": "reason",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Optional audit reason",
-              "title": "Reason"
-            }
           }
         ],
         "responses": {
@@ -4552,31 +3828,6 @@
           }
         ],
         "summary": "Admin Toggle User Admin",
-        "tags": [
-          "Admin",
-          "Admin"
-        ]
-      }
-    },
-    "/api/v1/admin/workers": {
-      "get": {
-        "operationId": "admin_workers_api_v1_admin_workers_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Admin Workers",
         "tags": [
           "Admin",
           "Admin"
@@ -5084,24 +4335,6 @@
       "post": {
         "description": "Create a Stripe Checkout Session for premium upgrade.",
         "operationId": "create_checkout_api_v1_billing_checkout_post",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "X-Idempotency-Key",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Idempotency-Key"
-            }
-          }
-        ],
         "responses": {
           "201": {
             "content": {
@@ -5112,16 +4345,6 @@
               }
             },
             "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
           }
         },
         "security": [
@@ -5217,16 +4440,16 @@
         ]
       }
     },
-    "/api/v1/bookings/driver-summary/active": {
+    "/api/v1/bookings/driver-summary": {
       "get": {
-        "description": "Active driver rides only (paginated counterpart uses /driver-summary/history).",
-        "operationId": "get_driver_active_summary_api_v1_bookings_driver_summary_active_get",
+        "description": "Driver rides with embedded passengers — replaces N+1 fetchRideManifest loop.",
+        "operationId": "get_driver_summary_api_v1_bookings_driver_summary_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DriverActiveResponse"
+                  "$ref": "#/components/schemas/DriverSummaryResponse"
                 }
               }
             },
@@ -5238,74 +4461,7 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Get Driver Active Summary",
-        "tags": [
-          "Bookings",
-          "Bookings"
-        ]
-      }
-    },
-    "/api/v1/bookings/driver-summary/history": {
-      "get": {
-        "operationId": "get_driver_history_summary_api_v1_bookings_driver_summary_history_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 20,
-              "maximum": 100,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "after",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "After"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DriverHistoryResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Get Driver History Summary",
+        "summary": "Get Driver Summary",
         "tags": [
           "Bookings",
           "Bookings"
@@ -5371,15 +4527,16 @@
         ]
       }
     },
-    "/api/v1/bookings/passenger-summary/active": {
+    "/api/v1/bookings/passenger-summary": {
       "get": {
-        "operationId": "get_passenger_active_summary_api_v1_bookings_passenger_summary_active_get",
+        "description": "Passenger bookings with embedded ride + driver — replaces N+1 fetchRideById loop.",
+        "operationId": "get_passenger_summary_api_v1_bookings_passenger_summary_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PassengerActiveResponse"
+                  "$ref": "#/components/schemas/PassengerSummaryResponse"
                 }
               }
             },
@@ -5391,74 +4548,7 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Get Passenger Active Summary",
-        "tags": [
-          "Bookings",
-          "Bookings"
-        ]
-      }
-    },
-    "/api/v1/bookings/passenger-summary/history": {
-      "get": {
-        "operationId": "get_passenger_history_summary_api_v1_bookings_passenger_summary_history_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 20,
-              "maximum": 100,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "after",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "After"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PassengerHistoryResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Get Passenger History Summary",
+        "summary": "Get Passenger Summary",
         "tags": [
           "Bookings",
           "Bookings"
@@ -5919,60 +5009,22 @@
     },
     "/api/v1/chat/conversations": {
       "get": {
-        "description": "Inbox for the current user with partner info and last message (cursor pagination).",
+        "description": "Inbox for the current user with partner info and last message.",
         "operationId": "list_conversations_api_v1_chat_conversations_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 30,
-              "maximum": 100,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          },
-          {
-            "description": "Cursor from previous page next_cursor",
-            "in": "query",
-            "name": "after",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Cursor from previous page next_cursor",
-              "title": "After"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedConversationsResponse"
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationListItem"
+                  },
+                  "title": "Response List Conversations Api V1 Chat Conversations Get",
+                  "type": "array"
                 }
               }
             },
             "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
           }
         },
         "security": [
@@ -6204,20 +5256,38 @@
             }
           },
           {
-            "description": "Opaque cursor from previous page next_cursor",
+            "description": "לפני message_id (טעינת הודעות ישנות יותר)",
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "לפני message_id (טעינת הודעות ישנות יותר)",
+              "title": "Before"
+            }
+          },
+          {
+            "description": "after message_id",
             "in": "query",
             "name": "after",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "type": "integer"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "Opaque cursor from previous page next_cursor",
+              "description": "after message_id",
               "title": "After"
             }
           }
@@ -6256,7 +5326,7 @@
         ]
       },
       "post": {
-        "description": "Post a message; participants only. Rate limited: 30 messages/minute per user.\n\nOptional Idempotency-Key: same semantics as POST request-ride-from-search (Redis TTL;\nmismatch → 422, in-flight → 409 + Retry-After).",
+        "description": "Post a message; participants only. Rate limited: 30 messages/minute per user.",
         "operationId": "post_message_api_v1_chat_conversations__conversation_id__messages_post",
         "parameters": [
           {
@@ -6267,24 +5337,6 @@
               "format": "uuid",
               "title": "Conversation Id",
               "type": "string"
-            }
-          },
-          {
-            "description": "Optional UUID per send intent — dedupe double-submit / client retries (same key + same body replays cached 201).",
-            "in": "header",
-            "name": "Idempotency-Key",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Optional UUID per send intent — dedupe double-submit / client retries (same key + same body replays cached 201).",
-              "title": "Idempotency-Key"
             }
           }
         ],
@@ -6326,66 +5378,6 @@
           }
         ],
         "summary": "שליחת הודעה",
-        "tags": [
-          "Chat",
-          "Chat"
-        ]
-      }
-    },
-    "/api/v1/chat/conversations/{conversation_id}/messages/gap": {
-      "get": {
-        "description": "Reconnect backfill for messages newer than since_message_id.",
-        "operationId": "list_conversation_messages_gap_api_v1_chat_conversations__conversation_id__messages_gap_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "conversation_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Conversation Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "since_message_id",
-            "required": true,
-            "schema": {
-              "minimum": 0,
-              "title": "Since Message Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MessageGapResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "פער הודעות מאז message_id אחרון",
         "tags": [
           "Chat",
           "Chat"
@@ -7144,34 +6136,6 @@
               "title": "Group Id",
               "type": "string"
             }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 20,
-              "maximum": 100,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "after",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "After"
-            }
           }
         ],
         "responses": {
@@ -7179,7 +6143,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedRidesResponse"
+                  "items": {
+                    "$ref": "#/components/schemas/RideResponse"
+                  },
+                  "title": "Response Get Group Rides Api V1 Groups  Group Id  Rides Get",
+                  "type": "array"
                 }
               }
             },
@@ -7428,7 +6396,7 @@
     },
     "/api/v1/passenger/passengers/me": {
       "get": {
-        "description": "List the current user's passenger requests (paginated).",
+        "description": "List the current user's passenger requests.",
         "operationId": "get_my_requests_api_v1_passenger_passengers_me_get",
         "parameters": [
           {
@@ -7448,38 +6416,6 @@
               "description": "סנן לפי סטטוס: pending, approved, cancelled, matched, expired, completed, rejected",
               "title": "Request Status"
             }
-          },
-          {
-            "description": "cursor אטום להמשך העמוד הבא",
-            "in": "query",
-            "name": "cursor",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "cursor אטום להמשך העמוד הבא",
-              "title": "Cursor"
-            }
-          },
-          {
-            "description": "פריטים לעמוד",
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 50,
-              "description": "פריטים לעמוד",
-              "maximum": 200,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
           }
         ],
         "responses": {
@@ -7487,7 +6423,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedPassengerRequestsResponse"
+                  "items": {
+                    "$ref": "#/components/schemas/PassengerRequestResponse"
+                  },
+                  "title": "Response Get My Requests Api V1 Passenger Passengers Me Get",
+                  "type": "array"
                 }
               }
             },
@@ -7621,26 +6561,7 @@
             }
           },
           {
-            "description": "יום מלא Asia/Jerusalem — הדדי ל־departure_time / departure_time_to",
-            "in": "query",
-            "name": "departure_date",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "date",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "יום מלא Asia/Jerusalem — הדדי ל־departure_time / departure_time_to",
-              "title": "Departure Date"
-            }
-          },
-          {
-            "description": "±2 שעות; או תחילת טווח עם departure_time_to",
+            "description": "אם ריק – יחפש מעכשיו",
             "in": "query",
             "name": "departure_time",
             "required": false,
@@ -7654,47 +6575,8 @@
                   "type": "null"
                 }
               ],
-              "description": "±2 שעות; או תחילת טווח עם departure_time_to",
+              "description": "אם ריק – יחפש מעכשיו",
               "title": "Departure Time"
-            }
-          },
-          {
-            "description": "סוף טווח כולל (דורש departure_time)",
-            "in": "query",
-            "name": "departure_time_to",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "סוף טווח כולל (דורש departure_time)",
-              "title": "Departure Time To"
-            }
-          },
-          {
-            "description": "רדיוס יעד בקילומטרים (אופציונלי)",
-            "in": "query",
-            "name": "destination_radius",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "maximum": 50,
-                  "minimum": 0.1,
-                  "type": "number"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "רדיוס יעד בקילומטרים (אופציונלי)",
-              "title": "Destination Radius"
             }
           },
           {
@@ -7712,20 +6594,21 @@
             }
           },
           {
-            "description": "opaque cursor",
+            "description": "cursor: ride_id להמשך",
             "in": "query",
             "name": "after",
             "required": false,
             "schema": {
               "anyOf": [
                 {
+                  "format": "uuid",
                   "type": "string"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "description": "opaque cursor",
+              "description": "cursor: ride_id להמשך",
               "title": "After"
             }
           },
@@ -8000,34 +6883,6 @@
               "description": "סנן לפי סטטוס: open, full, active, completed, cancelled",
               "title": "Status"
             }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 20,
-              "maximum": 100,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "after",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "After"
-            }
           }
         ],
         "responses": {
@@ -8035,7 +6890,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedRidesResponse"
+                  "items": {
+                    "$ref": "#/components/schemas/RideResponse"
+                  },
+                  "title": "Response Get My Rides Api V1 Rides Me Get",
+                  "type": "array"
                 }
               }
             },
@@ -8624,58 +7483,22 @@
     },
     "/api/v1/users/me/notifications": {
       "get": {
-        "description": "Cursor-paginated notifications: driver pending joins + passenger booking updates.",
+        "description": "All notifications for the user: as driver — join requests; as passenger — approve/reject/pending.",
         "operationId": "get_my_notifications_api_v1_users_me_notifications_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 20,
-              "maximum": 100,
-              "minimum": 1,
-              "title": "Limit",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "after",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "After"
-            }
-          }
-        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedNotificationsResponse"
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationItemResponse"
+                  },
+                  "title": "Response Get My Notifications Api V1 Users Me Notifications Get",
+                  "type": "array"
                 }
               }
             },
             "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
           }
         },
         "security": [

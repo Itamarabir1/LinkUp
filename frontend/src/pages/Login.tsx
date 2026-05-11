@@ -8,7 +8,6 @@ import { useAuth } from '../context/AuthContext';
 import GoogleSignIn from '../components/GoogleSignIn/GoogleSignIn.tsx';
 import ErrorBanner from '../components/ErrorBanner';
 import LoadingButton from '../components/LoadingButton';
-import { ERROR_MESSAGES } from '../config/constants';
 import { getApiErrorMessage, isTimeoutOrAbortError } from '../utils/apiError';
 import styles from './Login.module.css';
 
@@ -61,7 +60,7 @@ export default function Login() {
       navigate('/choose-destination', { replace: true });
     } catch (err: unknown) {
       if (isTimeoutOrAbortError(err)) {
-        setError(ERROR_MESSAGES.BACKEND_TIMEOUT);
+        setError(t('backend_timeout'));
         return;
       }
       setError(getApiErrorMessage(err, t('error_login_failed')));

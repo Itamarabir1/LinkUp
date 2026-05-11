@@ -3,7 +3,7 @@
 """
 
 import re
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 
 def parse_hebrew_time(time_str: str, base_date: datetime | None = None) -> datetime | None:
@@ -21,7 +21,7 @@ def parse_hebrew_time(time_str: str, base_date: datetime | None = None) -> datet
         return None
 
     if base_date is None:
-        base_date = datetime.now()
+        base_date = datetime.now(UTC)
 
     # Normalize input string
     time_str = time_str.strip()

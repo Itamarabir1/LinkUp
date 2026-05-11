@@ -2,10 +2,13 @@
 ייצוא טרמפים לקובצי iCal (.ics).
 """
 
+import logging
 from datetime import datetime
 
 from ..ai.schema import RideSummary
 from .builder import create_calendar_from_rides
+
+logger = logging.getLogger(__name__)
 
 
 def export_to_ical(rides: list[RideSummary], output_path: str, base_date: datetime | None = None) -> bool:
@@ -28,7 +31,7 @@ def export_to_ical(rides: list[RideSummary], output_path: str, base_date: dateti
 
         return True
     except Exception as e:
-        print(f"שגיאה ביצירת קובץ לוח שנה: {e}")
+        logger.error("export_to_ical failed: %s", e)
         return False
 
 

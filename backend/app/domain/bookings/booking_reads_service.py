@@ -258,7 +258,7 @@ class BookingReadsService:
         ride = await db.get(Ride, ride_id)
         if not ride or ride.driver_id != driver_id:
             raise ForbiddenRideActionError("גישה חסומה")
-        return await crud_booking.get_ride_bookings_by_status_async(db, ride_id, BookingStatus.PENDING)
+        return await crud_booking.get_ride_bookings_by_status_with_relations(db, ride_id, BookingStatus.PENDING)
 
     @staticmethod
     async def get_history_with_stats(db: AsyncSession, user_id: UUID, role: str):

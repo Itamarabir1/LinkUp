@@ -1,3 +1,4 @@
+import hmac
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -8,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 # Model and schemas
+from app.core.security import hash_refresh_token
 from app.domain.users.model import User
 from app.domain.users.schema import UserCreate, UserUpdate
 
@@ -75,7 +77,7 @@ class CRUDUser:
             update_data = obj_in.model_dump(exclude_unset=True)
 
         # Fields not allowed through this generic update
-        protected_fields = ["user_id", "created_at", "hashed_password"]
+        protected_fields = ["user_id", "created_at", "hashed_password", "refresh_token"]
 
         for field, value in update_data.items():
             if hasattr(db_obj, field) and field not in protected_fields:
@@ -105,12 +107,19 @@ class CRUDUser:
         return user
 
     async def update_refresh_token(self, db: AsyncSession, *, user: User, refresh_token: str | None) -> User:
-        """Set or clear refresh token (login/logout)."""
-        user.refresh_token = refresh_token
+        """Set or clear refresh token (login/logout). Stores SHA-256 hash, never plaintext."""
+        user.refresh_token = hash_refresh_token(refresh_token) if refresh_token else None
         db.add(user)
         await db.flush()
         await db.refresh(user)
         return user
+
+    @staticmethod
+    def verify_refresh_token(user: User, token: str) -> bool:
+        """Constant-time comparison of incoming token against stored hash."""
+        if not user.refresh_token or not token:
+            return False
+        return hmac.compare_digest(user.refresh_token, hash_refresh_token(token))
 
     async def update_password(self, db: AsyncSession, *, user: User, hashed_password: str) -> User:
         """Update hashed password only."""

@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 
 	"linkup/chat-ws/internal/config"
+	"linkup/chat-ws/internal/safego"
 )
 
 // ChannelUserOffline — publish payload = user_id (string); every chat-ws instance forwards to WS clients.
@@ -20,19 +22,59 @@ const ChannelUserOffline = "user:offline"
 // ChannelUserOnline — payload = user_id (string); broadcast user_online to all connected clients.
 const ChannelUserOnline = "user:online"
 
+const (
+	SubChat    = "chat"
+	SubOffline = "offline"
+	SubOnline  = "online"
+
+	subscriberHealthTimeout = 2 * time.Minute
+)
+
 // Hub maps user_id (UUID string) -> list of connections (one user can have multiple devices).
 type Hub struct {
 	mu          sync.RWMutex
 	users       map[string][]*Conn
 	redisClient *redis.Client
+
+	chatSubAt    atomic.Int64
+	offlineSubAt atomic.Int64
+	onlineSubAt  atomic.Int64
 }
 
 // NewHub creates a Hub. redisClient is used to publish typing events; can be nil (typing disabled).
+// Subscriber timestamps are seeded to now so /healthz has a grace window on startup.
 func NewHub(redisClient *redis.Client) *Hub {
-	return &Hub{
+	h := &Hub{
 		users:       make(map[string][]*Conn),
 		redisClient: redisClient,
 	}
+	now := time.Now().UnixMilli()
+	h.chatSubAt.Store(now)
+	h.offlineSubAt.Store(now)
+	h.onlineSubAt.Store(now)
+	return h
+}
+
+// MarkSubAlive records that a subscriber goroutine is active.
+func (h *Hub) MarkSubAlive(sub string) {
+	now := time.Now().UnixMilli()
+	switch sub {
+	case SubChat:
+		h.chatSubAt.Store(now)
+	case SubOffline:
+		h.offlineSubAt.Store(now)
+	case SubOnline:
+		h.onlineSubAt.Store(now)
+	}
+}
+
+// SubscribersHealthy returns true if every subscriber reported alive
+// within subscriberHealthTimeout.
+func (h *Hub) SubscribersHealthy() bool {
+	cutoff := time.Now().Add(-subscriberHealthTimeout).UnixMilli()
+	return h.chatSubAt.Load() > cutoff &&
+		h.offlineSubAt.Load() > cutoff &&
+		h.onlineSubAt.Load() > cutoff
 }
 
 // Register adds a connection for userID.
@@ -138,6 +180,7 @@ func (h *Hub) ScheduleLastSeenDebounce(ctx context.Context, userID, token string
 
 // RunLastSeenDebounceWorker every 5s: for each last_seen:hold:*, if debounce key is gone, PATCH backend and DEL hold.
 func (h *Hub) RunLastSeenDebounceWorker(ctx context.Context, cfg config.Config) {
+	defer safego.RecoverPanic("hub", "RunLastSeenDebounceWorker")
 	if h.redisClient == nil || cfg.BackendURL == "" {
 		return
 	}
@@ -231,6 +274,7 @@ func (h *Hub) PublishTypingMessage(payload []byte) {
 // RunUserOfflineSubscriber — separate Redis client from chat PSubscribe (recommended with go-redis).
 // Reconnects automatically with exponential backoff on disconnect.
 func (h *Hub) RunUserOfflineSubscriber(ctx context.Context, subClient *redis.Client) {
+	defer safego.RecoverPanic("hub", "RunUserOfflineSubscriber")
 	if subClient == nil {
 		return
 	}
@@ -261,6 +305,7 @@ func (h *Hub) runUserOfflineOnce(ctx context.Context, subClient *redis.Client) {
 	pubsub := subClient.Subscribe(ctx, ChannelUserOffline)
 	defer pubsub.Close()
 	ch := pubsub.Channel()
+	h.MarkSubAlive(SubOffline)
 	for {
 		select {
 		case <-ctx.Done():
@@ -282,6 +327,7 @@ func (h *Hub) runUserOfflineOnce(ctx context.Context, subClient *redis.Client) {
 }
 
 func (h *Hub) RunUserOnlineSubscriber(ctx context.Context, subClient *redis.Client) {
+	defer safego.RecoverPanic("hub", "RunUserOnlineSubscriber")
 	if subClient == nil {
 		return
 	}
@@ -312,6 +358,7 @@ func (h *Hub) runUserOnlineOnce(ctx context.Context, subClient *redis.Client) {
 	pubsub := subClient.Subscribe(ctx, ChannelUserOnline)
 	defer pubsub.Close()
 	ch := pubsub.Channel()
+	h.MarkSubAlive(SubOnline)
 	for {
 		select {
 		case <-ctx.Done():

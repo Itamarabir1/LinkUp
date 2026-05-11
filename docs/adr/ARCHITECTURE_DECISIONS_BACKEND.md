@@ -62,7 +62,7 @@
 | **למה Node.js** | תבניות מבוססות **React Email** נרנדרות בשרת עם **`renderToStaticMarkup`** — אותו דפוס כמו SSR בדפדפן, בלי להטמיע מנוע JavaScript בתוך תהליך Python; TypeScript וכלים (`react-email`) מיושרים לצוות הפרונט. |
 | **למה (סקייל / תפעול)** | **הפרדת אחריות**: orchestration, Outbox ושליחת SMTP נשארים ב-Python; רינדור HTML מרוכז בשירות שניתן לסקייל, לגרסאות ולפריסה עצמאית. |
 | **חוזה** | `EMAIL_MAP` בבקאנד משתמש ב-template names ב-**PascalCase**; ב-renderer יש `TEMPLATE_REGISTRY` + אימות fail-fast מול `EMAIL_MAP_KEYS` בזמן startup. |
-| **Trade-off** | תלות רשת נוספת (timeout, health, סדר עלייה). ב-Docker Compose: **healthcheck** ו-**`depends_on`** מ-`email-renderer` ל-`backend` ול-**`notification-worker`** (פרופיל **`compat`**: alias **`outbox-worker`**). |
+| **Trade-off** | תלות רשת נוספת (timeout, health, סדר עלייה). ב-Docker Compose: **healthcheck** ו-**`depends_on`** מ-`email-renderer` ל-`backend` ול-**`notification-worker`**. |
 | **אלטרנטיבות** | להישאר ב-Jinja2 בלבד; MJML/ HTML סטטי בלי קומפוננטות; או ספק SaaS לתבניות — פחות שליטה ושכפול לוגיקה מול המוצר. |
 | **בקצרה לראיון** | "העברנו רינדור מייל לשירות Node עם React Email כדי לשמור על תבניות מודרניות ו-SSR טבעי; Python ממשיך לנהל אירועים ואמינות דרך Outbox." |
 
