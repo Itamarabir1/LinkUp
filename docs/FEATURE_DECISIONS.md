@@ -90,11 +90,27 @@
 | | |
 |--|--|
 | **בעיה** | מספר מסלולי ניקוי בפרונט (**logout**, **`refreshUser`** catch, bootstrap **`fetchCurrentUser`** catch, ו-**`refreshAccessToken`** ב-`client.ts`) שיכפלו לוגיקה; כשזרימת הרענון נכשלת ב-axios, הקוד הקודם השאיר טוקן ב-React context כ‑**authenticated** בזמן ש-**localStorage** כבר התרוקן → משתמש "תקוע" על רוט מוגן. |
-| **החלטה** | פונקציה אחת **`tearDownSession({ reason })`** ב־[`AuthContext.tsx`](../frontend/src/context/AuthContext.tsx): **`user-action`** — `patchFcmToken(null)`, `logoutSession()`, אחר כך תמיד `cleanupFCM()`, `queryClient.clear()`, **`Sentry.setUser(null)`** (PROD), `clearTokens`, `isAuthenticated=false`. **`session-expired`** / **`bootstrap-failed`** מדלגים על קריאות HTTP (JWT לא מהימן), אבל מריצים את אותו **local teardown**. **`client.ts`**: בעת **`!refresh_token`** או refresh שנכשל — **`clearTokens()`** ואז **`window.dispatchEvent('auth:session-expired')`** עם **guard רק-entry** למניעת N אירועים מקבילים; בסוף זרימת 401 לאחר כשל refresh — סימון **`__sentryCaptured`** לפני `reject`. |
+| **החלטה** | פונקציה אחת **`tearDownSession({ reason })`** ב־[`AuthContext.tsx`](../frontend/src/context/AuthContext.tsx): **`user-action`** — `patchFcmToken(null)`, `logoutSession()` (שגם מנקה refresh cookie בשרת), אחר כך תמיד `cleanupFCM()`, `queryClient.clear()`, **`Sentry.setUser(null)`** (PROD), `clearTokens`, `isAuthenticated=false`. **`session-expired`** / **`bootstrap-failed`** מדלגים על קריאות HTTP (JWT לא מהימן), אבל מריצים את אותו **local teardown**. **`client.ts`**: **`refreshAccessToken`** שולח `POST /auth/refresh` עם `withCredentials: true` (ה-refresh token נשלח כ-HttpOnly cookie אוטומטית — **H19**); בעת catch — **`clearTokens()`** ואז **`window.dispatchEvent('auth:session-expired')`** עם **guard רק-entry** למניעת N אירועים מקבילים; בסוף זרימת 401 לאחר כשל refresh — סימון **`__sentryCaptured`** לפני `reject`. |
 | **Sentry noise** | ב־[`queryClient.ts`](../frontend/src/api/queryClient.ts), **`captureExceptionOnce`** מדלג על **401** בלבד (לא **403** — RBAC צריך להישאר visible). |
 | **Trade-off** | בלי **`patchFcmToken(null)`** בנתיב **session-expired** (מתכוון — מונע רקורסיה 401 והטוקן ב-DB יתעדכן ב-Re-login כשFirebase מחזיר token); משתמש אחר מאותה דפדפן עם אותו install — תלוי בהתנהגות Firebase ובניקוי NotRegistered בעתיד ב-backend אם צריך. |
 | **Interview pitch (≈30s)** | *"מרכזתי teardown לסוג הודעות: logout מפורש מול הרחבת session שמתה. Axios לא משתלב בצורה הגיונית בתוך React — CustomEvent מתנתק, guard מונע storm, והמסך עובר ל-login כי ProtectedRoute רואה isAuthenticated=false."* |
 | **הפניה** | Frontend ADR §21, [`client.ts`](../frontend/src/api/client.ts), [`queryClient.ts`](../frontend/src/api/queryClient.ts), [`AuthContext.tsx`](../frontend/src/context/AuthContext.tsx) |
+
+---
+
+<a id="refresh-token-httponly-cookie"></a>
+
+## H19 — Refresh token ב-HttpOnly cookie (XSS mitigation)
+
+| | |
+|--|--|
+| **בעיה** | Refresh token ב-`localStorage` חשוף לכל XSS — תוקף שמזריק סקריפט יכול לגנוב את ה-token ולחדש sessions ללא הגבלה. |
+| **החלטה** | הועבר ל-**`Set-Cookie: linkup_refresh_token`** עם **`HttpOnly; Secure; SameSite=lax; Path=/api/v1/auth`**. Backend: helper functions `_set_refresh_cookie` / `_clear_refresh_cookie` ב-`auth/router.py`; ה-token לא חוזר ב-JSON (הוסר מ-`LoginResponse` / `RefreshResponse`). Frontend: axios `withCredentials: true`; `setTokens(access)` ללא refresh; `clearTokens()` מוחק legacy key מ-localStorage (one-time migration). |
+| **CSRF** | `SameSite=lax` חוסם cross-origin POST (browser default); path scope (`/api/v1/auth`) מונע שליחת cookie לנתיבים אחרים; כל ה-endpoints הרלוונטיים הם POST-only. אין GET שמשנה state. לכן — אין צורך ב-CSRF token נפרד. |
+| **Secure flag** | נגזר מ-`settings.FORCE_HTTPS_REDIRECT` — `True` בפרודקשן (מאחורי nginx TLS), `False` בפיתוח מקומי (localhost HTTP). |
+| **Migration (frontend)** | `clearTokens()` כולל `localStorage.removeItem('linkup_refresh_token')` — מנקה key ישן אצל משתמשים קיימים שעדיין מחזיקים ערך מהגרסה הקודמת. |
+| **Trade-off** | cookie לא נגיש מ-JS — אי אפשר "לבדוק" refresh token בצד לקוח; הדפדפן שולח אוטומטית. הגנת CSRF ב-SameSite=lax מספיקה לאתרים שלא משתמשים ב-GET לפעולות שמשנות state (לינקאפ לא). |
+| **הפניה** | [`backend/app/domain/auth/router.py`](../backend/app/domain/auth/router.py), [`frontend/src/api/client.ts`](../frontend/src/api/client.ts), `docs/ENGINEERING_HIGHLIGHTS.md` |
 
 ---
 

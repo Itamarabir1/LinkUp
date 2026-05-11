@@ -183,25 +183,21 @@ class LoginUserInfo(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    """Login response: short-lived access token, refresh token, and user info."""
+    """Login response: short-lived access token and user info."""
 
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
     user: LoginUserInfo
 
 
 class RefreshRequest(BaseModel):
-    """Exchange a refresh token for a new access token."""
-
-    refresh_token: str = Field(..., description="Refresh token issued at login")
+    """Exchange a refresh token for a new access token (sent via HttpOnly cookie)."""
 
 
 class RefreshResponse(BaseModel):
-    """POST /auth/refresh response: rotated tokens and user info."""
+    """POST /auth/refresh response: new access token and user info."""
 
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
     user: LoginUserInfo
 

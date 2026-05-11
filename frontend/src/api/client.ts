@@ -4,13 +4,11 @@ import { STORAGE_KEYS } from '../config/constants';
 import { API_BASE_URL, API_TIMEOUT_MS } from '../config/env';
 import { throttle } from './throttle';
 
-// Log resolved API base (browser devtools console)
-console.log('[LinkUp Frontend] API Base URL:', API_BASE_URL);
-
 export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: API_TIMEOUT_MS,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 });
 
 /**
@@ -31,18 +29,13 @@ function getStoredAccessToken(): string | null {
   return localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
 }
 
-function getStoredRefreshToken(): string | null {
-  return localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-}
-
-export function setTokens(access: string, refresh: string): void {
+export function setTokens(access: string): void {
   localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, access);
-  localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refresh);
 }
 
 export function clearTokens(): void {
   localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+  localStorage.removeItem('linkup_refresh_token');
 }
 
 let sessionExpiredEmitted = false;
@@ -59,25 +52,17 @@ function emitSessionExpired(): void {
 }
 
 async function refreshAccessToken(): Promise<string | null> {
-  const refresh = getStoredRefreshToken();
-  if (!refresh) {
-    clearTokens();
-    emitSessionExpired();
-    return null;
-  }
   try {
     const { data } = await axios.post<{
       access_token: string;
-      refresh_token: string;
-    }>(`${API_BASE_URL}/auth/refresh`, { refresh_token: refresh }, {
+    }>(`${API_BASE_URL}/auth/refresh`, {}, {
       headers: { 'Content-Type': 'application/json' },
       timeout: API_TIMEOUT_MS,
+      withCredentials: true,
     });
     const newAccess = data.access_token;
-    const newRefresh = data.refresh_token;
     if (newAccess) {
       localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, newAccess);
-      if (newRefresh) localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, newRefresh);
       return newAccess;
     }
   } catch {

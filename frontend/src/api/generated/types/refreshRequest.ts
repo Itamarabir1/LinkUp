@@ -6,9 +6,7 @@
  */
 
 /**
- * Exchange a refresh token for a new access token.
+ * Exchange a refresh token for a new access token (sent via HttpOnly cookie).
  */
 export interface RefreshRequest {
-  /** Refresh token issued at login */
-  refresh_token: string;
 }

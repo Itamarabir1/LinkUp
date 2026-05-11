@@ -13,7 +13,7 @@ Authorization: Bearer <access_token>
 ```
 
 - **Access Token**: מתקבל מ-`POST /auth/login` או `POST /auth/google-signin` או `POST /auth/refresh`. תוקף: `ACCESS_TOKEN_EXPIRE_MINUTES` (ברירת מחדל 30). כולל **`jti`** (JWT ID) ייחודי; שרת בודק **Redis denylist** (`denylist:{jti}`) לפני שמשתמש מאומת ב-HTTP — אחרי **`POST /auth/logout`** עם אותו Bearer, אותו access נחסם עד `exp` (בנוסף לניקוי refresh ב-DB).
-- **Refresh Token**: נשמר ב-DB; משמש ל-`POST /auth/refresh` לקבלת access חדש. תוקף: `REFRESH_TOKEN_EXPIRE_DAYS` (7).
+- **Refresh Token (HttpOnly cookie)**: נשמר ב-DB (hash); מועבר ללקוח כ-**`Set-Cookie: linkup_refresh_token`** עם `HttpOnly; Secure; SameSite=lax; Path=/api/v1/auth`. תוקף: `REFRESH_TOKEN_EXPIRE_DAYS` (7). **לא חוזר בגוף ה-JSON** — הדפדפן שולח אותו אוטומטית ב-`POST /auth/refresh`. הגנת CSRF: `SameSite=lax` + path scope + POST-only endpoints.
 - **לוגין מייל+סיסמה:** שגיאת אימות אחידה (**401**, `AUTH_INVALID_CREDENTIALS`) גם כשהאימייל לא רשום וגם כשהסיסמה שגויה — **מניעת username enumeration** (OWASP); אימות מייל (`is_verified`) נבדק רק אחרי אימות סיסמה מוצלח.
 
 ### Idempotency-Key (אופציונלי)
@@ -93,9 +93,9 @@ Authorization: Bearer <access_token>
 | Method | Path | Auth | תיאור |
 |--------|------|------|--------|
 | POST | /register | לא | רישום — body: UserRegister (email, password, full_name, ...). מחזיר UserOut, שומר cookie לאימות מייל. **Rate limited** (Redis, אותו מנגנון כמו login/refresh). |
-| POST | /login | לא | התחברות — body: LoginRequest (email, password). מחזיר LoginResponse (access_token, refresh_token, user). Rate limited. |
-| POST | /refresh | לא | רענון טוקן — body: RefreshRequest (refresh_token). מחזיר RefreshResponse. Rate limited. |
-| POST | /logout | כן | ניקוי refresh ב-DB + **denylist** ל-access token מה-**`Authorization: Bearer`** (204). בלי Bearer — רק ניקוי refresh. |
+| POST | /login | לא | התחברות — body: LoginRequest (email, password). מחזיר LoginResponse (access_token, user) + **`Set-Cookie: linkup_refresh_token`** (HttpOnly). Rate limited. |
+| POST | /refresh | לא | רענון טוקן — refresh token נקרא מ-HttpOnly cookie (לא מגוף הבקשה). מחזיר RefreshResponse (access_token, user) + cookie מעודכן. Rate limited. |
+| POST | /logout | כן | ניקוי refresh ב-DB + **denylist** ל-access token מה-**`Authorization: Bearer`** + **מחיקת refresh cookie** (204). בלי Bearer — רק ניקוי refresh + cookie. |
 | GET | /verify-email/confirm | לא | אימות מייל מקישור — query: email, code. מפנה לפרונט. |
 | POST | /verify-email | לא | אימות מייל מקוד — body: VerifyEmailRequest (email, code). אימייל יכול מה-cookie. |
 | POST | /resend-verification | לא | body: EmailOnlyRequest. |

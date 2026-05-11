@@ -3,6 +3,15 @@ events {
 }
 
 http {
+  gzip on;
+  gzip_vary on;
+  gzip_proxied any;
+  gzip_min_length 1024;
+  gzip_types text/plain text/css application/json application/javascript text/xml application/xml image/svg+xml;
+
+  limit_req_zone $binary_remote_addr zone=api:10m rate=30r/s;
+  limit_req_status 429;
+
   map $http_upgrade $connection_upgrade {
     default upgrade;
     ''      close;
@@ -88,6 +97,7 @@ http {
 
     # REST + WebSocket (FastAPI) — /api/v1/*
     location /api/v1/ {
+      limit_req zone=api burst=50 nodelay;
       proxy_pass http://backend;
       proxy_next_upstream error timeout http_502;
       proxy_http_version 1.1;

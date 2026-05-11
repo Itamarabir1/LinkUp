@@ -10,7 +10,7 @@ export type RegisterPayload = {
 };
 
 export function loginWithPassword(email: string, password: string) {
-  return api.post<{ access_token: string; refresh_token: string; user: User }>('/auth/login', {
+  return api.post<{ access_token: string; user: User }>('/auth/login', {
     email,
     password,
   });
@@ -21,7 +21,7 @@ export function registerUser(payload: RegisterPayload) {
 }
 
 export function signInWithGoogleToken(idToken: string) {
-  return api.post<{ access_token: string; refresh_token: string; user: User }>(
+  return api.post<{ access_token: string; user: User }>(
     '/auth/google-signin',
     { id_token: idToken },
     { timeout: 60000 }

@@ -32,6 +32,13 @@ from app.db.session import engine
 from app.infrastructure.health.health_service import check_health, check_liveness, check_readiness
 
 setup_logging()
+
+if settings.ENVIRONMENT.lower() == "production" and getattr(settings, "DEBUG", False):
+    raise RuntimeError(
+        "DEBUG=True is not allowed in production. "
+        "Set DEBUG=False in backend/.env.production."
+    )
+
 logger = structlog.get_logger(__name__)
 
 # CORS: origins from config or FRONTEND_URL (computed before app creation)

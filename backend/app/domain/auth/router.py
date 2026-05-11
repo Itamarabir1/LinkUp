@@ -19,7 +19,6 @@ from app.domain.auth.schema import (
     LoginResponse,
     PasswordResetConfirm,
     PasswordResetConfirmResponse,
-    RefreshRequest,
     RefreshResponse,
     UserOut,
     UserRegister,
@@ -31,6 +30,30 @@ from app.domain.users.model import User
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+REFRESH_COOKIE_KEY = "linkup_refresh_token"
+
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=REFRESH_COOKIE_KEY,
+        value=token,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        httponly=True,
+        secure=settings.FORCE_HTTPS_REDIRECT,
+        samesite="lax",
+        path="/api/v1/auth",
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=REFRESH_COOKIE_KEY,
+        httponly=True,
+        secure=settings.FORCE_HTTPS_REDIRECT,
+        samesite="lax",
+        path="/api/v1/auth",
+    )
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -76,26 +99,29 @@ async def forgot_password(
 )
 async def login(
     data: LoginRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     _: None = Depends(rate_limit_auth),
     auth_svc: AuthService = Depends(get_auth_service),
 ):
     """
-    Authenticate and return a short-lived **access_token** plus **refresh_token**.
+    Authenticate and return a short-lived **access_token**.
 
-    Validates user exists, password matches, and `is_verified`.
-    Response includes JWT access token, rotated refresh token, `token_type: bearer`, and user info.
-
-    **Swagger:** run Login, copy `access_token`, click Authorize, paste token for protected routes.
-
+    The refresh token is set as an HttpOnly cookie scoped to /api/v1/auth.
     Clients send `Authorization: Bearer <access_token>` on protected APIs and call POST /auth/refresh
-    with the stored refresh token when the access token expires.
+    (cookie is sent automatically) when the access token expires.
     """
-    return await auth_svc.authenticate_and_create_token(
+    result = await auth_svc.authenticate_and_create_token(
         db=db,
         email=data.email,
         password=data.password,
     )
+    _set_refresh_cookie(response, result["refresh_token"])
+    return {
+        "access_token": result["access_token"],
+        "token_type": result.get("token_type", "bearer"),
+        "user": result["user"],
+    }
 
 
 @router.post(
@@ -105,18 +131,30 @@ async def login(
     summary="רענון Access Token",
 )
 async def refresh_token(
-    data: RefreshRequest,
+    request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     _: None = Depends(rate_limit_auth),
     auth_svc: AuthService = Depends(get_auth_service),
 ):
     """
-    Exchange the refresh token from login for a new access token and rotated refresh token.
+    Exchange the refresh token (HttpOnly cookie) for a new access token.
 
     Previous refresh tokens are invalidated; only the latest hash in DB is valid.
     Returns 401 (`InvalidRefreshTokenError`) when the token is wrong, expired, or not in DB.
     """
-    return await auth_svc.refresh_access_token(db, refresh_token=data.refresh_token)
+    from app.core.exceptions.auth import InvalidRefreshTokenError
+
+    token = request.cookies.get(REFRESH_COOKIE_KEY)
+    if not token:
+        raise InvalidRefreshTokenError()
+    result = await auth_svc.refresh_access_token(db, refresh_token=token)
+    _set_refresh_cookie(response, result["refresh_token"])
+    return {
+        "access_token": result["access_token"],
+        "token_type": result.get("token_type", "bearer"),
+        "user": result["user"],
+    }
 
 
 @router.post(
@@ -126,6 +164,7 @@ async def refresh_token(
 )
 async def logout(
     request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     auth_svc: AuthService = Depends(get_auth_service),
@@ -136,6 +175,7 @@ async def logout(
     if auth_header.lower().startswith("bearer "):
         access_token = auth_header[7:].strip()
     await auth_svc.logout(db, user=current_user, access_token=access_token)
+    _clear_refresh_cookie(response)
 
 
 def _frontend_base_url() -> str:
@@ -253,6 +293,7 @@ async def change_password(
 )
 async def google_signin(
     data: GoogleSignInRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     _: None = Depends(rate_limit_auth),
     auth_svc: AuthService = Depends(get_auth_service),
@@ -260,15 +301,20 @@ async def google_signin(
     """
     Google Sign-In: verify ID token from the client, auto-provision user if new.
 
-    Returns the same token bundle as password /login.
+    Returns the same token bundle as password /login (refresh token in HttpOnly cookie).
     """
     try:
-        # Ensure GOOGLE_CLIENT_ID is configured
         if not settings.GOOGLE_CLIENT_ID:
             logger.error("GOOGLE_CLIENT_ID not configured in settings")
             raise GoogleAuthFailed(message="שירות Google לא מוגדר בשרת")
 
-        return await auth_svc.authenticate_with_google(db=db, id_token=data.id_token)
+        result = await auth_svc.authenticate_with_google(db=db, id_token=data.id_token)
+        _set_refresh_cookie(response, result["refresh_token"])
+        return {
+            "access_token": result["access_token"],
+            "token_type": result.get("token_type", "bearer"),
+            "user": result["user"],
+        }
     except LinkUpError:
         raise
     except Exception as e:

@@ -113,7 +113,7 @@ jobs:
 
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
-            docker image prune -af
+            docker image prune -f
 
             if ! docker pull "$NEW_IMAGE"; then
               echo "WARN: pull failed for $NEW_IMAGE, falling back to ${GHCR_BASE}/backend:latest"

@@ -4,7 +4,6 @@
  */
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'linkup_access_token',
-  REFRESH_TOKEN: 'linkup_refresh_token',
 } as const;
 
 /** `window` CustomEvent name: notifications list should refetch (WS reconnect / server push). */

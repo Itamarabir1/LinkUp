@@ -10,6 +10,7 @@ FastAPI application: auth, rides, bookings, notifications, chat, workers.
 For production, use Docker (see root `docker-compose.yml`).
 
 - **Dockerfile (multi-stage):** `builder` stage installs gcc + libpq-dev + uv and Python dependencies. `runtime` stage is a clean `python:3.11-slim` with only `libpq5` (no build tools) — copies site-packages from builder. `development` inherits builder (for gcc rebuilds); `migrate`, `worker`, `production` inherit runtime (slim, non-root `appuser`). Production images do not contain gcc, test files, or pyproject.toml.
+- **Production DEBUG guard:** `app/main.py` raises `RuntimeError` at import time if `settings.ENVIRONMENT == "production"` and `DEBUG=True` — the process crashes before serving any request, preventing accidental debug mode in production.
 - **Uvicorn workers (Docker):** `backend/entrypoint.sh` מריץ `uvicorn ... --workers` לפי **`UVICORN_WORKERS`** ב-`backend/.env` (ברירת מחדל 1). ב-`.env.example`: **`UVICORN_WORKERS=4`**. פיתוח לוקאלי בלי דוקר: `run-backend.sh` / `run-backend.bat` — `--reload`, worker אחד.
 - **WebSocket auth:** `get_current_user_ws` מאמת **JWT בלבד** (אובייקט `WsUser`), בלי `SELECT` ל-DB בזמן חיבור — ראו `app/api/dependencies/auth.py`. HTTP endpoints עם `get_current_user` עדיין טוענים משתמש מ-DB.
 

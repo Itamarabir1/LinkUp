@@ -26,11 +26,12 @@
   - **Compose prod/dev split:** `docker-compose.yml` הוא **production baseline** (`backend.build.target: production`). בפיתוח, `docker-compose.override.yml` (נטען אוטומטית ע״י Docker Compose) מחליף ל-`target: development`, מוסיף **volume mounts** (`./backend/app:/app/app:ro`, `./backend/alembic:/app/alembic:ro`) לריענון קוד מהיר, ומפעיל `DEBUG=true`.
   - `docker-compose.yml`: ל־`db`, **`pgbouncer`**, `redis`, `rabbitmq`, **`migrate`**, `notification-worker`, `task-worker`, `ai-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **`migrate`** מריץ `alembic upgrade head` פעם אחת ויוצא (`restart: "no"`) ונשאר direct ל-`db`; **backend** וה־workers תלויים ב־`service_completed_successfully:migrate` וגם ב־`pgbouncer:service_healthy`. **healthcheck** על **`GET /readyz`** (Python `urllib` ל־`http://localhost:8000/readyz` בתוך הקונטיינר — readiness מול DB/Redis/RabbitMQ). **`chat-ws`** כולל healthcheck (`wget` על `/healthz`). לבדיקת תפעול עשירה יותר (כולל **`circuit_breakers`**) ראו **`GET /api/v1/health`** ב־**`docs/architecture/API.md`**. **`frontend`** ו־**`nginx`** מוגדרים באותו קובץ עם `profiles: ["prod"]` — עולים רק עם `docker compose --profile prod`; **nginx** תלוי ב־**backend** ב־`service_healthy`. שירות **`frontend`** (פרופיל prod) מגדיר **`env_file: ./frontend/.env`** — משתני `VITE_*` / `APP_ENV` נטענים לקונטיינר בזמן **יצירה** (גם אם הקובץ מינימלי), ואז entrypoint **`frontend/docker/40-render-config.sh`** מריץ **fail-fast** על מפתחות Firebase חובה + **`envsubst`** ל־`config.js` ו־`firebase-messaging-sw.js` (ראו **`docs/DEPLOYMENT.md`**, **`docs/FEATURE_DECISIONS.md#frontend-runtime-config`**).
   - **Non-root containers:** כל ה-images הסופיים רצים כמשתמש לא-root (`appuser` ב-backend production/worker/migrate, `nginx` ב-frontend, `node` ב-email-renderer, `appuser` ב-chat-ws).
+  - **Production DEBUG guard:** `backend/app/main.py` raises `RuntimeError` at import if `ENVIRONMENT=production` and `DEBUG=True` — process crashes before serving requests.
   - **Secrets isolation:** `chat-ws` מקבל רק `chat-ws/.env` (JWT_SECRET + REDIS_URL) — לא `backend/.env`. שירות ה-Go לא רואה סודות של Stripe, AWS, DB וכו׳.
   - **PgBouncer image:** נבנה מ-`infrastructure/pgbouncer/Dockerfile`; הקונטיינר מייצר בזמן startup את `/var/lib/pgbouncer/userlist.txt` מ־`POSTGRES_USER`/`POSTGRES_PASSWORD`/`PGBOUNCER_ADMIN_PASSWORD` (אין bind-mount ל-`userlist.txt` מה-host).
   - **פיתוח:** `docker compose up -d` → תשתית + **migrate** + 3 workers + backend (**8000**) + chat-ws (**8081**). פרונט: **`npm run dev`** בתיקיית `frontend`, לא קונטיינר.
    - **WebSocket בפיתוח:** צ'אט — `ws://localhost:8081/ws` (chat-ws); נסיעות / מיקום / **פיד התראות in-app** — `ws://localhost:8000/api/v1/...` (backend). מרוכז ב־[`frontend/src/config/env.ts`](../../frontend/src/config/env.ts).
-   - **סטאק מלא מאחורי Nginx (פורט 80):** לפני `docker compose --profile prod` הגדר **`SENTRY_REPORT_URI`** ב־`backend/.env` (endpoint של CSP reports מ־Sentry) והפעל **`bash scripts/ops/render-nginx-conf.sh`** כדי לייצר `nginx/nginx.conf` מה־template. אחר כך: `docker compose --profile prod up -d --build`.
+   - **סטאק מלא מאחורי Nginx (פורט 80):** לפני `docker compose --profile prod` הגדר **`SENTRY_REPORT_URI`** ב־`backend/.env` (endpoint של CSP reports מ־Sentry) והפעל **`bash scripts/ops/render-nginx-conf.sh`** כדי לייצר `nginx/nginx.conf` מה־template. אחר כך: `docker compose --profile prod up -d --build`. **Nginx** מפעיל **gzip compression** (`gzip_proxied any` — קריטי כי כל התגובות עוברות proxy) ו-**API rate limiting** (`limit_req_zone` 30r/s per IP על `/api/v1/`, `burst=50 nodelay`, `limit_req_status 429`).
   - **FCM (Model B לפרודקשן):** אין mount של קובץ credentials לקונטיינרים. בפרודקשן מגדירים `FIREBASE_CREDENTIALS_JSON` ב־`backend/.env` (JSON בשורה אחת). `FIREBASE_SERVICE_ACCOUNT_PATH` נשאר fallback לפיתוח לוקאלי בלבד.
    - **שינוי `backend/.env`:** משתני הסביבה של מיכל ה-backend נטענים בעת **יצירת** הקונטיינר. אחרי עריכת הקובץ הרץ `docker compose up -d --force-recreate backend` (לא מספיק `docker compose restart backend`).
   - **ולידציית פרודקשן אחרי שינוי סודות:** הרץ `bash scripts/ops/firebase-modelb-smoke.sh` משורש הפרויקט כדי לאמת טעינת Firebase + Redis contracts בפועל.
@@ -105,7 +106,7 @@
 | FIREBASE_CREDENTIALS_JSON | כן (פרודקשן) | מקור אמת יחיד לפרודקשן (Model B, בלי mount קובץ) |
 | RATE_LIMIT_AUTH_WINDOW_SECONDS | — | 60 |
 | RATE_LIMIT_AUTH_MAX_REQUESTS | — | 10 |
-| FORCE_HTTPS_REDIRECT | — | false (true מאחורי proxy) |
+| FORCE_HTTPS_REDIRECT | — | false (true מאחורי proxy); also controls `Secure` flag on the **refresh token HttpOnly cookie** (`linkup_refresh_token`) |
 | DOCKER_MODE | — | true ב-Docker |
 
 ### Google Sign-In local (403 origin not allowed)
@@ -286,6 +287,7 @@ LinkUp/
 - **למה broker-native retry (DLX/TTL) במקום republish ידני**: פחות race conditions ו-state בקוד worker; ה-broker מנהל delay/requeue, וה-worker מתמקד ב-ack/nack.
 - **למה PostgreSQL ולא MongoDB**: טרנזקציות, שלמות referential, PostGIS לגיאו, התאמה ל-ORM (SQLAlchemy).
 - **Cursor-based vs Page-based Pagination**: נסיעות והודעות — זרימה אינסופית ויציבות עם cursor; הזמנות — מספור עמודים ו-total לממשק "הזמנות שלי".
+- **למה refresh token ב-HttpOnly cookie (H19)**: localStorage חשוף ל-XSS; `HttpOnly; Secure; SameSite=lax; Path=/api/v1/auth` cookie לא נגיש מ-JS, מוגן מ-CSRF (lax + POST-only), ו-path-scoped כך שלא נשלח לנתיבי API אחרים. Frontend שולח `withCredentials: true`; לא דרוש CSRF token נפרד.
 - **למה PgBouncer עכשיו**: connection storms ב-EC2 קטן קורים לפני שנגמר CPU; pooler פנימי נותן שיפור מהיר בלי שינוי קוד דומיין.
 - **מה לא טריוויאלי (senior)**: `migrate` נשאר direct ל-`db`, `statement_cache_size=0` ל-asyncpg, ו-PgBouncer נשאר internal-only בלי פתיחת פורט ציבורי.
 - **Secrets ל-PgBouncer בפריסה**: אין יצירת `userlist.txt` על host/CI. ה-deploy רק מוודא ש־`POSTGRES_*` ו־`PGBOUNCER_ADMIN_PASSWORD` קיימים ב-`backend/.env`; הקובץ נוצר בתוך קונטיינר PgBouncer בזמן startup עם הרשאות פנימיות.

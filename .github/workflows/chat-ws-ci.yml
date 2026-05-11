@@ -27,6 +27,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      actions: write
     steps:
       - uses: actions/checkout@v5
 
@@ -43,6 +44,10 @@ jobs:
 
       - name: Vet
         run: go vet ./...
+
+      - name: Set up Docker Buildx
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to GHCR
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -64,3 +69,5 @@ jobs:
           context: ./chat-ws
           push: true
           tags: ghcr.io/${{ steps.lowercase.outputs.owner }}/linkup/chat-ws:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -11,7 +11,7 @@ Related operations docs:
 
 - **Host:** single EC2 instance.
 - **Runtime:** Docker Compose (`--profile prod`).
-- **Ingress:** `nginx` reverse proxy with TLS termination.
+- **Ingress:** `nginx` reverse proxy with TLS termination, **gzip compression** (`gzip_proxied any` for all upstream responses), and **API rate limiting** (30r/s per IP on `/api/v1/`, `limit_req_status 429`).
 - **Images:** נמשכות מ-GHCR — ברירות מחדל ב־**`docker-compose.yml`**: `ghcr.io/<owner>/linkup/{backend,worker,migrate,pgbouncer,frontend,chat-ws}` וגם **`ghcr.io/<owner>/linkup-email-renderer`** (שירות נפרד בלי קידומת `linkup/`). כל ה-images רצים כמשתמש **non-root** (backend/worker/migrate: `appuser`, frontend: `nginx` user, email-renderer: `node`, chat-ws: `appuser`).
 - **Public URL:** `https://linkup.itamarabir.com`.
 
@@ -34,7 +34,7 @@ Production deploy is centralized in **`deploy-ec2.yml`**, triggered by **`workfl
 
 | Workflow | When it runs | What it does |
 |----------|----------------|--------------|
-| [`backend-ci.yml`](../.github/workflows/backend-ci.yml) | Push/PR with path filters for backend, infra, nginx, compose, or this workflow file | Lint, tests, migrations, Docker build → push **`backend`**, **`worker`**, **`migrate`**, **`pgbouncer`** to GHCR on push to `main` (does **not** deploy by itself). |
+| [`backend-ci.yml`](../.github/workflows/backend-ci.yml) | Push/PR with path filters for backend, infra, nginx, compose, or this workflow file | Lint, tests, migrations, Docker build → push **`backend`**, **`worker`**, **`migrate`**, **`pgbouncer`** to GHCR on push to `main` (does **not** deploy by itself). **GHA Docker layer cache** (`setup-buildx-action` + `cache-from/to: type=gha,mode=max`) on all build targets for faster CI builds. |
 | [`deploy-ec2.yml`](../.github/workflows/deploy-ec2.yml) | After **Backend CI**, **Frontend CI**, **Chat-WS CI**, or **Email renderer CI** completes successfully on `main` (`workflow_run`) | Full stack on EC2: git sync, env sync, `envsubst` for edge **`nginx/nginx.conf`**, pull GHCR images, bring up infra → migrate → app services → **`frontend` + `nginx`**, **smokes** (`config.js` in **`linkup_frontend`**, `/health` in **`linkup_email_renderer`**) **before** backend rollout gate, health-gated backend deploy (`docker compose … --wait` on **`backend`**, then internal **`/readyz`** + Firebase env + Redis wiring in **`chat-ws`**), write resolved backend tag to **`.deploy_state/backend_prev_tag`**, rollback on failure. |
 
 ### Deploy (`deploy-ec2.yml`) — high-level flow
@@ -147,9 +147,10 @@ docker system df
 Cleanup:
 
 ```bash
-docker image prune -af
+docker image prune -f          # dangling only — preserves tagged images for rollback cache
 docker container prune -f
 docker volume prune -f
+# Note: deploy-ec2.yml uses `docker image prune -f` (not -af) to keep rollback images locally cached
 ```
 
 ### 2) RabbitMQ reset / consumer instability

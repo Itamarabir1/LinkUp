@@ -141,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const { data } = await loginWithPassword(email, password);
-    setTokens(data.access_token, data.refresh_token);
+    setTokens(data.access_token);
     queryClient.setQueryData(qk.auth.me(), data.user);
     setState({ user: data.user, isAuthenticated: true, isLoading: false });
     if (import.meta.env.PROD) {
@@ -158,7 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = useCallback(async (idToken: string) => {
     const { data } = await signInWithGoogleToken(idToken);
-    setTokens(data.access_token, data.refresh_token);
+    setTokens(data.access_token);
     queryClient.setQueryData(qk.auth.me(), data.user);
     setState({ user: data.user, isAuthenticated: true, isLoading: false });
     if (import.meta.env.PROD) {
