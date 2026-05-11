@@ -6,12 +6,12 @@ importScripts('https://www.gstatic.com/firebasejs/11.10.0/firebase-messaging-com
 // frontend/docker/firebase-messaging-sw.template.js via envsubst.
 // This fallback file stays scrubbed to avoid secret-scanner alerts.
 firebase.initializeApp({
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
+  apiKey: "AIzaSyA_-AcXKNVAusWm_q2MLq4i70os33FKQdo",
+  authDomain: "link-up-d33dc.firebaseapp.com",
+  projectId: "link-up-d33dc",
+  storageBucket: "link-up-d33dc.firebasestorage.app",
+  messagingSenderId: "650241102587",
+  appId: "1:650241102587:web:8b81490a43eff80000565e",
 });
 
 const messaging = firebase.messaging();

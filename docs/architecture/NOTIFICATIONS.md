@@ -27,6 +27,13 @@ Canonical overview of how outbound notifications are produced, rendered, and del
 - **Failure when open:** [`EmailProviderCircuitOpenError`](../../backend/app/core/exceptions/infrastructure.py) — HTTP **503**, `error_code` **`EMAIL_CIRCUIT_OPEN`** (workers should treat as transient / retry via RabbitMQ policy).
 - **Health (informational):** [`GET /api/v1/health`](API.md#health) includes **`circuit_breakers.brevo_email`**; it does **not** affect overall **`status`** (readiness is still DB + Redis + RabbitMQ only).
 
+## Event → channel mapping (notable entries)
+
+Full mapping: [`backend/app/domain/notifications/config/mappings.py`](../../backend/app/domain/notifications/config/mappings.py). Notable additions:
+
+- **`BOOKING_CANCELLED_BY_PASSENGER`** — role: **driver**, template: `passenger_cancelled`, channels: **[email, push, websocket]**. Fires only when a **passenger** cancels a **confirmed** booking (not pending). Outbox written in `cancel_booking()` before `db.commit()`.
+- **`PICKUP_REMINDER_PASSENGER`** / **`RIDE_START_DRIVER`** — channels: **[email, push]** (push added alongside email). Push templates `reminder_passenger` / `reminder_driver` in [`push_conf.py`](../../backend/app/domain/notifications/config/templates_map/push_conf.py).
+
 ## Retry / DLQ / replay
 
 - Broker-native retry via `retry_exchange` + per-queue `.retry` TTL queues; terminal failures → per-queue DLQ. Operational replay: `scripts/ops/rabbitmq-dlq-replay.py` — see [`EVENTS.md`](EVENTS.md).

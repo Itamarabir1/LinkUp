@@ -625,11 +625,41 @@
 | | |
 |--|--|
 | **בעיה** | שליטה ב-UX: Toast בחזית, SW ברקע, עקביות בין iOS/Web. |
-| **החלטה** | שרת שולח `data` map בלבד; קליינט מפרש ל-Toast/צליל. |
-| **אלטרנטивות** | (1) `notification` object של FCM — פחות שליטה אחידה. |
+| **החלטה** | שרת שולח `data` map בלבד; קליינט מפרש ל-Toast/צליל. SW config — מקור אמת אחד: `frontend/docker/firebase-messaging-sw.template.js`; Vite plugin ב-dev, `envsubst` ב-Docker. |
+| **אלטרנטיבות** | (1) `notification` object של FCM — פחות שליטה אחידה. |
 | **יתרון** | שליטה מלאה בטקסט, שפה, A/B, analytics. |
 | **Trade-off** | יותר לוגיקה בקליינט. |
 | **הפניה** | [FCM_SYSTEM_SUMMARY.md](FCM_SYSTEM_SUMMARY.md), [adr/FCM_AND_PUSH.md](adr/FCM_AND_PUSH.md) |
+
+---
+
+<a id="booking-cancelled-by-passenger"></a>
+
+## Booking cancelled by passenger — notification to driver
+
+| | |
+|--|--|
+| **בעיה** | כשנוסע מבטל הזמנה מאושרת, הנהג לא מקבל שום התראה — לא יודע שהתפנה מקום ושצריך לעדכן תכנון. |
+| **החלטה** | אירוע חדש **`BOOKING_CANCELLED_BY_PASSENGER`** ב-`NotificationEvent`; מופעל רק כשנוסע (לא נהג) מבטל booking **מאושר** (`CONFIRMED`). ב-`cancel_booking()` — בדיקת `is_passenger and was_confirmed` → `publish_to_outbox` לפני `db.commit()`. |
+| **אסטרטגיה** | `role: driver`, `builder: BookingBuilder`, `template: passenger_cancelled`, `channels: [email, push, websocket]`. |
+| **אלטרנטיבות** | (1) להתריע גם על ביטול PENDING — רעש מיותר לנהג. (2) רק מייל — חלון תגובה ארוך מדי. |
+| **יתרון** | הנהג מקבל עדכון מיידי בשלושה ערוצים; אותו pipeline כמו שאר אירועי booking (outbox → worker → channels). |
+| **Trade-off** | ביטול pending לא שולח התראה — בחירה מודעת להפחתת רעש. |
+| **הפניה** | [`backend/app/domain/bookings/service.py`](../backend/app/domain/bookings/service.py) (`cancel_booking`), [`backend/app/domain/notifications/constants.py`](../backend/app/domain/notifications/constants.py), [`backend/app/domain/notifications/config/mappings.py`](../backend/app/domain/notifications/config/mappings.py), [architecture/EVENTS.md](architecture/EVENTS.md) |
+
+---
+
+<a id="reminder-push-channel"></a>
+
+## Scheduled reminders — push channel
+
+| | |
+|--|--|
+| **בעיה** | תזכורות לנוסע ולנהג נשלחו רק במייל — שיעור פתיחה נמוך, חלון תגובה ארוך (30 דקות לפני נסיעה). |
+| **החלטה** | הוספת **`push`** לערוצי שני אירועי תזכורת (`PICKUP_REMINDER_PASSENGER`, `RIDE_START_DRIVER`); תבניות push חדשות `reminder_passenger` ו-`reminder_driver` ב-`push_conf.py`. |
+| **יתרון** | התראת מערכת מיידית למכשיר — גם אם המייל לא נפתח בזמן. |
+| **Trade-off** | שני ערוצים מקבילים יכולים ליצור "כפילות" תחושתית; push הוא ephemeral ומייל הוא persistent — משלימים זה את זה. |
+| **הפניה** | [`backend/app/domain/notifications/config/mappings.py`](../backend/app/domain/notifications/config/mappings.py), [`backend/app/domain/notifications/config/templates_map/push_conf.py`](../backend/app/domain/notifications/config/templates_map/push_conf.py), [FCM_SYSTEM_SUMMARY.md](FCM_SYSTEM_SUMMARY.md) §8 |
 
 ---
 
@@ -700,12 +730,12 @@
 | | |
 |--|--|
 | **בעיה** | `import.meta.env` ב-Vite מחליף ערכים בזמן build; image שנבנה בלי `VITE_*` גורם לפרונט שבור (`projectId` חסר ב-Firebase). |
-| **החלטה** | לעבור ל-runtime config: entrypoint מייצר `config.js` + `firebase-messaging-sw.js` עם `envsubst`; הקוד קורא `window.__APP_CONFIG__` עם fallback ל-`import.meta.env` בדב. |
+| **החלטה** | לעבור ל-runtime config: entrypoint מייצר `config.js` + `firebase-messaging-sw.js` עם `envsubst`; הקוד קורא `window.__APP_CONFIG__` עם fallback ל-`import.meta.env` בדב. **`firebase-messaging-sw.js`** — מקור אמת אחד: [`frontend/docker/firebase-messaging-sw.template.js`](../frontend/docker/firebase-messaging-sw.template.js); ב-dev/build: Vite plugin **`firebaseSwPlugin`** (`vite.config.ts`, hook `buildStart`, `loadEnv`) מחליף placeholders `${VITE_*}` וכותב ל-`public/`; ב-Docker: `envsubst` ב-`40-render-config.sh`. הקובץ gitignored — אין Firebase config hardcoded ב-git. |
 | **אלטרנטיבות** | (1) build-args + GH Secrets לכל VITE. (2) hardcode ציבורי בקוד. |
 | **יתרון** | image agnostic לסביבה; שינוי קונפיג = restart, לא rebuild/pipeline. |
 | **Trade-off** | עוד שכבת bootstrap בפרונט (template + entrypoint) וחובה לנהל env files בשרת בצורה עקבית. |
 | **Interview pitch (≈30s)** | *"הוצאתי קונפיג פרונט מזמן build לזמן runtime. אותו image רץ בכל סביבה, וה-entrypoint מייצר config.js מה-env. זה 12-factor נקי ומונע drift בין builds."* |
-| **הפניה** | `frontend/docker/40-render-config.sh` (**fail-fast** על מפתחות Firebase חובה; **defaults** לערכים אופציונליים), `frontend/src/config/runtime.ts`, `docker-compose.yml` (**`frontend`** עם **`env_file: ./frontend/.env`** בפרופיל prod) |
+| **הפניה** | `frontend/docker/40-render-config.sh` (**fail-fast** על מפתחות Firebase חובה; **defaults** לערכים אופציונליים), `frontend/src/config/runtime.ts`, `frontend/vite.config.ts` (**`firebaseSwPlugin`**), `docker-compose.yml` (**`frontend`** עם **`env_file: ./frontend/.env`** בפרופיל prod) |
 
 ---
 

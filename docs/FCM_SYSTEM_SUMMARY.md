@@ -27,7 +27,7 @@ FCM delivery has two connected paths:
 
 ### 2.1 Initialization trigger
 
-- **`AuthContext`** ([`frontend/src/context/AuthContext.tsx`](../frontend/src/context/AuthContext.tsx)): after successful **password login**, **Google sign-in**, or **initial session hydrate** (`fetchCurrentUser`), if `Notification.permission === 'granted'`, the app calls `void initFCM()` so the backend receives a fresh token for the logged-in user.
+- **`AuthContext`** ([`frontend/src/context/AuthContext.tsx`](../frontend/src/context/AuthContext.tsx)): after successful **password login**, **Google sign-in**, or **initial session hydrate** (`fetchCurrentUser`), the app calls `void initFCM()` unconditionally so the backend receives a fresh token for the logged-in user. `initFCM()` itself handles permission state internally (requests permission if `"default"`, exits early if `"denied"` or unsupported).
 - **Logout order (explicit user sign-out — `tearDownSession({ reason: 'user-action' })`):** `PATCH /users/fcm-token` with `{ "fcm_token": null }` (while the access token is still valid), then **`cleanupFCM()`** (unsubscribes foreground `onMessage`), then server `logout` / local token clear — so push is not sent to a stale device registration after sign-out.
 - **Session expiry / refresh failure (`session-expired`):** teardown clears tokens and local FCM listeners via the same **`cleanupFCM`** path but **does not** call **`PATCH …/fcm-token`** — intentional to avoid chained **401**s when JWT is already invalid; DB token can be refreshed on next successful login ([`FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#auth-session-teardown)).
 - **Profile menu:** “הפעל התראות” / enable notifications — [`useLayoutShell.ts`](../frontend/src/components/Layout/useLayoutShell.ts) calls `initFCM()` on user action (permission prompt + registration).
@@ -51,7 +51,7 @@ FCM delivery has two connected paths:
 ### 2.3 Foreground vs background
 
 - **Background**
-  - File: [`frontend/public/firebase-messaging-sw.js`](../frontend/public/firebase-messaging-sw.js)
+  - File: `frontend/public/firebase-messaging-sw.js` — **generated file** (gitignored). Source of truth: [`frontend/docker/firebase-messaging-sw.template.js`](../frontend/docker/firebase-messaging-sw.template.js). In dev/build: Vite plugin `firebaseSwPlugin` (`vite.config.ts`) reads the template and replaces `${VITE_*}` placeholders with values from `loadEnv`; in Docker: `envsubst` in `40-render-config.sh` at container start. Config is baked in at startup — no `postMessage` timing issues.
   - **`push` listener:** `event.waitUntil(registration.showNotification(...))` using `title` / `body` from `event.data?.json()?.data` (matches data-only backend).
   - **`messaging.onBackgroundMessage`:** still present for compatibility / `notification`-style payloads (e.g. `vibrate` on supported platforms). With **data-only** sends from the backend, the primary display path for system notifications is the **`push` handler**.
 
@@ -73,6 +73,7 @@ FCM delivery has two connected paths:
 - Env vars (see [`frontend/.env.example`](../frontend/.env.example)):
   - `VITE_FIREBASE_*` (apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId, measurementId)
   - `VITE_FIREBASE_VAPID_KEY` — required for `getToken` on web.
+- **Service worker config:** single source of truth is [`frontend/docker/firebase-messaging-sw.template.js`](../frontend/docker/firebase-messaging-sw.template.js). The generated `public/firebase-messaging-sw.js` is gitignored. **Dev:** Vite plugin `firebaseSwPlugin` in [`vite.config.ts`](../frontend/vite.config.ts) runs on `buildStart`, reads the template, replaces `${VITE_*}` placeholders via `loadEnv`, and writes the output. **Prod (Docker):** `envsubst` in [`40-render-config.sh`](../frontend/docker/40-render-config.sh) does the same at container start.
 
 ### 2.6 Dev test UI
 
@@ -155,7 +156,7 @@ messaging.Message(
 
 | Area | Files |
 |------|--------|
-| Frontend FCM | `frontend/src/services/fcm.ts` (`initFCM`, **`cleanupFCM`**), `frontend/src/config/firebase.ts`, `frontend/public/firebase-messaging-sw.js` (production image: rendered from `frontend/docker/firebase-messaging-sw.template.js`; **`importScripts`** Firebase compat SDK version aligned with **`firebase` npm** in `frontend/package.json`, e.g. **11.10.0**) |
+| Frontend FCM | `frontend/src/services/fcm.ts` (`initFCM`, **`cleanupFCM`**), `frontend/src/config/firebase.ts`, `frontend/public/firebase-messaging-sw.js` (**generated file**, gitignored; source of truth: `frontend/docker/firebase-messaging-sw.template.js`; dev/build: Vite plugin `firebaseSwPlugin` in `vite.config.ts`; prod: `envsubst` in `40-render-config.sh`; **`importScripts`** Firebase compat SDK version aligned with **`firebase` npm** in `frontend/package.json`, e.g. **11.10.0**) |
 | Toast UI | `NotificationToast.tsx`, `.module.css`, **`App.tsx`** (mount), `notificationToast.utils.ts` |
 | Auth + token lifecycle | `frontend/src/context/AuthContext.tsx`, `frontend/src/api/users.ts` (`patchFcmToken`) |
 | Profile “enable notifications” | `frontend/src/components/Layout/useLayoutShell.ts` |
@@ -173,7 +174,9 @@ messaging.Message(
    - **Background:** system notification from SW (`push` handler).
    - **Foreground:** toast under app chrome + sound if allowed.
 
-## 8) Scheduled email reminders (ReminderScheduler → handler)
+## 8) Scheduled reminders (ReminderScheduler → handler)
+
+Reminder events (`PICKUP_REMINDER_PASSENGER`, `RIDE_START_DRIVER`) are dispatched on both **email** and **push** channels.
 
 `ReminderScheduler` calls `NotificationHandler.handle_event` with an in-process payload (not the outbox). **Contract:** `scheduled_notification_id`, `ride_id`, and `user_id` together identify a due row in `scheduled_notifications` and tell the handler to hydrate a **`ScheduledReminderSource`**: the **ride** (with driver) supplies template context (`RideBuilder`); **`user_id`** is the recipient. Without all three fields, `ride_id` alone still loads a bare `Ride` and the usual resolver/builder paths apply. See [`backend/app/domain/notifications/core/scheduled_reminder_source.py`](../backend/app/domain/notifications/core/scheduled_reminder_source.py).
 

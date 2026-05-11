@@ -118,9 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (import.meta.env.PROD) {
           Sentry.setUser({ id: data.user_id });
         }
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          void initFCM();
-        }
+        void initFCM();
       })
       .catch(() => {
         if (cancelled) return;
@@ -147,9 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (import.meta.env.PROD) {
       Sentry.setUser({ id: data.user.user_id });
     }
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      void initFCM();
-    }
+    void initFCM();
   }, [queryClient]);
 
   const register = useCallback(async (payload: RegisterData) => {
@@ -164,9 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (import.meta.env.PROD) {
       Sentry.setUser({ id: data.user.user_id });
     }
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      void initFCM();
-    }
+    void initFCM();
   }, [queryClient]);
 
   const logout = useCallback(async () => {

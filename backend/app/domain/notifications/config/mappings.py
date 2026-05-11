@@ -35,7 +35,7 @@ NOTIFICATION_STRATEGY = {
         "role": "passenger",
         "builder": RideBuilder(),
         "template": "ride_created_for_passengers",
-        "channels": ["email"],
+        "channels": ["email", "push"],
     },
     NotificationEvent.RIDE_CANCELLED_BY_DRIVER: {
         "role": "passenger",
@@ -62,19 +62,25 @@ NOTIFICATION_STRATEGY = {
         "template": "booking_rejected",
         "channels": ["email", "push", "websocket"],
     },
+    NotificationEvent.BOOKING_CANCELLED_BY_PASSENGER: {
+        "role": "driver",
+        "builder": BookingBuilder(),
+        "template": "passenger_cancelled",
+        "channels": ["email", "push", "websocket"],
+    },
     # --- Reminders (scheduler) ---
     # Recipient from payload.user_id + ScheduledReminderSource; role bypasses normal resolver.
     NotificationEvent.PICKUP_REMINDER_PASSENGER: {
         "role": "passenger",
         "builder": RideBuilder(),
         "template": "reminder_passenger",
-        "channels": ["email"],
+        "channels": ["email", "push"],
     },
     NotificationEvent.RIDE_START_DRIVER: {
         "role": "driver",
         "builder": RideBuilder(),
         "template": "reminder_driver",
-        "channels": ["email"],
+        "channels": ["email", "push"],
     },
     # --- Chat ---
     NotificationEvent.CONVERSATION_COMPLETED: {

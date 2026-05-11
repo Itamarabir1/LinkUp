@@ -75,7 +75,7 @@ Outbox → Dispatcher → (RabbitMQ / Redis) → Workers/Realtime. מקור אמ
 1. פרסום נסיעה → commit + שורת Outbox **`ride.created`**.
 2. `notification-worker` → Outbox dispatcher מפרסם ל-exchange **`ride`** עם **`routing_key=ride.created`**.
 3. אותו תהליך Worker → consumer על **`notifications_queue`** מקבל `routing_key=ride.created` ומפעיל **`handle_ride_created`**.
-4. **אין יצירת Booking אוטומטית** — רק התראת מייל (וכל ערוץ נוסף שיוגדר בעתיד) לפי ההתאמה הגיאוגרפית.
+4. **אין יצירת Booking אוטומטית** — התראת מייל + push לפי ההתאמה הגיאוגרפית.
 
 פירוט סינון (רדיוסים, חלון תאריכים, `group_id`): ראו גם `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §17 ו-[`ARCHITECTURE.md`](../../ARCHITECTURE.md) (פסקת נוסע).
 
@@ -86,6 +86,7 @@ Outbox → Dispatcher → (RabbitMQ / Redis) → Workers/Realtime. מקור אמ
 | booking.passenger_join_request | booking | booking.passenger_join_request | request_to_join | booking_id, ride_id, passenger_id, ... |
 | booking.approved_by_driver | booking | booking.approved_by_driver | approve_booking | booking_id, ... |
 | booking.rejected_by_driver | booking | booking.rejected_by_driver | reject_booking | booking_id, ... |
+| booking.cancelled_by_passenger | booking | booking.cancelled_by_passenger | cancel_booking (passenger cancels confirmed) | booking_id |
 
 ### Chat
 

@@ -1,7 +1,24 @@
-import { defineConfig } from 'vitest/config'
+import fs from 'node:fs'
+import path from 'node:path'
+import { defineConfig, loadEnv } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { visualizer } from 'rollup-plugin-visualizer'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
+
+function firebaseSwPlugin(mode: string) {
+  const env = loadEnv(mode, process.cwd(), '')
+  return {
+    name: 'firebase-sw-from-template',
+    buildStart() {
+      const tpl = path.resolve(__dirname, 'docker/firebase-messaging-sw.template.js')
+      const out = path.resolve(__dirname, 'public/firebase-messaging-sw.js')
+      let content = fs.readFileSync(tpl, 'utf-8')
+      content = content.replace(/\$\{(\w+)}/g, (_, key) => env[key] ?? '')
+      fs.writeFileSync(out, content, 'utf-8')
+      console.log('[fcm-sw] Service worker written from template')
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -13,6 +30,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [
+      firebaseSwPlugin(mode),
       react(),
       visualizer({
         filename: 'dist/stats.html',

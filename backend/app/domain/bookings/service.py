@@ -218,10 +218,27 @@ class BookingService:
             ride = await crud_booking.get_ride_for_update(db, booking.ride_id)
             if not ride:
                 raise RideNotAvailableError(ride_id=str(booking.ride_id))
+            was_confirmed = str(booking.status) in (
+                BookingStatus.CONFIRMED,
+                BookingStatus.CONFIRMED.value,
+            )
             await crud_booking.execute_booking_cancellation(db, booking)
             await db.flush()
+            if is_passenger and was_confirmed:
+                await publish_to_outbox(
+                    db,
+                    NotificationEvent.BOOKING_CANCELLED_BY_PASSENGER.value,
+                    {"booking_id": str(booking.booking_id)},
+                    [DispatchTarget.RABBITMQ.value],
+                )
             await db.commit()
             bookings_cancelled_total.inc()
+            if is_passenger and was_confirmed:
+                await publish_user_event(
+                    ride.driver_id,
+                    "booking.cancelled_by_passenger",
+                    {"booking_id": str(booking_id), "ride_id": str(booking.ride_id)},
+                )
             return await crud_booking.get_booking_by_id_async(db, booking_id)
         except (BookingNotFoundError, ForbiddenRideActionError, RideNotAvailableError):
             await db.rollback()

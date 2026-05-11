@@ -18,6 +18,7 @@ class NotificationEvent(str, Enum):
     PASSENGER_JOIN_REQUEST = "booking.passenger_join_request"
     BOOKING_APPROVED_BY_DRIVER = "booking.approved_by_driver"
     BOOKING_REJECTED_BY_DRIVER = "booking.rejected_by_driver"
+    BOOKING_CANCELLED_BY_PASSENGER = "booking.cancelled_by_passenger"
     # Reminder events (strings must match reminder_scheduler)
     PICKUP_REMINDER_PASSENGER = "PICKUP_REMINDER_PASSENGER"
     RIDE_START_DRIVER = "RIDE_START_DRIVER"

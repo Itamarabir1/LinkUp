@@ -19,4 +19,16 @@ PUSH_TEMPLATES = {
         "title": "הנסיעה בוטלה 🛑",
         "body": "לצערנו הנהג ביטל את הנסיעה ל{destination}.",
     },
+    "reminder_passenger": {
+        "title": "⏰ תזכורת לנסיעה",
+        "body": "הנסיעה ל-{destination} מתחילה בעוד 30 דקות!",
+    },
+    "reminder_driver": {
+        "title": "⏰ תזכורת לנסיעה",
+        "body": "הנסיעה שלך ל-{destination} מתחילה בעוד 30 דקות!",
+    },
+    "ride_created_for_passengers": {
+        "title": "🚗 נסיעה חדשה זמינה!",
+        "body": "נסיעה ל-{destination} ב-{ride_date}. לחץ להצטרף.",
+    },
 }
