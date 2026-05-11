@@ -155,9 +155,12 @@ jobs:
               echo "No nginx-related changes in HEAD; skipping forced nginx recreate."
             fi
 
-            docker exec linkup_frontend wget -qO- http://localhost:80/config.js > /dev/null \
-              && echo "Frontend smoke OK" \
-              || { echo "Frontend smoke FAILED"; exit 1; }
+            for i in 1 2 3 4 5; do
+              docker exec linkup_frontend wget -qO- http://localhost:80/config.js > /dev/null \
+                && { echo "Frontend smoke OK"; break; } \
+                || { echo "Frontend smoke attempt $i failed, retrying in 3s..."; sleep 3; }
+              [ "$i" -eq 5 ] && { echo "Frontend smoke FAILED after $i attempts"; exit 1; }
+            done
 
             docker exec linkup_email_renderer wget -qO- http://localhost:3001/health > /dev/null \
               && echo "Email-renderer smoke OK" \
