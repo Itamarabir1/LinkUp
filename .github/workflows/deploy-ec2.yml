@@ -156,7 +156,7 @@ jobs:
             fi
 
             for i in 1 2 3 4 5; do
-              docker exec linkup_frontend wget -qO- http://localhost:80/config.js > /dev/null \
+              docker exec linkup_frontend wget -qO- http://localhost:8080/config.js > /dev/null \
                 && { echo "Frontend smoke OK"; break; } \
                 || { echo "Frontend smoke attempt $i failed, retrying in 3s..."; sleep 3; }
               [ "$i" -eq 5 ] && { echo "Frontend smoke FAILED after $i attempts"; exit 1; }
