@@ -52,7 +52,7 @@
 
 - New endpoints: add a function in the appropriate `src/api/<domain>.ts` file and import it from pages/hooks.
 - New pages: default export from `pages/<Name>.tsx` or `pages/<Name>/index.tsx`; register route in `App.tsx`.
-- **UI copy:** prefer **`useTranslation`** + JSON namespaces under `src/i18n/locales/`; for hook-level API error fallbacks use **`apiErr('err_*')`** with keys in `common.json`. Keep server-driven `error_code` handling aligned with [`docs/ERRORS.md`](../../docs/ERRORS.md).
+- **UI copy:** prefer **`useTranslation`** + JSON namespaces under `src/i18n/locales/`; for hook-level API error fallbacks use **`apiErr('err_*')`** with keys in `common.json`; for client-side validation errors (geolocation, missing fields, route selection) use **`t('err_*')`** from the feature namespace (e.g. `rides`). Page-level UI copy (e.g. `Messages.tsx`) uses **`common:msg_*`** / **`common:unread_count`** / **`common:user_fallback`**. Keep server-driven `error_code` handling aligned with [`docs/ERRORS.md`](../../docs/ERRORS.md).
 
 ## Scripts
 

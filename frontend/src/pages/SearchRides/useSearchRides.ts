@@ -178,7 +178,7 @@ export function useSearchRides() {
 
   const fillPickupFromMyLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      setError('הדפדפן לא תומך במיקום');
+      setError(t('err_geolocation_not_supported'));
       return;
     }
     const token = claimLocation();
@@ -201,7 +201,7 @@ export function useSearchRides() {
       },
       () => {
         if (isLocationOpCurrent(token)) {
-          setError('לא ניתן לקבל מיקום — בדוק הרשאות');
+          setError(t('err_geolocation_denied'));
           setLocationLoading(false);
         }
       },
@@ -419,7 +419,7 @@ export function useSearchRides() {
     (e: React.FormEvent) => {
       e.preventDefault();
       if (!pickup.trim() || !destination.trim()) {
-        setError('יש למלא מוצא ויעד');
+        setError(t('err_fill_origin_destination'));
         return;
       }
       claimLocation();
@@ -483,7 +483,7 @@ export function useSearchRides() {
   const sendRequestToJoin = useCallback(
     async (r: Ride) => {
       if (!pickup.trim() || !destination.trim()) {
-        setError('יש למלא מוצא ויעד לפני שליחת בקשה');
+        setError(t('err_fill_origin_destination_before_request'));
         return;
       }
       setError('');
@@ -493,7 +493,7 @@ export function useSearchRides() {
         destination,
         () => {},
         (msg) => setError(msg),
-        () => setError('פג תוקף ההתחברות'),
+        () => setError(t('err_session_expired_join')),
       );
     },
     [pickup, destination, joinRide],

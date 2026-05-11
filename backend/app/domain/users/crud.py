@@ -146,6 +146,23 @@ class CRUDUser:
         await db.refresh(user)
         return user
 
+    async def link_google_account(self, db: AsyncSession, *, user: User, google_sub: str) -> User:
+        """Link a Google account to an existing user and mark as verified."""
+        user.google_id = google_sub
+        user.is_verified = True
+        db.add(user)
+        await db.flush()
+        await db.refresh(user)
+        return user
+
+    async def update_last_login(self, db: AsyncSession, *, user: User) -> User:
+        """Stamp last_login to now (Google / token-based login)."""
+        user.last_login = datetime.now(UTC)
+        db.add(user)
+        await db.flush()
+        await db.refresh(user)
+        return user
+
     async def update_last_active(self, db: AsyncSession, *, user_id: UUID | str) -> bool:
         """Bump last_active_at (chat, etc.); does not touch last_login."""
         user = await self.get_by_id(db, user_id)

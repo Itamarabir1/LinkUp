@@ -313,11 +313,8 @@ class AuthService:
             # Persist user
             user = await self.crud_user.create(db, obj_in=user_create, hashed_password=hashed_password)
 
-            # Extra fields from Google (avatar_key stays None — S3 upload is explicit)
-            user.is_verified = True  # Google already verified email
-
+            await self.crud_user.update(db, db_obj=user, obj_in={"is_verified": True})
             await db.commit()
-            await db.refresh(user)
 
             logger.info(f"Auto-signup via Google: {email}")
             auth_registrations_total.labels(provider="google").inc()
@@ -342,18 +339,15 @@ class AuthService:
                     user.user_id,
                     type(user.user_id).__name__,
                 )
-                user.google_id = google_sub
-                user.is_verified = True
+                await self.crud_user.link_google_account(db, user=user, google_sub=google_sub)
                 await db.commit()
-                await db.refresh(user)
 
         # 4. Issue tokens (new or existing user)
         access_token = create_access_token(data={"sub": str(user.user_id)})
         refresh_token = create_refresh_token(data={"sub": str(user.user_id)})
 
         # 5+6. Save refresh token (hashed via CRUD) + last_login in one commit
-        user.last_login = datetime.now(UTC)
-        db.add(user)
+        await self.crud_user.update_last_login(db, user=user)
         await self.crud_user.update_refresh_token(db, user=user, refresh_token=refresh_token)
         await db.commit()
 

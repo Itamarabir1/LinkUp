@@ -18,6 +18,7 @@ const inboxLimit = inboxPageSizeDefault;
 
 export default function Messages() {
   const { t } = useTranslation('nav');
+  const { t: tc } = useTranslation('common');
   const pageTitle = t('messages');
   usePageTitle(pageTitle);
   const { user } = useAuth();
@@ -70,19 +71,19 @@ export default function Messages() {
       <aside ref={sidebarRef} className={styles.sidebar}>
         <header className={styles.sidebarHeader}>
           {unreadMessages > 0 && (
-            <span className={styles.newCount}>{unreadMessages} חדשות</span>
+            <span className={styles.newCount}>{tc('unread_count', { count: unreadMessages })}</span>
           )}
         </header>
 
         {loading ? (
-          <div className={styles.loading}>טוען...</div>
+          <div className={styles.loading}>{tc('loading')}</div>
         ) : error ? (
           <ErrorBanner message={error} variant="compact" className={styles.error} />
         ) : list.length === 0 ? (
           <div className={styles.emptyList}>
             <MessageCircle size={44} strokeWidth={1.5} className={styles.emptyIcon} />
-            <p className={styles.emptyTitle}>אין הודעות עדיין</p>
-            <p className={styles.emptySub}>הודעות יישלחו דרך נסיעות</p>
+            <p className={styles.emptyTitle}>{tc('msg_no_conversations')}</p>
+            <p className={styles.emptySub}>{tc('msg_no_conversations_sub')}</p>
           </div>
         ) : (
           <div className={styles.conversationList}>
@@ -108,7 +109,7 @@ export default function Messages() {
                 <div className={styles.rowContent}>
                   <div className={styles.rowFirst}>
                     <span className={`${styles.partnerName} ${c.has_unread ? styles.convName : ''}`}>
-                      {c.partner.full_name || `משתמש #${c.partner.user_id}`}
+                      {c.partner.full_name || tc('user_fallback', { id: c.partner.user_id })}
                     </span>
                     <span className={styles.rowTime}>
                       {formatConversationTime(c.last_message_at)}
@@ -122,7 +123,7 @@ export default function Messages() {
             ))}
             <div ref={sentinelRef} className={styles.inboxSentinel} aria-hidden />
             {isFetchingNextPage && (
-              <div className={styles.loadingMore}>טוען עוד…</div>
+              <div className={styles.loadingMore}>{tc('msg_loading_more')}</div>
             )}
           </div>
         )}
@@ -134,7 +135,7 @@ export default function Messages() {
         ) : (
           <div className={styles.panelPlaceholder}>
             <MessageCircle size={52} strokeWidth={1.5} className={styles.placeholderIcon} />
-            <p className={styles.placeholderText}>בחר שיחה כדי להתחיל</p>
+            <p className={styles.placeholderText}>{tc('msg_select_conversation')}</p>
           </div>
         )}
       </section>

@@ -108,6 +108,7 @@
 
 1. אם צריך מיפוי ייעודי בעברית ב-UI: הוסיפו `error_code` ל-`CODE_MESSAGES` ב-[`frontend/src/errors/useErrorHandler.ts`](../frontend/src/errors/useErrorHandler.ts) (אופציונלי — ברירת המחדל היא להשתמש ב-`message` מהשרת).
 2. ודאו שהבקשה עוברת דרך `api` מ-`src/api/client.ts` כדי שיופיעו לוגים/עתיד Sentry על שגיאות שאינן 401.
+3. **שגיאות ולידציה צד-לקוח** (לא מהשרת — למשל geolocation, שדות חסרים, בחירת מסלול): השתמשו ב-**`t('err_*')`** מ-namespace פיצ'רי (למשל `rides.json`) ולא במחרוזות עברית קשיחות. דפוס זה נפרד מ-`apiErr` / `CODE_MESSAGES` שנועדו ל-`error_code` שמגיע מהשרת.
 
 ---
 

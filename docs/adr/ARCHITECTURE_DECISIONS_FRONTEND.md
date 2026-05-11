@@ -104,10 +104,11 @@
 
 | | |
 |--|--|
-| **החלטה** | **i18next** + `react-i18next`; משאבים תחת [`frontend/src/i18n/locales/`](../../frontend/src/i18n/locales/) (`he` / `en`), כולל מפתחות **`common:err_*`** לטקסטי שגיאה כלליים. |
+| **החלטה** | **i18next** + `react-i18next`; משאבים תחת [`frontend/src/i18n/locales/`](../../frontend/src/i18n/locales/) (`he` / `en`), כולל מפתחות **`common:err_*`** לטקסטי שגיאה כלליים ו-**`rides:err_*`** לשגיאות ולידציה ספציפיות לדומיין (geolocation, מוצא/יעד, מסלול). UI copy בדפים (`Messages.tsx`) משתמש ב-**`common:msg_*`** / **`common:unread_count`** / **`common:user_fallback`**. |
 | **למה** | מוצר מקומי עם אפשרות הדגמה/שימוש ב-LTR; מחרוזות UI ושגיאות נשארות מתורגמות גם מחוץ לרכיבי React (hooks) דרך `i18n.t`. |
-| **בקצרה לראיון** | "לא שומרים עברית קשיחה ב-hooks — מפתחות `common` ו-`apiErr`." |
+| **בקצרה לראיון** | "אפס עברית קשיחה ב-hooks ובדפים — `common` ל-UI כללי, `rides:err_*` לולידציות דומיין, `apiErr` ל-fallback שגיאות שרת." |
 | **עדכון S.7** | `common`/`nav` נשארים **bundled** ב-`src/i18n/config.ts`, בעוד namespaces פיצ'ריים (`auth`,`rides`,`bookings`,`groups`,`profile`,`billing`) נטענים עצלנית דרך `i18next-http-backend` מ-`/locales/{{lng}}/{{ns}}.json` (מקור אמת נשאר ב-`src/i18n/locales`, והעתקה runtime ב-`public/locales`). |
+| **ניקוי מפתחות מתים** | סריקה אוטומטית של כל ~430 מפתחות מול קבצי מקור; הוסרו **57 מפתחות לא בשימוש** (~13%) מ-6 namespaces (`rides`, `bookings`, `groups`, `profile`, `auth`, `common`) — מפתחות שהוחלפו (`resendCode` → `resendNewCode`, `noBookingsPassenger` → `noPassengerBookings`, `driverTab` → `iAmDriver`), שגיאות ללא קריאה, ותוויות UI ישנות. `billing` ו-`nav` היו נקיים לחלוטין. תוקן באג runtime: `backend_timeout` ו-`error_origin_not_allowed` היו חסרים מ-`public/locales/auth.json` (הקובץ הנטען בפועל) למרות שקיימים ב-`src/i18n/locales/auth.json`. |
 
 ---
 

@@ -192,7 +192,7 @@ export function useCreateRide() {
 
   const fillOriginFromMyLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      setError('הדפדפן לא תומך במיקום');
+      setError(t('err_geolocation_not_supported'));
       return;
     }
     const token = claim();
@@ -214,7 +214,7 @@ export function useCreateRide() {
       },
       () => {
         if (isCurrent(token)) {
-          setError('לא ניתן לקבל מיקום — בדוק הרשאות');
+          setError(t('err_geolocation_denied'));
           setStatus('idle');
         }
       },
@@ -246,7 +246,7 @@ export function useCreateRide() {
       availableSeats: number,
     ) => {
       if (!user?.user_id) {
-        setError('לא זוהה משתמש מחובר. התחבר/י מחדש ונסה/י שוב.');
+        setError(t('err_not_logged_in'));
         return;
       }
 
@@ -355,15 +355,15 @@ export function useCreateRide() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!user?.user_id) {
-        setError('לא זוהה משתמש מחובר. התחבר/י מחדש ונסה/י שוב.');
+        setError(t('err_not_logged_in'));
         return;
       }
       if (!originName.trim() || !destinationName.trim()) {
-        setError('יש למלא מוצא ויעד');
+        setError(t('err_fill_origin_destination'));
         return;
       }
       if (isNaN(selectedDate.getTime()) || selectedDate <= new Date()) {
-        setError('יש לבחור זמן יציאה בעתיד');
+        setError(t('err_select_future_time'));
         return;
       }
       await performPreview(originName, destinationName, selectedDate, seats);
@@ -375,7 +375,7 @@ export function useCreateRide() {
     if (!preview?.session_id) return;
     const routesCount = preview.routes?.length ?? 0;
     if (routesCount > 1 && (selectedRouteIndex < 0 || selectedRouteIndex >= routesCount)) {
-      setError('יש לבחור מסלול');
+      setError(t('err_select_route'));
       return;
     }
     const token = claim();
