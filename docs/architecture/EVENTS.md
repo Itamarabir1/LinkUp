@@ -133,7 +133,7 @@ Outbox → Dispatcher → (RabbitMQ / Redis) → Workers/Realtime. מקור אמ
 
 מימוש: `backend/app/infrastructure/rabbitmq/consumer.py` — `_handle_with_retry`; retry path מתבסס על `nack(requeue=False)` ל-`retry_exchange` + `x-message-ttl` על `<queue>.retry`, וספירה לפי `x-death` של התור הראשי. קביעת retryability/delay/retry-cap דרך `QueueSpec` ב-`backend/app/infrastructure/rabbitmq/topology.py`.
 
-- **Outbox:** retry_count ו-last_error ב-outbox_events; ה-worker מפרסם ל-RabbitMQ לפי מדיניות.
+- **Outbox:** retry_count ו-last_error ב-outbox_events; ה-worker מפרסם ל-RabbitMQ לפי מדיניות. **`MAX_RETRIES = 5`** ב-`OutboxService` — אירוע שנכשל 5 פעמים מסומן כ-**`FAILED`** (לא חוזר ל-PENDING), ומתועד ב-`logger.error`. שחזור ידני אפשרי דרך ממשק האדמין (outbox requeue).
 
 ---
 

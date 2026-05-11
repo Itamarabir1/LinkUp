@@ -68,7 +68,7 @@
 | RABBITMQ_HOST | — | localhost / rabbitmq |
 | RABBITMQ_USER | כן | |
 | RABBITMQ_PASSWORD | כן | |
-| SECRET_KEY | כן (פרודקשן) | ל-JWT |
+| SECRET_KEY | כן (פרודקשן) | ל-JWT; **`model_validator`** אוכף **≥32 תווים** כש-`ENVIRONMENT=production` |
 | ALGORITHM | — | HS256 |
 | ACCESS_TOKEN_EXPIRE_MINUTES | — | 30 |
 | REFRESH_TOKEN_EXPIRE_DAYS | — | 7 |

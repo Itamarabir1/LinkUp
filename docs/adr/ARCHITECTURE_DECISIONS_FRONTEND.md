@@ -251,6 +251,18 @@
 
 ---
 
+## 22. Open redirect protection on post-login navigation
+
+| | |
+|--|--|
+| **הקשר** | אחרי login/Google Sign-In, הקוד קורא את `?from=` מה-URL ומפנה אליו. תוקף יכול להזריק `?from=https://evil.com` או `?from=//evil.com` ולהפנות משתמש אחרי התחברות מוצלחת. |
+| **החלטה** | לפני `navigate(decoded)`, לוודא `decoded.startsWith('/') && !decoded.startsWith('//')`. ב-`Login.tsx` — כישלון מפיל לשרשרת fallback (`fromState` → `/choose-destination`). ב-`useGoogleSignIn.ts` — גרסה נקייה עם `let target = '/choose-destination'` שמבטיחה navigate תמיד. |
+| **למה** | Open redirect הוא OWASP Top 10 (Unvalidated Redirects); גם אם `react-router` navigate לא תמיד מפנה חיצונית, best practice דורש validation בכל מקרה. |
+| **Trade-off** | אם `from` לא עומד בתנאי — המשתמש נוחת על דף ברירת מחדל במקום היעד המבוקש. זה מצב נדיר שלא אמור לקרות עם לינקים לגיטימיים מתוך האפליקציה. |
+| **בקצרה לראיון** | "מנענו open redirect אחרי login/Google Sign-In — `from` חייב להתחיל ב-`/` ולא ב-`//` כדי למנוע protocol-relative URLs." |
+
+---
+
 ## קישורים
 
 - [README.md](README.md) (מפת ADR)  

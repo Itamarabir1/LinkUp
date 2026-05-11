@@ -313,6 +313,30 @@
 
 ---
 
+## 27. Production secret validation — `model_validator` for `SECRET_KEY`
+
+| | |
+|--|--|
+| **הקשר** | `SECRET_KEY` משמש לחתימת JWT ואימות tokens. מפתח קצר בפרודקשן פוגע בביטחון כל מנגנוני ה-auth. |
+| **החלטה** | `model_validator(mode="after")` ב-`Settings` (Pydantic v2 `BaseSettings`) מוודא ש-`SECRET_KEY` ≥ 32 תווים כש-`ENVIRONMENT=production`. |
+| **למה `model_validator` ולא `field_validator`** | ב-Pydantic v2 עם `BaseSettings`, `field_validator(mode="after")` לא מקבל `info.data` עם שדות אחרים בצורה אמינה — הסדר תלוי בסדר ההגדרה במחלקה. `model_validator(mode="after")` רץ אחרי שכל השדות נטענו ומקבל `self` מלא. |
+| **סקייל/תפעול** | אם `SECRET_KEY` בפרודקשן קצר מ-32 — `Settings()` זורק `ValueError` והאפליקציה לא עולה. ב-dev/staging אין אכיפה (ברירת מחדל `""` עובדת). |
+| **בקצרה לראיון** | "הוספתי model_validator שמונע מהאפליקציה לעלות בפרודקשן עם מפתח JWT חלש — fail-fast בטעינה." |
+
+---
+
+## 28. Outbox MAX_RETRIES — retry cap for permanently failing events
+
+| | |
+|--|--|
+| **הקשר** | אירוע outbox שנכשל שוב ושוב (למשל בגלל routing שגוי או exchange חסר) ממשיך לחזור ל-PENDING ומציף לוגים ו-metrics אינסופי. |
+| **החלטה** | `MAX_RETRIES = 5` כקבוע ברמת מודול ב-`outbox_service.py`. בתחילת `process_single_event`, אם `retry_count >= MAX_RETRIES` — `mark_as_failed` (status=FAILED) + commit + `logger.error` + return. |
+| **למה** | מניעת retry storms; אירועים שנכשלו לצמיתות מפסיקים לצרוך משאבי worker ו-DB. שחזור ידני אפשרי דרך ממשק האדמין (outbox requeue — מחזיר ל-PENDING). |
+| **Trade-off** | `mark_as_failed` ב-repository מוסיף `retry_count + 1`, כך אירוע FAILED יציג `retry_count=6` — קוסמטי בלבד, לא משפיע על לוגיקה. |
+| **בקצרה לראיון** | "הוספתי תקרת 5 ניסיונות ל-outbox כדי למנוע retry storms — FAILED events ניתנים לשחזור דרך אדמין." |
+
+---
+
 ## קישורים
 
 - [README — מפת ADR](README.md)  
