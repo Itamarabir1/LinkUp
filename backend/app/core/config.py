@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
-from pydantic import AliasChoices, EmailStr, Field, computed_field, field_validator
+from pydantic import AliasChoices, EmailStr, Field, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Backend directory (where .env lives) so .env loads even when cwd differs
@@ -247,6 +247,15 @@ class Settings(BaseSettings):
             return v
         v = v.strip().removeprefix("https://").removeprefix("http://").rstrip("/")
         return v or None
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        if self.ENVIRONMENT.lower() == "production":
+            if len(self.SECRET_KEY) < 32:
+                raise ValueError(
+                    "SECRET_KEY must be at least 32 characters in production"
+                )
+        return self
 
     # --- Upload temp directory (staging before S3 upload) ---
     # Default: system temp (tempfile.gettempdir()). If set, use this path (created if missing).

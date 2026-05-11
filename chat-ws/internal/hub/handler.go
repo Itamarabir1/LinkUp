@@ -72,7 +72,7 @@ func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
 		}
 		conn.SetReadLimit(int64(maxMessageSize))
 		typingLimiter := rate.NewLimiter(rate.Limit(30), 60)
-		c := &Conn{UserID: userID, Conn: conn, Send: make(chan []byte, 256)}
+		c := &Conn{UserID: userID, Conn: conn, Send: make(chan []byte, 256), done: make(chan struct{})}
 		h.Register(userID, c)
 		h.SetPresence(context.Background(), userID)
 		h.ClearLastSeenDebounce(context.Background(), userID)
@@ -92,7 +92,7 @@ func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
 			}
 			h.ScheduleLastSeenDebounce(ctx, userID, token)
 			h.Unregister(userID, c)
-			close(c.Send)
+			close(c.done)
 		}()
 		go c.RunWritePump()
 		// Read client messages: typing_start/typing_stop -> publish to Redis; other types ignored for now.

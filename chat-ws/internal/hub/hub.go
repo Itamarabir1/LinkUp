@@ -229,10 +229,35 @@ func (h *Hub) PublishTypingMessage(payload []byte) {
 }
 
 // RunUserOfflineSubscriber — separate Redis client from chat PSubscribe (recommended with go-redis).
+// Reconnects automatically with exponential backoff on disconnect.
 func (h *Hub) RunUserOfflineSubscriber(ctx context.Context, subClient *redis.Client) {
 	if subClient == nil {
 		return
 	}
+	backoff := time.Second
+	const maxBackoff = 30 * time.Second
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		h.runUserOfflineOnce(ctx, subClient)
+		if ctx.Err() != nil {
+			return
+		}
+		slog.Warn("user offline subscriber disconnected, reconnecting", "backoff", backoff)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(backoff):
+		}
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+	}
+}
+
+func (h *Hub) runUserOfflineOnce(ctx context.Context, subClient *redis.Client) {
 	pubsub := subClient.Subscribe(ctx, ChannelUserOffline)
 	defer pubsub.Close()
 	ch := pubsub.Channel()
@@ -260,6 +285,30 @@ func (h *Hub) RunUserOnlineSubscriber(ctx context.Context, subClient *redis.Clie
 	if subClient == nil {
 		return
 	}
+	backoff := time.Second
+	const maxBackoff = 30 * time.Second
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		h.runUserOnlineOnce(ctx, subClient)
+		if ctx.Err() != nil {
+			return
+		}
+		slog.Warn("user online subscriber disconnected, reconnecting", "backoff", backoff)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(backoff):
+		}
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+	}
+}
+
+func (h *Hub) runUserOnlineOnce(ctx context.Context, subClient *redis.Client) {
 	pubsub := subClient.Subscribe(ctx, ChannelUserOnline)
 	defer pubsub.Close()
 	ch := pubsub.Channel()
@@ -303,6 +352,7 @@ func (h *Hub) broadcastOnline(onlineUserID string) {
 	for _, c := range conns {
 		select {
 		case c.Send <- payload:
+		case <-c.done:
 		default:
 		}
 	}
@@ -328,6 +378,7 @@ func (h *Hub) broadcastOffline(offlineUserID string) {
 	for _, c := range conns {
 		select {
 		case c.Send <- payload:
+		case <-c.done:
 		default:
 		}
 	}
@@ -345,8 +396,8 @@ func (h *Hub) SendToUser(userID string, payload []byte) {
 	for _, c := range conns {
 		select {
 		case c.Send <- payload:
+		case <-c.done:
 		default:
-			// buffer full, skip (or close conn)
 		}
 	}
 }

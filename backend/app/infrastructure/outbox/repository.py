@@ -33,7 +33,6 @@ class OutboxRepository:
                 event.status = "PENDING"
 
             await db.flush()  # persist without commit (e.g. for generated ID)
-            print(f"[NOTIF] Outbox repo: saved event_name={event.event_name}", flush=True)
             logger.info(
                 "[NOTIF] Outbox repo: saved event_name=%s (in API process)",
                 event.event_name,

@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class MaintenanceService:
     async def run_full_system_cleanup(self, db: AsyncSession) -> dict:
-        now = datetime.now()
+        now = datetime.now(UTC)
         try:
             stats, pending_events = await crud_maintenance.bulk_update_expired_entities(db, now)
             await db.commit()

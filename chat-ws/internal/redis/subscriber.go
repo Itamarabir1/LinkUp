@@ -2,7 +2,9 @@ package redis
 
 import (
 	"context"
+	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"linkup/chat-ws/internal/hub"
@@ -14,11 +16,33 @@ const (
 	UserEventPattern     = "user:*:events"
 )
 
-// RunSubscriber subscribes to chat/user event channels and forwards messages to the Hub.
 func RunSubscriber(ctx context.Context, client *redis.Client, h *hub.Hub) {
+	backoff := time.Second
+	const maxBackoff = 30 * time.Second
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		runOnce(ctx, client, h)
+		if ctx.Err() != nil {
+			return
+		}
+		slog.Warn("redis subscriber disconnected, reconnecting", "backoff", backoff)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(backoff):
+		}
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+	}
+}
+
+func runOnce(ctx context.Context, client *redis.Client, h *hub.Hub) {
 	pubsub := client.PSubscribe(ctx, ChatChannelPattern, TypingChannelPattern, UserEventPattern)
 	defer pubsub.Close()
-
 	ch := pubsub.Channel()
 	for {
 		select {

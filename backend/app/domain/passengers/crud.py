@@ -240,7 +240,7 @@ class CRUDPassenger:
         """Driver discovers passengers near their route polyline."""
         if not route_coords or len(route_coords) < 2:
             return []
-        now = datetime.now()
+        now = datetime.now(UTC)
         try:
             line = LineString([(p[1], p[0]) for p in route_coords])
             route_geom = from_shape(line, srid=4326)
@@ -270,7 +270,7 @@ class CRUDPassenger:
         radius: int,
     ) -> list[PassengerRequest]:
         """Match passenger requests near driver's origin/destination pair."""
-        now = datetime.now()
+        now = datetime.now(UTC)
         driver_origin = func.ST_SetSRID(func.ST_MakePoint(origin_lon, origin_lat), 4326)
         driver_dest = func.ST_SetSRID(func.ST_MakePoint(dest_lon, dest_lat), 4326)
         stmt = select(PassengerRequest).where(
@@ -304,7 +304,7 @@ class CRUDPassenger:
         Filter pipeline: active + notifications on + same group scope + future window
         → exclude driver → dest proximity → pickup near route.
         """
-        now = datetime.now()
+        now = datetime.now(UTC)
         ride_date = ride.departure_time.date() if getattr(ride, "departure_time", None) else None
         if not ride_date:
             logger.warning(

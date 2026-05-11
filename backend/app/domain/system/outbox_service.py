@@ -10,6 +10,8 @@ from app.infrastructure.outbox.repository import OutboxRepository
 
 logger = logging.getLogger(__name__)
 
+MAX_RETRIES = 5
+
 
 class OutboxService:
     def __init__(self, repo: OutboxRepository, dispatcher: EventDispatcher):
@@ -21,6 +23,15 @@ class OutboxService:
         הלוגיקה של 'איך מעבדים אירוע' נמצאת רק כאן.
         exchange + routing_key נגזרים מ-event_name (מקור אמת ב-domain.events.routing).
         """
+        if (db_event.retry_count or 0) >= MAX_RETRIES:
+            await self.repo.mark_as_failed(db, db_event.id, error_msg="Max retries exceeded")
+            await db.commit()
+            logger.error(
+                "[NOTIF] Outbox: event_id=%s permanently failed after %d retries event_name=%s",
+                db_event.id, MAX_RETRIES, db_event.event_name,
+            )
+            return
+
         try:
             targets = [DispatchTarget(t) for t in (db_event.targets or []) if t]
             metadata = get_routing_metadata(db_event.event_name)

@@ -43,7 +43,6 @@ async def register(
 ):
     """Register a new user (step one: create unverified account)."""
     logger.info("[LinkUp] register called: email=%s", getattr(user_in, "email", ""))
-    print("[LinkUp] register endpoint – starting register_new_user")
     new_user = await auth_svc.register_new_user(db=db, user_in=user_in)
 
     # Stash email in cookie for verification (10 minutes)

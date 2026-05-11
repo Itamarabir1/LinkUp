@@ -30,11 +30,14 @@ export function useGoogleSignIn({ onError, disabled }: UseGoogleSignInOptions) {
         await signInWithGoogle(response.credential);
         const searchParams = new URLSearchParams(location.search);
         const fromQuery = searchParams.get('from');
+        let target = '/choose-destination';
         if (fromQuery) {
-          navigate(decodeURIComponent(fromQuery), { replace: true });
-        } else {
-          navigate('/choose-destination', { replace: true });
+          const decoded = decodeURIComponent(fromQuery);
+          if (decoded.startsWith('/') && !decoded.startsWith('//')) {
+            target = decoded;
+          }
         }
+        navigate(target, { replace: true });
       } catch (err: unknown) {
         const e = err as { code?: string; message?: string };
         if ((e.code === 'ECONNABORTED' || (e.message && e.message.includes('timeout'))) && onError) {

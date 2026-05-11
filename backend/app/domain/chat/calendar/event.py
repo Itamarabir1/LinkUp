@@ -2,7 +2,7 @@
 יצירת אירועי לוח שנה מטרמפים.
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from icalendar import Event
 
@@ -50,7 +50,7 @@ def create_calendar_event(ride: RideSummary, base_date: datetime | None = None) 
         event.add("location", ride.pickup_location)
 
     # Created timestamp
-    event.add("dtstamp", datetime.now())
+    event.add("dtstamp", datetime.now(UTC))
 
     # Event UID
     event.add(

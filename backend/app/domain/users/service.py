@@ -114,7 +114,7 @@ class UserService:
         if not (-90 <= lat <= 90) or not (-180 <= lon <= 180) or (lat == 0 and lon == 0):
             raise InvalidLocationError(lat=lat, lon=lon)
 
-        success = self.crud.update_location(db, user_id=user_id, lat=lat, lon=lon)
+        success = await self.crud.update_location(db, user_id=user_id, lat=lat, lon=lon)
         if not success:
             raise UserNotFoundError(user_id=user_id)
         return True

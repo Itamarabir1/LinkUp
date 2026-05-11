@@ -47,8 +47,11 @@ export default function Login() {
       const searchParams = new URLSearchParams(location.search);
       const fromQuery = searchParams.get('from');
       if (fromQuery) {
-        navigate(decodeURIComponent(fromQuery), { replace: true });
-        return;
+        const decoded = decodeURIComponent(fromQuery);
+        if (decoded.startsWith('/') && !decoded.startsWith('//')) {
+          navigate(decoded, { replace: true });
+          return;
+        }
       }
       const fromState = state?.from;
       if (fromState) {

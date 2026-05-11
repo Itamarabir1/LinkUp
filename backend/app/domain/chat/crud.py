@@ -252,7 +252,7 @@ async def get_conversations_with_timeout(
         Conversations that should be analyzed
     """
     # Cutoff: now minus timeout_hours
-    timeout_threshold = datetime.utcnow() - timedelta(hours=timeout_hours)
+    timeout_threshold = datetime.now(UTC) - timedelta(hours=timeout_hours)
 
     # Last message before threshold and no chat_analysis row
     subquery = (

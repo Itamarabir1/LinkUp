@@ -130,7 +130,7 @@ flowchart LR
 | notification-worker | Python | Outbox dispatcher + notifications consumer (email/push/user refresh events) |
 | task-worker | Python | Avatar pipeline + scheduled tasks + scheduled publisher (**single replica**) — כולל **chat idle timeout** → `handle_conversation_completion` (Groq) |
 | ai-worker | Python | **מאזין אופציונלי** ל־Redis `chat:completion:*` (אותה לוגיקת ניתוח אם מתקבל payload) |
-| chat-ws  | Go               | WebSocket server; chat + typing + presence; Redis Pub/Sub including **`user:online` / `user:offline`** and **`user:*:events`** (ride/maintenance-style JSON to the logged-in client) |
+| chat-ws  | Go               | WebSocket server; chat + typing + presence; Redis Pub/Sub including **`user:online` / `user:offline`** and **`user:*:events`** (ride/maintenance-style JSON to the logged-in client). **Reconnect-safe:** all subscribers use exponential backoff (1s→30s); connection teardown uses `done` channel to prevent send-on-closed-channel panics. |
 | email-renderer | Node.js / Express / React Email | Dedicated email HTML rendering microservice (`/health`, `/render`), shared by backend notification flow |
 | frontend | React / TypeScript | Web app (Vite); Hebrew RTL |
 | mobile   | React Native / Expo | Mobile app (TypeScript) |

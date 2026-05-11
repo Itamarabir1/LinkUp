@@ -80,6 +80,12 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 2. **`ai-worker`** כולל **מאזין** אופציונלי ל־`chat:completion:*`; אין בשורות ה-Python ב-backend שזוהה **publish** לערוץ הזה — לא לבנות עליו בתור contract יציב עד שהקוד מתאים לתיעוד.
 3. תוצאה נשמרת ב־DB; פרסום ל-client דרך WS לניתוח — לא חלק מ-chat-ws היום.
 
+## Reliability & Concurrency
+
+- **Redis reconnect:** All Redis subscribers (`RunSubscriber`, `RunUserOfflineSubscriber`, `RunUserOnlineSubscriber`) use an exponential backoff reconnect loop (1s → 30s cap). If Redis disconnects, the goroutine logs a warning and re-subscribes automatically — no permanent message loss.
+- **Safe connection teardown:** Each `Conn` has a `done chan struct{}` that is closed on disconnect (instead of closing the `Send` channel). `RunWritePump` exits on `<-c.done` and sends a proper WebSocket `CloseNormalClosure` frame. All message senders (`SendToUser`, `broadcastOnline`, `broadcastOffline`) include `case <-c.done:` in their select, which prevents panics from sending on a closed channel when a broadcast snapshot races with connection cleanup.
+- **Graceful batching:** Multiple JSON payloads may be batched into a single WebSocket text frame separated by `\n`. The frontend splits on `\n` before `JSON.parse`.
+
 ## Presence ו-last seen (תקציר)
 
 - בחיבור WS: `SET presence:{user_id}` (TTL ~60s), **`PUBLISH user:online`** (payload = `user_id`) → כל מופעי chat-ws משדרים ללקוחות `{"type":"user_online","user_id":"..."}`.

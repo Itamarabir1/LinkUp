@@ -132,6 +132,7 @@ async def cancel_ride(
 async def read_ride(
     ride_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     ride_svc: RideService = Depends(get_ride_service),
 ):
     ride = await ride_svc.get_ride_by_id(db, ride_id)

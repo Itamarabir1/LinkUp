@@ -26,6 +26,7 @@ type Conn struct {
 	UserID string
 	Conn   *websocket.Conn
 	Send   chan []byte
+	done   chan struct{}
 }
 
 // RunWritePump pumps messages from the hub to the websocket connection.
@@ -39,21 +40,17 @@ func (c *Conn) RunWritePump() {
 
 	for {
 		select {
-		case message, ok := <-c.Send:
+		case <-c.done:
+			c.Conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+			return
+		case message := <-c.Send:
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if !ok {
-				// The hub closed the channel.
-				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
-			}
-
 			w, err := c.Conn.NextWriter(websocket.TextMessage)
 			if err != nil {
 				return
 			}
 			w.Write(message)
 
-			// Add queued chat messages to the current websocket message.
 			n := len(c.Send)
 			for i := 0; i < n; i++ {
 				w.Write([]byte{'\n'})
@@ -63,7 +60,6 @@ func (c *Conn) RunWritePump() {
 			if err := w.Close(); err != nil {
 				return
 			}
-
 		case <-ticker.C:
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
