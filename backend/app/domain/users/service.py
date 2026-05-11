@@ -108,6 +108,7 @@ class UserService:
         success = await self.crud.update_location(db, user_id=user_id, lat=lat, lon=lon)
         if not success:
             raise UserNotFoundError(user_id=user_id)
+        await db.commit()
         return True
 
     async def update_user_info(self, db: AsyncSession, user_id: int, update_data: UserUpdate) -> User:
@@ -153,6 +154,7 @@ class UserService:
     async def update_fcm_token(self, db: AsyncSession, user_id: int, fcm_token: str | None) -> bool:
         db_user = await self.get_user_by_id(db, user_id=user_id)
         await self.crud.update_fcm_token(db, user=db_user, token=fcm_token)
+        await db.commit()
         return True
 
 

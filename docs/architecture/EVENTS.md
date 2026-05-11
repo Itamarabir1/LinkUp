@@ -6,7 +6,7 @@ Outbox → Dispatcher → (RabbitMQ / Redis) → Workers/Realtime. מקור אמ
 
 ## Pattern: Outbox → Dispatcher → Targets
 
-1. **Backend** כותב אירוע ל-tבלת `outbox_events` (status=PENDING) באותה transaction עם שינוי עסקי.
+1. **Backend** כותב אירוע ל-טבלת `outbox_events` (status=PENDING) באותה transaction עם שינוי עסקי. CRUD write methods use `db.flush()` only; `OutboxRepository.save_event` also flushes without committing. The caller controls the single `db.commit()` that persists both the domain change and the outbox row atomically (see ADR backend §29).
 2. **notification-worker** מריץ `run_outbox_worker`, קורא רשומות PENDING ומפעיל `EventDispatcher` לפי `targets` של האירוע:
    - `RABBITMQ` -> `RabbitMQPublisher` (עם `get_routing_metadata(event_name)`),
    - `REDIS` -> `RedisChatPublisher` (למשל `chat.message_sent` -> `chat:conversation:{id}`).

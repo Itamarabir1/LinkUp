@@ -41,6 +41,7 @@ async def update_last_seen(
     ok = await crud_user.update_last_active(db, user_id=current_user.user_id)
     if not ok:
         raise UserNotFoundError(identifier=str(current_user.user_id))
+    await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

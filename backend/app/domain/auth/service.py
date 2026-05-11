@@ -134,6 +134,7 @@ class AuthService:
         await verification_service.verify_otp(str(user.user_id), "email_verification", code)
 
         await self.crud_user.update(db, db_obj=user, obj_in={"is_verified": True})
+        await db.commit()
         return {"message": "Account verified successfully", "status": "success"}
 
     async def request_password_reset(self, db: AsyncSession, email: str):
@@ -229,6 +230,7 @@ class AuthService:
 
         # 5. Persist refresh token (enables logout / revoke)
         await self.crud_user.update_refresh_token(db, user=user, refresh_token=refresh_token)
+        await db.commit()
 
         logger.info("User %s logged in successfully.", email)
         auth_logins_total.labels(provider="email").inc()
@@ -391,6 +393,7 @@ class AuthService:
         new_access_token = create_access_token(data={"sub": str(user.user_id)})
         new_refresh_token = create_refresh_token(data={"sub": str(user.user_id)})
         await self.crud_user.update_refresh_token(db, user=user, refresh_token=new_refresh_token)
+        await db.commit()
 
         return {
             "access_token": new_access_token,
@@ -407,6 +410,7 @@ class AuthService:
     async def logout(self, db: AsyncSession, user: User, access_token: str | None = None) -> None:
         """Clear refresh token; optionally denylist current access token jti until exp."""
         await self.crud_user.update_refresh_token(db, user=user, refresh_token=None)
+        await db.commit()
         if not access_token:
             return
         payload = decode_access_token(access_token)
@@ -434,6 +438,7 @@ class AuthService:
             raise InvalidPasswordError()
         hashed = await get_password_hash(data.new_password)
         await self.crud_user.update_password(db, user=user, hashed_password=hashed)
+        await db.commit()
         return {"message": "הסיסמה עודכנה בהצלחה", "status": "success"}
 
     async def reset_password_with_code(self, db: AsyncSession, email: str, code: str, new_password: str):
@@ -445,4 +450,5 @@ class AuthService:
         await verification_service.verify_otp(str(user.user_id), "password_reset", code)
         hashed = await get_password_hash(new_password)
         await self.crud_user.update_password(db, user=user, hashed_password=hashed)
+        await db.commit()
         return {"message": "Password reset successfully.", "status": "success"}

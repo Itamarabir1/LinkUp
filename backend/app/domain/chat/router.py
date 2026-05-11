@@ -197,6 +197,7 @@ async def post_message(
             body=data.body,
         )
         await crud_user.update_last_active(db, user_id=current_user.user_id)
+        await db.commit()
         if claimed and redis_key:
             await redis_client.idempotency_set_result(
                 redis_key,

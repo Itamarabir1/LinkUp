@@ -337,6 +337,20 @@
 
 ---
 
+## 29. Transaction ownership — CRUD flush-only, caller commits
+
+| | |
+|--|--|
+| **הקשר** | `CRUDUser` write methods (`update`, `update_location`, `update_fcm_token`, `update_refresh_token`, `update_password`, `mark_as_verified`, `update_last_active`) called `db.commit()` internally. This worked for simple operations but broke atomicity when callers needed to combine a DB write with an outbox event in a single transaction. Bug was first hit in `confirm_avatar_upload` and `remove_avatar` — fixed by bypassing CRUD, but the root cause remained. |
+| **החלטה** | All CRUD write methods use **`db.flush()`** only — they never commit. Callers own the transaction boundary and call **`await db.commit()`** when ready. One pattern, no `_no_commit` variants. |
+| **מה השתנה** | 7 methods in `users/crud.py` changed from `commit()` to `flush()`. 11 caller sites across 6 files (`auth/service.py` ×6, `push_provider.py` ×1, `users/service.py` ×2, `users/router.py` ×1, `chat/router.py` ×1) received explicit `await db.commit()`. Dead-code method `mark_as_verified` (zero callers) was removed. |
+| **למה בטוח** | Session factory in [`app/db/session.py`](../../backend/app/db/session.py) sets **`expire_on_commit=False`** — ORM attributes remain accessible after commit without `refresh()`. Outbox `save_event` already uses `flush()`. Methods `create`, `mark_as_premium`, `update_stripe_customer_id` already followed this pattern with callers committing in `register_new_user`, `authenticate_with_google`, and `billing/service.py`. |
+| **אלטרנטיבות** | (1) `_no_commit` variant methods — dual patterns, inconsistent, error-prone. (2) Context manager / middleware auto-commit — hides transaction boundaries, makes outbox atomicity implicit. |
+| **סקייל** | Enables any future caller to combine DB writes + outbox events atomically without CRUD-layer changes. The pattern is already proven in registration, avatar lifecycle, and billing. |
+| **בקצרה לראיון** | "העברתי transaction ownership מ-CRUD לקוראים — CRUD עושה flush בלבד, הקורא מחליט מתי לעשות commit. זה מאפשר atomicity בין כתיבות DB לאירועי outbox בלי band-aids." |
+
+---
+
 ## קישורים
 
 - [README — מפת ADR](README.md)  

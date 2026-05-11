@@ -47,6 +47,7 @@ class PushProvider(BaseNotificationProvider):
             logger.warning("🗑️ Invalid FCM token for user_id=%s — clearing from DB", uid)
             if db is not None:
                 await crud_user.update_fcm_token(db, user=user, token=None)
+                await db.commit()
             raise
 
         except Exception as e:

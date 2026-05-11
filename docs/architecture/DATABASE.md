@@ -7,7 +7,8 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 ## Overview
 
 - **Driver**: asyncpg (`postgresql+asyncpg://`).
-- **Connection**: `backend/app/db/session.py` — `get_db()` מחזיר AsyncSession.
+- **Connection**: `backend/app/db/session.py` — `get_db()` מחזיר AsyncSession. Session factory: `expire_on_commit=False`, `autocommit=False`, `autoflush=False`.
+- **Transaction ownership**: CRUD write methods use `db.flush()` only — callers own the transaction and call `db.commit()`. This enables atomic DB writes + outbox events in a single transaction. `expire_on_commit=False` means no `db.refresh()` is needed after commit. See ADR backend §29.
 - **רשימות נסיעות (נהג / קבוצה):** `get_by_driver_id` / `get_by_group_id` מגבילות ל־**200** שורות במיון `departure_time DESC` (קבוע `_RIDES_HARD_LIMIT` ב־`rides/crud.py`); ראו **`docs/architecture/API.md`** ל־`/rides/me` ו־`/groups/{id}/rides`.
 - **מדיה (קשר ל-S3, לא עמודה נפרדת):** שדות `avatar_key` ב-`users` / `groups` מחזיקים prefix או מפתח אובייקט ב-bucket; ה-API בונה URL ציבורי — עם **`CLOUDFRONT_DOMAIN`** (ראו `app/core/config.py`, `app/infrastructure/s3/service.py`) או presigned. פירוט תהליך אווטאר גרסתי: `ARCHITECTURE.md` (Features), `docs/ENGINEERING_HIGHLIGHTS.md` (סעיף 12).
 

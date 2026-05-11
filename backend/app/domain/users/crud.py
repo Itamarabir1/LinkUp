@@ -15,6 +15,10 @@ from app.domain.users.schema import UserCreate, UserUpdate
 class CRUDUser:
     """
     Async CRUD for User (SQLAlchemy 2.0), DDD-style service boundary.
+
+    Transaction ownership: all write methods use db.flush() only.
+    Callers are responsible for db.commit().
+    expire_on_commit=False means no db.refresh() needed after commit.
     """
 
     async def get_by_id(self, db: AsyncSession, id: UUID | str) -> User | None:
@@ -78,7 +82,7 @@ class CRUDUser:
                 setattr(db_obj, field, value)
 
         db.add(db_obj)
-        await db.commit()
+        await db.flush()
         await db.refresh(db_obj)
         return db_obj
 
@@ -88,7 +92,7 @@ class CRUDUser:
         user = await self.get_by_id(db, user_id)
         if user:
             user.last_location = ST_GeomFromText(point_wkt, srid=4326)
-            await db.commit()
+            await db.flush()
             return True
         return False
 
@@ -96,7 +100,7 @@ class CRUDUser:
         """Set or clear FCM token."""
         user.fcm_token = token
         db.add(user)
-        await db.commit()
+        await db.flush()
         await db.refresh(user)
         return user
 
@@ -104,7 +108,7 @@ class CRUDUser:
         """Set or clear refresh token (login/logout)."""
         user.refresh_token = refresh_token
         db.add(user)
-        await db.commit()
+        await db.flush()
         await db.refresh(user)
         return user
 
@@ -112,15 +116,7 @@ class CRUDUser:
         """Update hashed password only."""
         user.hashed_password = hashed_password
         db.add(user)
-        await db.commit()
-        await db.refresh(user)
-        return user
-
-    async def mark_as_verified(self, db: AsyncSession, user: User) -> User:
-        """Mark user verified."""
-        user.is_verified = True
-        db.add(user)
-        await db.commit()
+        await db.flush()
         await db.refresh(user)
         return user
 
@@ -148,7 +144,7 @@ class CRUDUser:
             return False
         user.last_active_at = datetime.now(UTC)
         db.add(user)
-        await db.commit()
+        await db.flush()
         return True
 
 
