@@ -7,11 +7,10 @@
 import type { LoginUserInfo } from './loginUserInfo';
 
 /**
- * Login response: short-lived access token, refresh token, and user info.
+ * Login response: short-lived access token and user info.
  */
 export interface LoginResponse {
   access_token: string;
-  refresh_token: string;
   token_type?: string;
   user: LoginUserInfo;
 }

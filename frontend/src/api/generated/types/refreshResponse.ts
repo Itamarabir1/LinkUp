@@ -7,11 +7,10 @@
 import type { LoginUserInfo } from './loginUserInfo';
 
 /**
- * POST /auth/refresh response: rotated tokens and user info.
+ * POST /auth/refresh response: new access token and user info.
  */
 export interface RefreshResponse {
   access_token: string;
-  refresh_token: string;
   token_type?: string;
   user: LoginUserInfo;
 }

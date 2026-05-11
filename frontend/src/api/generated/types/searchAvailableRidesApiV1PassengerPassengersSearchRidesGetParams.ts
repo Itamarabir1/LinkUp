@@ -15,9 +15,21 @@ destination_name: string;
  */
 search_radius?: number;
 /**
- * אם ריק – יחפש מעכשיו
+ * יום מלא Asia/Jerusalem — הדדי ל־departure_time / departure_time_to
+ */
+departure_date?: string | null;
+/**
+ * ±2 שעות; או תחילת טווח עם departure_time_to
  */
 departure_time?: string | null;
+/**
+ * סוף טווח כולל (דורש departure_time)
+ */
+departure_time_to?: string | null;
+/**
+ * רדיוס יעד בקילומטרים (אופציונלי)
+ */
+destination_radius?: number | null;
 /**
  * כמות תוצאות
  * @minimum 1
@@ -25,7 +37,7 @@ departure_time?: string | null;
  */
 limit?: number;
 /**
- * cursor: ride_id להמשך
+ * opaque cursor
  */
 after?: string | null;
 group_id?: string | null;

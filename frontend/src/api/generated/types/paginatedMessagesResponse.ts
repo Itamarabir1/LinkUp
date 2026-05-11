@@ -12,6 +12,6 @@ import type { AppDomainChatSchemaMessageResponse } from './appDomainChatSchemaMe
 export interface PaginatedMessagesResponse {
   has_more?: boolean;
   items?: AppDomainChatSchemaMessageResponse[];
-  /** Oldest message_id for next page (before=) */
+  /** Opaque cursor — pass as `after` query param. */
   next_cursor?: string | null;
 }

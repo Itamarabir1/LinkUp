@@ -9,9 +9,13 @@ import type {
   AISearchResult,
   AddressFromCoordsResponse,
   AdminAuditLogApiV1AdminAuditLogGetParams,
+  AdminBillingPaymentsApiV1AdminBillingPaymentsGetParams,
+  AdminBookingsApiV1AdminBookingsGetParams,
   AdminGroupsApiV1AdminGroupsGetParams,
   AdminOutboxApiV1AdminOutboxGetParams,
+  AdminOutboxByIdApiV1AdminOutboxEventIdGetParams,
   AdminRidesApiV1AdminRidesGetParams,
+  AdminToggleUserAdminApiV1AdminUsersUserIdAdminPatchParams,
   AdminUsersApiV1AdminUsersGetParams,
   AppDomainChatSchemaMessageResponse,
   AppDomainUsersSchemaMessageResponse,
@@ -25,18 +29,22 @@ import type {
   CheckoutResponse,
   ConversationCreate,
   ConversationDetail,
-  ConversationListItem,
+  DriverActiveResponse,
+  DriverHistoryResponse,
   DriverInfoResponse,
   DriverLocationReport,
-  DriverSummaryResponse,
   EmailOnlyRequest,
   FCMTokenUpdate,
   ForgotPasswordApiV1AuthForgotPasswordPostParams,
   GetAddressFromCoordsApiV1GeoAddressGetParams,
   GetAllRidesAdminApiV1PassengerPassengersAllGetParams,
   GetAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGetParams,
+  GetDriverHistorySummaryApiV1BookingsDriverSummaryHistoryGetParams,
+  GetGroupRidesApiV1GroupsGroupIdRidesGetParams,
+  GetMyNotificationsApiV1UsersMeNotificationsGetParams,
   GetMyRequestsApiV1PassengerPassengersMeGetParams,
   GetMyRidesApiV1RidesMeGetParams,
+  GetPassengerHistorySummaryApiV1BookingsPassengerSummaryHistoryGetParams,
   GetUserBookingsApiV1BookingsMyBookingsGetParams,
   GoogleSignInRequest,
   GroupCreate,
@@ -46,16 +54,23 @@ import type {
   GroupOut,
   GroupUpdate,
   ListConversationMessagesApiV1ChatConversationsConversationIdMessagesGetParams,
+  ListConversationMessagesGapApiV1ChatConversationsConversationIdMessagesGapGetParams,
+  ListConversationsApiV1ChatConversationsGetParams,
   LoginRequest,
   LoginResponse,
   MessageCreate,
-  NotificationItemResponse,
+  MessageGapResponse,
+  PaginatedBookingsResponse,
+  PaginatedConversationsResponse,
   PaginatedMessagesResponse,
+  PaginatedNotificationsResponse,
+  PaginatedPassengerRequestsResponse,
+  PaginatedRidesResponse,
+  PassengerActiveResponse,
+  PassengerHistoryResponse,
   PassengerLocationReport,
   PassengerRequestCreate,
-  PassengerRequestResponse,
   PassengerRequestWithMatches,
-  PassengerSummaryResponse,
   PasswordResetConfirm,
   PasswordResetConfirmResponse,
   PaymentRead,
@@ -104,6 +119,68 @@ const adminAuditLogApiV1AdminAuditLogGet = (
  options?: SecondParameter<typeof apiMutator<unknown>>,) => {
       return apiMutator<unknown>(
       {url: `/api/v1/admin/audit-log`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Billing Payments
+ */
+const adminBillingPaymentsApiV1AdminBillingPaymentsGet = (
+    params?: AdminBillingPaymentsApiV1AdminBillingPaymentsGetParams,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/billing/payments`, method: 'GET',
+        params
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Billing Payment By Id
+ */
+const adminBillingPaymentByIdApiV1AdminBillingPaymentsPaymentIdGet = (
+    paymentId: string,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/billing/payments/${paymentId}`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Billing Reconcile Payment
+ */
+const adminBillingReconcilePaymentApiV1AdminBillingReconcilePaymentIdPost = (
+    paymentId: string,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/billing/reconcile/${paymentId}`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Billing Stale Pending
+ */
+const adminBillingStalePendingApiV1AdminBillingStalePendingGet = (
+
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/billing/stale-pending`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Bookings
+ */
+const adminBookingsApiV1AdminBookingsGet = (
+    params?: AdminBookingsApiV1AdminBookingsGetParams,
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/bookings`, method: 'GET',
         params
     },
       options);
@@ -176,9 +253,11 @@ const adminOutboxApiV1AdminOutboxGet = (
  */
 const adminOutboxByIdApiV1AdminOutboxEventIdGet = (
     eventId: string,
+    params?: AdminOutboxByIdApiV1AdminOutboxEventIdGetParams,
  options?: SecondParameter<typeof apiMutator<unknown>>,) => {
       return apiMutator<unknown>(
-      {url: `/api/v1/admin/outbox/${eventId}`, method: 'GET'
+      {url: `/api/v1/admin/outbox/${eventId}`, method: 'GET',
+        params
     },
       options);
     }
@@ -191,6 +270,18 @@ const adminOutboxRequeueApiV1AdminOutboxEventIdRequeuePost = (
  options?: SecondParameter<typeof apiMutator<unknown>>,) => {
       return apiMutator<unknown>(
       {url: `/api/v1/admin/outbox/${eventId}/requeue`, method: 'POST'
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Queues
+ */
+const adminQueuesApiV1AdminQueuesGet = (
+
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/queues`, method: 'GET'
     },
       options);
     }
@@ -246,6 +337,18 @@ const adminStatsApiV1AdminStatsGet = (
     }
 
 /**
+ * @summary Admin System Overview
+ */
+const adminSystemOverviewApiV1AdminSystemOverviewGet = (
+
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/system/overview`, method: 'GET'
+    },
+      options);
+    }
+
+/**
  * @summary Admin Users
  */
 const adminUsersApiV1AdminUsersGet = (
@@ -275,9 +378,23 @@ const adminToggleUserActiveApiV1AdminUsersUserIdActivePatch = (
  */
 const adminToggleUserAdminApiV1AdminUsersUserIdAdminPatch = (
     userId: string,
+    params?: AdminToggleUserAdminApiV1AdminUsersUserIdAdminPatchParams,
  options?: SecondParameter<typeof apiMutator<unknown>>,) => {
       return apiMutator<unknown>(
-      {url: `/api/v1/admin/users/${userId}/admin`, method: 'PATCH'
+      {url: `/api/v1/admin/users/${userId}/admin`, method: 'PATCH',
+        params
+    },
+      options);
+    }
+
+/**
+ * @summary Admin Workers
+ */
+const adminWorkersApiV1AdminWorkersGet = (
+
+ options?: SecondParameter<typeof apiMutator<unknown>>,) => {
+      return apiMutator<unknown>(
+      {url: `/api/v1/admin/workers`, method: 'GET'
     },
       options);
     }
@@ -314,7 +431,7 @@ const forgotPasswordApiV1AuthForgotPasswordPost = (
 /**
  * Google Sign-In: verify ID token from the client, auto-provision user if new.
 
-Returns the same token bundle as password /login.
+Returns the same token bundle as password /login (refresh token in HttpOnly cookie).
  * @summary התחברות דרך Google OAuth
  */
 const googleSigninApiV1AuthGoogleSigninPost = (
@@ -329,15 +446,11 @@ const googleSigninApiV1AuthGoogleSigninPost = (
     }
 
 /**
- * Authenticate and return a short-lived **access_token** plus **refresh_token**.
+ * Authenticate and return a short-lived **access_token**.
 
-Validates user exists, password matches, and `is_verified`.
-Response includes JWT access token, rotated refresh token, `token_type: bearer`, and user info.
-
-**Swagger:** run Login, copy `access_token`, click Authorize, paste token for protected routes.
-
+The refresh token is set as an HttpOnly cookie scoped to /api/v1/auth.
 Clients send `Authorization: Bearer <access_token>` on protected APIs and call POST /auth/refresh
-with the stored refresh token when the access token expires.
+(cookie is sent automatically) when the access token expires.
  * @summary התחברות (Access Token)
  */
 const loginApiV1AuthLoginPost = (
@@ -395,17 +508,17 @@ const requestPasswordResetApiV1AuthPasswordResetRequestPost = (
     }
 
 /**
- * Exchange the refresh token from login for a new access token and rotated refresh token.
+ * Exchange the refresh token (HttpOnly cookie) for a new access token.
 
 Previous refresh tokens are invalidated; only the latest hash in DB is valid.
 Returns 401 (`InvalidRefreshTokenError`) when the token is wrong, expired, or not in DB.
  * @summary רענון Access Token
  */
 const refreshTokenApiV1AuthRefreshPost = (
+
  options?: SecondParameter<typeof apiMutator<RefreshResponse>>,) => {
       return apiMutator<RefreshResponse>(
-      {url: `/api/v1/auth/refresh`, method: 'POST',
-      headers: {'Content-Type': 'application/json', },
+      {url: `/api/v1/auth/refresh`, method: 'POST'
     },
       options);
     }
@@ -525,14 +638,27 @@ const stripeWebhookApiV1BillingWebhookPost = (
     }
 
 /**
- * Driver rides with embedded passengers — replaces N+1 fetchRideManifest loop.
- * @summary Get Driver Summary
+ * Active driver rides only (paginated counterpart uses /driver-summary/history).
+ * @summary Get Driver Active Summary
  */
-const getDriverSummaryApiV1BookingsDriverSummaryGet = (
+const getDriverActiveSummaryApiV1BookingsDriverSummaryActiveGet = (
 
- options?: SecondParameter<typeof apiMutator<DriverSummaryResponse>>,) => {
-      return apiMutator<DriverSummaryResponse>(
-      {url: `/api/v1/bookings/driver-summary`, method: 'GET'
+ options?: SecondParameter<typeof apiMutator<DriverActiveResponse>>,) => {
+      return apiMutator<DriverActiveResponse>(
+      {url: `/api/v1/bookings/driver-summary/active`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Get Driver History Summary
+ */
+const getDriverHistorySummaryApiV1BookingsDriverSummaryHistoryGet = (
+    params?: GetDriverHistorySummaryApiV1BookingsDriverSummaryHistoryGetParams,
+ options?: SecondParameter<typeof apiMutator<DriverHistoryResponse>>,) => {
+      return apiMutator<DriverHistoryResponse>(
+      {url: `/api/v1/bookings/driver-summary/history`, method: 'GET',
+        params
     },
       options);
     }
@@ -542,8 +668,8 @@ const getDriverSummaryApiV1BookingsDriverSummaryGet = (
  */
 const getUserBookingsApiV1BookingsMyBookingsGet = (
     params?: GetUserBookingsApiV1BookingsMyBookingsGetParams,
- options?: SecondParameter<typeof apiMutator<BookingResponse[]>>,) => {
-      return apiMutator<BookingResponse[]>(
+ options?: SecondParameter<typeof apiMutator<PaginatedBookingsResponse>>,) => {
+      return apiMutator<PaginatedBookingsResponse>(
       {url: `/api/v1/bookings/my-bookings`, method: 'GET',
         params
     },
@@ -551,14 +677,26 @@ const getUserBookingsApiV1BookingsMyBookingsGet = (
     }
 
 /**
- * Passenger bookings with embedded ride + driver — replaces N+1 fetchRideById loop.
- * @summary Get Passenger Summary
+ * @summary Get Passenger Active Summary
  */
-const getPassengerSummaryApiV1BookingsPassengerSummaryGet = (
+const getPassengerActiveSummaryApiV1BookingsPassengerSummaryActiveGet = (
 
- options?: SecondParameter<typeof apiMutator<PassengerSummaryResponse>>,) => {
-      return apiMutator<PassengerSummaryResponse>(
-      {url: `/api/v1/bookings/passenger-summary`, method: 'GET'
+ options?: SecondParameter<typeof apiMutator<PassengerActiveResponse>>,) => {
+      return apiMutator<PassengerActiveResponse>(
+      {url: `/api/v1/bookings/passenger-summary/active`, method: 'GET'
+    },
+      options);
+    }
+
+/**
+ * @summary Get Passenger History Summary
+ */
+const getPassengerHistorySummaryApiV1BookingsPassengerSummaryHistoryGet = (
+    params?: GetPassengerHistorySummaryApiV1BookingsPassengerSummaryHistoryGetParams,
+ options?: SecondParameter<typeof apiMutator<PassengerHistoryResponse>>,) => {
+      return apiMutator<PassengerHistoryResponse>(
+      {url: `/api/v1/bookings/passenger-summary/history`, method: 'GET',
+        params
     },
       options);
     }
@@ -685,14 +823,15 @@ const rejectBookingApiV1BookingsBookingIdRejectPatch = (
     }
 
 /**
- * Inbox for the current user with partner info and last message.
+ * Inbox for the current user with partner info and last message (cursor pagination).
  * @summary רשימת השיחות שלי
  */
 const listConversationsApiV1ChatConversationsGet = (
-
- options?: SecondParameter<typeof apiMutator<ConversationListItem[]>>,) => {
-      return apiMutator<ConversationListItem[]>(
-      {url: `/api/v1/chat/conversations`, method: 'GET'
+    params?: ListConversationsApiV1ChatConversationsGetParams,
+ options?: SecondParameter<typeof apiMutator<PaginatedConversationsResponse>>,) => {
+      return apiMutator<PaginatedConversationsResponse>(
+      {url: `/api/v1/chat/conversations`, method: 'GET',
+        params
     },
       options);
     }
@@ -770,6 +909,9 @@ const listConversationMessagesApiV1ChatConversationsConversationIdMessagesGet = 
 
 /**
  * Post a message; participants only. Rate limited: 30 messages/minute per user.
+
+Optional Idempotency-Key: same semantics as POST request-ride-from-search (Redis TTL;
+mismatch → 422, in-flight → 409 + Retry-After).
  * @summary שליחת הודעה
  */
 const postMessageApiV1ChatConversationsConversationIdMessagesPost = (
@@ -780,6 +922,21 @@ const postMessageApiV1ChatConversationsConversationIdMessagesPost = (
       {url: `/api/v1/chat/conversations/${conversationId}/messages`, method: 'POST',
       headers: {'Content-Type': 'application/json', },
       data: messageCreate
+    },
+      options);
+    }
+
+/**
+ * Reconnect backfill for messages newer than since_message_id.
+ * @summary פער הודעות מאז message_id אחרון
+ */
+const listConversationMessagesGapApiV1ChatConversationsConversationIdMessagesGapGet = (
+    conversationId: string,
+    params: ListConversationMessagesGapApiV1ChatConversationsConversationIdMessagesGapGetParams,
+ options?: SecondParameter<typeof apiMutator<MessageGapResponse>>,) => {
+      return apiMutator<MessageGapResponse>(
+      {url: `/api/v1/chat/conversations/${conversationId}/messages/gap`, method: 'GET',
+        params
     },
       options);
     }
@@ -997,9 +1154,11 @@ const promoteMemberApiV1GroupsGroupIdMembersUserIdPromotePatch = (
  */
 const getGroupRidesApiV1GroupsGroupIdRidesGet = (
     groupId: string,
- options?: SecondParameter<typeof apiMutator<RideResponse[]>>,) => {
-      return apiMutator<RideResponse[]>(
-      {url: `/api/v1/groups/${groupId}/rides`, method: 'GET'
+    params?: GetGroupRidesApiV1GroupsGroupIdRidesGetParams,
+ options?: SecondParameter<typeof apiMutator<PaginatedRidesResponse>>,) => {
+      return apiMutator<PaginatedRidesResponse>(
+      {url: `/api/v1/groups/${groupId}/rides`, method: 'GET',
+        params
     },
       options);
     }
@@ -1075,13 +1234,13 @@ const getAllRidesAdminApiV1PassengerPassengersAllGet = (
     }
 
 /**
- * List the current user's passenger requests.
+ * List the current user's passenger requests (paginated).
  * @summary Get My Requests
  */
 const getMyRequestsApiV1PassengerPassengersMeGet = (
     params?: GetMyRequestsApiV1PassengerPassengersMeGetParams,
- options?: SecondParameter<typeof apiMutator<PassengerRequestResponse[]>>,) => {
-      return apiMutator<PassengerRequestResponse[]>(
+ options?: SecondParameter<typeof apiMutator<PaginatedPassengerRequestsResponse>>,) => {
+      return apiMutator<PaginatedPassengerRequestsResponse>(
       {url: `/api/v1/passenger/passengers/me`, method: 'GET',
         params
     },
@@ -1176,8 +1335,8 @@ const createNewRideApiV1RidesPost = (
  */
 const getMyRidesApiV1RidesMeGet = (
     params?: GetMyRidesApiV1RidesMeGetParams,
- options?: SecondParameter<typeof apiMutator<RideResponse[]>>,) => {
-      return apiMutator<RideResponse[]>(
+ options?: SecondParameter<typeof apiMutator<PaginatedRidesResponse>>,) => {
+      return apiMutator<PaginatedRidesResponse>(
       {url: `/api/v1/rides/me`, method: 'GET',
         params
     },
@@ -1370,14 +1529,15 @@ const updateLastSeenApiV1UsersMeLastSeenPatch = (
     }
 
 /**
- * All notifications for the user: as driver — join requests; as passenger — approve/reject/pending.
+ * Cursor-paginated notifications: driver pending joins + passenger booking updates.
  * @summary Get My Notifications
  */
 const getMyNotificationsApiV1UsersMeNotificationsGet = (
-
- options?: SecondParameter<typeof apiMutator<NotificationItemResponse[]>>,) => {
-      return apiMutator<NotificationItemResponse[]>(
-      {url: `/api/v1/users/me/notifications`, method: 'GET'
+    params?: GetMyNotificationsApiV1UsersMeNotificationsGetParams,
+ options?: SecondParameter<typeof apiMutator<PaginatedNotificationsResponse>>,) => {
+      return apiMutator<PaginatedNotificationsResponse>(
+      {url: `/api/v1/users/me/notifications`, method: 'GET',
+        params
     },
       options);
     }
@@ -1407,9 +1567,14 @@ const getUserLastSeenApiV1UsersUserIdLastSeenGet = (
       options);
     }
 
-return {readRootGet,adminAuditLogApiV1AdminAuditLogGet,adminBookingByIdApiV1AdminBookingsBookingIdGet,adminGroupsApiV1AdminGroupsGet,adminHealthApiV1AdminHealthGet,adminMeApiV1AdminMeGet,adminOutboxApiV1AdminOutboxGet,adminOutboxByIdApiV1AdminOutboxEventIdGet,adminOutboxRequeueApiV1AdminOutboxEventIdRequeuePost,adminRidesApiV1AdminRidesGet,adminRideByIdApiV1AdminRidesRideIdGet,adminCancelRideApiV1AdminRidesRideIdCancelPost,adminStatsApiV1AdminStatsGet,adminUsersApiV1AdminUsersGet,adminToggleUserActiveApiV1AdminUsersUserIdActivePatch,adminToggleUserAdminApiV1AdminUsersUserIdAdminPatch,changePasswordApiV1AuthChangePasswordPost,forgotPasswordApiV1AuthForgotPasswordPost,googleSigninApiV1AuthGoogleSigninPost,loginApiV1AuthLoginPost,logoutApiV1AuthLogoutPost,confirmPasswordResetApiV1AuthPasswordResetConfirmPost,requestPasswordResetApiV1AuthPasswordResetRequestPost,refreshTokenApiV1AuthRefreshPost,registerApiV1AuthRegisterPost,resendVerificationCodeApiV1AuthResendVerificationPost,verifyEmailApiV1AuthVerifyEmailPost,verifyEmailByLinkApiV1AuthVerifyEmailConfirmGet,createCheckoutApiV1BillingCheckoutPost,getMyPaymentsApiV1BillingPaymentsGet,getBillingStatusApiV1BillingStatusGet,stripeWebhookApiV1BillingWebhookPost,getDriverSummaryApiV1BookingsDriverSummaryGet,getUserBookingsApiV1BookingsMyBookingsGet,getPassengerSummaryApiV1BookingsPassengerSummaryGet,requestToJoinApiV1BookingsRequestToJoinPost,getRideManifestApiV1BookingsRideRideIdManifestGet,getPendingRequestsApiV1BookingsRideRideIdPendingGet,getBookingApiV1BookingsBookingIdGet,approveBookingApiV1BookingsBookingIdApprovePatch,cancelBookingApiV1BookingsBookingIdCancelPost,reportDriverLocationApiV1BookingsBookingIdLocationPost,reportPassengerLocationApiV1BookingsBookingIdPassengerLocationPost,rejectBookingApiV1BookingsBookingIdRejectPatch,listConversationsApiV1ChatConversationsGet,createOrGetConversationApiV1ChatConversationsPost,createOrGetConversationByBookingApiV1ChatConversationsByBookingBookingIdPost,getConversationApiV1ChatConversationsConversationIdGet,exportConversationCalendarApiV1ChatConversationsConversationIdCalendarIcsGet,listConversationMessagesApiV1ChatConversationsConversationIdMessagesGet,postMessageApiV1ChatConversationsConversationIdMessagesPost,markReadApiV1ChatConversationsConversationIdReadPost,unreadCountApiV1ChatUnreadCountGet,getAddressFromCoordsApiV1GeoAddressGet,getMapsApiKeyApiV1GeoMapsKeyGet,createGroupApiV1GroupsPost,getGroupByInviteApiV1GroupsJoinInviteCodeGet,joinGroupApiV1GroupsJoinInviteCodePost,getMyGroupsApiV1GroupsMyGet,closeGroupApiV1GroupsGroupIdDelete,updateGroupApiV1GroupsGroupIdPatch,confirmGroupImageApiV1GroupsGroupIdConfirmImagePost,deleteGroupImageApiV1GroupsGroupIdImageDelete,leaveGroupApiV1GroupsGroupIdLeaveDelete,getMembersApiV1GroupsGroupIdMembersGet,removeMemberApiV1GroupsGroupIdMembersUserIdDelete,promoteMemberApiV1GroupsGroupIdMembersUserIdPromotePatch,getGroupRidesApiV1GroupsGroupIdRidesGet,getGroupImageUploadUrlApiV1GroupsGroupIdUploadImagePost,apiHealthApiV1HealthGet,createNewRequestApiV1PassengerPassengersPost,aiParseSearchApiV1PassengerPassengersAiParseSearchPost,getAllRidesAdminApiV1PassengerPassengersAllGet,getMyRequestsApiV1PassengerPassengersMeGet,requestRideFromSearchApiV1PassengerPassengersRequestRideFromSearchPost,searchAvailableRidesApiV1PassengerPassengersSearchRidesGet,cancelRequestApiV1PassengerPassengersRequestIdCancelDelete,getLatestMatchesApiV1PassengerPassengersRequestIdMatchesGet,getRideDriverInfoApiV1PassengerRidesRideIdDriverInfoGet,createNewRideApiV1RidesPost,getMyRidesApiV1RidesMeGet,previewRideOptionsApiV1RidesPreviewRoutesPost,readRideApiV1RidesRideIdGet,updateRideApiV1RidesRideIdPatch,cancelRideApiV1RidesRideIdCancelDelete,endRideApiV1RidesRideIdEndPost,startRideApiV1RidesRideIdStartPost,updateFcmTokenApiV1UsersFcmTokenPatch,getMyProfileApiV1UsersMeGet,updateMyProfileApiV1UsersMePut,removeMyAvatarApiV1UsersMeAvatarDelete,confirmAvatarUploadApiV1UsersMeAvatarConfirmPost,getAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGet,updateLastSeenApiV1UsersMeLastSeenPatch,getMyNotificationsApiV1UsersMeNotificationsGet,testPushApiV1UsersMeTestPushPost,getUserLastSeenApiV1UsersUserIdLastSeenGet}};
+return {readRootGet,adminAuditLogApiV1AdminAuditLogGet,adminBillingPaymentsApiV1AdminBillingPaymentsGet,adminBillingPaymentByIdApiV1AdminBillingPaymentsPaymentIdGet,adminBillingReconcilePaymentApiV1AdminBillingReconcilePaymentIdPost,adminBillingStalePendingApiV1AdminBillingStalePendingGet,adminBookingsApiV1AdminBookingsGet,adminBookingByIdApiV1AdminBookingsBookingIdGet,adminGroupsApiV1AdminGroupsGet,adminHealthApiV1AdminHealthGet,adminMeApiV1AdminMeGet,adminOutboxApiV1AdminOutboxGet,adminOutboxByIdApiV1AdminOutboxEventIdGet,adminOutboxRequeueApiV1AdminOutboxEventIdRequeuePost,adminQueuesApiV1AdminQueuesGet,adminRidesApiV1AdminRidesGet,adminRideByIdApiV1AdminRidesRideIdGet,adminCancelRideApiV1AdminRidesRideIdCancelPost,adminStatsApiV1AdminStatsGet,adminSystemOverviewApiV1AdminSystemOverviewGet,adminUsersApiV1AdminUsersGet,adminToggleUserActiveApiV1AdminUsersUserIdActivePatch,adminToggleUserAdminApiV1AdminUsersUserIdAdminPatch,adminWorkersApiV1AdminWorkersGet,changePasswordApiV1AuthChangePasswordPost,forgotPasswordApiV1AuthForgotPasswordPost,googleSigninApiV1AuthGoogleSigninPost,loginApiV1AuthLoginPost,logoutApiV1AuthLogoutPost,confirmPasswordResetApiV1AuthPasswordResetConfirmPost,requestPasswordResetApiV1AuthPasswordResetRequestPost,refreshTokenApiV1AuthRefreshPost,registerApiV1AuthRegisterPost,resendVerificationCodeApiV1AuthResendVerificationPost,verifyEmailApiV1AuthVerifyEmailPost,verifyEmailByLinkApiV1AuthVerifyEmailConfirmGet,createCheckoutApiV1BillingCheckoutPost,getMyPaymentsApiV1BillingPaymentsGet,getBillingStatusApiV1BillingStatusGet,stripeWebhookApiV1BillingWebhookPost,getDriverActiveSummaryApiV1BookingsDriverSummaryActiveGet,getDriverHistorySummaryApiV1BookingsDriverSummaryHistoryGet,getUserBookingsApiV1BookingsMyBookingsGet,getPassengerActiveSummaryApiV1BookingsPassengerSummaryActiveGet,getPassengerHistorySummaryApiV1BookingsPassengerSummaryHistoryGet,requestToJoinApiV1BookingsRequestToJoinPost,getRideManifestApiV1BookingsRideRideIdManifestGet,getPendingRequestsApiV1BookingsRideRideIdPendingGet,getBookingApiV1BookingsBookingIdGet,approveBookingApiV1BookingsBookingIdApprovePatch,cancelBookingApiV1BookingsBookingIdCancelPost,reportDriverLocationApiV1BookingsBookingIdLocationPost,reportPassengerLocationApiV1BookingsBookingIdPassengerLocationPost,rejectBookingApiV1BookingsBookingIdRejectPatch,listConversationsApiV1ChatConversationsGet,createOrGetConversationApiV1ChatConversationsPost,createOrGetConversationByBookingApiV1ChatConversationsByBookingBookingIdPost,getConversationApiV1ChatConversationsConversationIdGet,exportConversationCalendarApiV1ChatConversationsConversationIdCalendarIcsGet,listConversationMessagesApiV1ChatConversationsConversationIdMessagesGet,postMessageApiV1ChatConversationsConversationIdMessagesPost,listConversationMessagesGapApiV1ChatConversationsConversationIdMessagesGapGet,markReadApiV1ChatConversationsConversationIdReadPost,unreadCountApiV1ChatUnreadCountGet,getAddressFromCoordsApiV1GeoAddressGet,getMapsApiKeyApiV1GeoMapsKeyGet,createGroupApiV1GroupsPost,getGroupByInviteApiV1GroupsJoinInviteCodeGet,joinGroupApiV1GroupsJoinInviteCodePost,getMyGroupsApiV1GroupsMyGet,closeGroupApiV1GroupsGroupIdDelete,updateGroupApiV1GroupsGroupIdPatch,confirmGroupImageApiV1GroupsGroupIdConfirmImagePost,deleteGroupImageApiV1GroupsGroupIdImageDelete,leaveGroupApiV1GroupsGroupIdLeaveDelete,getMembersApiV1GroupsGroupIdMembersGet,removeMemberApiV1GroupsGroupIdMembersUserIdDelete,promoteMemberApiV1GroupsGroupIdMembersUserIdPromotePatch,getGroupRidesApiV1GroupsGroupIdRidesGet,getGroupImageUploadUrlApiV1GroupsGroupIdUploadImagePost,apiHealthApiV1HealthGet,createNewRequestApiV1PassengerPassengersPost,aiParseSearchApiV1PassengerPassengersAiParseSearchPost,getAllRidesAdminApiV1PassengerPassengersAllGet,getMyRequestsApiV1PassengerPassengersMeGet,requestRideFromSearchApiV1PassengerPassengersRequestRideFromSearchPost,searchAvailableRidesApiV1PassengerPassengersSearchRidesGet,cancelRequestApiV1PassengerPassengersRequestIdCancelDelete,getLatestMatchesApiV1PassengerPassengersRequestIdMatchesGet,getRideDriverInfoApiV1PassengerRidesRideIdDriverInfoGet,createNewRideApiV1RidesPost,getMyRidesApiV1RidesMeGet,previewRideOptionsApiV1RidesPreviewRoutesPost,readRideApiV1RidesRideIdGet,updateRideApiV1RidesRideIdPatch,cancelRideApiV1RidesRideIdCancelDelete,endRideApiV1RidesRideIdEndPost,startRideApiV1RidesRideIdStartPost,updateFcmTokenApiV1UsersFcmTokenPatch,getMyProfileApiV1UsersMeGet,updateMyProfileApiV1UsersMePut,removeMyAvatarApiV1UsersMeAvatarDelete,confirmAvatarUploadApiV1UsersMeAvatarConfirmPost,getAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGet,updateLastSeenApiV1UsersMeLastSeenPatch,getMyNotificationsApiV1UsersMeNotificationsGet,testPushApiV1UsersMeTestPushPost,getUserLastSeenApiV1UsersUserIdLastSeenGet}};
 export type ReadRootGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['readRootGet']>>>
 export type AdminAuditLogApiV1AdminAuditLogGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminAuditLogApiV1AdminAuditLogGet']>>>
+export type AdminBillingPaymentsApiV1AdminBillingPaymentsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminBillingPaymentsApiV1AdminBillingPaymentsGet']>>>
+export type AdminBillingPaymentByIdApiV1AdminBillingPaymentsPaymentIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminBillingPaymentByIdApiV1AdminBillingPaymentsPaymentIdGet']>>>
+export type AdminBillingReconcilePaymentApiV1AdminBillingReconcilePaymentIdPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminBillingReconcilePaymentApiV1AdminBillingReconcilePaymentIdPost']>>>
+export type AdminBillingStalePendingApiV1AdminBillingStalePendingGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminBillingStalePendingApiV1AdminBillingStalePendingGet']>>>
+export type AdminBookingsApiV1AdminBookingsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminBookingsApiV1AdminBookingsGet']>>>
 export type AdminBookingByIdApiV1AdminBookingsBookingIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminBookingByIdApiV1AdminBookingsBookingIdGet']>>>
 export type AdminGroupsApiV1AdminGroupsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminGroupsApiV1AdminGroupsGet']>>>
 export type AdminHealthApiV1AdminHealthGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminHealthApiV1AdminHealthGet']>>>
@@ -1417,13 +1582,16 @@ export type AdminMeApiV1AdminMeGetResult = NonNullable<Awaited<ReturnType<Return
 export type AdminOutboxApiV1AdminOutboxGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminOutboxApiV1AdminOutboxGet']>>>
 export type AdminOutboxByIdApiV1AdminOutboxEventIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminOutboxByIdApiV1AdminOutboxEventIdGet']>>>
 export type AdminOutboxRequeueApiV1AdminOutboxEventIdRequeuePostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminOutboxRequeueApiV1AdminOutboxEventIdRequeuePost']>>>
+export type AdminQueuesApiV1AdminQueuesGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminQueuesApiV1AdminQueuesGet']>>>
 export type AdminRidesApiV1AdminRidesGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminRidesApiV1AdminRidesGet']>>>
 export type AdminRideByIdApiV1AdminRidesRideIdGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminRideByIdApiV1AdminRidesRideIdGet']>>>
 export type AdminCancelRideApiV1AdminRidesRideIdCancelPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminCancelRideApiV1AdminRidesRideIdCancelPost']>>>
 export type AdminStatsApiV1AdminStatsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminStatsApiV1AdminStatsGet']>>>
+export type AdminSystemOverviewApiV1AdminSystemOverviewGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminSystemOverviewApiV1AdminSystemOverviewGet']>>>
 export type AdminUsersApiV1AdminUsersGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminUsersApiV1AdminUsersGet']>>>
 export type AdminToggleUserActiveApiV1AdminUsersUserIdActivePatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminToggleUserActiveApiV1AdminUsersUserIdActivePatch']>>>
 export type AdminToggleUserAdminApiV1AdminUsersUserIdAdminPatchResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminToggleUserAdminApiV1AdminUsersUserIdAdminPatch']>>>
+export type AdminWorkersApiV1AdminWorkersGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['adminWorkersApiV1AdminWorkersGet']>>>
 export type ChangePasswordApiV1AuthChangePasswordPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['changePasswordApiV1AuthChangePasswordPost']>>>
 export type ForgotPasswordApiV1AuthForgotPasswordPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['forgotPasswordApiV1AuthForgotPasswordPost']>>>
 export type GoogleSigninApiV1AuthGoogleSigninPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['googleSigninApiV1AuthGoogleSigninPost']>>>
@@ -1440,9 +1608,11 @@ export type CreateCheckoutApiV1BillingCheckoutPostResult = NonNullable<Awaited<R
 export type GetMyPaymentsApiV1BillingPaymentsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getMyPaymentsApiV1BillingPaymentsGet']>>>
 export type GetBillingStatusApiV1BillingStatusGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getBillingStatusApiV1BillingStatusGet']>>>
 export type StripeWebhookApiV1BillingWebhookPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['stripeWebhookApiV1BillingWebhookPost']>>>
-export type GetDriverSummaryApiV1BookingsDriverSummaryGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getDriverSummaryApiV1BookingsDriverSummaryGet']>>>
+export type GetDriverActiveSummaryApiV1BookingsDriverSummaryActiveGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getDriverActiveSummaryApiV1BookingsDriverSummaryActiveGet']>>>
+export type GetDriverHistorySummaryApiV1BookingsDriverSummaryHistoryGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getDriverHistorySummaryApiV1BookingsDriverSummaryHistoryGet']>>>
 export type GetUserBookingsApiV1BookingsMyBookingsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getUserBookingsApiV1BookingsMyBookingsGet']>>>
-export type GetPassengerSummaryApiV1BookingsPassengerSummaryGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getPassengerSummaryApiV1BookingsPassengerSummaryGet']>>>
+export type GetPassengerActiveSummaryApiV1BookingsPassengerSummaryActiveGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getPassengerActiveSummaryApiV1BookingsPassengerSummaryActiveGet']>>>
+export type GetPassengerHistorySummaryApiV1BookingsPassengerSummaryHistoryGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getPassengerHistorySummaryApiV1BookingsPassengerSummaryHistoryGet']>>>
 export type RequestToJoinApiV1BookingsRequestToJoinPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['requestToJoinApiV1BookingsRequestToJoinPost']>>>
 export type GetRideManifestApiV1BookingsRideRideIdManifestGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getRideManifestApiV1BookingsRideRideIdManifestGet']>>>
 export type GetPendingRequestsApiV1BookingsRideRideIdPendingGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getPendingRequestsApiV1BookingsRideRideIdPendingGet']>>>
@@ -1459,6 +1629,7 @@ export type GetConversationApiV1ChatConversationsConversationIdGetResult = NonNu
 export type ExportConversationCalendarApiV1ChatConversationsConversationIdCalendarIcsGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['exportConversationCalendarApiV1ChatConversationsConversationIdCalendarIcsGet']>>>
 export type ListConversationMessagesApiV1ChatConversationsConversationIdMessagesGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['listConversationMessagesApiV1ChatConversationsConversationIdMessagesGet']>>>
 export type PostMessageApiV1ChatConversationsConversationIdMessagesPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['postMessageApiV1ChatConversationsConversationIdMessagesPost']>>>
+export type ListConversationMessagesGapApiV1ChatConversationsConversationIdMessagesGapGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['listConversationMessagesGapApiV1ChatConversationsConversationIdMessagesGapGet']>>>
 export type MarkReadApiV1ChatConversationsConversationIdReadPostResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['markReadApiV1ChatConversationsConversationIdReadPost']>>>
 export type UnreadCountApiV1ChatUnreadCountGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['unreadCountApiV1ChatUnreadCountGet']>>>
 export type GetAddressFromCoordsApiV1GeoAddressGetResult = NonNullable<Awaited<ReturnType<ReturnType<typeof getLinkUpAPI>['getAddressFromCoordsApiV1GeoAddressGet']>>>
