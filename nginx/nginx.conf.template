@@ -15,7 +15,7 @@ http {
     server chat-ws:8081;
   }
   upstream frontend {
-    server frontend:80;
+    server frontend:8080;
   }
 
   server {

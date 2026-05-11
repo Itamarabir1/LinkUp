@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.23-alpine AS builder
 WORKDIR /app
 
 # Copy go.mod first (needed for module resolution)
@@ -20,5 +20,8 @@ FROM alpine:3.19
 RUN apk --no-cache add ca-certificates
 WORKDIR /app
 COPY --from=builder /chat-ws .
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
+    && chown appuser:appgroup /app/chat-ws
+USER appuser
 EXPOSE 8081
 CMD ["./chat-ws"]

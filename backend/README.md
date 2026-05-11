@@ -9,6 +9,7 @@ FastAPI application: auth, rides, bookings, notifications, chat, workers.
 
 For production, use Docker (see root `docker-compose.yml`).
 
+- **Dockerfile (multi-stage):** `builder` stage installs gcc + libpq-dev + uv and Python dependencies. `runtime` stage is a clean `python:3.11-slim` with only `libpq5` (no build tools) — copies site-packages from builder. `development` inherits builder (for gcc rebuilds); `migrate`, `worker`, `production` inherit runtime (slim, non-root `appuser`). Production images do not contain gcc, test files, or pyproject.toml.
 - **Uvicorn workers (Docker):** `backend/entrypoint.sh` מריץ `uvicorn ... --workers` לפי **`UVICORN_WORKERS`** ב-`backend/.env` (ברירת מחדל 1). ב-`.env.example`: **`UVICORN_WORKERS=4`**. פיתוח לוקאלי בלי דוקר: `run-backend.sh` / `run-backend.bat` — `--reload`, worker אחד.
 - **WebSocket auth:** `get_current_user_ws` מאמת **JWT בלבד** (אובייקט `WsUser`), בלי `SELECT` ל-DB בזמן חיבור — ראו `app/api/dependencies/auth.py`. HTTP endpoints עם `get_current_user` עדיין טוענים משתמש מ-DB.
 
@@ -104,6 +105,7 @@ See `docs/architecture/API.md` and `docs/architecture/DATABASE.md`.
   - `AsyncSession` usage in API/service paths
   - `select(...)` + `await db.execute(...)` for async querying
   - `await db.flush()` / `await db.commit()` in async transaction boundaries
+- **Transaction ownership (CRUD flush-only):** `CRUDUser` write methods use `db.flush()` only — callers own the transaction with explicit `await db.commit()`. This enables atomic DB writes + outbox events in a single transaction. Session factory uses `expire_on_commit=False`, so no `db.refresh()` is needed after commit. See `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §29.
 - **Bookings are async-only** now (no `db.run_sync`): lock-critical paths use `select(...).with_for_update()` directly on `AsyncSession` to prevent races while keeping the call chain fully async.
 - **Workers:** notification handlers (e.g. `notification_tasks.py` — ride created, booking approved, **ride cancelled**) query with `await db.execute(select(...))`; `find_passengers_for_ride_notification` is async. No `db.run_sync` in application code (Alembic `env.py` still uses `connection.run_sync` for migrations).
 - Result: lower event-loop blocking risk, cleaner async call chains, and safer concurrency in booking/ride state transitions.

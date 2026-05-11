@@ -12,7 +12,7 @@ Related operations docs:
 - **Host:** single EC2 instance.
 - **Runtime:** Docker Compose (`--profile prod`).
 - **Ingress:** `nginx` reverse proxy with TLS termination.
-- **Images:** נמשכות מ-GHCR — ברירות מחדל ב־**`docker-compose.yml`**: `ghcr.io/<owner>/linkup/{backend,worker,migrate,pgbouncer,frontend,chat-ws}` וגם **`ghcr.io/<owner>/linkup-email-renderer`** (שירות נפרד בלי קידומת `linkup/`).
+- **Images:** נמשכות מ-GHCR — ברירות מחדל ב־**`docker-compose.yml`**: `ghcr.io/<owner>/linkup/{backend,worker,migrate,pgbouncer,frontend,chat-ws}` וגם **`ghcr.io/<owner>/linkup-email-renderer`** (שירות נפרד בלי קידומת `linkup/`). כל ה-images רצים כמשתמש **non-root** (backend/worker/migrate: `appuser`, frontend: `nginx` user, email-renderer: `node`, chat-ws: `appuser`).
 - **Public URL:** `https://linkup.itamarabir.com`.
 
 ### Main runtime services
@@ -77,7 +77,7 @@ Notes:
 
 - `backend/.env` drives backend + infrastructure variables (Postgres/Redis/RabbitMQ/etc.).
 - `frontend/.env` provides `VITE_*` + `APP_ENV` for frontend runtime rendering. In **`docker-compose.yml`**, the **`frontend`** service (profile **`prod`**) lists **`env_file: ./frontend/.env`** so the static container receives the same contract as local/EC2 deploys that use **`--env-file frontend/.env`**; without a file at that path, Compose may fail to start the service — keep a file (even a stub) or adjust paths for your environment.
-- `chat-ws/.env` contains chat-ws specific env values.
+- `chat-ws/.env` contains chat-ws specific env values (`JWT_SECRET`, `REDIS_URL`). In Compose, **chat-ws only receives `chat-ws/.env`** — not `backend/.env` (secrets isolation).
 - Deploy script enforces backend/frontend env presence and fails fast when missing.
 - **Edge nginx:** CI renders **`nginx/nginx.conf`** from **`nginx/nginx.conf.template`** with `envsubst '${SENTRY_REPORT_URI}'`, reading **`SENTRY_REPORT_URI`** from **`backend/.env`** (same as local: **`bash scripts/ops/render-nginx-conf.sh`**). **PgBouncer:** no host-side `userlist.txt` generation; container startup renders `/var/lib/pgbouncer/userlist.txt` from `POSTGRES_USER` / `POSTGRES_PASSWORD` / `PGBOUNCER_ADMIN_PASSWORD`.
 

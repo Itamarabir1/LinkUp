@@ -30,6 +30,7 @@ Open **frontend** upgrade checklist (React Query backlog, Tier-1/2 items): **[do
 - Chat **missed messages on reconnect**: chat contracts split by purpose. Historical scrolling uses **`GET /chat/conversations/{id}/messages?after=<opaque>`** (keyset cursor on `(created_at, message_id)`), while reconnect backfill uses dedicated **`GET /chat/conversations/{id}/messages/gap?since_message_id=<int>`** with batched continuation when `truncated=true`. Frontend keeps this separation in **`useConversationMessages`** (history) and **`fetchMissedGap`** (reconnect). See **`docs/architecture/REALTIME.md`**, **`docs/architecture/API.md`**, and **`docs/ENGINEERING_HIGHLIGHTS.md`**.
 - **WebSocket reconnect (frontend):** unified **`computeReconnectDelayMs`** (**`frontend/src/utils/reconnectBackoff.ts`**) — **exponential backoff + ±20% jitter**, **30s** cap, **`attempt` reset on `onopen`** — wired into **`useChatWebSocket`**, **`useReconnectingWebSocket`**, **`useReconnectingWebSocketState`** (mirrors Redis reconnect strategy on the server side). See **`docs/architecture/REALTIME.md`**, **`docs/FEATURE_DECISIONS.md#frontend-ws-reconnect-backoff`**.
 - **chat-ws inbound guards (Go hub):** **`SetReadLimit(2048)`** on upgraded connections; **`golang.org/x/time/rate`** per connection for **`typing_start`/`typing_stop`** Redis publishes only (**`ping`** exempt; over-limit typing dropped silently). See **`chat-ws/ARCHITECTURE.md`** and **`docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`** §7.
+- **Infrastructure refactor (senior-grade):** backend Dockerfile restructured to true multi-stage (builder/runtime separation — production images ship without gcc/build tools, ~200–400MB smaller). All containers run as **non-root** users (`appuser`, `node`, `nginx`). `docker-compose.yml` is now production-baseline (`target: production`); dev overrides via `docker-compose.override.yml` (auto-loaded locally). Secrets isolation: **chat-ws** receives only `chat-ws/.env` — no access to backend secrets. Frontend switched to `nginxinc/nginx-unprivileged:alpine` (port 8080). Deprecated `main_worker.py` and compat `outbox-worker` service removed.
 - CI builds/pushes runtime images to GHCR; deploy pulls immutable tags on EC2.
 - Rolling backend deploy with health-gated rollback (`docker compose ... --wait`).
 - Compose env hardening with multiple env files and fail-fast checks.
@@ -131,7 +132,7 @@ flowchart LR
 | notification-worker | Python | Outbox dispatcher + notifications consumer (email/push/user refresh events) |
 | task-worker | Python | Avatar pipeline + scheduled tasks + scheduled publisher (**single replica**) — כולל **chat idle timeout** → `handle_conversation_completion` (Groq) |
 | ai-worker | Python | **מאזין אופציונלי** ל־Redis `chat:completion:*` (אותה לוגיקת ניתוח אם מתקבל payload) |
-| chat-ws  | Go               | WebSocket server; chat + typing + presence; Redis Pub/Sub including **`user:online` / `user:offline`** and **`user:*:events`** (ride/maintenance-style JSON to the logged-in client). **Reconnect-safe:** all subscribers use exponential backoff (1s→30s); connection teardown uses `done` channel to prevent send-on-closed-channel panics. |
+| chat-ws  | Go 1.23          | WebSocket server; chat + typing + presence; Redis Pub/Sub including **`user:online` / `user:offline`** and **`user:*:events`** (ride/maintenance-style JSON to the logged-in client). **Reconnect-safe:** all subscribers use exponential backoff (1s→30s); connection teardown uses `done` channel to prevent send-on-closed-channel panics. |
 | email-renderer | Node.js / Express / React Email | Dedicated email HTML rendering microservice (`/health`, `/render`), shared by backend notification flow |
 | frontend | React / TypeScript | Web app (Vite); Hebrew RTL |
 | mobile   | React Native / Expo | Mobile app (TypeScript) |
@@ -147,7 +148,7 @@ flowchart LR
 | **Real-time** | Go (chat-ws), Redis Pub/Sub |
 | **Frontend**  | React, TypeScript, Vite, Google Maps |
 | **Mobile**    | React Native, Expo, TypeScript |
-| **Infrastructure** | Docker, Docker Compose |
+| **Infrastructure** | Docker (multi-stage builds, non-root containers), Docker Compose (prod/dev split via override) |
 | **Cloud / CI** | GitHub Actions, GHCR (GitHub Container Registry), Docker |
 | **Scaling & reliability** | Request ID (X-Request-ID), structured JSON logging (**python-json-logger** v3+); unified **`LinkupError`** JSON responses — **[docs/ERRORS.md](docs/ERRORS.md)**; RabbitMQ broker-native retry (DLX/TTL + `x-death`) + DLQ; pessimistic locking (booking approve/cancel); **configurable SQLAlchemy async pool** (`DB_POOL_*` in `.env`), DB indexes |
 
@@ -166,7 +167,7 @@ flowchart LR
 - ✅ **WebSocket reconnect pacing (frontend):** **`frontend/src/utils/reconnectBackoff.ts`** (`computeReconnectDelayMs`) drives chat + generic WS hooks (**`useChatWebSocket`**, **`useReconnectingWebSocket`**, **`useReconnectingWebSocketState`**) — **3s→6s→12s→24s→30s cap** with **±20% jitter** and reset on **`onopen`** / resource key change (**`docs/architecture/REALTIME.md`**, **`reconnectBackoff.test.ts`**).
 - ✅ **Inbox chat N+1 fix + pagination:** [`list_my_conversations`](backend/app/domain/chat/service.py) pages via [`list_conversations_paginated`](backend/app/domain/chat/crud.py) and uses batched aggregates (`get_inbox_aggregates`) **per page only** — no per-row N+1; sort key is persisted on `conversations.last_message_at` (fallback `created_at`) and `after` cursor stays server-side via shared cursor core ([`backend/app/core/pagination/cursor.py`](backend/app/core/pagination/cursor.py)).
 - ✅ **Unified WebSocket notifications via `chat-ws`:** user-domain refresh events (`user:*:events`) are delivered over the same `chat-ws` connection to reduce concurrent sockets per client.
-- ✅ **Worker split:** legacy monolith worker was split into `notification-worker`, `task-worker`, `ai-worker`; each runs as its own Compose service with a dedicated runtime entrypoint.
+- ✅ **Worker split:** legacy monolith worker was split into `notification-worker`, `task-worker`, `ai-worker`; each runs as its own Compose service with a dedicated runtime entrypoint. Deprecated `main_worker.py` shim was removed.
 - ✅ **Task worker safety:** `task-worker` is pinned to one replica to avoid duplicate scheduled task publishing.
 - ✅ **Per-worker DB connection caps:** explicit `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` per worker keeps total DB usage below Postgres defaults.
 - ✅ **Postgres `statement_timeout` (layered):** Effective per-session timeout from **`DB_STATEMENT_TIMEOUT_MS`** (`.env`, default 30000ms) is applied via asyncpg `server_settings` in [`backend/app/db/session.py`](backend/app/db/session.py) — `.env` change + restart actually takes effect. Alembic **017** sets a deterministic role-level **ceiling of 60000ms** (literal, no env dependency) as defense-in-depth. Helps fail long queries before worker timeouts; details in **`docs/architecture/DATABASE.md`**.
@@ -226,7 +227,7 @@ cp frontend/.env.example frontend/.env
 ```
 
 - **מקור אמת לסיסמאות ול־Postgres/Redis/RabbitMQ (ב־Docker):** רק **`backend/.env`**. אין לשכפל סיסמאות ב־`.env` בשורש.
-- **`chat-ws/.env`** — כולל `JWT_SECRET` זהה ל־`SECRET_KEY` ב־`backend/.env`. בקונטיינר, `REDIS_URL` מוזרק מ־Compose (`REDIS_PASSWORD` מ־**`backend/.env`** דרך `--env-file`).
+- **`chat-ws/.env`** — כולל `JWT_SECRET` זהה ל־`SECRET_KEY` ב־`backend/.env` ו־`REDIS_URL`. ב־Compose, **chat-ws מקבל רק את `chat-ws/.env`** (בלי `backend/.env`) — secrets isolation: שירות ה-Go לא רואה סודות שלא שייכים לו (Stripe, AWS, DB passwords וכו׳).
 - **FCM בדוקר (Model B לפרודקשן):** אין mount של קובץ credentials. הגדר `FIREBASE_CREDENTIALS_JSON` ב־`backend/.env` (JSON בשורה אחת). `FIREBASE_SERVICE_ACCOUNT_PATH` מיועד לפיתוח מקומי בלבד.
 
 **מיגרציות:** ב־**Docker Compose** שירות **`migrate`** (image עם `ENTRYPOINT ["alembic"]`) מריץ **`alembic upgrade head`** פעם אחת לפני **backend** וכל ה־workers (`notification-worker`, `task-worker`, `ai-worker`). אם המיגרציה נכשלת ה־API וה־workers לא יעלו. **מקומי עם `uv`:** מתוך `backend/` → **`uv run alembic upgrade head`** ואז `uvicorn` / `make dev` (**`backend/Makefile`** תומך בכך). למפת טבלאות ובעיות merge ראשי Alembic: **[`docs/architecture/DATABASE.md`](docs/architecture/DATABASE.md)**.
@@ -257,6 +258,8 @@ cd frontend && make dev
 
 ב־[`docker-compose.yml`](docker-compose.yml) שירותי **`frontend`** ו־**`nginx`** מוגדרים עם `profiles: ["prod"]` — לא עולים ב־`docker compose --env-file backend/.env up -d` ללא הפרופיל. בפרופיל prod, **nginx** תלוי ב־**backend** במצב **`service_healthy`** (לא רק `started`).
 
+> **Compose split (prod/dev):** `docker-compose.yml` הוא **production baseline** (`backend` target: `production`). בפיתוח מקומי, `docker-compose.override.yml` (נטען אוטומטית) מחליף ל-`target: development`, מוסיף volume mounts ל-`app/` ו-`alembic/`, ומדליק `DEBUG`. בפריסה, deploy-ec2.yml מריץ עם `-f docker-compose.yml -f docker-compose.prod.yml` (דילוג על override).
+
 ### בדיקת פרודקשן
 
 ```bash
@@ -285,7 +288,7 @@ make admin-revoke EMAIL=user@example.com  # הסרת אדמין לפי אימי�
 
 | Folder      | Description |
 |------------|-------------|
-| `backend/` | FastAPI app: API, domain logic, split workers (`notification_worker`, `task_worker`, `ai_worker`), Alembic migrations |
+| `backend/` | FastAPI app: API, domain logic, split workers (`notification_worker`, `task_worker`, `ai_worker`), Alembic migrations. Multi-stage Dockerfile (builder/runtime separation; production images without gcc). |
 | `chat-ws/` | Go WebSocket server: Redis subscribe, JWT auth, message fan-out to clients |
 | `frontend/`| React (Vite) web app; Dockerfile + `nginx.conf` לתוך image סטטי; מודול אדמין ב־`src/features/admin/` (מסלולים `/admin/*`); WebSocket — [`frontend/README.md`](frontend/README.md), חוזי JSON ב־[`docs/architecture/REALTIME.md`](docs/architecture/REALTIME.md) |
 | `nginx/`   | קונפיג Nginx ל־Compose — reverse proxy ל־API/chat-ws/frontend, TLS ב־443 (**`listen 443 ssl`** — HTTP/1.1 אלא אם מוסיפים `http2`), security headers ו־**CSP מאוכף** + `report-uri` (מתועד ב־[`docs/SECURITY_HEADERS.md`](docs/SECURITY_HEADERS.md)) |
@@ -340,8 +343,8 @@ GitHub Actions workflows run on **`main`** / **`develop`** עם **path filters**
 | Service   | Workflow | Steps |
 |-----------|----------|-------|
 | backend   | `backend-ci.yml`  | lint (Ruff), format check, migrations (`uv run alembic upgrade head` on ephemeral `test_db`), `scripts/ops/check-migration-head.sh`, targeted RabbitMQ pytest, full `uv run pytest tests/`, Docker build → push to GHCR (`latest` + `sha`) |
-| chat-ws   | `chat-ws-ci.yml`  | build, vet, Docker build → push to GHCR |
-| frontend  | `frontend-ci.yml` | `quality` (ESLint, build, bundle-size), `publish-image` (main push only, GHCR). Contract codegen moved to its own workflow. |
+| chat-ws   | `chat-ws-ci.yml`  | build (Go 1.23), vet, Docker build → push to GHCR. Concurrency group + timeout. |
+| frontend  | `frontend-ci.yml` | `quality` (ESLint, **Vitest**, build, bundle-size), `publish-image` (main push only, GHCR). Contract codegen moved to its own workflow. |
 | OpenAPI contract | `openapi-contract.yml` | Single source of truth for backend↔frontend schema. Triggers on `backend/app/**`, `backend/scripts/export_openapi.py`, `backend/{pyproject.toml,uv.lock}`, `frontend/{orval.config.ts,src/api/generated/**,package.json,package-lock.json}`. Steps: `uv sync` → `python backend/scripts/export_openapi.py` → `npm run gen:api` → `git diff --exit-code -- frontend/src/api/generated/`. No DB needed. |
 | (deploy hook) | `deploy-ec2.yml` | Runs **after** successful **Backend CI**, **Frontend CI**, **Chat-WS CI**, or **Email renderer CI** on `main` (`workflow_run`; concurrency queue): SSH to EC2, full Docker Compose prod profile, internal smokes (`config.js` in `linkup_frontend`, `/health` in `linkup_email_renderer`) **before** backend rollout, post-deploy gate (internal **`/readyz`**, Firebase env, Redis wiring in **`chat-ws`**), rollback with **`backend:latest`** fallback if the previous image tag is gone — see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) |
 | email-renderer | `email-renderer-ci.yml` | Node install, lint/build, GHCR publish on `main` when `email-renderer/**` changes |

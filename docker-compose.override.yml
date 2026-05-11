@@ -2,10 +2,16 @@
 # Production deploy explicitly passes -f flags to skip this file.
 services:
   backend:
+    build:
+      target: development
     ports:
       - "127.0.0.1:8000:8000"
+    volumes:
+      - ./backend/app:/app/app:ro
+      - ./backend/alembic:/app/alembic:ro
     environment:
       API_DOCS_ENABLED: "true"
+      DEBUG: "true"
 
   chat-ws:
     ports:

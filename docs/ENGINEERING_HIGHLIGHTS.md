@@ -17,6 +17,16 @@
 
 ## Latest architecture updates
 
+- **Infrastructure refactor (senior-grade Docker/Compose/CI hardening):**
+  - **Backend Dockerfile — true multi-stage build:** `builder` (gcc + libpq-dev + uv, installs deps) → `runtime` (clean python:3.11-slim + libpq5 only, copies site-packages from builder). `development` inherits from builder (has gcc for rebuilds); `migrate`, `worker`, `production` inherit from runtime (no gcc, no test files, no build tools). Estimated ~200–400MB image size reduction per production target.
+  - **Non-root everywhere:** all runtime containers run as non-root users — `appuser` (backend worker/production/migrate), `nginx` (frontend via `nginxinc/nginx-unprivileged:alpine`, port 8080), `node` (email-renderer), `appuser` (chat-ws).
+  - **Compose prod/dev split:** `docker-compose.yml` is now production-baseline (`target: production`). `docker-compose.override.yml` (auto-loaded locally) overrides to `target: development`, mounts `app/` and `alembic/` as volumes for hot-reload, enables `DEBUG`. Production deploy uses `-f docker-compose.yml -f docker-compose.prod.yml`.
+  - **Secrets isolation (least privilege):** `chat-ws` service now receives only `chat-ws/.env` (JWT_SECRET + REDIS_URL). Removed `env_file: ./backend/.env` from chat-ws — Go service no longer sees Stripe keys, AWS secrets, DB passwords, or 40+ unrelated secrets.
+  - **Version alignment:** Go 1.21 → 1.23 across go.mod, Dockerfile, and CI workflow. All CI workflows now have concurrency groups + timeout-minutes.
+  - **CI test step:** frontend-ci now runs `npm run test` (Vitest) between lint and build.
+  - **Cleanup:** deleted deprecated `main_worker.py` shim and removed compat `outbox-worker` Compose service.
+  - **chat-ws healthcheck:** added `wget` healthcheck on `/healthz` in docker-compose.yml.
+
 - **S3 prefix deletes + avatar removal path:** Listing תחת prefix מוזרם דרך `S3Client.iter_prefix_keys`; מחיקות ב **`delete_objects`** עד **1000** מפתחות לקריאה (`delete_object_keys_batch`). **`UserService.remove_avatar`** מפרסם **`user.avatar_remove`** ל-Outbox (אחרי ניקוי שדות `avatar_*` ב-DB) ומוסר קריאה סינכרונית ל-S3 מתוך ה-API — מחיקת האובייקטים מתבצעת ב-[`workers/tasks/avatar_tasks.py`](../backend/app/workers/tasks/avatar_tasks.py). פירוט: [`docs/architecture/STORAGE.md`](architecture/STORAGE.md), [`FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#s3-delete-objects-avatar-async).
 
 - **Geo preview orchestration + read caps (manifest / passengers/me):** **`processor.get_full_routing_data`** ממפה מוצא/יעד לקואורדינטות דרך **`geocode_cache.get_coordinates`** (Redis + **`get_or_compute`**) במקום קריאה ישירה ל-Google על כל preview — בהתאמה לעקרון "מקור אמת גיאוקוד אחד" ב-[`geocode_cache.py`](../backend/app/infrastructure/geo/geocode_cache.py). **`BookingReadsService.get_ride_manifest`**: ספירות מאושר/ממתין + רשימה מוצגת ב-**SELECT** יחיד עם **`CASE` למיון (confirmed לפני pending)** ו-**`.limit(MANIFEST_BOOKING_ROW_LIMIT)`** (**100**) מתוך [`app/core/constants.py`](../backend/app/core/constants.py). **`GET /passenger/passengers/me`** עבר ל-**cursor pagination** (`cursor`, `limit` → `items`, `next_cursor`, `has_more`) עם keyset יציב ב-backend ו-`useInfiniteQuery` ב-frontend. טסט: **`tests/domain/test_geo_processor_routing_cache.py`**. פירוט החלטה: [`FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#geo-manifest-passenger-reads), [`architecture/API.md`](architecture/API.md).
@@ -146,6 +156,8 @@
 
 - **Chat inbox N+1 fix + index hardening**: `list_my_conversations` הריצה `get_last_message` + `has_unread_messages` לכל שיחה בנפרד (~3N קריאות). הוחלפה ב-`get_inbox_aggregates` (`chat/crud.py`) — 3 aggregate queries + מיזוג בזיכרון, **4 קריאות קבועות**. נוסף `__table_args__` ב-`Message` model עם `Index("idx_messages_sender_id", "sender_id")` להתאמה ל-migration 012. פירוט: [FEATURE_DECISIONS.md — Chat inbox N+1](FEATURE_DECISIONS.md#chat-inbox-n1).
 - **Task scheduler safety**: `task-worker` is fixed to a single replica to prevent duplicate scheduled task publishing.
+
+- **Transaction ownership refactor (CRUD flush-only):** `CRUDUser` write methods no longer call `db.commit()` — all 7 methods (`update`, `update_location`, `update_fcm_token`, `update_refresh_token`, `update_password`, `update_last_active`, and the removed dead-code `mark_as_verified`) now use `db.flush()` only, consistent with `create`, `mark_as_premium`, and `update_stripe_customer_id` which already followed this pattern. Callers in `auth/service.py` (6), `push_provider.py` (1), `users/service.py` (2), `users/router.py` (1), and `chat/router.py` (1) now own the transaction boundary with explicit `await db.commit()`. This enables any caller to combine DB writes with outbox events in a single atomic transaction — the same pattern already proven in `register_new_user`, `confirm_avatar_upload`, `remove_avatar`, and `billing/service.py`. Session factory uses `expire_on_commit=False` ([`app/db/session.py`](../backend/app/db/session.py)), so no `db.refresh()` is needed after commit at caller sites. Dead-code method `mark_as_verified` (zero callers — `verify_user_email` uses generic `update()`) was removed. Documented in ADR backend §29.
 
 ---
 

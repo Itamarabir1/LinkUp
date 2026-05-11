@@ -21,8 +21,6 @@ services:
       retries: 5
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     networks:
       - linkup_network
 
@@ -57,7 +55,7 @@ services:
       - linkup_network
 
   # --- Cache & Pub/Sub: Redis (single-node) ---
-  # DB 0 -> backend + compatibility outbox-worker
+  # DB 0 -> backend (cache, rate-limit, idempotency) + outbox worker
   # DB 1 -> chat-ws pub/sub + chat completion listener
   redis:
     image: redis:7.2-alpine
@@ -252,48 +250,12 @@ services:
       - linkup_network
     restart: unless-stopped
 
-  # --- Temporary compatibility alias (opt-in profile) ---
-  outbox-worker:
-    profiles: ["compat"]
-    image: ${WORKER_IMAGE:-ghcr.io/itamarabir1/linkup/worker:latest}
-    build:
-      context: ./backend
-      target: worker
-    command: python -m app.workers.notification_worker
-    container_name: linkup_outbox_worker
-    env_file:
-      - ./backend/.env
-    environment:
-      - POSTGRES_HOST=pgbouncer
-      - POSTGRES_PORT=6432
-      - REDIS_HOST=redis
-      - REDIS_DB=0
-      - REDIS_CHAT_DB=1
-      - RABBITMQ_HOST=rabbitmq
-    mem_limit: 256m
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      db:
-        condition: service_healthy
-      pgbouncer:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      email-renderer:
-        condition: service_healthy
-    networks:
-      - linkup_network
-    restart: unless-stopped
-
   # --- Backend: FastAPI ---
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/itamarabir1/linkup/backend:latest}
     build:
       context: ./backend
-      target: development
+      target: production
     container_name: linkup_backend
     restart: unless-stopped
     env_file:
@@ -335,7 +297,7 @@ services:
       - linkup_network
 
   # --- WebSocket: Chat (Go) ---
-  # JWT_SECRET must match backend/.env
+  # JWT_SECRET in chat-ws/.env must match SECRET_KEY in backend/.env
   chat-ws:
     image: ${CHAT_WS_IMAGE:-ghcr.io/itamarabir1/linkup/chat-ws:latest}
     build:
@@ -344,12 +306,17 @@ services:
     container_name: linkup_chat_ws
     restart: unless-stopped
     env_file:
-      - ./backend/.env
       - ./chat-ws/.env
     environment:
       - PORT=8081
       - BACKEND_URL=http://backend:8000
       - REDIS_ADDR=redis:6379
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     depends_on:
       redis:
         condition: service_healthy

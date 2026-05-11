@@ -9,7 +9,7 @@
 - **Docker** ו-Docker Compose (להרצת db, **pgbouncer**, `redis`, rabbitmq, backend, notification-worker, task-worker, ai-worker, chat-ws).
 - **Python** 3.11+ (להרצת backend/worker לוקאלית בלי Docker).
 - **Node** (אם מריצים פרונט — לא מפורט כאן).
-- **Go** 1.x (אם בונים chat-ws ידנית).
+- **Go** 1.23+ (אם בונים chat-ws ידנית).
 
 ---
 
@@ -23,7 +23,10 @@
 
 2. **הרצה עם Docker**
   - מומלץ להשתמש ב־`Makefile` בשורש כ-entrypoint אחיד: `make up`, `make down`, `make build`, `make logs`, `make ps`, `make restart`, `make migrate` (כולם מריצים Compose עם `--env-file backend/.env --env-file frontend/.env`).
-  - `docker-compose.yml`: ל־`db`, **`pgbouncer`**, `redis`, `rabbitmq`, **`migrate`**, `notification-worker`, `task-worker`, `ai-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **`migrate`** מריץ `alembic upgrade head` פעם אחת ויוצא (`restart: "no"`) ונשאר direct ל-`db`; **backend** וה־workers תלויים ב־`service_completed_successfully:migrate` וגם ב־`pgbouncer:service_healthy`. **backend** עם **`8000:8000`** ל־host, **healthcheck** על **`GET /readyz`** (Python `urllib` ל־`http://localhost:8000/readyz` בתוך הקונטיינר — readiness מול DB/Redis/RabbitMQ). לבדיקת תפעול עשירה יותר (כולל **`circuit_breakers`**) ראו **`GET /api/v1/health`** ב־**`docs/architecture/API.md`**. **`frontend`** ו־**`nginx`** מוגדרים באותו קובץ עם `profiles: ["prod"]` — עולים רק עם `docker compose --profile prod`; **nginx** תלוי ב־**backend** ב־`service_healthy`. שירות **`frontend`** (פרופיל prod) מגדיר **`env_file: ./frontend/.env`** — משתני `VITE_*` / `APP_ENV` נטענים לקונטיינר בזמן **יצירה** (גם אם הקובץ מינימלי), ואז entrypoint **`frontend/docker/40-render-config.sh`** מריץ **fail-fast** על מפתחות Firebase חובה + **`envsubst`** ל־`config.js` ו־`firebase-messaging-sw.js` (ראו **`docs/DEPLOYMENT.md`**, **`docs/FEATURE_DECISIONS.md#frontend-runtime-config`**).
+  - **Compose prod/dev split:** `docker-compose.yml` הוא **production baseline** (`backend.build.target: production`). בפיתוח, `docker-compose.override.yml` (נטען אוטומטית ע״י Docker Compose) מחליף ל-`target: development`, מוסיף **volume mounts** (`./backend/app:/app/app:ro`, `./backend/alembic:/app/alembic:ro`) לריענון קוד מהיר, ומפעיל `DEBUG=true`.
+  - `docker-compose.yml`: ל־`db`, **`pgbouncer`**, `redis`, `rabbitmq`, **`migrate`**, `notification-worker`, `task-worker`, `ai-worker`, `backend`, `chat-ws` **אין** `profiles` — עולים ב־`docker compose up -d`. **`migrate`** מריץ `alembic upgrade head` פעם אחת ויוצא (`restart: "no"`) ונשאר direct ל-`db`; **backend** וה־workers תלויים ב־`service_completed_successfully:migrate` וגם ב־`pgbouncer:service_healthy`. **healthcheck** על **`GET /readyz`** (Python `urllib` ל־`http://localhost:8000/readyz` בתוך הקונטיינר — readiness מול DB/Redis/RabbitMQ). **`chat-ws`** כולל healthcheck (`wget` על `/healthz`). לבדיקת תפעול עשירה יותר (כולל **`circuit_breakers`**) ראו **`GET /api/v1/health`** ב־**`docs/architecture/API.md`**. **`frontend`** ו־**`nginx`** מוגדרים באותו קובץ עם `profiles: ["prod"]` — עולים רק עם `docker compose --profile prod`; **nginx** תלוי ב־**backend** ב־`service_healthy`. שירות **`frontend`** (פרופיל prod) מגדיר **`env_file: ./frontend/.env`** — משתני `VITE_*` / `APP_ENV` נטענים לקונטיינר בזמן **יצירה** (גם אם הקובץ מינימלי), ואז entrypoint **`frontend/docker/40-render-config.sh`** מריץ **fail-fast** על מפתחות Firebase חובה + **`envsubst`** ל־`config.js` ו־`firebase-messaging-sw.js` (ראו **`docs/DEPLOYMENT.md`**, **`docs/FEATURE_DECISIONS.md#frontend-runtime-config`**).
+  - **Non-root containers:** כל ה-images הסופיים רצים כמשתמש לא-root (`appuser` ב-backend production/worker/migrate, `nginx` ב-frontend, `node` ב-email-renderer, `appuser` ב-chat-ws).
+  - **Secrets isolation:** `chat-ws` מקבל רק `chat-ws/.env` (JWT_SECRET + REDIS_URL) — לא `backend/.env`. שירות ה-Go לא רואה סודות של Stripe, AWS, DB וכו׳.
   - **PgBouncer image:** נבנה מ-`infrastructure/pgbouncer/Dockerfile`; הקונטיינר מייצר בזמן startup את `/var/lib/pgbouncer/userlist.txt` מ־`POSTGRES_USER`/`POSTGRES_PASSWORD`/`PGBOUNCER_ADMIN_PASSWORD` (אין bind-mount ל-`userlist.txt` מה-host).
   - **פיתוח:** `docker compose up -d` → תשתית + **migrate** + 3 workers + backend (**8000**) + chat-ws (**8081**). פרונט: **`npm run dev`** בתיקיית `frontend`, לא קונטיינר.
    - **WebSocket בפיתוח:** צ'אט — `ws://localhost:8081/ws` (chat-ws); נסיעות / מיקום / **פיד התראות in-app** — `ws://localhost:8000/api/v1/...` (backend). מרוכז ב־[`frontend/src/config/env.ts`](../../frontend/src/config/env.ts).
@@ -249,7 +252,7 @@ LinkUp/
 │   │   ├── db/              # session, base, models (imports domain)
 │   │   ├── domain/          # Domain-Driven: users, rides, bookings, passengers, chat, groups, auth, events, admin
 │   │   ├── infrastructure/  # redis, rabbitmq, outbox, events publishers, S3
-│   │   ├── workers/         # notification_worker, task_worker, ai_worker (+ tasks/: notifications, avatar, scheduled, chat_summary, …); `run_outbox_worker` מאותה חבילה — שירות Compose **`outbox-worker`** הוא alias compat ל-**`notification-worker`**
+│   │   ├── workers/         # notification_worker, task_worker, ai_worker (+ tasks/: notifications, avatar, scheduled, chat_summary, …); `run_outbox_worker` מאותה חבילה
 │   │   └── admin/           # SQLAdmin setup
 │   ├── alembic/versions/    # מיגרציות ממוספרות (כולל billing idempotency + merge heads)
 │   ├── k6/                  # k6 load tests (scripts + shared helpers)

@@ -25,6 +25,7 @@ defaults:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # JS-based actions (checkout, setup-node, docker/*) run on Node 24 per GitHub deprecation timeline
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -46,6 +47,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Run tests
+        run: npm run test
+
       - name: Build
         run: npm run build
 
@@ -55,6 +59,7 @@ jobs:
   publish-image:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: [quality]
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
