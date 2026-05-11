@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { defineConfig, loadEnv } from 'vitest/config'
+import { loadEnv } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { visualizer } from 'rollup-plugin-visualizer'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
