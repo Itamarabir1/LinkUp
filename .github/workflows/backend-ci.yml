@@ -9,6 +9,7 @@ on:
       - 'nginx/**'
       - 'docker-compose.yml'
       - '.github/workflows/backend-ci.yml'
+      - '.github/workflows/deploy-ec2.yml'
   pull_request:
     branches: [main, develop]
     paths:
@@ -17,6 +18,7 @@ on:
       - 'nginx/**'
       - 'docker-compose.yml'
       - '.github/workflows/backend-ci.yml'
+      - '.github/workflows/deploy-ec2.yml'
 
 concurrency:
   group: backend-ci-${{ github.workflow }}-${{ github.ref }}
