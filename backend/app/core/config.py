@@ -8,6 +8,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Backend directory (where .env lives) so .env loads even when cwd differs
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 
+_DEV_SECRET_KEY = "insecure-dev-key-do-not-use-in-production"
+
 
 class Settings(BaseSettings):
     """
@@ -194,9 +196,23 @@ class Settings(BaseSettings):
 
     # --- Security & Auth (required in production; defaults in dev) ---
     SECRET_KEY: str = Field(
-        "",
-        description="Must be set in .env for production",
+        _DEV_SECRET_KEY,
+        description="JWT signing key. Production requires an explicit value >= 32 chars; dev/test/CI uses a safe default.",
     )
+
+    @field_validator("SECRET_KEY", mode="before")
+    @classmethod
+    def _normalize_empty_secret(cls, v: str) -> str:
+        """Treat empty/whitespace-only SECRET_KEY as unset → dev default.
+
+        This handles ``SECRET_KEY=`` in ``.env`` (copied from ``.env.example``).
+        The production guard in ``validate_production_secrets`` rejects this
+        default at runtime in production.
+        """
+        if not v or not v.strip():
+            return _DEV_SECRET_KEY
+        return v
+
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(30, description="Access token TTL in minutes")
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(7, description="Refresh token TTL in days (long-lived token)")
@@ -252,10 +268,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
-        if not self.SECRET_KEY:
-            raise ValueError("SECRET_KEY must not be empty (set it in .env)")
-        if self.ENVIRONMENT.lower() == "production" and len(self.SECRET_KEY) < 32:
-            raise ValueError("SECRET_KEY must be at least 32 characters in production")
+        if self.ENVIRONMENT.lower() == "production":
+            if not self.SECRET_KEY or self.SECRET_KEY == _DEV_SECRET_KEY:
+                raise ValueError(
+                    "SECRET_KEY must be explicitly set in production (do not use the dev default)"
+                )
+            if len(self.SECRET_KEY) < 32:
+                raise ValueError("SECRET_KEY must be at least 32 characters in production")
         return self
 
     # --- Upload temp directory (staging before S3 upload) ---
