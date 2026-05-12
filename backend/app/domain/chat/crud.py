@@ -457,13 +457,17 @@ async def get_unread_conversations_count(db: AsyncSession, user_id: UUID) -> int
     """
     Count of conversations with new messages from the other party after last_read_at.
     Unread is per conversation, not per message.
+
+    Starts from Conversation (always exists) and LEFT JOINs ConversationParticipant
+    so that conversations the user has never opened (no participant row) are correctly
+    counted as unread.
     """
     uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
 
-    subq = (
+    last_other_subq = (
         select(
             Message.conversation_id.label("conversation_id"),
-            func.max(Message.created_at).label("last_message_at"),
+            func.max(Message.created_at).label("last_other_at"),
         )
         .where(Message.sender_id != uid)
         .group_by(Message.conversation_id)
@@ -472,13 +476,23 @@ async def get_unread_conversations_count(db: AsyncSession, user_id: UUID) -> int
 
     q = (
         select(func.count())
-        .select_from(ConversationParticipant)
-        .join(subq, ConversationParticipant.conversation_id == subq.c.conversation_id)
+        .select_from(Conversation)
+        .join(
+            last_other_subq,
+            Conversation.conversation_id == last_other_subq.c.conversation_id,
+        )
+        .outerjoin(
+            ConversationParticipant,
+            and_(
+                ConversationParticipant.conversation_id == Conversation.conversation_id,
+                ConversationParticipant.user_id == uid,
+            ),
+        )
         .where(
-            ConversationParticipant.user_id == uid,
+            or_(Conversation.user_id_1 == uid, Conversation.user_id_2 == uid),
             or_(
                 ConversationParticipant.last_read_at.is_(None),
-                ConversationParticipant.last_read_at < subq.c.last_message_at,
+                ConversationParticipant.last_read_at < last_other_subq.c.last_other_at,
             ),
         )
     )
