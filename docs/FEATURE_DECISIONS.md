@@ -121,7 +121,7 @@
 | | |
 |--|--|
 | **בעיה** | הודעות 1:1 + typing + presence — צריך הרבה idle connections; לא רוצים לייבל את path ה-DB ב-Python. |
-| **החלטה** | **Go `chat-ws`**: WebSocket, JWT ב-handshake, מנוי ל-**Redis** (`chat:conversation:*`, notification/typing, `user:*:events`), fan-out. Python שומר הודעה + publish ל-Redis. במסלול הנכנס: **`SetReadLimit(2048)`** על המסר; דילול **פרסום `typing_*` לרדיס** פר־חיבור עם **`x/time/rate`** (**`ping`** פטור). **מסגרות WS יוצאות** יכולות לאחות כמה JSONים עם newline — הפרונט מפצל לפני parse (**`useUserEventStream`**); **`message_read`** דורש **`recipient_id`** ב-payload כדי לנתב עדכוני read receipt חיים לשולח. |
+| **החלטה** | **Go `chat-ws`**: WebSocket, JWT ב-handshake, מנוי ל-**Redis** (`chat:conversation:*`, notification/typing, `user:*:events`), fan-out. Python שומר הודעה + publish ל-Redis. במסלול הנכנס: **`SetReadLimit(2048)`** על המסר; דילול **פרסום `typing_*` לרדיס** פר־חיבור עם **`x/time/rate`** (**`ping`** פטור). **מסגרות WS יוצאות:** כל הודעת JSON נשלחת כ-**frame עצמאי** (`WriteMessage` per message ב-`RunWritePump`); **`message_read`** דורש **`recipient_id`** ב-payload כדי לנתב עדכוני read receipt חיים לשולח. |
 | **אלטרנטיבות** | (1) WebSocket ב-FastAPI בלבד — אפשרי אבל per-connection cost גבוה ב-Python. (2) SaaS (Pusher/Ably) — עלות+vendor. (3) רק long polling — גרוע ל-UX. |
 | **יתרון** | הפרדת "מסע real-time" משכבת REST/DB; גורוטינים זולים per connection. |
 | **Trade-off** | שני runtimes (Python + Go); אותו `SECRET_KEY` ל-WS. |
@@ -156,6 +156,8 @@
 | **החלטה** | **`onopen` תמיד** — **`fetchMissedMessages(lastMessageIdRef ?? 0)`**; עדכון ref — **`messages.length > 0 ? max(message_id) : null`**. ההשלמה בפועל עוברת דרך **`fetchMissedGap`** — עמוד ראשון עם **`after`**, המשך עם **`before=next_cursor`** כל עוד **`has_more`**, בהתאם לחוזה ב־[API messages](architecture/API.md) (זהה ל־pagination של גלילה לעבר הישן). |
 | **Trade-off** | הרבה יותר HTTP בפערים גדולים (עד **~50** עמודים × **`limit` 30**, עם **שני** ניסיונות חוזרים לכל עמוד); כפילויות נסגרות ע"י **`message_id`** ב־merge; אם הגענו למכסה או השיחה מתחלפת באמצע — חלק מהפער עלול להישאר (**`shouldAbort`** / **`cidRef`**). |
 | **הפניה** | [architecture/REALTIME.md](architecture/REALTIME.md), [ENGINEERING_HIGHLIGHTS.md](ENGINEERING_HIGHLIGHTS.md) (Latest updates), [`fetchMissedGap.ts`](../frontend/src/pages/MessageThread/fetchMissedGap.ts), [`fetchMissedGap.test.ts`](../frontend/src/pages/MessageThread/fetchMissedGap.test.ts), [`useChatWebSocket.ts`](../frontend/src/pages/MessageThread/useChatWebSocket.ts), [`useConversationMessages.ts`](../frontend/src/pages/MessageThread/useConversationMessages.ts) |
+
+**הערה — גלילה מבוססת כוונה (H2 fix):** `useConversationMessages` כבר לא גולל לתחתית על כל שינוי ב-`messages`. `scrollIntentRef` (`'bottom'`/`'preserve'`/`'none'`) נקבע לפני כל `setMessages`: טעינה ראשונית ושליחה → `'bottom'`; טעינת היסטוריה → `'preserve'` (שימור offset); gap-fill → `'none'`; הודעות WS → `requestScrollToBottom` (גולל רק אם המשתמש קרוב לתחתית — 150px). `useChatPopup` משתמש ב-`shouldScrollRef` (טעינה ראשונית + שליחה בלבד). ב-`MessageThreadPanel`, `scrollerRef` מחובר ל-container.
 
 ---
 
@@ -561,12 +563,60 @@
 | | |
 |--|--|
 | **בעיה** | JWT stateless — אחרי logout ה-access עדיין חתום עד `exp`. |
-| **החלטה** | `jti` + `SETEX denylist:{jti}` ב-Redis עד `exp`; HTTP בודק; **fail-open** אם Redis down ב-read. |
+| **החלטה** | `jti` + `SETEX denylist:{jti}` ב-Redis עד `exp`; HTTP בודק; **fail-open** אם Redis down ב-read. **Password reset/change** מנקה refresh token ב-DB (`_invalidate_sessions`) — ראו [`#password-reset-session-invalidation`](#password-reset-session-invalidation). |
 | **אלטרנטיבות** | (1) session server-side (sticky). (2) רשימת ביטול ב-Postgres לכל request — עומס. (3) access קצר מאוד בלי denylist — UX גרוע. |
 | **יתרון** | logout אמיתי על access בלי טבלת sessions גדולה. |
 | **Trade-off** | בדיקות denylist בכל handshake מוסיפות תלות Redis במסלול WS auth; נבחר fail-open לשמירת זמינות אם Redis למטה. |
 | **Interview pitch (≈30s)** | *"הוספתי jti ל-access ו-Redis denylist ב-logout גם ל-HTTP וגם ל-WS handshake. אם Redis נופל, בחרתי fail-open כדי לא ליפול גלובלית בזמינות."* |
 | **הפניה** | ADR §18, HIGHLIGHTS §7ד |
+
+---
+
+<a id="password-reset-session-invalidation"></a>
+
+## M7 — Password reset/change invalidates all sessions
+
+| | |
+|--|--|
+| **בעיה** | `change_password` ו-`reset_password_with_code` עדכנו רק את ה-hash ב-DB. refresh token קיים נשאר תקף — תוקף עם cookie תקין יכל להמשיך `POST /auth/refresh` ולקבל access tokens חדשים ללא הגבלה עד תפוגה טבעית (7 ימים). |
+| **החלטה** | helper פנימי `_invalidate_sessions(db, user)` מנקה `user.refresh_token = None` באותה טרנזקציה של עדכון הסיסמה. נקרא גם ב-`change_password` וגם ב-`reset_password_with_code`, לפני ה-`commit`. כל מכשיר שינסה refresh יקבל 401 ויידרש re-login. |
+| **אלטרנטיבות** | (1) Denylist כל access tokens — דורש מעקב אחרי כל `jti` per-user ב-Redis; overkill עם TTL של 30 דקות. (2) Token versioning (`token_generation` column) — מורכב יותר, שווה ערך כשה-TTL קצר. (3) אי עשייה — security gap מובהק. |
+| **יתרון** | תוקף עם refresh token מאבד גישה מיידית; access tokens קיימים פוקעים ב-30 דקות מקסימום; שינוי מינימלי (שורה אחת באותה טרנזקציה). |
+| **Trade-off** | המשתמש עצמו מנותק מכל מכשיר — re-login חד פעמי; access tokens ישנים עדיין תקפים עד 30 דקות. |
+| **Interview pitch (≈20s)** | *"אחרי password reset מנקים את ה-refresh token ב-DB — כל session קיים מת בניסיון ה-refresh הבא. access tokens פוקעים בעצמם תוך 30 דקות — tradeoff מקובל מול מעקב per-jti."* |
+| **הפניה** | [`backend/app/domain/auth/service.py`](../backend/app/domain/auth/service.py) (`_invalidate_sessions`), ADR §18 (denylist), HIGHLIGHTS (audit fixes M7) |
+
+---
+
+<a id="redis-password-process-list"></a>
+
+## M5 — Redis password hidden from process list
+
+| | |
+|--|--|
+| **בעיה** | `docker-compose.yml` העביר `--requirepass "$REDIS_PASSWORD"` כ-argument ל-`redis-server` — הסיסמה גלויה ב-`/proc/PID/cmdline` לכל תהליך על ה-host (`ps aux`, `docker top`, monitoring agents). |
+| **החלטה** | כתיבת `requirepass <password>` לקובץ config runtime (`/tmp/redis.conf`) בתוך הקונטיינר דרך `printf`, ואז `exec redis-server /tmp/redis.conf ...`. בhealth check: `REDISCLI_AUTH` env var במקום `-a` flag. |
+| **אלטרנטיבות** | (1) ACL file מראש — דורש mount או build step. (2) Docker secrets — לא נתמך ב-compose standalone (רק Swarm). (3) bind mount של `redis.conf` — דורש תחזוקה של קובץ נפרד. |
+| **יתרון** | Process list מציג `redis-server /tmp/redis.conf`; env vars לא ב-cmdline; אין mount חיצוני; שינוי שורה אחת ב-compose. |
+| **Trade-off** | הסיסמה עדיין בתוך container's `/proc/PID/environ` (נגיש רק ל-root/same user — אותו threat model כמו env vars רגילים). |
+| **Interview pitch (≈15s)** | *"הסיסמה הייתה ב-cmdline — גלויה ב-ps. העברתי ל-runtime config file שנכתב בstartup ואז exec — process list נקי."* |
+| **הפניה** | [`docker-compose.yml`](../docker-compose.yml) (redis service), HIGHLIGHTS (audit fixes M5) |
+
+---
+
+<a id="group-join-toctou"></a>
+
+## M3 — TOCTOU race in group join (`SELECT FOR UPDATE`)
+
+| | |
+|--|--|
+| **בעיה** | `join_by_invite` בדק `SELECT COUNT(*)` (max members) ואז `INSERT` — תחת `READ COMMITTED`, שתי בקשות מקבילות רואות אותו count ומצליחות להצטרף מעבר ל-`max_members`. |
+| **החלטה** | `SELECT groups ... FOR UPDATE` על שורת הקבוצה לפני כל check — סריאליזציה של joins מקבילים לאותה קבוצה. בנוסף catch `IntegrityError` כ-defense-in-depth (UNIQUE constraint על `group_id, user_id`) → 409 נקי. |
+| **אלטרנטיבות** | (1) `SERIALIZABLE` isolation — wide blast radius, deadlock risk. (2) `INSERT ... ON CONFLICT DO NOTHING` + count after — לא עוצר overfill. (3) DB trigger — מורכבות נסתרת. (4) Advisory lock — semantics פחות ברורות מ-row lock. |
+| **יתרון** | Row lock מינימלי (שורה אחת בלבד); transaction קצרה (ms); לא צריך שינוי isolation level; count check מדויק כי rw serialized; IntegrityError handler מונע 500 גם ב-edge cases. |
+| **Trade-off** | Joins מקבילים לאותה קבוצה רצים סדרתית — אין impact ב-frequency הצפויה (join group הוא אירוע נדיר). |
+| **Interview pitch (≈25s)** | *"הייתה TOCTOU — שני requests רואים count=4 כש-max=5, שניהם מצליחים. תיקנתי עם SELECT FOR UPDATE על שורת ה-group — סריאליזציה של joins, count מדויק, plus IntegrityError catch כ-defense-in-depth."* |
+| **הפניה** | [`backend/app/domain/groups/service.py`](../backend/app/domain/groups/service.py), [`backend/app/domain/groups/crud.py`](../backend/app/domain/groups/crud.py) (`get_group_for_update`), HIGHLIGHTS (audit fixes M3) |
 
 ---
 

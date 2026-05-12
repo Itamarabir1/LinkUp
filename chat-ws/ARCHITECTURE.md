@@ -20,6 +20,8 @@
 - ✅ **Graceful HTTP shutdown (H8):** `*http.Server` + `srv.Shutdown(10s)` — ב-SIGTERM ניקוי subscribers ואז drain מסודר של חיבורים פעילים.
 - ✅ **Pong/read deadline (H9):** `SetReadDeadline(pongWait=60s)` + `SetPongHandler` — לקוחות מתים מזוהים ומנותקים תוך 60 שניות; אין דליפת goroutines.
 - ✅ **Panic recovery (H10):** `defer safego.RecoverPanic(...)` ([`internal/safego/safego.go`](internal/safego/safego.go)) על כל goroutine עצמאית — panic לא מפיל את התהליך.
+- ✅ **Shared `http.Client`:** outbound HTTP to backend (last-seen PATCH in `flushDueLastSeen`, presence GET in `fetchLastSeenFromBackend`) uses a shared `*http.Client` with tuned `http.Transport` (`MaxIdleConns: 20`, `MaxIdleConnsPerHost: 10`, `IdleConnTimeout: 30s`) on `Hub` struct / `HandlePresence` closure — no per-request client allocation.
+- ✅ **Backoff reset after stable connections:** all subscriber loops reset backoff to 1s if the inner function ran longer than `maxBackoff` (30s) — prevents permanent 30s delay after accumulated disconnects.
 
 **מה לא:**
 - ❌ Calendar export

@@ -93,7 +93,7 @@ This follows a senior engineering principle: avoid premature optimization, but e
 ## Chat Full React Query Migration (Deferred)
 
 - **Decision:** Defer full chat-domain migration (`useConversationMessages` + `useChatPopup` + WS write path integration) for now.
-- **Current state:** Chat is WS-driven and stable in production.
+- **Current state:** Chat is WS-driven and stable in production. Scroll behavior is intent-based (history load preserves position, gap-fill doesn't scroll, new messages scroll only if near bottom). Reconnect backoff resets after stable connections.
 - **Why deferred:**
   - Migration risk is currently higher than practical benefit at the current scale.
   - Reconnect backfill is hardened: every chat WS **`onOpen`** runs REST gap fill (**`after=`** + **`before=next_cursor`** במחזור עד **`has_more`** או מכסת לקוח) with **`lastMessageIdRef ?? 0`** and a fixed **`lastMessageIdRef`** sync (see **`ENGINEERING_HIGHLIGHTS.md`** + **[`FEATURE_DECISIONS.md`](FEATURE_DECISIONS.md#chat-thread-reconnect)** + **`fetchMissedGap.ts`**); message-stream UX remains WS-first.

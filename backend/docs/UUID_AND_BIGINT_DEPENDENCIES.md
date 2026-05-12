@@ -123,7 +123,7 @@
 ### 2.7 S3 וקבצים
 
 - **`backend/app/infrastructure/s3/service.py`**  
-  `uid_str = str(user_id)` – משמש לבניית paths. תואם ל-UUID string. אם user_id הוא integer, המחרוזת "1" תעבוד אבל אחרי מיגרציה ל-UUID המבנה ישתנה.
+  `uid_str = str(user_id)` – משמש לבניית paths. תואם ל-UUID string. ~~אם user_id הוא integer, המחרוזת "1" תעבוד אבל אחרי מיגרציה ל-UUID המבנה ישתנה.~~ **עדכון (H8):** type annotation תוקן מ-`UUID | int | str` ל-`UUID | str` — vestigial `int` הוסר.
 
 ### 2.8 שאר השירותים
 
@@ -175,8 +175,10 @@
 
 ## 5. רשימת בעיות / סיכונים שעלו במעבר
 
+> **H8 fix (תוקן):** שאריות `user_id: int` ב-type annotations תוקנו — `users/service.py` (4 מתודות: `get_user_by_id`, `update_user_location`, `update_user_info`, `update_fcm_token`), `exceptions/user.py` (`UserNotFoundError.__init__`: `int | None` → `UUID | str | None`), `chat/calendar_export.py` (`conversation_id: int` + `current_user_id: int` → `UUID`), `s3/service.py` (`UUID | int | str` → `UUID | str`). קוד מת עם `int` ב-`users/router.py` הוסר. DB PK כבר היה `PG_UUID(as_uuid=True)` — הבאג היה רק ב-Python type hints.
+
 1. **users.user_id עדיין INTEGER ב-DB**  
-   - ה-ORM והמודל מצפים ל-UUID → UPDATE/WHERE עם cast ל-UUID וערך integer → `operator does not exist: integer = uuid`.  
+   - ~~ה-ORM והמודל מצפים ל-UUID → UPDATE/WHERE עם cast ל-UUID וערך integer → `operator does not exist: integer = uuid`.~~ **תוקן:** DB ו-ORM כבר UUID; שאריות `int` ב-type annotations תוקנו (H8).  
    - **פתרון:** מיגרציה שממירה את `users.user_id` (וכל ה-FK אליו) ל-UUID, או workaround עם SQL ישיר בלי cast (זמני).
 
 2. **JWT `sub` ו-refresh**  
