@@ -13,13 +13,31 @@ interface State {
   error: Error | null;
 }
 
-/**
- */
+const CHUNK_RELOAD_KEY = 'chunk_reload_attempted';
+
+function isChunkLoadError(error: Error): boolean {
+  return (
+    error.name === 'ChunkLoadError' ||
+    error.message.includes('Failed to fetch dynamically imported module') ||
+    error.message.includes('Importing a module script failed') ||
+    error.message.includes('Unable to preload CSS')
+  );
+}
+
 export default class RouteErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: Error): State {
+    if (isChunkLoadError(error) && !sessionStorage.getItem(CHUNK_RELOAD_KEY)) {
+      sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
+      window.location.reload();
+      return { hasError: false, error: null };
+    }
     return { hasError: true, error };
+  }
+
+  componentDidMount() {
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY);
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -34,6 +52,11 @@ export default class RouteErrorBoundary extends Component<Props, State> {
   }
 
   handleRetry = () => {
+    if (this.state.error && isChunkLoadError(this.state.error)) {
+      sessionStorage.removeItem(CHUNK_RELOAD_KEY);
+      window.location.reload();
+      return;
+    }
     this.setState({ hasError: false, error: null });
   };
 
