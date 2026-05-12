@@ -44,11 +44,11 @@ class PushProvider(BaseNotificationProvider):
 
         except (UnregisteredError, SenderIdMismatchError):
             uid = getattr(user, "user_id", "N/A")
-            logger.warning("🗑️ Invalid FCM token for user_id=%s — clearing from DB", uid)
+            logger.info("Push token expired for user_id=%s — cleared from DB", uid)
             if db is not None:
                 await crud_user.update_fcm_token(db, user=user, token=None)
                 await db.commit()
-            raise
+            return
 
         except Exception as e:
             logger.error("❌ Push failed for user_id=%s: %s", getattr(user, "user_id", "N/A"), e)

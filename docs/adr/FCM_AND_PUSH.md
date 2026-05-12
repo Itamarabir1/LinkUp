@@ -19,7 +19,7 @@
 |------|------|
 | **שליטה אחידה על התצוגה** | כשמשתמשים ב-`notification` בלבד, ה-SDK/דפדפן עלולים להציג התנהגות "אוטומטית" שלא תמיד מתאימה לשכבת המוצר (כפילות foreground+background, טקסט שלא עבר i18n/פורמט אחיד). |
 | **Foreground** | `onMessage` קורא `title`/`body` מ-`payload.data` (עם fallback אם ה-SDK מעלה גם `notification`) — אנחנו מחליטים על Toast אחד עקבי. |
-| **Background** | ה-SW ב-`push` קורא `data.title` / `data.body` וקורא ל-`showNotification` — אותו חוזה תוכן. |
+| **Background** | ה-SW משתמש ב-`onBackgroundMessage` כנתיב ראשי; בנוסף, raw `push` event listener פועל כ-**fallback** לדפדפנים שבהם `onBackgroundMessage` לא נורה עבור data-only payloads (בעיקר Chrome כשהטאב סגור). שני ה-handlers לא יורים יחד באותו דפדפן — Firebase מדכא את ה-raw event כש-`onBackgroundMessage` מטפל בהודעה. |
 | **עקביות עם Outbox** | האירוע יוצא דרך אותו pipeline (מייל / push / websocket לפי אסטרטגיה); ה-payload ל-push הוא שכבת נתונים, לא "קסם" של פלטפורמה. |
 
 **משפט לראיון:** "בחרנו data-only כדי שכל ההצגה — בטאב פתוח או ברקע — תעבור דרך הקוד שלנו ולא דרך שביל אוטומטי של FCM שלא תמיד נשלט."
@@ -30,10 +30,10 @@
 
 | שלב | מה קורה |
 |-----|---------|
-| **אחרי login / Google / hydrate** | קוראים `initFCM()` ללא תנאי — הפונקציה עצמה מבקשת הרשאה אם `"default"` ויוצאת אם `"denied"`. `PATCH /users/fcm-token` עם הטוקן. |
-| **לפני logout** | קודם `PATCH` עם `fcm_token: null` (בעוד ה-access token תקף), אחר כך `cleanupFCM()`, ורק אז logout — כדי שלא יישלח push לרישום ישן. |
+| **אחרי login / Google / hydrate** | קוראים `initFCM()` ללא תנאי — הפונקציה עצמה מבקשת הרשאה אם `"default"` ויוצאת אם `"denied"`. משווה טוקן מול `localStorage` cache — אם לא השתנה, דילוג על PATCH; אחרת `PATCH /users/fcm-token` ועדכון cache. |
+| **לפני logout** | קודם `PATCH` עם `fcm_token: null` (בעוד ה-access token תקף), אחר כך `cleanupFCM()` (מוחק גם את localStorage cache של הטוקן), ורק אז logout — כדי שלא יישלח push לרישום ישן ושמשתמש הבא תמיד ישלח את הטוקן שלו. |
 | **הפעלה ידנית** | תפריט פרופיל / מסך FCM check. |
-| **כשהשרת שולח push לטוקן שפג/לא תקף** | Firebase Admin מעלה **`UnregisteredError`** / **`SenderIdMismatchError`**. ה־**`PushProvider`** (עם **`AsyncSession`** מאותו אירוע worker) מבצע **`update_fcm_token(..., token=None)`** — בנוסף לניקוי מצד הלקוח ב-logout. |
+| **כשהשרת שולח push לטוקן שפג/לא תקף** | Firebase Admin מעלה **`UnregisteredError`** / **`SenderIdMismatchError`**. ה־**`PushProvider`** (עם **`AsyncSession`** מאותו אירוע worker) מבצע **`update_fcm_token(..., token=None)`** ו-**`return`** (לא `raise`) — טוקן שפג הוא lifecycle event צפוי, לא שגיאה. לוג ברמת `info`. |
 
 **למה זה חשוב בראיון:** מראה חשיבה על **ניקוי רישום** ועל סדר פעולות נגד race עם ביטול סשן.
 

@@ -44,7 +44,7 @@ FCM delivery has two connected paths:
   5. Get messaging instance (`getMessagingSafe()` from [`frontend/src/config/firebase.ts`](../frontend/src/config/firebase.ts)).
   6. Register **foreground** listener `onMessage` once (module-level guard).
   7. `getToken` with VAPID key and the same SW registration.
-  8. `PATCH /users/fcm-token` with `{ "fcm_token": "<token>" }` (or `{ "fcm_token": null }` on logout to clear `users.fcm_token` in the DB).
+  8. **localStorage cache check:** compares the new token against `localStorage('fcm_token')`; if unchanged, skips the PATCH (avoids a redundant backend call on every page reload when the token hasn't rotated). On change: `PATCH /users/fcm-token` with `{ "fcm_token": "<token>" }` and updates the cache. On logout / session teardown: `cleanupFCM()` clears the cached key so the next user always sends their token. (Or `{ "fcm_token": null }` on explicit logout to clear `users.fcm_token` in the DB.)
 
 - **Logging:** verbose registration / token paths use **`devLog`** and only emit when **`import.meta.env.DEV`** is true, so production consoles stay quiet; `console.warn` in some failure paths may still appear for operational diagnostics.
 
@@ -52,8 +52,8 @@ FCM delivery has two connected paths:
 
 - **Background**
   - File: `frontend/public/firebase-messaging-sw.js` — **generated file** (gitignored). Source of truth: [`frontend/docker/firebase-messaging-sw.template.js`](../frontend/docker/firebase-messaging-sw.template.js). In dev/build: Vite plugin `firebaseSwPlugin` (`vite.config.ts`) reads the template and replaces `${VITE_*}` placeholders with values from `loadEnv`; in Docker: `envsubst` in `40-render-config.sh` at container start. Config is baked in at startup — no `postMessage` timing issues.
-  - **`push` listener:** `event.waitUntil(registration.showNotification(...))` using `title` / `body` from `event.data?.json()?.data` (matches data-only backend).
-  - **`messaging.onBackgroundMessage`:** still present for compatibility / `notification`-style payloads (e.g. `vibrate` on supported platforms). With **data-only** sends from the backend, the primary display path for system notifications is the **`push` handler**.
+  - **`messaging.onBackgroundMessage`:** Firebase's managed handler — the primary display path. Calls `showNotification` with `title`/`body`/`vibrate` from `payload.data`. On browsers/platforms where it fires, it handles the push event internally and suppresses the raw `push` listener below.
+  - **Raw `push` event listener (fallback):** `self.addEventListener('push', ...)` with `event.waitUntil(registration.showNotification(...))` using `title`/`body` from `event.data.json().data`. Acts as a **fallback** for browsers where `onBackgroundMessage` does **not** fire for data-only FCM messages (notably Chrome when the tab is closed). The two do not double-fire on the same platform — `onBackgroundMessage` suppresses the raw event when it handles the message.
 
 - **Foreground**
   - File: [`frontend/src/services/fcm.ts`](../frontend/src/services/fcm.ts)
@@ -116,7 +116,7 @@ messaging.Message(
 ### 3.4 Push provider — invalid token cleanup
 
 - File: [`backend/app/domain/notifications/providers/push_provider.py`](../backend/app/domain/notifications/providers/push_provider.py)
-- On **`UnregisteredError`** or **`SenderIdMismatchError`**, if **`db`** is present, calls **`crud_user.update_fcm_token(db, user=user, token=None)`** (commits via CRUD), then **re-raises** so the notification manager still logs the channel failure.
+- On **`UnregisteredError`** or **`SenderIdMismatchError`**, if **`db`** is present, calls **`crud_user.update_fcm_token(db, user=user, token=None)`** (commits via CRUD), then **returns cleanly** — an expired/unregistered token is an expected lifecycle event, not an error. Logging at `info` level (not `warning`); no re-raise, so `NotificationManager._safe_send` does not log a false failure or trigger retry logic.
 
 ### 3.5 Firebase Admin init
 
@@ -148,8 +148,8 @@ messaging.Message(
 
 1. **Dev:** seeing `http://localhost:5173/api/v1/...` in the network tab is normal — Vite proxies `/api` to the backend.
 2. **Token saved ≠ delivery:** token must be valid and permission granted.
-3. **Skip push:** missing `fcm_token` — provider skips. **Invalid registration** from FCM (`UnregisteredError` / `SenderIdMismatchError`) — **`PushProvider`** clears **`users.fcm_token`** in DB when **`db`** is passed (see §3.4).
-4. **Duplicate notifications:** if both raw `push` and `onBackgroundMessage` run for the same message, you could see double system notifications; current design prioritizes **`push`** for data-only; trim `onBackgroundMessage` if duplicates appear.
+3. **Skip push:** missing `fcm_token` — provider skips. **Invalid registration** from FCM (`UnregisteredError` / `SenderIdMismatchError`) — **`PushProvider`** clears **`users.fcm_token`** in DB when **`db`** is passed and **returns cleanly** (no re-raise; see §3.4).
+4. **Duplicate notifications:** `onBackgroundMessage` is the primary handler; the raw `push` listener is a fallback for browsers that do not fire `onBackgroundMessage` for data-only payloads. Firebase suppresses the raw `push` event when `onBackgroundMessage` handles the message, so the two do not double-fire on the same platform.
 5. **Permissions:** site notifications must be **Allow** for token + SW display.
 
 ## 6) File Inventory (FCM-related)

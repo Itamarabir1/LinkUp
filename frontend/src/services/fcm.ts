@@ -7,6 +7,8 @@ import { patchFcmToken } from '../api/users';
 import { playNotificationChime } from '../utils/notificationSound';
 import { triggerNotificationToast } from '../components/NotificationToast/notificationToast.utils';
 
+const FCM_TOKEN_STORAGE_KEY = 'fcm_token';
+
 function devLog(...args: unknown[]): void {
   if (import.meta.env.DEV) {
     console.log(...args);
@@ -20,6 +22,7 @@ export function cleanupFCM(): void {
     foregroundUnsubscribe();
     foregroundUnsubscribe = null;
   }
+  localStorage.removeItem(FCM_TOKEN_STORAGE_KEY);
 }
 
 function showForegroundNotification(payload: MessagePayload): void {
@@ -81,8 +84,14 @@ export async function initFCM(): Promise<void> {
     devLog('[FCM] Token:', token ? token.substring(0, 20) + '...' : 'null');
     if (!token) return;
 
-    await patchFcmToken(token);
-    devLog('[FCM] Token sent to backend successfully');
+    const cachedToken = localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
+    if (token !== cachedToken) {
+      await patchFcmToken(token);
+      localStorage.setItem(FCM_TOKEN_STORAGE_KEY, token);
+      devLog('[FCM] Token sent to backend successfully');
+    } else {
+      devLog('[FCM] Token unchanged, skipping backend update');
+    }
   } catch (err) {
     console.warn('[FCM] init failed:', err);
   }

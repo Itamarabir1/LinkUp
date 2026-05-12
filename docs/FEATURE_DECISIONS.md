@@ -625,7 +625,7 @@
 | | |
 |--|--|
 | **בעיה** | שליטה ב-UX: Toast בחזית, SW ברקע, עקביות בין iOS/Web. |
-| **החלטה** | שרת שולח `data` map בלבד; קליינט מפרש ל-Toast/צליל. SW config — מקור אמת אחד: `frontend/docker/firebase-messaging-sw.template.js`; Vite plugin ב-dev, `envsubst` ב-Docker. |
+| **החלטה** | שרת שולח `data` map בלבד; קליינט מפרש ל-Toast/צליל. SW config — מקור אמת אחד: `frontend/docker/firebase-messaging-sw.template.js`; Vite plugin ב-dev, `envsubst` ב-Docker. ב-SW: `onBackgroundMessage` כנתיב ראשי + raw `push` listener כ-fallback לדפדפנים שלא מפעילים `onBackgroundMessage` עבור data-only (Chrome עם טאב סגור). |
 | **אלטרנטיבות** | (1) `notification` object של FCM — פחות שליטה אחידה. |
 | **יתרון** | שליטה מלאה בטקסט, שפה, A/B, analytics. |
 | **Trade-off** | יותר לוגיקה בקליינט. |
@@ -660,6 +660,38 @@
 | **יתרון** | התראת מערכת מיידית למכשיר — גם אם המייל לא נפתח בזמן. |
 | **Trade-off** | שני ערוצים מקבילים יכולים ליצור "כפילות" תחושתית; push הוא ephemeral ומייל הוא persistent — משלימים זה את זה. |
 | **הפניה** | [`backend/app/domain/notifications/config/mappings.py`](../backend/app/domain/notifications/config/mappings.py), [`backend/app/domain/notifications/config/templates_map/push_conf.py`](../backend/app/domain/notifications/config/templates_map/push_conf.py), [FCM_SYSTEM_SUMMARY.md](FCM_SYSTEM_SUMMARY.md) §8 |
+
+---
+
+<a id="push-provider-return-not-raise"></a>
+
+## PushProvider — return on invalid token (not raise)
+
+| | |
+|--|--|
+| **בעיה** | כש-Firebase מחזיר `UnregisteredError` / `SenderIdMismatchError`, ה-`PushProvider` ניקה את הטוקן ב-DB **אבל אז עשה `raise`**. `NotificationManager._safe_send` תפס את החריגה ורשם `"❌ push failed"` — **שגיאה מדומה** על מה שהוא למעשה ניקוי מוצלח של טוקן שפג תוקף. |
+| **החלטה** | החלפת `raise` ב-`return`; הורדת רמת לוג מ-`warning` ל-`info`. טוקן שפג הוא אירוע lifecycle צפוי, לא שגיאה. |
+| **אלטרנטיבות** | (1) להשאיר raise ולסנן ב-manager — מורכב ומפר SRP. (2) לתפוס ספציפית ב-`_safe_send` — מזהם שכבה שצריכה להיות גנרית. |
+| **יתרון** | לוגים נקיים; אין false failure ב-manager; אין retry מיותר על אירוע שטופל בהצלחה. |
+| **Trade-off** | `_safe_send` ירשום `"✅ push sent"` גם כשהטוקן נוקה (ה-push לא באמת נשלח) — קוסמטי, לא פונקציונלי. |
+| **Interview pitch (≈15s)** | *"טוקן FCM שפג הוא lifecycle event, לא שגיאה. ה-provider ניקה את ה-DB ואז עשה raise — מה שגרם ל-manager לרשום false failure. שיניתי ל-return כדי שהלוגים ישקפו את המציאות."* |
+| **הפניה** | [`backend/app/domain/notifications/providers/push_provider.py`](../backend/app/domain/notifications/providers/push_provider.py), [`backend/app/domain/notifications/manager.py`](../backend/app/domain/notifications/manager.py), [FCM_SYSTEM_SUMMARY.md](FCM_SYSTEM_SUMMARY.md) §3.4 |
+
+---
+
+<a id="fcm-token-localstorage-cache"></a>
+
+## FCM token — localStorage cache (skip redundant PATCH)
+
+| | |
+|--|--|
+| **בעיה** | `initFCM()` רץ בכל login / page reload / Google sign-in ושולח `PATCH /users/fcm-token` **בכל פעם** — גם כשהטוקן לא השתנה. FCM tokens נשארים יציבים לשבועות; רוב ה-PATCH-ים מיותרים. |
+| **החלטה** | שמירת הטוקן ב-`localStorage('fcm_token')` אחרי PATCH מוצלח; ב-`initFCM()` — השוואה מול cache; אם זהה — דילוג על PATCH. ב-`cleanupFCM()` — מחיקת ה-cache (כדי שמשתמש חדש על אותו דפדפן תמיד ישלח את הטוקן שלו). |
+| **אלטרנטיבות** | (1) לנקות cache רק ב-logout מפורש (כמו בהצעה המקורית) — באג multi-user: אם session פג ומשתמש אחר מתחבר, ה-cache שייך למשתמש הקודם ולא נמחק. (2) לבדוק idempotency בבקאנד — אפשרי אבל עדיין שולח HTTP מיותר. (3) לא לעשות כלום — PATCH הוא idempotent ובקאנד מטפל, אבל חוסך round-trip מיותר. |
+| **יתרון** | חוסך HTTP call מיותר ב-99% מה-reloads; אנקפסולציה מלאה ב-`fcm.ts` (אף קובץ אחר לא צריך לדעת על ה-cache). |
+| **Trade-off** | אחרי logout → re-login של אותו משתמש, ה-cache נמחק ב-`cleanupFCM()` ולכן ישלח PATCH אחד "מיותר" — מחיר זניח לעומת נכונות. |
+| **Interview pitch (≈20s)** | *"FCM tokens נשארים יציבים לשבועות, אבל initFCM שלח PATCH בכל reload. הוספתי localStorage cache ב-fcm.ts — קובץ אחד, אנקפסולציה מלאה. Cache נמחק ב-cleanupFCM כדי להימנע מבאג multi-user כש-session פג."* |
+| **הפניה** | [`frontend/src/services/fcm.ts`](../frontend/src/services/fcm.ts), [FCM_SYSTEM_SUMMARY.md](FCM_SYSTEM_SUMMARY.md) §2.2 |
 
 ---
 
