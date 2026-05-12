@@ -55,11 +55,16 @@ jobs:
             cp backend/.env.production backend/.env
             cp chat-ws/.env.production chat-ws/.env
             BACKEND_SECRET="$(grep -E '^SECRET_KEY=' backend/.env | head -1 | cut -d= -f2-)"
-            sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$BACKEND_SECRET|" chat-ws/.env
             [ -n "$BACKEND_SECRET" ] || { echo "ERROR: SECRET_KEY missing in backend/.env"; exit 1; }
             BACKEND_REDIS_PASSWORD="$(grep -E '^REDIS_PASSWORD=' backend/.env | head -1 | cut -d= -f2-)"
             [ -n "$BACKEND_REDIS_PASSWORD" ] || { echo "ERROR: REDIS_PASSWORD missing in backend/.env"; exit 1; }
-            sed -i "s|^REDIS_URL=.*|REDIS_URL=redis://:${BACKEND_REDIS_PASSWORD}@redis:6379/1|" chat-ws/.env
+            # Sync JWT_SECRET and REDIS_URL from backend/.env into chat-ws/.env.
+            # Delete+append instead of sed substitution — works even if the key
+            # is missing or formatted differently in chat-ws/.env.production.
+            sed -i '/^JWT_SECRET=/d' chat-ws/.env
+            echo "JWT_SECRET=$BACKEND_SECRET" >> chat-ws/.env
+            sed -i '/^REDIS_URL=/d' chat-ws/.env
+            echo "REDIS_URL=redis://:${BACKEND_REDIS_PASSWORD}@redis:6379/1" >> chat-ws/.env
             sed -i '/^REDIS_SENTINEL_HOST=/d' backend/.env
             grep -q '^POSTGRES_HOST_DIRECT=' backend/.env || echo 'POSTGRES_HOST_DIRECT=db' >> backend/.env
             grep -q '^POSTGRES_PORT_DIRECT=' backend/.env || echo 'POSTGRES_PORT_DIRECT=5432' >> backend/.env
@@ -150,7 +155,7 @@ jobs:
 
             $COMPOSE up -d --no-deps email-renderer
             $COMPOSE up -d --no-deps notification-worker task-worker ai-worker
-            $COMPOSE up -d --no-deps chat-ws
+            $COMPOSE up -d --no-deps --force-recreate chat-ws
 
             $COMPOSE --profile prod up -d --no-deps --wait --wait-timeout 30 frontend
 
