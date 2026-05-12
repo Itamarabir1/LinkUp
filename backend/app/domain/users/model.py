@@ -1,7 +1,7 @@
 import uuid
 
 from geoalchemy2 import Geography  # PostGIS geography type
-from sqlalchemy import Boolean, Column, DateTime, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Index, String, Text, text
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
@@ -16,11 +16,19 @@ class User(Base):
     """
 
     __tablename__ = "users"
+    __table_args__ = (
+        Index(
+            "ix_users_phone_partial",
+            "phone_number",
+            unique=True,
+            postgresql_where=text("phone_number IS NOT NULL"),
+        ),
+    )
 
     # Primary key
     user_id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     full_name = Column(String(100), nullable=False)
-    phone_number = Column(String(20), unique=True, index=True, nullable=False)
+    phone_number = Column(String(20), nullable=True, index=False)
     email = Column(String(255), unique=True, index=True, nullable=True)
     hashed_password = Column(String(255), nullable=False)
 

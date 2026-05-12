@@ -119,21 +119,13 @@ class UserService:
         if "email" in update_dict and update_dict["email"] != db_user.email:
             if await self.crud.get_by_email(db, email=update_dict["email"]):
                 raise EmailAlreadyRegisteredError(email=update_dict["email"])
-
-            update_dict["is_verified"] = False
             email_changed = True
 
-        # Apply field updates in the same transaction (single commit)
-        protected_fields = ["user_id", "created_at", "hashed_password"]
-        for field, value in update_dict.items():
-            if hasattr(db_user, field) and field not in protected_fields:
-                setattr(db_user, field, value)
-        db.add(db_user)
-
-        # Flush without commit so outbox sees updated row state
-        await db.flush()
+        db_user = await self.crud.update(db, db_obj=db_user, obj_in=update_data)
 
         if email_changed:
+            db_user.is_verified = False
+            await db.flush()
             await publish_to_outbox(
                 db,
                 NotificationEvent.EMAIL_VERIFICATION.value,

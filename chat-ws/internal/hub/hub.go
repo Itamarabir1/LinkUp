@@ -399,7 +399,7 @@ func (h *Hub) broadcastOnline(onlineUserID string) {
 	for _, c := range conns {
 		select {
 		case c.Send <- payload:
-		case <-c.done:
+		case <-c.Done():
 		default:
 		}
 	}
@@ -425,7 +425,7 @@ func (h *Hub) broadcastOffline(offlineUserID string) {
 	for _, c := range conns {
 		select {
 		case c.Send <- payload:
-		case <-c.done:
+		case <-c.Done():
 		default:
 		}
 	}
@@ -443,7 +443,7 @@ func (h *Hub) SendToUser(userID string, payload []byte) {
 	for _, c := range conns {
 		select {
 		case c.Send <- payload:
-		case <-c.done:
+		case <-c.Done():
 		default:
 		}
 	}

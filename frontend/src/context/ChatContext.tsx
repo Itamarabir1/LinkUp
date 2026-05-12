@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useMemo, useReducer } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { NOTIFICATIONS_REFRESH_EVENT } from '../config/constants';
+import { markNotificationsReadApi } from '../api/users';
 import { useUserEventStream } from '../hooks/useUserEventStream';
 import type { InvalidateEvent, UserEvent } from '../types/wsEvents';
 import { useAuth } from './AuthContext';
@@ -10,7 +11,9 @@ import { useChatNotificationsFeed } from './useChatNotificationsFeed';
 import { useChatOpenClose } from './useChatOpenClose';
 import { useChatUnreadMessages } from './useChatUnreadMessages';
 
-export { getNotificationItemKey } from './chatNotificationStorage';
+export { getNotificationItemKey } from './useChatNotificationsFeed';
+
+const LEGACY_NOTIF_READ_KEY = 'linkup_notif_read';
 
 const ChatContext = createContext<ChatContextValue | null>(null);
 
@@ -36,6 +39,35 @@ export function ChatProvider({ children }: ChatProviderProps) {
     notificationsLoading,
     notificationsError,
   } = useChatNotificationsFeed(user?.user_id, state.notificationList, dispatch);
+
+  const migrated = useRef(false);
+  useEffect(() => {
+    if (!user?.user_id || migrated.current) return;
+    const raw = localStorage.getItem(LEGACY_NOTIF_READ_KEY);
+    if (!raw) return;
+    migrated.current = true;
+    try {
+      const arr = JSON.parse(raw) as string[];
+      if (!Array.isArray(arr) || arr.length === 0) {
+        localStorage.removeItem(LEGACY_NOTIF_READ_KEY);
+        return;
+      }
+      const items = arr
+        .map((key) => {
+          const idx = key.indexOf('_');
+          if (idx === -1) return null;
+          return { booking_id: key.slice(0, idx), created_at: key.slice(idx + 1) };
+        })
+        .filter(Boolean) as Array<{ booking_id: string; created_at: string }>;
+      if (items.length > 0) {
+        const batch = items.slice(0, 200);
+        markNotificationsReadApi(batch).catch(() => {});
+      }
+    } catch {
+      // corrupt data — just discard
+    }
+    localStorage.removeItem(LEGACY_NOTIF_READ_KEY);
+  }, [user?.user_id]);
 
   const handleInvalidate = useCallback(
     (event: InvalidateEvent) => {

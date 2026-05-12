@@ -1,10 +1,6 @@
 importScripts('https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/11.10.0/firebase-messaging-compat.js');
 
-// Do not hardcode Firebase public config in git-tracked files.
-// In containerized runtime, this file is rendered from
-// frontend/docker/firebase-messaging-sw.template.js via envsubst.
-// This fallback file stays scrubbed to avoid secret-scanner alerts.
 firebase.initializeApp({
   apiKey: "AIzaSyA_-AcXKNVAusWm_q2MLq4i70os33FKQdo",
   authDomain: "link-up-d33dc.firebaseapp.com",
@@ -20,10 +16,46 @@ messaging.onBackgroundMessage((payload) => {
   const data = payload.data || {};
   const title = data.title || 'LinkUp';
   const body = data.body || '';
-  self.registration.showNotification(title, {
+  const options = {
     body,
     icon: '/favicon.png',
     silent: false,
     vibrate: [180, 80, 180],
-  });
+  };
+  if (data.conversation_id) {
+    options.tag = 'chat-' + data.conversation_id;
+    options.renotify = true;
+  }
+  self.registration.showNotification(title, options);
+});
+
+self.addEventListener('push', (event) => {
+  if (event.data) {
+    try {
+      const payload = event.data.json();
+      const data = payload.data || {};
+      const title = data.title || 'LinkUp';
+      const body = data.body || '';
+      const options = {
+        body,
+        icon: '/favicon.png',
+        silent: false,
+        vibrate: [180, 80, 180],
+      };
+      if (data.conversation_id) {
+        options.tag = 'chat-' + data.conversation_id;
+        options.renotify = true;
+      }
+      event.waitUntil(
+        self.registration.showNotification(title, options)
+      );
+    } catch (e) {
+      const title = event.data.text() || 'LinkUp';
+      event.waitUntil(
+        self.registration.showNotification(title, {
+          icon: '/favicon.png',
+        })
+      );
+    }
+  }
 });

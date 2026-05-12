@@ -272,17 +272,19 @@
 
 ---
 
-## 24. Persistent audit log for admin actions and billing webhook attempts
+## 24. Persistent audit log for admin actions, billing webhook attempts, and auth events
 
 | | |
 |--|--|
-| **הקשר** | אדמין מבצע פעולות רגישות (user active/admin toggle, ride cancel, outbox requeue) ו-billing webhook יכול להישלח מחדש ע״י Stripe. לוגים בלבד לא מספיקים ל-forensics, ו-idempotency על `stripe_event_id` עלול להסתיר ניסיונות כפולים. |
-| **החלטה** | טבלת `audit_log` append-only ב-Postgres + repository ייעודי לכתיבה/קריאה. ב-admin שומרים גם logger (`[admin_audit]`) וגם DB record (defense in depth). ב-`checkout.session.completed` רושמים audit attempt **לפני** בדיקת event-level idempotency כדי לתעד גם duplicate retries. |
+| **הקשר** | אדמין מבצע פעולות רגישות (user active/admin toggle, ride cancel, outbox requeue), billing webhook יכול להישלח מחדש ע״י Stripe, ואירועי auth (login, logout, password change) דורשים forensic trail עצמאי מ-Prometheus metrics. לוגים בלבד לא מספיקים ל-forensics, ו-idempotency על `stripe_event_id` עלול להסתיר ניסיונות כפולים. |
+| **החלטה** | טבלת `audit_log` append-only ב-Postgres + repository ייעודי לכתיבה/קריאה. ב-admin שומרים גם logger (`[admin_audit]`) וגם DB record (defense in depth). ב-`checkout.session.completed` רושמים audit attempt **לפני** בדיקת event-level idempotency כדי לתעד גם duplicate retries. **ב-auth router** רושמים `login` / `login_failed` / `logout` / `change_password` / `password_reset` עם IP מחולץ מ-`X-Forwarded-For` (shared helper `app.api.helpers.client_ip`). |
 | **סכימה** | `audit_log(id, actor_user_id, action, resource_type, resource_id, metadata JSONB, ip_address, created_at)` + indexes לפי `(actor_user_id, created_at DESC)` ו-`(resource_type, resource_id)`. |
 | **למה** | מחזק traceability, incident response ו-compliance בסיסי בלי תלות במערכת לוגים חיצונית בלבד. מאפשר feed אדמין מסונן לפי actor/resource/action עם limit. |
 | **Trade-off** | תוספת write-path לכל פעולה רגישה ונפח metadata שעלול לגדול. mitigation: metadata קומפקטי בלבד; בלי payloadים מלאים. |
 | **Fail policy** | ל-admin ול-billing נשמר best-effort pragmatic: כש-audit write נכשל — לוג warning, ולא שוברים את זרימת הדומיין הקריטית (במיוחד webhook processing). |
-| **בקצרה לראיון** | “תיעדתי פעולות רגישות בטבלת audit ייעודית, וב-billing הקפדתי על ordering נכון: audit לפני idempotency, כדי שגם retries כפולים יהיו נראים בחקירה.” |
+| **auth actions** | `login` (email/google success), `login_failed` (bad credentials / unverified / Google failure — metadata כולל `reason=error_code` + `provider`), `logout`, `change_password`, `password_reset` (OTP confirm). `resource_type="auth"` לכולם; `actor_user_id=NULL` כשהמשתמש לא מזוהה (failed login, unauthenticated reset). |
+| **client_ip extraction** | `client_ip(request)` חולצה מ-`rate_limit.py` ל-`app/api/helpers.py` כ-shared utility — rate limiting ו-auth audit מייבאים ממודול אחד בלי שכפול קוד ובלי circular imports. |
+| **בקצרה לראיון** | "תיעדתי פעולות רגישות בטבלת audit ייעודית — אדמין, billing, ועכשיו גם auth (login/logout/password). חילצתי `client_ip` ל-shared helper כדי ש-rate-limit ו-audit ישתמשו באותו מקור — בלי duplication." |
 
 ---
 
@@ -341,13 +343,30 @@
 
 | | |
 |--|--|
-| **הקשר** | `CRUDUser` write methods (`update`, `update_location`, `update_fcm_token`, `update_refresh_token`, `update_password`, `mark_as_verified`, `update_last_active`) called `db.commit()` internally. This worked for simple operations but broke atomicity when callers needed to combine a DB write with an outbox event in a single transaction. Bug was first hit in `confirm_avatar_upload` and `remove_avatar` — fixed by bypassing CRUD, but the root cause remained. |
-| **החלטה** | All CRUD write methods use **`db.flush()`** only — they never commit. Callers own the transaction boundary and call **`await db.commit()`** when ready. One pattern, no `_no_commit` variants. |
-| **מה השתנה** | 7 methods in `users/crud.py` changed from `commit()` to `flush()`. 11 caller sites across 6 files (`auth/service.py` ×6, `push_provider.py` ×1, `users/service.py` ×2, `users/router.py` ×1, `chat/router.py` ×1) received explicit `await db.commit()`. Dead-code method `mark_as_verified` (zero callers) was removed. Two dedicated methods added: **`link_google_account`** (sets `google_id` + `is_verified` — replaces direct ORM assignment in the existing-user branch of `authenticate_with_google`) and **`update_last_login`** (stamps `last_login` — replaces direct assignment + `db.add` in the same method). The new-user branch now uses the generic `update()` for `is_verified` instead of raw attribute assignment. Result: `authenticate_with_google` has zero direct ORM writes — all mutations go through CRUD. |
+| **הקשר** | `CRUDUser` write methods (`update`, `update_location`, `update_fcm_token`, `update_refresh_token`, `update_password`, `mark_as_verified`, `update_last_active`) called `db.commit()` internally. This worked for simple operations but broke atomicity when callers needed to combine a DB write with an outbox event in a single transaction. Bug was first hit in `confirm_avatar_upload` and `remove_avatar` — fixed by bypassing CRUD, but the root cause remained. The same anti-pattern existed in **groups CRUD** — `create_group`, `join_group`, `remove_member`, `rename_group`, `update_group_description`, `update_group_avatar_key`, `close_group`, `update_member_role` all committed internally, making the `update_group` handler (rename + update description) non-atomic. |
+| **החלטה** | All CRUD write methods use **`db.flush()`** only — they never commit. Callers own the transaction boundary and call **`await db.commit()`** when ready. One pattern, no `_no_commit` variants. Applied consistently across **users** and **groups** domains. |
+| **מה השתנה** | **Users:** 7 methods in `users/crud.py` changed from `commit()` to `flush()`. 11 caller sites across 6 files (`auth/service.py` ×6, `push_provider.py` ×1, `users/service.py` ×2, `users/router.py` ×1, `chat/router.py` ×1) received explicit `await db.commit()`. Dead-code method `mark_as_verified` (zero callers) was removed. Two dedicated methods added: **`link_google_account`** and **`update_last_login`**. **Groups:** 8 methods in `groups/crud.py` changed from `commit()` to `flush()`. Commit ownership moved to `groups/service.py` (`create_group`, `join_by_invite`) and `groups/router.py` (7 write endpoints: `confirm_group_image`, `delete_group_image`, `remove_member`, `promote_member`, `leave_group`, `close_group`, `update_group`). Result: `update_group` (rename + update description) is now **atomic** — both operations commit together or roll back together. |
 | **למה בטוח** | Session factory in [`app/db/session.py`](../../backend/app/db/session.py) sets **`expire_on_commit=False`** — ORM attributes remain accessible after commit without `refresh()`. Outbox `save_event` already uses `flush()`. Methods `create`, `mark_as_premium`, `update_stripe_customer_id` already followed this pattern with callers committing in `register_new_user`, `authenticate_with_google`, and `billing/service.py`. |
 | **אלטרנטיבות** | (1) `_no_commit` variant methods — dual patterns, inconsistent, error-prone. (2) Context manager / middleware auto-commit — hides transaction boundaries, makes outbox atomicity implicit. |
-| **סקייל** | Enables any future caller to combine DB writes + outbox events atomically without CRUD-layer changes. The pattern is already proven in registration, avatar lifecycle, and billing. |
-| **בקצרה לראיון** | "העברתי transaction ownership מ-CRUD לקוראים — CRUD עושה flush בלבד, הקורא מחליט מתי לעשות commit. זה מאפשר atomicity בין כתיבות DB לאירועי outbox בלי band-aids." |
+| **סקייל** | Enables any future caller to combine DB writes + outbox events atomically without CRUD-layer changes. The pattern is now consistent across all domains (users, groups). |
+| **בקצרה לראיון** | "העברתי transaction ownership מ-CRUD לקוראים — CRUD עושה flush בלבד, הקורא מחליט מתי לעשות commit. זה מאפשר atomicity בין כתיבות DB לאירועי outbox בלי band-aids. הדפוס חל גם על users וגם על groups." |
+
+---
+
+## 30. Automated PostgreSQL backup pipeline — pg_dump → encrypt → S3
+
+| | |
+|--|--|
+| **הקשר** | PostgreSQL רץ על Docker named volume ב-EC2 יחיד. אין שום backup חיצוני — אובדן דיסק = אובדן כל הנתונים. |
+| **החלטה** | Docker Compose service **`db-backup`** (profile `backup`) עם image מבוסס `postgres:15` + AWS CLI + `openssl`. Pipeline: `pg_dump --format=custom --compress=6` → AES-256-CBC encryption (`openssl enc`) → `aws s3 cp` → size verification. שני טריגרים: (1) cron יומי 03:00 UTC על host (`scripts/ops/setup-backup-cron.sh`), (2) pre-deploy hook ב-`deploy-ec2.yml` (non-blocking). S3 lifecycle: `daily/` → Glacier at 14d, expire 30d; `pre-deploy/` → Glacier 30d, expire 90d. |
+| **למה pg_dump (ולא WAL-G)** | RPO מקובל (שעות) ל-MVP; logical dump = portable בין major versions; פחות מורכבות תפעולית; restore ל-RDS פשוט יותר (Phase 2). |
+| **למה encryption** | Data-at-rest protection ב-S3; AES-256 עם passphrase ב-env var. מפתח חייב להישמר **בנפרד** מה-backups. |
+| **למה pre-deploy** | Recovery point לפני כל migration — אם migration נכשלת, יש backup מיידי לחזרה. |
+| **Restore** | `restore.sh` — S3 download → `openssl dec` → `pg_restore --clean --if-exists --no-owner`; `--list` mode למיפוי; post-restore row-count sanity check. |
+| **Monitoring** | `scripts/ops/check-backup-health.sh` — freshness (<25h) + size threshold; exit code 1 on failure. |
+| **Trade-offs** | RPO ~24h (daily) / ~deployment-interval (pre-deploy); restore time linear with DB size; encryption key = single point of recovery. |
+| **Phase 2** | Migration ל-AWS RDS (managed PITR + automated snapshots) — `db-backup` pipeline נשמר ל-ad-hoc exports. |
+| **בקצרה לראיון** | "זיהיתי SPOF על Postgres ב-EC2, הקמתי pipeline מוצפן ל-S3 עם שני טריגרים — יומי ולפני כל deploy. Phase 2 = RDS managed." |
 
 ---
 

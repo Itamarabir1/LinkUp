@@ -133,7 +133,7 @@ class AuthService:
         # Single Redis-backed OTP verification
         await verification_service.verify_otp(str(user.user_id), "email_verification", code)
 
-        await self.crud_user.update(db, db_obj=user, obj_in={"is_verified": True})
+        await self.crud_user.mark_as_verified(db, user=user)
         await db.commit()
         return {"message": "Account verified successfully", "status": "success"}
 
@@ -167,7 +167,7 @@ class AuthService:
 
     async def _validate_unique_user(self, db: AsyncSession, user_in: UserRegister):
         """Pre-checks before starting a transaction."""
-        if await self.crud_user.get_by_phone(db, phone=user_in.phone_number):
+        if user_in.phone_number and await self.crud_user.get_by_phone(db, phone=user_in.phone_number):
             raise PhoneAlreadyRegisteredError(phone=user_in.phone_number)
 
         if user_in.email and await self.crud_user.get_by_email(db, email=user_in.email):
@@ -290,36 +290,26 @@ class AuthService:
             )
 
         if not user:
-            # 3. Auto-signup: new user
-            # Placeholder phone: E.164 +9725 + 8 digits derived from Google sub
-            google_sub = "".join(c for c in (google_user.get("sub") or "00000000") if c.isdigit())[:8]
-            google_sub = google_sub.ljust(8, "0")  # exactly 8 digits
-            placeholder_phone = f"+9725{google_sub}"  # valid E.164-style placeholder
-
-            # Dummy password (unused but required by schema/DB)
-            # Long random string
+            # Auto-signup: Google-only account — no phone, no usable password
             dummy_password = secrets.token_urlsafe(32)
             hashed_password = await get_password_hash(dummy_password)
 
-            # UserCreate with dummy password
             user_create = UserCreate(
                 full_name=google_user.get("name", "Google User"),
                 email=email,
-                phone_number=placeholder_phone,
-                password=dummy_password,  # dummy — not used for Google users
+                phone_number=None,
+                password=dummy_password,
                 fcm_token=None,
             )
 
-            # Persist user
             user = await self.crud_user.create(db, obj_in=user_create, hashed_password=hashed_password)
 
-            await self.crud_user.update(db, db_obj=user, obj_in={"is_verified": True})
-            await db.commit()
+            google_sub = google_user.get("sub")
+            if google_sub:
+                await self.crud_user.link_google_account(db, user=user, google_sub=google_sub)
+            else:
+                await self.crud_user.mark_as_verified(db, user=user)
 
-            logger.info(f"Auto-signup via Google: {email}")
-            auth_registrations_total.labels(provider="google").inc()
-
-            # user.registered outbox event
             await self.outbox_repo.save_event(
                 db,
                 OutboxEvent(
@@ -328,7 +318,12 @@ class AuthService:
                     targets=[DispatchTarget.RABBITMQ.value],
                 ),
             )
+
+            # Single atomic commit: user + google link + outbox event
             await db.commit()
+
+            logger.info("Auto-signup via Google: %s", email)
+            auth_registrations_total.labels(provider="google").inc()
 
         else:
             # Existing user — link google_id if missing

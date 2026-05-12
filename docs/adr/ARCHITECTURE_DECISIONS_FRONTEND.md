@@ -265,6 +265,19 @@
 
 ---
 
+## 23. AbortController — ביטול בקשות HTTP בפרונט
+
+| | |
+|--|--|
+| **בעיה** | אפס שימושים ב-`AbortController` באפליקציה. 14 `useEffect` hooks ב-10 קבצים מבצעים קריאות async ללא ביטול — שש משתמשות ב-`let cancelled = false` (מונע state update אחרי unmount אבל **לא מבטל** את בקשת ה-HTTP), ושמונה ללא שום cleanup — גורם למרוצי בקשות (race conditions), בזבוז bandwidth, ומצבי state-update-after-unmount. |
+| **החלטה** | ריפקטור שכבתי bottom-up: **(1) API layer** — כל פונקציה ידנית ב-`api/*.ts` מקבלת `opts?: { signal?: AbortSignal }` ומעבירה ל-Axios; generated client (Orval `apiMutator`) כבר תומך ב-signal דרך `options`. **(2) Utility hook** — `useAbortSignal()` (`hooks/useAbortSignal.ts`) מחזיר `getSignal()` שמבטל signal קודם, יוצר חדש, ומבטל ב-unmount. **(3) React Query migrations** — hooks שניתנים להמרה עברו ל-`useQuery` עם `queryFn({ signal })` forwarding: `useGroupManageLists`, `JoinGroup`, partner presence, `RouteMapModal` maps key. **(4) Manual hooks** — hooks עם state מורכב שאי-אפשר להעביר ל-RQ (`useConversationMessages`, `useChatPopup`, `AuthContext`, `useLocationBroadcast`, `useProfile`) משתמשים ב-`useAbortSignal()` או `new AbortController()` ישירות. |
+| **מה לא שונה (ומדוע)** | WebSocket hooks — `ws.close()` מספיק; `useGoogleSignInScript` — script load, לא HTTP; `useFCMCheck` — browser API לא ניתן לביטול; `fetchMissedGap` — כבר יש `shouldAbort` callback בין עמודים — הוספת signal מקבילי מסבכת ללא תועלת. |
+| **Error handling** | `axios.isCancel(err)` ב-catch blocks; response interceptor ב-`client.ts` כבר מסנן `ERR_CANCELED` מ-Sentry (שורה 104). |
+| **Trade-off** | שתי instance של `useAbortSignal` ב-`useConversationMessages` (fetch + load-more) — מוסיף מעט overhead אבל מאפשר ביטול עצמאי של כל flow. |
+| **בקצרה לראיון** | "הוספתי AbortController שכבתי: API layer מקבל signal, React Query מעביר אותו אוטומטית, ו-useAbortSignal hook מחליף cancelled booleans — כל בקשה מבוטלת באמת ולא רק ignored." |
+
+---
+
 ## קישורים
 
 - [README.md](README.md) (מפת ADR)  

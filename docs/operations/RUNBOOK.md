@@ -161,7 +161,55 @@ make admin-revoke EMAIL=user@example.com
 - Prefer backend admin endpoints for day-to-day role changes; Makefile commands are an ops fallback.
 - Re-login after role change to refresh auth payload.
 
-## 7) Admin Ops / Billing / Audit Pages Show Empty or 403
+## 7) Database Backup Not Running / Stale Backup
+
+### Symptoms
+
+- `check-backup-health.sh` returns exit 1
+- no `daily/` objects in S3 for today
+- cron log shows errors (`/var/log/linkup-backup.log`)
+
+### Checks
+
+```bash
+# Verify cron is installed
+crontab -l | grep linkup-db-backup
+
+# Check last backup age/size
+export BACKUP_S3_BUCKET=linkup-db-backups
+bash scripts/ops/check-backup-health.sh
+
+# Check cron execution log
+tail -100 /var/log/linkup-backup.log
+
+# Check if db service is healthy
+docker compose ps db
+```
+
+### Actions
+
+```bash
+# Manual backup trigger
+cd ~/LinkUp
+docker compose --env-file backend/.env --profile backup run --rm -e BACKUP_TYPE=daily db-backup
+
+# Rebuild backup image if needed
+docker compose --env-file backend/.env build db-backup
+
+# Reinstall cron if missing
+bash scripts/ops/setup-backup-cron.sh
+```
+
+### Common causes
+
+- `BACKUP_ENCRYPTION_KEY` or `BACKUP_S3_BUCKET` not set in `backend/.env`
+- AWS credentials expired or IAM permissions missing (`s3:PutObject`, `s3:GetObject`, `s3:ListBucket`)
+- `db` service not healthy (backup depends on `service_healthy`)
+- disk full (pg_dump temp files)
+
+Full runbook: [`docs/BACKUP_AND_RECOVERY.md`](../BACKUP_AND_RECOVERY.md).
+
+## 8) Admin Ops / Billing / Audit Pages Show Empty or 403
 
 ### Symptoms
 

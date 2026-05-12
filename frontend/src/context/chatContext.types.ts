@@ -12,10 +12,10 @@ export interface ChatContextValue {
   notificationList: NotificationItem[];
   notificationsLoading: boolean;
   notificationsError: string;
-  markNotificationRead: (key: string) => void;
+  markNotificationRead: (n: NotificationItem) => void;
   markAllNotificationsRead: () => void;
   refreshUnreadNotifications: () => void;
-  isNotificationRead: (key: string) => boolean;
+  isNotificationRead: (n: NotificationItem) => boolean;
 }
 
 export interface ChatProviderProps {

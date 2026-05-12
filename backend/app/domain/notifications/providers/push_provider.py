@@ -6,6 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.notifications.channels.push.client import fcm_client
 from app.domain.notifications.channels.push.render import render_push_content
+from app.domain.notifications.exceptions import (
+    PermanentNotificationError,
+    TransientNotificationError,
+)
 from app.domain.notifications.providers.base import BaseNotificationProvider
 from app.domain.users.crud import crud_user
 from app.domain.users.model import User
@@ -25,7 +29,7 @@ class PushProvider(BaseNotificationProvider):
         db: AsyncSession | None = None,
     ) -> None:
         if not user or not getattr(user, "fcm_token", None):
-            logger.warning("⚠️ Push skipped: no user or fcm_token")
+            logger.warning("Push skipped: no user or fcm_token")
             return
 
         try:
@@ -37,10 +41,10 @@ class PushProvider(BaseNotificationProvider):
                 **context,
             )
 
-            data = {key: str(context[key]) for key in ("ride_id", "booking_id", "event_key") if context.get(key) is not None}
+            data = {key: str(context[key]) for key in ("ride_id", "booking_id", "event_key", "conversation_id") if context.get(key) is not None}
 
             await fcm_client.send(user.fcm_token, title, body, data or None)
-            logger.info("✅ Push sent to user_id=%s", getattr(user, "user_id", "N/A"))
+            logger.info("Push sent to user_id=%s", getattr(user, "user_id", "N/A"))
 
         except (UnregisteredError, SenderIdMismatchError):
             uid = getattr(user, "user_id", "N/A")
@@ -48,8 +52,11 @@ class PushProvider(BaseNotificationProvider):
             if db is not None:
                 await crud_user.update_fcm_token(db, user=user, token=None)
                 await db.commit()
-            return
+            raise PermanentNotificationError(f"FCM token invalid for user_id={uid}")
+
+        except PermanentNotificationError:
+            raise
 
         except Exception as e:
-            logger.error("❌ Push failed for user_id=%s: %s", getattr(user, "user_id", "N/A"), e)
-            raise
+            logger.error("Push failed (transient) for user_id=%s: %s", getattr(user, "user_id", "N/A"), e)
+            raise TransientNotificationError(f"Push send failed: {e}") from e

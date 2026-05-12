@@ -15,6 +15,8 @@ Human-facing consoles sit **next to** in-repo integrations (`SENTRY_DSN`, `VITE_
 
 Self-hosted **Prometheus + Grafana** (`docker compose --profile monitoring`) stays the metrics path inside the repo—see [Metrics stack](#metrics-stack) below.
 
+**Network exposure:** both monitoring services bind to **`127.0.0.1`** only in `docker-compose.yml` (`127.0.0.1:9090:9090` for Prometheus, `127.0.0.1:3002:3000` for Grafana) — not reachable from the internet. Access from a workstation requires an SSH tunnel (e.g. `ssh -L 9090:127.0.0.1:9090 ec2-host`).
+
 ## Metrics Stack
 
 - **Backend:** Prometheus endpoint at `GET /metrics`
@@ -183,6 +185,26 @@ If external readiness monitoring becomes a requirement (e.g. dependency-aware st
 
 **עומק DLQ:** [`run_dlq_monitor`](../../backend/app/infrastructure/rabbitmq/dlq_monitor.py) כותב **לוגים** (warning/critical לפי סף). ה־Gauge **`rabbitmq_dlq_depth`** אינו מתעדכן מהמוניטור הנוכחי — ניטור עומק דרך לוגים / ממשק RabbitMQ, או הרחבת הקוד אם תרצו ייצוא ל־Prometheus.
 
+## Database Backup Health
+
+The backup pipeline runs as a Docker Compose service (`db-backup`, profile `backup`) triggered by host crontab (daily 03:00 UTC) and `deploy-ec2.yml` (pre-deploy). It writes encrypted pg_dump files to S3 under `daily/` and `pre-deploy/` prefixes.
+
+| Check | Script | Frequency |
+|-------|--------|-----------|
+| Backup freshness + size | `scripts/ops/check-backup-health.sh` | Manual or cron-based |
+
+The script verifies: (1) a `daily/` backup exists, (2) the most recent backup is < 25 hours old, and (3) the file size exceeds a minimum threshold. Exit 1 on any failure.
+
+```bash
+# Run on EC2 host
+export BACKUP_S3_BUCKET=linkup-db-backups
+bash scripts/ops/check-backup-health.sh
+```
+
+Logs from daily cron runs go to `/var/log/linkup-backup.log` on the host.
+
+Full backup documentation: [`docs/BACKUP_AND_RECOVERY.md`](../BACKUP_AND_RECOVERY.md).
+
 ## Alerting Baseline
 
 Suggested initial alerts:
@@ -192,6 +214,7 @@ Suggested initial alerts:
 - DLQ depth above warning/critical threshold
 - worker process down / restart storm
 - disk usage above 85% on EC2 host
+- database backup age above 25 hours (`check-backup-health.sh`)
 
 ## SLO Baseline (starting point)
 

@@ -43,11 +43,30 @@ No inline `<script>` bodies remain in the shell for these concerns, so **`script
 
 ### TLS / HTTP (Compose `nginx`)
 
-Canonical template: [`nginx/nginx.conf.template`](../nginx/nginx.conf.template) → rendered `nginx/nginx.conf` locally via [`scripts/ops/render-nginx-conf.sh`](../scripts/ops/render-nginx-conf.sh). The **`443`** server block uses **`listen 443 ssl`** (the `http2` keyword is **not** present in the template) — effectively **HTTP/1.1 over TLS** unless you add **`http2`** to the directive. After any change to ALPN/HTTP version, re-smoke **WebSockets** (`/api/v1/…` upgrade, `/ws`) and large uploads.
+Canonical template: [`nginx/nginx.conf.template`](../nginx/nginx.conf.template) → rendered `nginx/nginx.conf` locally via [`scripts/ops/render-nginx-conf.sh`](../scripts/ops/render-nginx-conf.sh). TLS tuning is extracted into [`nginx/snippets/ssl-params.conf`](../nginx/snippets/ssl-params.conf) and included via `include /etc/nginx/snippets/ssl-params.conf;` — single auditable file for all cipher/session/OCSP directives. The **`443`** server block uses **`listen 443 ssl`** with **`http2 on`** (HTTP/2 multiplexing + header compression). After any change to ALPN/HTTP version, re-smoke **WebSockets** (`/api/v1/…` upgrade, `/ws`) and large uploads.
 
-- `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+#### SSL hardening (`nginx/snippets/ssl-params.conf`)
+
+| Directive | Value | Rationale |
+|-----------|-------|-----------|
+| `ssl_protocols` | `TLSv1.2 TLSv1.3` | Drops legacy TLS 1.0/1.1 |
+| `ssl_prefer_server_ciphers` | `on` | Forces server cipher order for TLS 1.2 |
+| `ssl_ciphers` | ECDHE-only AEAD suite | Forward secrecy, no CBC/3DES/RC4/DHE |
+| `ssl_ecdh_curve` | `X25519:secp384r1:secp256r1` | Fastest modern curves first |
+| `ssl_session_cache` | `shared:SSL:10m` | ~40K sessions, avoids full handshake on reconnect |
+| `ssl_session_timeout` | `1d` | Session reuse window |
+| `ssl_session_tickets` | `off` | Tickets undermine forward secrecy without key rotation |
+| `ssl_stapling` | `on` | OCSP stapling — faster handshake, no client-to-CA privacy leak |
+| `ssl_stapling_verify` | `on` | Validates stapled OCSP response against `chain.pem` |
+| `resolver` | `1.1.1.1 8.8.8.8` | For OCSP responder DNS resolution |
+
+#### Certbot renewal (zero-downtime)
+
+Port 80 server block includes `location /.well-known/acme-challenge/` serving from `/var/www/certbot` — certbot webroot mode works without stopping nginx. The volume is mounted read-only in `docker-compose.yml`.
+
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
   - Forces browsers to use HTTPS after first successful secure visit.
-  - `preload` is intentionally excluded for now to avoid lock-in risk on future/non-HTTPS subdomains.
+  - `preload` enables submission to the [HSTS Preload List](https://hstspreload.org/).
 
 - `X-Content-Type-Options: nosniff`
   - Prevents MIME type sniffing and reduces script/style confusion attacks.
@@ -96,6 +115,53 @@ The project intentionally used **`Content-Security-Policy-Report-Only`** first t
 ## CSP and static SPA (nonces)
 
 The web client is a **Vite static build** served by nginx (`frontend/Dockerfile` copies **`dist/`**). There is **no SSR** that can inject a fresh **`nonce`** into HTML per request unless you add **edge HTML rewriting**, a tiny **SSR gate** for `index.html`, or move to **`'sha256-'` hashes** for fixed inline blobs. **Bootstrap snippets** are no longer inline: they live in **`/bootstrap.js`**, so **`script-src` can stay strict** without hashes for that path. If you add new **inline** scripts to `index.html`, you must either allow them via **`'sha256-…'`** (see historical tooling discussions in repo history) or move them to external files whitelisted by **`'self'`**.
+
+---
+
+## Frontend internal nginx headers (`frontend/nginx.conf`)
+
+The internal nginx inside the frontend container (port 8080, serving the SPA) adds defense-in-depth headers at the `server` block level:
+
+| Header | Value |
+|--------|-------|
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(self)` |
+
+**Intentionally omitted from the internal nginx:** CSP and HSTS — these are set by the outer Compose edge nginx (`nginx/nginx.conf.template`). Duplicating them in the frontend container would cause double-header conflicts or break the local dev environment where the outer nginx is not present.
+
+These headers protect against MIME sniffing, clickjacking, and referrer leakage even when the frontend container is accessed directly (e.g., during development or if the outer nginx proxies without overriding headers).
+
+---
+
+## Backend API CSP (FastAPI middleware)
+
+The FastAPI `SecurityHeadersMiddleware` (`backend/app/core/middleware/security_headers.py`) adds a **Content-Security-Policy** header to every API response as a defense-in-depth layer. Two policies are used:
+
+**API responses (JSON):**
+
+```
+default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'
+```
+
+This is the strictest possible CSP — blocks all resource loading. If a browser renders an API response directly (bookmarked URL, open-in-new-tab), no scripts or frames can execute.
+
+**Swagger UI / ReDoc (`/docs`, `/redoc`, `/openapi.json`):**
+
+```
+default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https://fastapi.tiangolo.com; font-src 'self' https://cdn.jsdelivr.net; frame-ancestors 'none'
+```
+
+Relaxed to allow Swagger/ReDoc JS/CSS assets. Only active when `API_DOCS_ENABLED` is true (disabled in production).
+
+**Layering summary:**
+
+| Layer | CSP? | Scope |
+|-------|------|-------|
+| Edge nginx (`nginx/nginx.conf.template`) | Enforcing, full SPA policy | Browser-rendered content (HTML/JS/CSS) |
+| Backend middleware (`security_headers.py`) | Enforcing, strict `none` policy | API JSON responses |
+| Frontend nginx (`frontend/nginx.conf`) | No (intentional) | Avoids double-header conflicts |
 
 ---
 

@@ -8,7 +8,7 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 
 - **Driver**: asyncpg (`postgresql+asyncpg://`).
 - **Connection**: `backend/app/db/session.py` — `get_db()` מחזיר AsyncSession. Session factory: `expire_on_commit=False`, `autocommit=False`, `autoflush=False`.
-- **Transaction ownership**: CRUD write methods use `db.flush()` only — callers own the transaction and call `db.commit()`. This enables atomic DB writes + outbox events in a single transaction. `expire_on_commit=False` means no `db.refresh()` is needed after commit. See ADR backend §29.
+- **Transaction ownership**: CRUD write methods (users, groups) use `db.flush()` only — callers own the transaction and call `db.commit()`. This enables atomic DB writes + outbox events in a single transaction, and multi-step mutations (e.g. group rename + description update) to be atomic. `expire_on_commit=False` means no `db.refresh()` is needed after commit. See ADR backend §29.
 - **רשימות נסיעות (נהג / קבוצה):** `get_by_driver_id` / `get_by_group_id` מגבילות ל־**200** שורות במיון `departure_time DESC` (קבוע `_RIDES_HARD_LIMIT` ב־`rides/crud.py`); ראו **`docs/architecture/API.md`** ל־`/rides/me` ו־`/groups/{id}/rides`.
 - **מדיה (קשר ל-S3, לא עמודה נפרדת):** שדות `avatar_key` ב-`users` / `groups` מחזיקים prefix או מפתח אובייקט ב-bucket; ה-API בונה URL ציבורי — עם **`CLOUDFRONT_DOMAIN`** (ראו `app/core/config.py`, `app/infrastructure/s3/service.py`) או presigned. פירוט תהליך אווטאר גרסתי: `ARCHITECTURE.md` (Features), `docs/ENGINEERING_HIGHLIGHTS.md` (סעיף 12).
 
@@ -62,7 +62,7 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 |-----|--------|--------|
 | user_id | UUID PK | |
 | full_name | VARCHAR(100) NOT NULL | |
-| phone_number | VARCHAR(20) UNIQUE NOT NULL | index |
+| phone_number | VARCHAR(20) NULLABLE | partial unique index (`WHERE phone_number IS NOT NULL`); NULL for OAuth-only accounts |
 | email | VARCHAR(255) UNIQUE | index |
 | hashed_password | VARCHAR(255) NOT NULL | |
 | is_verified | BOOLEAN DEFAULT FALSE | |
@@ -212,7 +212,8 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 - **נהג — היסטוריה:** `GET /bookings/driver-summary/history` — [`get_driver_history_rides`](../../backend/app/domain/bookings/crud.py): נסיעות **`completed` / `cancelled`**; אותם joins; **`with_loader_criteria`** על **confirmed, cancelled, completed, rejected** כדי שיופיעו נוסעים גם אחרי סיום/ביטול; מיון **`departure_time DESC, ride_id DESC`**; דפדוף `limit+1` + תנאי קורסור על `(departure_time, ride_id)`.
 - **נוסע — פעיל:** `GET /bookings/passenger-summary/active` — [`get_passenger_active_bookings`](../../backend/app/domain/bookings/crud.py): הזמנות פעילות (כולל מחזור נסיעה); **`LIMIT 200`**.
 - **נוסע — היסטוריה:** `GET /bookings/passenger-summary/history` — [`get_passenger_history_bookings`](../../backend/app/domain/bookings/crud.py): סטטוסים טרמינליים; מיון **`Ride.departure_time DESC, booking_id DESC`**; דפדוף `limit+1` + קורסור.
-- **קוד קורסור משותף (UTC):** [`core/pagination/cursor.py`](../../backend/app/core/pagination/cursor.py) משמש bookings/chat/rides/passengers עם payload אטום ו-normalization ל-UTC.
+- **הזמנות שלי (כללי):** `GET /bookings/my-bookings` — [`get_user_bookings_filtered_async`](../../backend/app/domain/bookings/crud.py): הזמנות לפי `passenger_id`; מיון **`created_at DESC, booking_id DESC`**; דפדוף keyset cursor (`limit+1` + `after`); פילטר `status` אופציונלי.
+- **קוד קורסור משותף (UTC):** [`core/pagination/cursor.py`](../../backend/app/core/pagination/cursor.py) משמש bookings/chat/rides/passengers/my-bookings עם payload אטום ו-normalization ל-UTC.
 
 ### conversations
 
@@ -283,6 +284,19 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 
 אינדקס חלקי: `idx_scheduled_notifications_deliver` על `deliver_at` WHERE `sent_at IS NULL`.
 
+### notification_reads
+
+מצב קריאת התראות — server-side read-state עבור פיד ההתראות הנגזר מ-bookings. מחליף localStorage צד-לקוח שצבר נתונים ללא הגבלה.
+
+| שדה | טיפוס | הערות |
+|-----|--------|--------|
+| user_id | UUID FK users NOT NULL | PK חלק 1; CASCADE |
+| booking_id | UUID FK bookings NOT NULL | PK חלק 2; CASCADE |
+| created_at | TIMESTAMPTZ NOT NULL | PK חלק 3; ה-`created_at` של ה-booking כמפתח זהות ההתראה |
+| read_at | TIMESTAMPTZ NOT NULL DEFAULT now() | מתי סומנה כנקראה |
+
+**PK מורכב:** `(user_id, booking_id, created_at)` — תואם למפתח הזהות הקיים בפרונט (`${booking_id}_${created_at}`). **CASCADE** על שני ה-FKs — מחיקת משתמש או הזמנה מנקה אוטומטית. **אינדקס:** `idx_notification_reads_user` על `user_id`.
+
 ---
 
 ## Indexes
@@ -317,6 +331,12 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 | group_members | group_id | idx_group_members_group_id | חברי קבוצה |
 | group_members | user_id | idx_group_members_user_id | קבוצות של משתמש |
 | passenger_requests | passenger_id | idx_passenger_requests_passenger_id | בקשות שלי |
+
+### מ-023_notification_reads
+
+| טבלה | שדות | שם Index | סיבה |
+|------|------|----------|--------|
+| notification_reads | user_id | idx_notification_reads_user | batch-fetch read-state לעמוד התראות |
 
 ### מ-022_add_missing_indexes
 
@@ -356,8 +376,11 @@ Outbox — אירועים שמחכים לפרסום ל-RabbitMQ.
 | 018_rides_composite_indexes (`018_rides_composite_indexes.py`) | אינדקסים `idx_rides_driver_departure`, `idx_rides_group_departure` (חלקי); מחיקת `idx_rides_driver_id` / `idx_rides_group_id` כפולים | 2026-05-06 |
 | 019_booking_lifecycle_enum (`019_booking_lifecycle_enum.py`) | הוספת **`en_route`**, **`arrived`**, **`trip_in_progress`** ל־enum **`booking_status`** — תואם ל־`BookingStatus` בקוד ול־`IN (...)` queries (סיכול bulk ביטול בקשה + צינור קריאות פעילות) | 2026-05-06 |
 | 020_conversation_last_message_at (`020_add_conversations_last_message_at.py`) | הוספת `conversations.last_message_at`, backfill מ־`MAX(messages.created_at)` (fallback ל־`conversations.created_at`) ואינדקס `idx_conversations_last_message_at` | 2026-05-07 |
-| 021_hash_refresh_tokens (`021_hash_existing_refresh_tokens.py`) | **M4 — Hashed refresh tokens:** NULL-ify כל ה-refresh tokens הקיימים (plaintext JWTs — אי אפשר ל-hash ללא deploy מתואם); משתמשים מתחברים מחדש ומקבלים token חדש שנשמר כ-SHA-256 hash. שינויים נלווים בקוד: `update_refresh_token` (CRUD) שומר hash בלבד; `verify_refresh_token` (CRUD) משווה עם `hmac.compare_digest`; `refresh_token` נוסף ל-`protected_fields` ב-generic `update` | 2026-05-11 |
+| 021_hash_refresh_tokens (`021_hash_existing_refresh_tokens.py`) | **M4 — Hashed refresh tokens:** NULL-ify כל ה-refresh tokens הקיימים (plaintext JWTs — אי אפשר ל-hash ללא deploy מתואם); משתמשים מתחברים מחדש ומקבלים token חדש שנשמר כ-SHA-256 hash. שינויים נלווים בקוד: `update_refresh_token` (CRUD) שומר hash בלבד; `verify_refresh_token` (CRUD) משווה עם `hmac.compare_digest`; generic `update` מוגן ב-**schema-derived allowlist** (`_allowed_update_fields = set(UserUpdate.model_fields.keys())`) — רק שדות ב-Pydantic schema ניתנים לכתיבה; שדות רגישים (`is_admin`, `is_premium`, `is_active`, `is_verified`, `refresh_token`) דורשים CRUD methods ייעודיים | 2026-05-11 |
 | 022_add_missing_indexes (`022_add_missing_indexes.py`) | 6 אינדקסים composite/partial לשאילתות חמות: `idx_bookings_passenger_status`, `idx_bookings_ride_status`, `idx_passenger_requests_status`, `idx_passenger_requests_passenger_status`, `idx_outbox_events_status_created` (partial), `idx_users_last_active_at` (partial DESC) | 2026-05-11 |
+| 023_notification_reads (`023_notification_reads.py`) | טבלת `notification_reads` — server-side read-state להתראות; PK מורכב `(user_id, booking_id, created_at)`, CASCADE על שני FKs, אינדקס `idx_notification_reads_user`. מחליף localStorage צד-לקוח שצבר נתונים ללא הגבלה | 2026-05-12 |
+| 024_add_check_constraints (`024_add_check_constraints.py`) | **CHECK constraints** על `rides`: `ck_rides_available_seats_positive` (`available_seats >= 1`), `ck_rides_price_non_negative` (`price >= 0`), `ck_rides_distance_km_non_negative` (`distance_km >= 0`), `ck_rides_duration_min_non_negative` (`duration_min >= 0`); על `bookings`: `ck_bookings_num_seats_positive` (`num_seats >= 1`). אכיפת invariants עסקיים ברמת PostgreSQL | 2026-05-12 |
+| 025_nullable_phone_for_oauth (`025_nullable_phone_for_oauth.py`) | **M8 — Google OAuth phone collision fix:** `users.phone_number` → `nullable=True`; unique index `ix_users_phone_number` הוחלף ב-**partial unique index** `ix_users_phone_partial` (`WHERE phone_number IS NOT NULL`) — מאפשר NULLs מרובים לחשבונות OAuth-only תוך שמירה על ייחודיות לטלפונים אמיתיים. Downgrade ממלא placeholder phones לפני שחזור NOT NULL | 2026-05-12 |
 
 **הערת Alembic:** רוויזיות **`015_add_audit_log`** ו־**`015_billing_idem`** מתפצלות מ־**014**; המיזוג הוא **`016_merge015_heads`** בקובץ **`016_merge_015_audit_and_billing_heads.py`** (מזהי רוויזיה חייבים להתאים ל־`VARCHAR(32)` בטבלת **`alembic_version`** — לכן הסט מקוצר עבור מיגרציית האידמפוטנטיות).
 
@@ -373,10 +396,12 @@ users ◄──┬── rides (driver_id)
          ├── bookings (passenger_id)
          ├── passenger_requests (passenger_id)
          ├── conversations (user_id_1, user_id_2)
-         └── messages (sender_id)
+         ├── messages (sender_id)
+         └── notification_reads (user_id)
 
 groups ◄── rides (group_id), group_members (group_id)
 rides  ◄── bookings (ride_id)
+bookings ◄── notification_reads (booking_id)
 passenger_requests ◄── bookings (request_id)
 conversations ◄── messages (conversation_id), chat_analysis (conversation_id)
 ```
@@ -394,6 +419,19 @@ conversations ◄── messages (conversation_id), chat_analysis (conversation_
 | **Passenger cancel request** (`bulk_cancel_bookings_for_request`) | rides | לפני החזרת מושבים לבקשה (סטטוסים שתפסו מושב: confirmed / en_route / arrived / trip_in_progress) — `SELECT ride_id ... WITH FOR UPDATE` על כל הנסיעות המושפעות, ואז `UPDATE rides` פר־נסיעה |
 
 מימוש: `get_ride_for_update(db, ride_id)` ב-`bookings/crud.py` משתמש ב־`AsyncSession` ומבצע `select(Ride).with_for_update()` כדי לנעול את שורת הנסיעה. ה-service קורא ל-crud זה לפני שינוי booking/ride. **`bulk_cancel_bookings_for_request`** נועל את שורות **`rides`** לפני עדכון `available_seats` כשמבטלים בקשת נוסע (`DELETE …/passengers/{id}/cancel`).
+
+---
+
+## Backup & Restore
+
+PostgreSQL is backed up automatically via the `db-backup` Docker Compose service (profile `backup`). The pipeline performs `pg_dump --format=custom --compress=6`, encrypts the output with AES-256-CBC, and uploads to S3. Two triggers:
+
+- **Daily cron** (03:00 UTC) — host crontab via `scripts/ops/setup-backup-cron.sh`
+- **Pre-deploy** — non-blocking step in `deploy-ec2.yml` before image pulls
+
+Restore: `infrastructure/backup/restore.sh` downloads from S3, decrypts, and runs `pg_restore --clean --if-exists --no-owner` with post-restore row-count validation.
+
+Env vars: `BACKUP_S3_BUCKET`, `BACKUP_ENCRYPTION_KEY` in `backend/.env`. Full runbook: [`docs/BACKUP_AND_RECOVERY.md`](../BACKUP_AND_RECOVERY.md).
 
 ---
 

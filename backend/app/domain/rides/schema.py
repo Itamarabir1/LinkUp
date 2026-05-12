@@ -59,6 +59,8 @@ class RideUpdate(BaseModel):
     departure_time: datetime | None = None
     available_seats: int | None = Field(None, ge=1)
 
+    model_config = ConfigDict(extra="forbid")
+
     @field_validator("departure_time")
     @classmethod
     def time_future(cls, v: datetime | None) -> datetime | None:

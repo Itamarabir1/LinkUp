@@ -143,8 +143,7 @@ export default function Notifications() {
 
   const handleRowClick = useCallback(
     (n: NotificationItem) => {
-      const key = getNotificationItemKey(n);
-      if (!isNotificationRead(key)) markNotificationRead(key);
+      if (!isNotificationRead(n)) markNotificationRead(n);
       const target = getNotificationTarget(n.type);
       if (target) navigate(target);
     },
@@ -214,7 +213,7 @@ export default function Notifications() {
               <h2 className={styles.groupTitle}>{label}</h2>
               {items.map((n) => {
                 const key = getNotificationItemKey(n);
-                const read = isNotificationRead(key);
+                const read = n.is_read;
                 const displayType = getDisplayType(n.type);
                 const origin = n.ride_origin?.trim() || '';
                 const dest = n.ride_destination?.trim() || '';

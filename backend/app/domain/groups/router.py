@@ -134,6 +134,7 @@ async def confirm_group_image(
     if not data.key.startswith(expected_prefix):
         raise GroupInvalidImageKeyError()
     group = await crud.update_group_avatar_key(db, group, data.key)
+    await db.commit()
     count = await crud.get_member_count(db, group_id)
     return group_to_out(group, count)
 
@@ -155,6 +156,7 @@ async def delete_group_image(
     except Exception as e:
         logger.warning("S3 delete failed (non-critical): %s", e)
     group = await crud.update_group_avatar_key(db, group, None)
+    await db.commit()
     count = await crud.get_member_count(db, group_id)
     return group_to_out(group, count)
 
@@ -170,6 +172,7 @@ async def remove_member(
     if not membership or membership.role != "admin":
         raise GroupAdminRequiredError()
     await crud.remove_member(db, group_id, user_id)
+    await db.commit()
 
 
 @router.patch("/{group_id}/members/{user_id}/promote", response_model=GroupMemberOut)
@@ -185,6 +188,7 @@ async def promote_member(
     member = await crud.update_member_role(db, group_id, user_id, "admin")
     if not member:
         raise GroupMemberNotFoundError(user_id)
+    await db.commit()
     return group_member_to_out(member)
 
 
@@ -195,6 +199,7 @@ async def leave_group(
     current_user: User = Depends(get_current_user),
 ):
     await crud.remove_member(db, group_id, current_user.user_id)
+    await db.commit()
 
 
 @router.delete("/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -209,6 +214,7 @@ async def close_group(
     if group.admin_id != current_user.user_id:
         raise GroupAdminRequiredError()
     await crud.close_group(db, group)
+    await db.commit()
 
 
 @router.patch("/{group_id}", response_model=GroupOut)
@@ -227,5 +233,6 @@ async def update_group(
         group = await crud.rename_group(db, group, data.name)
     if data.description is not None:
         group = await crud.update_group_description(db, group, data.description)
+    await db.commit()
     count = await crud.get_member_count(db, group_id)
     return group_to_out(group, count)

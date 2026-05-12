@@ -1,9 +1,13 @@
 # app/domain/bookings/booking_reads_service.py
 """Read-only aggregations: manifests, summaries, history, notifications."""
 
+from __future__ import annotations
+
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import case, func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -25,6 +29,7 @@ from app.domain.bookings.schema import (
     DriverHistoryResponse,
     DriverSummaryInfo,
     NotificationItemResponse,
+    NotificationReadItem,
     PaginatedNotificationsResponse,
     PaginatedBookingsResponse,
     PassengerActiveResponse,
@@ -34,6 +39,7 @@ from app.domain.bookings.schema import (
     RideWithPassengersItem,
 )
 from app.core.pagination.cursor import CursorDecodeError, decode_cursor, encode_cursor
+from app.domain.notifications.model import NotificationRead
 from app.domain.passengers.model import PassengerRequest
 from app.domain.rides.model import Ride
 from app.domain.users.model import User
@@ -235,21 +241,32 @@ class BookingReadsService:
         db: AsyncSession,
         user_id: UUID,
         status: str | None = None,
-        page: int = 1,
         limit: int = 20,
-    ):
-        """Paginated list of bookings for a user."""
-        total = await crud_booking.get_user_bookings_count_async(db, user_id, status)
-        offset = (page - 1) * limit
-        bookings = await crud_booking.get_user_bookings_filtered_async(db, user_id, status, offset=offset, limit=limit)
-        items = [BookingResponse.model_validate(b) for b in bookings]
-        has_more = (page * limit) < total
+        after: str | None = None,
+    ) -> PaginatedBookingsResponse:
+        """Cursor-paginated list of bookings for a user."""
+        cursor_tuple = None
+        if after:
+            try:
+                cursor_tuple = decode_cursor(after)
+            except CursorDecodeError as e:
+                raise BadRequestError("מסמן עמוד לא תקין") from e
+
+        bookings = await crud_booking.get_user_bookings_filtered_async(
+            db, user_id, status, limit=limit, after=cursor_tuple
+        )
+        has_more = len(bookings) > limit
+        page = bookings[:limit]
+        next_cursor = None
+        if has_more and page:
+            last = page[-1]
+            next_cursor = encode_cursor(last.created_at, last.booking_id)
+        items = [BookingResponse.model_validate(b) for b in page]
         return PaginatedBookingsResponse(
             items=items,
-            total=total,
-            page=page,
-            limit=limit,
+            next_cursor=next_cursor,
             has_more=has_more,
+            limit=limit,
         )
 
     @staticmethod
@@ -365,9 +382,76 @@ class BookingReadsService:
             last = page[-1]
             next_cursor = encode_cursor(last.created_at, last.booking_id)
 
+        read_keys = await BookingReadsService._get_read_keys(db, user_id, page)
+        unread = 0
+        for item in page:
+            key = (item.booking_id, item.created_at)
+            item.is_read = key in read_keys
+            if not item.is_read:
+                unread += 1
+
         return PaginatedNotificationsResponse(
             items=page,
             next_cursor=next_cursor,
             has_more=has_more,
             limit=lim,
+            unread_count=unread,
         )
+
+    @staticmethod
+    async def _get_read_keys(
+        db: AsyncSession,
+        user_id: UUID,
+        items: list[NotificationItemResponse],
+    ) -> set[tuple[UUID, datetime]]:
+        """Batch-fetch read state for a page of notification items."""
+        if not items:
+            return set()
+        pairs = [(item.booking_id, item.created_at) for item in items]
+        booking_ids = list({p[0] for p in pairs})
+        stmt = (
+            select(NotificationRead.booking_id, NotificationRead.created_at)
+            .where(
+                NotificationRead.user_id == user_id,
+                NotificationRead.booking_id.in_(booking_ids),
+            )
+        )
+        rows = (await db.execute(stmt)).all()
+        return {(row[0], row[1]) for row in rows}
+
+    @staticmethod
+    async def mark_notifications_read(
+        db: AsyncSession,
+        user_id: UUID,
+        items: list[NotificationReadItem],
+    ) -> None:
+        """Upsert notification read-state rows (idempotent)."""
+        values = [
+            {"user_id": user_id, "booking_id": it.booking_id, "created_at": it.created_at}
+            for it in items
+        ]
+        stmt = pg_insert(NotificationRead).values(values)
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=["user_id", "booking_id", "created_at"]
+        )
+        await db.execute(stmt)
+        await db.commit()
+
+    @staticmethod
+    async def mark_all_notifications_read(db: AsyncSession, user_id: UUID) -> None:
+        """Mark every current notification as read in one pass."""
+        all_items_resp = await BookingReadsService.get_notifications_for_user(
+            db, user_id, limit=NOTIFICATIONS_MAX_LIMIT
+        )
+        if not all_items_resp.items:
+            return
+        values = [
+            {"user_id": user_id, "booking_id": item.booking_id, "created_at": item.created_at}
+            for item in all_items_resp.items
+        ]
+        stmt = pg_insert(NotificationRead).values(values)
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=["user_id", "booking_id", "created_at"]
+        )
+        await db.execute(stmt)
+        await db.commit()

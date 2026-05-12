@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { sendMessage } from '../../api/chat';
 import { useAuth } from '../../context/AuthContext';
+import { qk } from '../../api/queryKeys';
 import type { ChatListRow } from '../../types/chatList';
 import { getApiErrorMessage, isChatIdempotencyKeyMismatch } from '../../utils/apiError';
 import { applyInboundRealMessage, removePendingByClientId } from '../../utils/chatMessagesMerge';
@@ -74,18 +76,15 @@ export function useMessageThread(conversationIdOverride?: string) {
     }
   }, [cid]);
 
+  const { data: presenceData } = useQuery({
+    queryKey: qk.presence.partner(partnerId!),
+    queryFn: ({ signal }) => fetchPartnerPresence(partnerId!, { signal }).then((r) => r.data),
+    enabled: !!partnerId,
+  });
+
   useEffect(() => {
-    if (!partnerId) return;
-    let cancelled = false;
-    fetchPartnerPresence(partnerId)
-      .then((res) => {
-        if (!cancelled && res.data) setPartnerPresence(res.data);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [partnerId]);
+    if (presenceData) setPartnerPresence(presenceData);
+  }, [presenceData]);
 
   const { sendTypingIfNeeded, sendTypingStop } = useChatWebSocket({
     cid,

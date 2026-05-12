@@ -322,22 +322,15 @@ class CRUDBooking:
 
     # --- Helpers used by BookingService ---
 
-    async def get_user_bookings_count_async(self, db: AsyncSession, user_id: UUID, status_filter: str | None = None) -> int:
-        uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
-        stmt = select(func.count()).select_from(Booking).where(Booking.passenger_id == uid)
-        if status_filter:
-            stmt = stmt.where(Booking.status == status_filter)
-        result = await db.execute(stmt)
-        return int(result.scalar() or 0)
-
     async def get_user_bookings_filtered_async(
         self,
         db: AsyncSession,
         user_id: UUID,
         status_filter: str | None = None,
-        offset: int = 0,
         limit: int = 20,
+        after: tuple[datetime, UUID] | None = None,
     ) -> list[Booking]:
+        """Keyset-paginated bookings for a user, ordered by (created_at DESC, booking_id DESC)."""
         uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
         stmt = (
             select(Booking)
@@ -346,12 +339,18 @@ class CRUDBooking:
                 joinedload(Booking.passenger),
             )
             .where(Booking.passenger_id == uid)
-            .order_by(Booking.created_at.desc())
-            .offset(offset)
-            .limit(limit)
         )
         if status_filter:
             stmt = stmt.where(Booking.status == status_filter)
+        if after:
+            cursor_ts, cursor_id = after
+            stmt = stmt.where(
+                or_(
+                    Booking.created_at < cursor_ts,
+                    and_(Booking.created_at == cursor_ts, Booking.booking_id < cursor_id),
+                )
+            )
+        stmt = stmt.order_by(Booking.created_at.desc(), Booking.booking_id.desc()).limit(limit + 1)
         result = await db.execute(stmt)
         return list(result.scalars().all())
 

@@ -252,9 +252,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
-        if self.ENVIRONMENT.lower() == "production":
-            if len(self.SECRET_KEY) < 32:
-                raise ValueError("SECRET_KEY must be at least 32 characters in production")
+        if not self.SECRET_KEY:
+            raise ValueError("SECRET_KEY must not be empty (set it in .env)")
+        if self.ENVIRONMENT.lower() == "production" and len(self.SECRET_KEY) < 32:
+            raise ValueError("SECRET_KEY must be at least 32 characters in production")
         return self
 
     # --- Upload temp directory (staging before S3 upload) ---

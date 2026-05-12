@@ -101,10 +101,9 @@ export interface PaginatedConversationsResponse {
 
 export interface PaginatedBookingsResponse {
   items: Booking[];
-  total: number;
-  page: number;
-  limit: number;
+  next_cursor: string | null;
   has_more: boolean;
+  limit: number;
 }
 
 export interface PassengerRequest {
@@ -247,9 +246,8 @@ export interface NotificationItem {
   ride_origin: string | null;
   ride_destination: string | null;
   status: string | null;
-  /** Optional unread flag when provided by backend. */
+  is_read: boolean;
   id?: string;
-  is_read?: boolean;
   action_url?: string;
 }
 
@@ -258,6 +256,7 @@ export interface PaginatedNotificationsResponse {
   next_cursor: string | null;
   has_more: boolean;
   limit: number;
+  unread_count: number;
 }
 
 export interface Group {

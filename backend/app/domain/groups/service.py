@@ -15,6 +15,7 @@ async def create_group(db: AsyncSession, data: GroupCreate, user_id: UUID) -> Gr
         max_members=data.max_members,
         description=data.description,
     )
+    await db.commit()
     count = await crud.get_member_count(db, group.group_id)
     return group_to_out(group, count)
 
@@ -54,5 +55,6 @@ async def join_by_invite(db: AsyncSession, invite_code: str, user_id: UUID) -> G
             )
 
     await crud.join_group(db, group.group_id, user_id)
+    await db.commit()
     count = await crud.get_member_count(db, group.group_id)
     return group_to_out(group, count)

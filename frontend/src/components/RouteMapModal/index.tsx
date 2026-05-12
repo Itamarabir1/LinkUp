@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { fetchMapsKey } from '../../api/geo';
+import { qk } from '../../api/queryKeys';
 import { GOOGLE_MAPS_API_KEY } from '../../config/env';
 import ErrorBanner from '../ErrorBanner';
 import styles from './RouteMapModal.module.css';
@@ -34,31 +36,16 @@ function pathToLatLngs(coords: number[][]): { lat: number; lng: number }[] {
 export default function RouteMapModal({ data, onClose }: RouteMapModalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
-  const [resolvedKey, setResolvedKey] = useState<string | null>(null);
+  const { data: fetchedKey } = useQuery({
+    queryKey: qk.geo.mapsKey(),
+    queryFn: ({ signal }) => fetchMapsKey({ signal }).then((r) => r.data?.google_maps_api_key ?? ''),
+    enabled: !GOOGLE_MAPS_API_KEY,
+    staleTime: Infinity,
+  });
+
+  const resolvedKey = GOOGLE_MAPS_API_KEY || fetchedKey ?? null;
   const [scriptLoaded, setScriptLoaded] = useState(!!window.google?.maps);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (GOOGLE_MAPS_API_KEY) {
-      queueMicrotask(() => setResolvedKey(GOOGLE_MAPS_API_KEY));
-      return;
-    }
-    let cancelled = false;
-    fetchMapsKey()
-      .then(({ data }) => {
-        if (!cancelled && data?.google_maps_api_key) {
-          setResolvedKey(data.google_maps_api_key);
-        } else if (!cancelled) {
-          setResolvedKey('');
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setResolvedKey('');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (resolvedKey === null) return;

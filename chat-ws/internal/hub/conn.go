@@ -2,6 +2,7 @@ package hub
 
 import (
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -25,10 +26,21 @@ const (
 
 // Conn represents a WebSocket connection for a user.
 type Conn struct {
-	UserID string
-	Conn   *websocket.Conn
-	Send   chan []byte
-	done   chan struct{}
+	UserID    string
+	Conn      *websocket.Conn
+	Send      chan []byte
+	done      chan struct{}
+	closeOnce sync.Once
+}
+
+// Close signals the write pump to stop. Safe to call from any goroutine, any number of times.
+func (c *Conn) Close() {
+	c.closeOnce.Do(func() { close(c.done) })
+}
+
+// Done returns a receive-only channel that is closed when Close() is called.
+func (c *Conn) Done() <-chan struct{} {
+	return c.done
 }
 
 // RunWritePump pumps messages from the hub to the websocket connection.
@@ -43,7 +55,7 @@ func (c *Conn) RunWritePump() {
 
 	for {
 		select {
-		case <-c.done:
+		case <-c.Done():
 			c.Conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 			return
 		case message := <-c.Send:

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies.auth import get_current_user, get_db
 from app.api.dependencies.rate_limit import rate_limit_auth
 from app.api.dependencies.services import get_auth_service
+from app.api.helpers import client_ip
 from app.core.config import settings
 from app.core.exceptions.auth import GoogleAuthFailed
 from app.core.exceptions.base import LinkUpError
@@ -26,6 +27,7 @@ from app.domain.auth.schema import (
 )
 from app.domain.auth.service import AuthService
 from app.domain.users.model import User
+from app.infrastructure.audit import audit_repo
 
 logger = logging.getLogger(__name__)
 
@@ -81,16 +83,6 @@ async def register(
     return new_user
 
 
-@router.post("/forgot-password")
-async def forgot_password(
-    email: str,
-    db: AsyncSession = Depends(get_db),
-    _: None = Depends(rate_limit_auth),
-    auth_svc: AuthService = Depends(get_auth_service),
-):
-    return await auth_svc.request_password_reset(db, email=email)
-
-
 @router.post(
     "/login",
     response_model=LoginResponse,
@@ -99,6 +91,7 @@ async def forgot_password(
 )
 async def login(
     data: LoginRequest,
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
     _: None = Depends(rate_limit_auth),
@@ -111,11 +104,35 @@ async def login(
     Clients send `Authorization: Bearer <access_token>` on protected APIs and call POST /auth/refresh
     (cookie is sent automatically) when the access token expires.
     """
-    result = await auth_svc.authenticate_and_create_token(
-        db=db,
-        email=data.email,
-        password=data.password,
+    ip = client_ip(request)
+    try:
+        result = await auth_svc.authenticate_and_create_token(
+            db=db,
+            email=data.email,
+            password=data.password,
+        )
+    except LinkUpError as exc:
+        await audit_repo.record(
+            db,
+            actor_user_id=None,
+            action="login_failed",
+            resource_type="auth",
+            metadata={"email": data.email, "reason": exc.error_code},
+            ip_address=ip,
+        )
+        await db.commit()
+        raise
+
+    await audit_repo.record(
+        db,
+        actor_user_id=result["user"]["user_id"],
+        action="login",
+        resource_type="auth",
+        metadata={"email": data.email, "provider": "email"},
+        ip_address=ip,
     )
+    await db.commit()
+
     _set_refresh_cookie(response, result["refresh_token"])
     return {
         "access_token": result["access_token"],
@@ -175,6 +192,16 @@ async def logout(
     if auth_header.lower().startswith("bearer "):
         access_token = auth_header[7:].strip()
     await auth_svc.logout(db, user=current_user, access_token=access_token)
+
+    await audit_repo.record(
+        db,
+        actor_user_id=current_user.user_id,
+        action="logout",
+        resource_type="auth",
+        ip_address=client_ip(request),
+    )
+    await db.commit()
+
     _clear_refresh_cookie(response)
 
 
@@ -258,22 +285,36 @@ async def request_password_reset(
 @router.post("/password-reset/confirm", response_model=PasswordResetConfirmResponse)
 async def confirm_password_reset(
     data: PasswordResetConfirm,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _: None = Depends(rate_limit_auth),
     auth_svc: AuthService = Depends(get_auth_service),
 ):
     """Password reset step 2: email + OTP + new password (twice)."""
-    return await auth_svc.reset_password_with_code(
+    result = await auth_svc.reset_password_with_code(
         db=db,
         email=data.email,
         code=data.code,
         new_password=data.new_password,
     )
 
+    await audit_repo.record(
+        db,
+        actor_user_id=None,
+        action="password_reset",
+        resource_type="auth",
+        metadata={"email": data.email},
+        ip_address=client_ip(request),
+    )
+    await db.commit()
+
+    return result
+
 
 @router.post("/change-password", response_model=AuthMessageResponse)
 async def change_password(
     data: ChangePasswordRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     auth_svc: AuthService = Depends(get_auth_service),
@@ -282,7 +323,18 @@ async def change_password(
     Authenticated password change with old password + new password confirmation.
     Same strength rules as registration.
     """
-    return await auth_svc.change_password(db, user_id=current_user.user_id, data=data)
+    result = await auth_svc.change_password(db, user_id=current_user.user_id, data=data)
+
+    await audit_repo.record(
+        db,
+        actor_user_id=current_user.user_id,
+        action="change_password",
+        resource_type="auth",
+        ip_address=client_ip(request),
+    )
+    await db.commit()
+
+    return result
 
 
 @router.post(
@@ -293,6 +345,7 @@ async def change_password(
 )
 async def google_signin(
     data: GoogleSignInRequest,
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
     _: None = Depends(rate_limit_auth),
@@ -303,20 +356,50 @@ async def google_signin(
 
     Returns the same token bundle as password /login (refresh token in HttpOnly cookie).
     """
+    ip = client_ip(request)
     try:
         if not settings.GOOGLE_CLIENT_ID:
             logger.error("GOOGLE_CLIENT_ID not configured in settings")
             raise GoogleAuthFailed(message="שירות Google לא מוגדר בשרת")
 
         result = await auth_svc.authenticate_with_google(db=db, id_token=data.id_token)
-        _set_refresh_cookie(response, result["refresh_token"])
-        return {
-            "access_token": result["access_token"],
-            "token_type": result.get("token_type", "bearer"),
-            "user": result["user"],
-        }
-    except LinkUpError:
+    except LinkUpError as exc:
+        await audit_repo.record(
+            db,
+            actor_user_id=None,
+            action="login_failed",
+            resource_type="auth",
+            metadata={"provider": "google", "reason": exc.error_code},
+            ip_address=ip,
+        )
+        await db.commit()
         raise
     except Exception as e:
         logger.exception("Error in google_signin endpoint: %s", e)
+        await audit_repo.record(
+            db,
+            actor_user_id=None,
+            action="login_failed",
+            resource_type="auth",
+            metadata={"provider": "google", "reason": "unhandled_exception"},
+            ip_address=ip,
+        )
+        await db.commit()
         raise GoogleAuthFailed() from e
+
+    await audit_repo.record(
+        db,
+        actor_user_id=result["user"]["user_id"],
+        action="login",
+        resource_type="auth",
+        metadata={"provider": "google", "email": result["user"].get("email")},
+        ip_address=ip,
+    )
+    await db.commit()
+
+    _set_refresh_cookie(response, result["refresh_token"])
+    return {
+        "access_token": result["access_token"],
+        "token_type": result.get("token_type", "bearer"),
+        "user": result["user"],
+    }

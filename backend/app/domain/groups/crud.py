@@ -65,8 +65,7 @@ async def create_group(
 
     member = GroupMember(group_id=group.group_id, user_id=admin_id, role="admin")
     db.add(member)
-    await db.commit()
-    await db.refresh(group)
+    await db.flush()
     return group
 
 
@@ -100,8 +99,7 @@ async def get_membership(db: AsyncSession, group_id: UUID, user_id: UUID) -> Gro
 async def join_group(db: AsyncSession, group_id: UUID, user_id: UUID) -> GroupMember:
     member = GroupMember(group_id=group_id, user_id=user_id, role="member")
     db.add(member)
-    await db.commit()
-    await db.refresh(member)
+    await db.flush()
     return member
 
 
@@ -126,22 +124,20 @@ async def remove_member(db: AsyncSession, group_id: UUID, user_id: UUID) -> None
             group.is_active = False
 
     db.delete(member)
-    await db.commit()
+    await db.flush()
 
 
 async def update_member_role(db: AsyncSession, group_id: UUID, user_id: UUID, role: str) -> GroupMember | None:
     member = await get_membership(db, group_id, user_id)
     if member:
         member.role = role
-        await db.commit()
-        await db.refresh(member)
+        await db.flush()
     return member
 
 
 async def rename_group(db: AsyncSession, group: Group, name: str) -> Group:
     group.name = name
-    await db.commit()
-    await db.refresh(group)
+    await db.flush()
     return group
 
 
@@ -149,21 +145,19 @@ async def update_group_description(db: AsyncSession, group: Group, description: 
     if description is not None and len(description) > 500:
         description = description[:500]
     group.description = description
-    await db.commit()
-    await db.refresh(group)
+    await db.flush()
     return group
 
 
 async def update_group_avatar_key(db: AsyncSession, group: Group, avatar_key: str | None) -> Group:
     group.avatar_key = avatar_key
-    await db.commit()
-    await db.refresh(group)
+    await db.flush()
     return group
 
 
 async def close_group(db: AsyncSession, group: Group) -> Group:
     group.is_active = False
-    await db.commit()
+    await db.flush()
     return group
 
 

@@ -60,6 +60,11 @@ class CRUDUser:
         await db.refresh(db_obj)
         return db_obj
 
+    # Allowlist derived from UserUpdate schema — the single source of truth for
+    # which fields a user may change about their own profile.  Fail-closed: any
+    # column NOT declared on UserUpdate is blocked regardless of caller input.
+    _allowed_update_fields: set[str] = set(UserUpdate.model_fields.keys())
+
     async def update(
         self,
         db: AsyncSession,
@@ -68,19 +73,15 @@ class CRUDUser:
         obj_in: UserUpdate | dict[str, Any],
     ) -> User:
         """
-        Partial update: only fields present in the request (model_dump exclude_unset).
+        Partial update: only fields present in the request AND declared on UserUpdate are written.
         """
         if isinstance(obj_in, dict):
             update_data = obj_in
         else:
-            # exclude_unset=True avoids overwriting omitted JSON fields
             update_data = obj_in.model_dump(exclude_unset=True)
 
-        # Fields not allowed through this generic update
-        protected_fields = ["user_id", "created_at", "hashed_password", "refresh_token"]
-
         for field, value in update_data.items():
-            if hasattr(db_obj, field) and field not in protected_fields:
+            if field in self._allowed_update_fields and hasattr(db_obj, field):
                 setattr(db_obj, field, value)
 
         db.add(db_obj)
@@ -141,6 +142,14 @@ class CRUDUser:
     async def update_stripe_customer_id(self, db: AsyncSession, *, user: User, stripe_customer_id: str) -> User:
         """Save Stripe customer ID on first payment."""
         user.stripe_customer_id = stripe_customer_id
+        db.add(user)
+        await db.flush()
+        await db.refresh(user)
+        return user
+
+    async def mark_as_verified(self, db: AsyncSession, *, user: User) -> User:
+        """Mark user email as verified."""
+        user.is_verified = True
         db.add(user)
         await db.flush()
         await db.refresh(user)

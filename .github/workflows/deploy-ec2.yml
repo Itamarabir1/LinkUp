@@ -27,7 +27,7 @@ jobs:
       packages: read
     steps:
       - name: Deploy stack on EC2 (rolling single-instance)
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f # v1.2.2
         env:
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -91,6 +91,20 @@ jobs:
             envsubst '${SENTRY_REPORT_URI}' < "$DEPLOY_DIR/nginx/nginx.conf.template" \
                    > "$DEPLOY_DIR/nginx/nginx.conf"
             chmod 600 "$DEPLOY_DIR/nginx/nginx.conf"
+
+            # ── Pre-deploy database backup ──────────────────────────────
+            if grep -qE '^BACKUP_S3_BUCKET=' backend/.env && \
+               grep -qE '^BACKUP_ENCRYPTION_KEY=' backend/.env; then
+              echo "Running pre-deploy database backup ..."
+              $COMPOSE --profile prod up -d --wait --wait-timeout 60 db
+              $COMPOSE --profile backup run --rm \
+                -e BACKUP_TYPE=pre-deploy \
+                db-backup \
+                && echo "Pre-deploy backup succeeded" \
+                || echo "WARN: Pre-deploy backup failed (non-blocking, continuing deploy)"
+            else
+              echo "WARN: BACKUP_S3_BUCKET or BACKUP_ENCRYPTION_KEY not set, skipping pre-deploy backup"
+            fi
 
             OWNER_LOWER="$(echo "$IMAGE_OWNER" | tr '[:upper:]' '[:lower:]')"
             GHCR_BASE="ghcr.io/$OWNER_LOWER/linkup"

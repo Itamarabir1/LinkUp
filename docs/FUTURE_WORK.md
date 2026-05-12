@@ -7,8 +7,6 @@
 
 ## Near-Term, High-Value (Implement Next)
 
-_Nginx connection/request rate limiting (`limit_req` / `limit_conn`) is intentionally **not** scheduled here — it is covered under [API Gateway Load Shedding (Deferred)](#api-gateway-load-shedding-nginx-deferred) until traffic baselines justify thresholds._
-
 ### 1) Formal SLO Alerting (Prometheus Rules)
 
 - **Decision:** Prioritize formal alert rules next.
@@ -44,17 +42,17 @@ This follows a senior engineering principle: avoid premature optimization, but e
   - After production traffic shows recurring read hotspots that cannot be solved with query/index tuning alone.
   - When SLOs show read latency saturation on primary under realistic load.
 
-## API Gateway Load Shedding (nginx) (Deferred)
+## API Gateway Load Shedding (nginx) — `limit_conn` / Advanced (Deferred)
 
-- **Decision:** Do not add gateway-level load shedding/concurrency limiting in nginx yet.
-- **Current state:** nginx does not enforce explicit API concurrency/queue limits.
+- **Decision:** Do not add gateway-level **concurrency** limiting (`limit_conn`) or advanced load shedding in nginx yet.
+- **Current state:** nginx enforces **request rate limiting** (`limit_req_zone` 30r/s per IP on `/api/v1/`, burst=50, 429 status) — shipped. Concurrency-based limiting (`limit_conn`) and queue-depth shedding are not yet active.
 - **Why deferred:**
-  - Aggressive shedding without traffic baselines can cause avoidable user-facing 503s.
-  - Correct thresholds require production concurrency and latency distributions.
-  - Existing app-level protections (rate limiting, async workers, retries) cover current scale.
+  - Aggressive concurrency shedding without traffic baselines can cause avoidable user-facing 503s.
+  - Correct `limit_conn` thresholds require production concurrency and latency distributions.
+  - Existing protections (per-IP rate limiting, app-level per-user rate limits, async workers) cover current scale.
 - **When to revisit:**
   - After observing overload signatures (worker saturation, tail-latency spikes, queue buildup) under real traffic.
-  - When gateway-level protection is needed to preserve core endpoints during bursts/incidents.
+  - When gateway-level concurrency protection is needed to preserve core endpoints during bursts/incidents.
 
 ## CDN for Frontend Bundle (Deferred)
 

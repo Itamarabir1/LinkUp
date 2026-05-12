@@ -31,7 +31,9 @@ class GroupCreate(BaseModel):
 
 class GroupUpdate(BaseModel):
     name: str | None = None
-    description: str | None = None  # עד 500 תווים, וולידציה ב-Field לא חובה כאן (מודל DB מגביל)
+    description: str | None = None
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class GroupOut(BaseModel):

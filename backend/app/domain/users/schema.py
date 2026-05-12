@@ -58,7 +58,7 @@ class UserBaseSchema(BaseModel):
 class UserRead(BaseModel):
     user_id: UUID
     full_name: str
-    phone_number: str
+    phone_number: str | None = None
     email: EmailStr | None = None
     avatar_key: str | None = None
     avatar_status: str = "none"
@@ -85,18 +85,53 @@ class UserRead(BaseModel):
 
 class UserCreate(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=100)
-    phone_number: str = Field(..., pattern=r"^\+?[1-9]\d{1,14}$")  # E.164-style phone validation
-    password: str = Field(..., min_length=8)  # Raw password from the client
+    phone_number: str | None = Field(None)
+    password: str = Field(..., min_length=8)
     email: EmailStr | None = None
     fcm_token: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone_e164(cls, v: str | None):
+        if v is None:
+            return v
+        import re
+        if not re.match(r"^\+?[1-9]\d{1,14}$", v):
+            raise ValueError("Invalid phone number format (E.164)")
+        return v
+
 
 # --- Updates ---
-class UserUpdate(UserBaseSchema):
+class UserUpdate(BaseModel):
+    """Profile update: only the fields a user may change about themselves."""
+
     full_name: str | None = Field(None, min_length=2, max_length=100)
     email: EmailStr | None = None
+    phone_number: str | None = None
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, v: str | None):
+        if v is None:
+            return v
+        try:
+            return normalize_email_for_auth(v)
+        except ValueError as e:
+            raise InvalidEmailError(email=v) from e
+
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone(cls, v: str | None):
+        if v is None:
+            return v
+        try:
+            return validate_phone_number(v)
+        except ValueError as e:
+            raise InvalidPhoneError(phone=v) from e
 
 
 # --- Location & FCM ---

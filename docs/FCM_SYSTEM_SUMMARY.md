@@ -180,7 +180,17 @@ Reminder events (`PICKUP_REMINDER_PASSENGER`, `RIDE_START_DRIVER`) are dispatche
 
 `ReminderScheduler` calls `NotificationHandler.handle_event` with an in-process payload (not the outbox). **Contract:** `scheduled_notification_id`, `ride_id`, and `user_id` together identify a due row in `scheduled_notifications` and tell the handler to hydrate a **`ScheduledReminderSource`**: the **ride** (with driver) supplies template context (`RideBuilder`); **`user_id`** is the recipient. Without all three fields, `ride_id` alone still loads a bare `Ride` and the usual resolver/builder paths apply. See [`backend/app/domain/notifications/core/scheduled_reminder_source.py`](../backend/app/domain/notifications/core/scheduled_reminder_source.py).
 
-## 9) Related docs
+## 9) Chat message push (offline fallback)
+
+When a chat message is sent, the outbox event `chat.message_sent` targets **both** `REDIS` (real-time WebSocket delivery via chat-ws) and `RABBITMQ` (offline push fallback). The notification worker's custom handler `handle_chat_message_push` in [`notification_tasks.py`](../backend/app/workers/tasks/notification_tasks.py):
+
+1. **Presence check:** queries Redis DB 1 for `EXISTS presence:{recipient_id}` (set by chat-ws Go service on WebSocket connect, 60s TTL refreshed on each ping). If online → skip.
+2. **Debounce:** `SET NX` on `chat_push_debounce:{recipient_id}:{conversation_id}` with 30s TTL. If key exists → skip (max 1 push per conversation per 30 seconds).
+3. **Dispatch:** loads sender + recipient from DB, builds `NotificationCommand` with template `chat_message` and channel `["push"]`, dispatches via `NotificationManager`.
+
+**SW notification collapsing:** the FCM data payload includes `conversation_id`; the service worker uses `tag: 'chat-' + conversation_id` with `renotify: true` — the browser replaces (not stacks) notifications for the same conversation.
+
+## 10) Related docs
 
 - [`docs/ENGINEERING_HIGHLIGHTS.md`](ENGINEERING_HIGHLIGHTS.md) — portfolio summary (includes FCM).
 - [`docs/architecture/API.md`](architecture/API.md) — `PATCH /fcm-token`.

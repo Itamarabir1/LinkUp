@@ -1,64 +1,50 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect } from 'react';
 import { getGroupMembers, getGroupRides } from '../../api/groups';
-import type { GroupMember, RideResponse } from '../../types/api';
-import { getApiErrorMessage } from '../../utils/apiError';
-import { apiErr } from '../../utils/i18nError';
+import { qk } from '../../api/queryKeys';
 import type { GroupTab } from './groupManage.types';
 
-/**
- */
 export function useGroupManageLists(
   groupId: string | undefined,
   activeTab: GroupTab,
   refreshGroups: () => Promise<void>,
-  setError: (message: string) => void
+  _setError: (message: string) => void
 ) {
-  const [members, setMembers] = useState<GroupMember[]>([]);
-  const [rides, setRides] = useState<RideResponse[]>([]);
-  const [loadingMembers, setLoadingMembers] = useState(true);
-  const [loadingRides, setLoadingRides] = useState(false);
+  const queryClient = useQueryClient();
 
-  const loadMembers = useCallback(async () => {
-    if (!groupId) return;
-    setLoadingMembers(true);
-    setError('');
-    try {
-      const list = await getGroupMembers(groupId);
-      setMembers(list);
-    } catch (err) {
-      setError(getApiErrorMessage(err, apiErr('err_load_group_members')));
-      setMembers([]);
-    } finally {
-      setLoadingMembers(false);
-    }
-  }, [groupId, setError]);
+  const {
+    data: members = [],
+    isLoading: loadingMembers,
+  } = useQuery({
+    queryKey: qk.groups.members(groupId!),
+    queryFn: ({ signal }) => getGroupMembers(groupId!, { signal }),
+    enabled: !!groupId,
+  });
 
-  const loadRides = useCallback(async () => {
-    if (!groupId) return;
-    setLoadingRides(true);
-    setError('');
-    try {
-      const page = await getGroupRides(groupId, { limit: 20 });
-      setRides(Array.isArray(page.rides) ? page.rides : []);
-    } catch (err) {
-      setError(getApiErrorMessage(err, apiErr('err_load_group_rides')));
-      setRides([]);
-    } finally {
-      setLoadingRides(false);
-    }
-  }, [groupId, setError]);
+  const {
+    data: ridesPage,
+    isLoading: loadingRides,
+  } = useQuery({
+    queryKey: qk.groups.rides(groupId!),
+    queryFn: ({ signal }) => getGroupRides(groupId!, { limit: 20, signal }),
+    enabled: !!groupId && activeTab === 'rides',
+  });
+
+  const rides = Array.isArray(ridesPage?.rides) ? ridesPage.rides : [];
 
   useEffect(() => {
     void refreshGroups();
   }, [refreshGroups]);
 
-  useEffect(() => {
-    void loadMembers();
-  }, [loadMembers]);
+  const loadMembers = useCallback(async () => {
+    if (!groupId) return;
+    await queryClient.invalidateQueries({ queryKey: qk.groups.members(groupId) });
+  }, [groupId, queryClient]);
 
-  useEffect(() => {
-    if (activeTab === 'rides') void loadRides();
-  }, [activeTab, loadRides]);
+  const loadRides = useCallback(async () => {
+    if (!groupId) return;
+    await queryClient.invalidateQueries({ queryKey: qk.groups.rides(groupId) });
+  }, [groupId, queryClient]);
 
   return {
     members,

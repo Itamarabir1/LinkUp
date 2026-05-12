@@ -3,8 +3,13 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions.infrastructure import EmailProviderCircuitOpenError
 from app.domain.notifications.channels.email.client import email_client
 from app.domain.notifications.channels.email.renderer import render_email_template
+from app.domain.notifications.exceptions import (
+    PermanentNotificationError,
+    TransientNotificationError,
+)
 from app.domain.notifications.providers.base import BaseNotificationProvider
 from app.domain.users.model import User
 
@@ -20,7 +25,6 @@ class EmailProvider(BaseNotificationProvider):
         for key, value in context.items():
             if key and value is not None:
                 result = result.replace("{" + key + "}", str(value).strip())
-        # Leave placeholders not in context as-is (if a value is missing)
         return result
 
     async def send(
@@ -31,14 +35,11 @@ class EmailProvider(BaseNotificationProvider):
         db: AsyncSession | None = None,
     ):
         try:
-            # Subject may come from context (builder prepared it) — substitute placeholders
             raw_subject = context.get("subject", "Update from LinkUp")
             subject = self._render_subject(raw_subject, context)
 
-            # 1. Render HTML
             html_content = render_email_template(template_name, **context)
 
-            # 2. Send via EmailClient (Brevo) — recipient = driver/user; Brevo requires non-empty name in to
             if html_content:
                 recipient_name = (
                     context.get("user_name") or context.get("driver_name") or getattr(user, "full_name", None) or getattr(user, "first_name", None)
@@ -52,11 +53,6 @@ class EmailProvider(BaseNotificationProvider):
                     recipient_name,
                     (subject or "")[:60],
                 )
-                logger.info(
-                    "[EMAIL DEBUG] action_url=%s ride_url=%s",
-                    context.get("action_url"),
-                    context.get("ride_url"),
-                )
                 await email_client.send(
                     recipient=user.email,
                     subject=subject,
@@ -69,14 +65,14 @@ class EmailProvider(BaseNotificationProvider):
                     "[NOTIF] Email: no html_content, skip send to=%s",
                     getattr(user, "email", "?"),
                 )
+
+        except (ValueError, EmailProviderCircuitOpenError) as e:
+            logger.error("[NOTIF] Email: permanent failure to=%s: %s", getattr(user, "email", "?"), e)
+            raise PermanentNotificationError(f"Email permanent failure: {e}") from e
+
         except Exception as e:
-            logger.error(
-                "[NOTIF] Email: FAILED to=%s: %s",
-                getattr(user, "email", "?"),
-                e,
-                exc_info=True,
-            )
-            raise
+            logger.error("[NOTIF] Email: transient failure to=%s: %s", getattr(user, "email", "?"), e, exc_info=True)
+            raise TransientNotificationError(f"Email send failed: {e}") from e
 
     def can_send(self, user) -> bool:
         return bool(user and hasattr(user, "email") and "@" in user.email)

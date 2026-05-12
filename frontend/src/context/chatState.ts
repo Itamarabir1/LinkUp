@@ -1,5 +1,4 @@
 import type { NotificationItem } from '../types/api';
-import { getNotificationItemKey, getReadNotificationSet } from './chatNotificationStorage';
 
 export type ChatState = {
   openConversationId: string | null;
@@ -22,15 +21,10 @@ export type ChatAction =
   | { type: 'OPEN_PANEL'; conversationId: string }
   | { type: 'CLOSE_ALL_CHATS' }
   | { type: 'SET_UNREAD_MESSAGES'; count: number }
-  | { type: 'SET_NOTIFICATION_STATE'; list: NotificationItem[] }
+  | { type: 'SET_NOTIFICATION_STATE'; list: NotificationItem[]; unreadCount: number }
   | { type: 'RESET_SESSION' }
   | { type: 'DECREMENT_UNREAD_NOTIFICATIONS' }
   | { type: 'MARK_ALL_NOTIFICATIONS_READ' };
-
-function countUnreadFromList(list: NotificationItem[]): number {
-  const readSet = getReadNotificationSet();
-  return list.filter((n) => !readSet.has(getNotificationItemKey(n))).length;
-}
 
 export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
@@ -54,7 +48,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return {
         ...state,
         notificationList: action.list,
-        unreadNotifications: countUnreadFromList(action.list),
+        unreadNotifications: action.unreadCount,
       };
     case 'RESET_SESSION':
       return { ...initialChatState };

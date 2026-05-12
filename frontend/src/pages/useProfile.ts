@@ -8,6 +8,14 @@ import { getApiErrorMessage } from '../utils/apiError';
 export const ACCEPT_AVATAR = 'image/jpeg,image/png,image/webp';
 export const MAX_SIZE_MB = 5;
 
+function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) { reject(signal.reason); return; }
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason); }, { once: true });
+  });
+}
+
 export function useProfile() {
   const { user, logout, refreshUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -17,19 +25,23 @@ export function useProfile() {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarExpanded, setAvatarExpanded] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
+  const pollControllerRef = useRef<AbortController | null>(null);
 
-  const waitForAvatarReady = async () => {
-    // Poll short-term while worker finalizes staging -> final variants.
+  useEffect(() => {
+    return () => pollControllerRef.current?.abort();
+  }, []);
+
+  const waitForAvatarReady = async (signal: AbortSignal) => {
     for (let i = 0; i < 12; i += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await abortableDelay(1000, signal);
       try {
-        const { data } = await fetchCurrentUser();
+        const { data } = await fetchCurrentUser({ signal });
         if (data.avatar_status === 'ready' && data.avatar_url_medium) {
           await refreshUser();
           return true;
         }
       } catch {
-        // Ignore transient read errors while polling.
+        if (signal.aborted) return false;
       }
     }
     return false;
@@ -54,6 +66,9 @@ export function useProfile() {
     if (avatarPreview) URL.revokeObjectURL(avatarPreview);
     const newPreviewUrl = URL.createObjectURL(file);
     setAvatarPreview(newPreviewUrl);
+    pollControllerRef.current?.abort();
+    const controller = new AbortController();
+    pollControllerRef.current = controller;
     try {
       const compressed = await compressImage(file, { maxWidth: 800, quality: 0.85 });
       const { data: uploadData } = await getAvatarUploadUrl();
@@ -61,15 +76,17 @@ export function useProfile() {
         method: 'PUT',
         body: compressed,
         headers: { 'Content-Type': 'image/webp' },
+        signal: controller.signal,
       });
       await confirmAvatar(uploadData.staging_key);
       await refreshUser();
-      const ready = await waitForAvatarReady();
+      const ready = await waitForAvatarReady(controller.signal);
       if (ready) {
         URL.revokeObjectURL(newPreviewUrl);
         setAvatarPreview(null);
       }
     } catch (err: unknown) {
+      if (controller.signal.aborted) return;
       setError(getApiErrorMessage(err, i18n.t('profile:uploadFailed')));
     } finally {
       setUploading(false);

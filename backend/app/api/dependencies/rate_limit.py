@@ -16,19 +16,12 @@ from __future__ import annotations
 from fastapi import Depends, Request
 
 from app.api.dependencies.auth import get_current_user
+from app.api.helpers import client_ip
 from app.core.config import settings
 from app.core.exceptions.infrastructure import RateLimitExceeded
 from app.domain.users.model import User
 from app.infrastructure.metrics import rate_limit_rejected_total
 from app.infrastructure.rate_limiter import rate_limiter
-
-
-def _client_ip(request: Request) -> str:
-    """Returns client IP — X-Forwarded-For if behind a proxy, else client.host."""
-    forwarded = request.headers.get("x-forwarded-for", "").strip()
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
 
 
 async def rate_limit_auth(request: Request) -> None:
@@ -37,7 +30,7 @@ async def rate_limit_auth(request: Request) -> None:
     Anti-bruteforce: a quiet attacker cannot stockpile a burst — every request
     counts inside a true rolling window.
     """
-    ip = _client_ip(request)
+    ip = client_ip(request)
     key = f"ratelimit:auth:{ip}"
     result = await rate_limiter.sliding_window(
         key,

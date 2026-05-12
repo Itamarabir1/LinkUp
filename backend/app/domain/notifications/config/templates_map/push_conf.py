@@ -31,4 +31,8 @@ PUSH_TEMPLATES = {
         "title": "🚗 נסיעה חדשה זמינה!",
         "body": "נסיעה ל-{destination} ב-{ride_date}. לחץ להצטרף.",
     },
+    "chat_message": {
+        "title": "הודעה מ-{sender_name}",
+        "body": "{message_preview}",
+    },
 }

@@ -119,7 +119,6 @@ export default function ConfirmModal({
     <div
       className={styles.backdrop}
       onClick={handleBackdropClick}
-      aria-hidden="true"
     >
       <div
         ref={panelRef}

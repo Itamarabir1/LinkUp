@@ -109,10 +109,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       queueMicrotask(() => setState((s) => ({ ...s, isLoading: false })));
       return;
     }
-    let cancelled = false;
-    fetchCurrentUser()
+    const controller = new AbortController();
+    fetchCurrentUser({ signal: controller.signal })
       .then(({ data }) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         queryClient.setQueryData(qk.auth.me(), data);
         setState({ user: data, isAuthenticated: true, isLoading: false });
         if (import.meta.env.PROD) {
@@ -121,12 +121,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         void initFCM();
       })
       .catch(() => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         void tearDownSession({ reason: 'bootstrap-failed' });
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [queryClient, tearDownSession]);
 
   useEffect(() => {
@@ -190,8 +188,8 @@ export function useAuth() {
 export function useCurrentUser() {
   return useQuery({
     queryKey: qk.auth.me(),
-    queryFn: async () => {
-      const { data } = await fetchCurrentUser();
+    queryFn: async ({ signal }) => {
+      const { data } = await fetchCurrentUser({ signal });
       return data;
     },
     enabled: !!localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN),

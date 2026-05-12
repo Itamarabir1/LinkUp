@@ -19,6 +19,7 @@ const DEFAULT_INBOX_LIMIT = 30;
 
 export async function listConversations(
   params?: { limit?: number; after?: string },
+  opts?: { signal?: AbortSignal },
 ): Promise<PaginatedConversationsResponse> {
   const limit = params?.limit ?? DEFAULT_INBOX_LIMIT;
   const { data } = await api.get<PaginatedConversationsResponse>('/chat/conversations', {
@@ -26,6 +27,7 @@ export async function listConversations(
       limit,
       ...(params?.after ? { after: params.after } : {}),
     },
+    signal: opts?.signal,
   });
   return {
     items: data.items ?? [],
@@ -36,17 +38,19 @@ export async function listConversations(
 
 export const inboxPageSizeDefault = DEFAULT_INBOX_LIMIT;
 
-export function getConversation(conversationId: string) {
-  return api.get<ConversationDetail>(`/chat/conversations/${conversationId}`);
+export function getConversation(conversationId: string, opts?: { signal?: AbortSignal }) {
+  return api.get<ConversationDetail>(`/chat/conversations/${conversationId}`, { signal: opts?.signal });
 }
 
-export function getMessages(conversationId: string, params?: { limit?: number; after?: string }) {
-  return api.get<PaginatedMessagesResponse>(`/chat/conversations/${conversationId}/messages`, { params });
+export function getMessages(conversationId: string, params?: { limit?: number; after?: string; signal?: AbortSignal }) {
+  const { signal, ...rest } = params ?? {};
+  return api.get<PaginatedMessagesResponse>(`/chat/conversations/${conversationId}/messages`, { params: rest, signal });
 }
 
-export function getMessagesGap(conversationId: string, since_message_id: number) {
+export function getMessagesGap(conversationId: string, since_message_id: number, opts?: { signal?: AbortSignal }) {
   return api.get<MessageGapResponse>(`/chat/conversations/${conversationId}/messages/gap`, {
     params: { since_message_id },
+    signal: opts?.signal,
   });
 }
 
@@ -63,6 +67,6 @@ export function markConversationRead(conversationId: string) {
   return api.post(`/chat/conversations/${conversationId}/read`);
 }
 
-export function fetchUnreadMessageCount() {
-  return api.get<{ count: number }>('/chat/unread-count');
+export function fetchUnreadMessageCount(opts?: { signal?: AbortSignal }) {
+  return api.get<{ count: number }>('/chat/unread-count', { signal: opts?.signal });
 }

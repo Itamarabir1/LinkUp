@@ -7,7 +7,7 @@ from app.api.dependencies.auth import get_current_user
 from app.core.exceptions.user import UserNotFoundError
 from app.db.session import get_db
 from app.core.constants import NOTIFICATIONS_DEFAULT_LIMIT, NOTIFICATIONS_MAX_LIMIT
-from app.domain.bookings.schema import PaginatedNotificationsResponse
+from app.domain.bookings.schema import MarkNotificationsReadRequest, PaginatedNotificationsResponse
 from app.domain.bookings.booking_reads_service import BookingReadsService
 from app.domain.users.crud import crud_user
 from app.domain.users.model import User
@@ -78,6 +78,29 @@ async def get_my_notifications(
     )
 
 
+@router.patch("/me/notifications/read", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_notifications_read(
+    body: MarkNotificationsReadRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Mark specific notifications as read (idempotent upsert)."""
+    await BookingReadsService.mark_notifications_read(
+        db, current_user.user_id, body.items
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/me/notifications/read-all", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_all_notifications_read(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Mark all current notifications as read in one pass."""
+    await BookingReadsService.mark_all_notifications_read(db, current_user.user_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 # --- 2. FCM token update (push notifications) ---
 @router.patch("/fcm-token", response_model=MessageResponse)
 async def update_fcm_token(
@@ -95,6 +118,15 @@ async def update_fcm_token(
 async def test_push(
     current_user: User = Depends(get_current_user),
 ):
+    from app.core.config import settings
+    from app.core.exceptions.base import LinkUpError
+
+    if not settings.DEBUG:
+        raise LinkUpError(
+            message="Endpoint available in debug mode only",
+            status_code=404,
+            error_code="NOT_FOUND",
+        )
     from app.domain.notifications.channels.push.client import fcm_client
 
     if not current_user.fcm_token:

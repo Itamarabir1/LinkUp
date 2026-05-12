@@ -83,13 +83,12 @@ class TripStats(BaseModel):
 
 
 class PaginatedBookingsResponse(BaseModel):
-    """User bookings with page-based pagination."""
+    """User bookings with cursor-based keyset pagination."""
 
     items: list[BookingResponse] = Field(default_factory=list)
-    total: int = 0
-    page: int = 1
-    limit: int = 20
+    next_cursor: str | None = None
     has_more: bool = False
+    limit: int = 20
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -183,6 +182,7 @@ class NotificationItemResponse(BaseModel):
     ride_origin: str | None = None
     ride_destination: str | None = None
     status: str | None = None  # לנוסע: confirmed / rejected / pending_approval
+    is_read: bool = False
 
 
 class PaginatedNotificationsResponse(BaseModel):
@@ -192,5 +192,15 @@ class PaginatedNotificationsResponse(BaseModel):
     next_cursor: str | None = None
     has_more: bool = False
     limit: int = NOTIFICATIONS_DEFAULT_LIMIT
+    unread_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class NotificationReadItem(BaseModel):
+    booking_id: UUID
+    created_at: datetime
+
+
+class MarkNotificationsReadRequest(BaseModel):
+    items: list[NotificationReadItem] = Field(..., min_length=1, max_length=200)

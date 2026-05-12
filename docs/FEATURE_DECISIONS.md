@@ -132,12 +132,12 @@
 
 <a id="chat-ws-operational-hardening"></a>
 
-## chat-ws operational hardening (H7–H10)
+## chat-ws operational hardening (H7–H11)
 
 | | |
 |--|--|
 | **בעיה** | (H7) `docker-compose.yml` healthcheck references `/healthz` but no handler existed — always 404; combined with subscriber death, chat-ws appears alive but delivers zero messages. (H8) raw `http.ListenAndServe` without `Shutdown` — SIGTERM instantly kills active WS connections. (H9) no `SetReadDeadline`/`SetPongHandler` — dead clients leak goroutines forever. (H10) zero `recover()` — any goroutine panic crashes the entire process. |
-| **החלטה** | **H7:** `/healthz` checks Redis PING **and** `Hub.SubscribersHealthy()` — three `atomic.Int64` timestamps (chat/offline/online) updated on each successful `(P)Subscribe`, with 2-min staleness threshold; seeded to `now` in `NewHub` for startup grace. **H8:** `*http.Server` + `srv.Shutdown(shutdownCtx)` with 10s timeout. **H9:** `conn.SetReadDeadline(pongWait)` + `SetPongHandler` before read loop. **H10:** shared `internal/safego/safego.go` with `RecoverPanic(component, op)` — `defer` in every independent goroutine. |
+| **החלטה** | **H7:** `/healthz` checks Redis PING **and** `Hub.SubscribersHealthy()` — three `atomic.Int64` timestamps (chat/offline/online) updated on each successful `(P)Subscribe`, with 2-min staleness threshold; seeded to `now` in `NewHub` for startup grace. **H8:** `*http.Server` + `srv.Shutdown(shutdownCtx)` with 10s timeout. **H9:** `conn.SetReadDeadline(pongWait)` + `SetPongHandler` before read loop. **H10:** shared `internal/safego/safego.go` with `RecoverPanic(component, op)` — `defer` in every independent goroutine. **H11 (sync.Once):** `Conn.done` channel closed via `sync.Once`-guarded `Conn.Close()` method; all consumers read through `Conn.Done()` (read-only `<-chan struct{}`). Eliminates double-close panic that was possible under concurrent teardown (handler `defer` + hub broadcast timeout racing). |
 | **אלטרנטיבות** | (H7) Redis PING only — doesn't catch dead subscribers. (H10) inline `recover()` per function — code duplication across `hub`/`redis` packages. |
 | **יתרון** | Healthcheck catches real failure mode (alive but deaf); deploy drains gracefully; dead clients detected in ≤60s; single goroutine crash doesn't take down process. |
 | **Trade-off** | H7 subscriber liveness tracks subscription success, not message receipt — legitimate silence doesn't trigger staleness (acceptable: if subscriber disconnects, `runOnce` returns and timestamp goes stale). H10 recovery swallows the panic — the goroutine stops silently (logged with full stack trace). |
@@ -301,7 +301,7 @@
 |--|--|
 | **בעיה** | קריאות רשת מפוזרות יוצרות policy לא עקבי ל-retry/cache ושגיאות כפולות ב-Sentry בין axios interceptors לבין שכבות UI. |
 | **החלטה** | `QueryClient` מרכזי עם `QueryCache`/`MutationCache`, retry policy מוגדר (network/5xx בלבד), תמיכה ב-`Retry-After` (seconds/date), ו-`mutations.retry=false`. |
-| **Dedup שגיאות** | axios מסמן `__sentryCaptured` לפני capture ל-5xx; React Query `onError` בודק marker ולא מדווח שוב. `ERR_CANCELED` מדולג בשתי השכבות. |
+| **Dedup שגיאות** | axios מסמן `__sentryCaptured` לפני capture ל-5xx; React Query `onError` בודק marker ולא מדווח שוב. `ERR_CANCELED` מדולג בשתי השכבות. **M2 AbortController refactor:** כל פונקציות API מקבלות `signal?: AbortSignal`; React Query מעביר signal אוטומטית; hooks ידניים משתמשים ב-`useAbortSignal()` או `AbortController` ישיר + `axios.isCancel(err)` guard בכל catch. |
 | **Query key convention** | factories typed (`qk`/`mk`) במקום keys ידניים מפוזרים, כולל `Record<string, unknown>` לפילטרים. |
 | **יתרון** | cache/retry עקביים בכל הדומיינים, observability נקייה יותר (בלי double-capture), ובסיס טוב למיגרציה הדרגתית של מסכים ל-RQ hooks. |
 | **Trade-off** | שכבת תשתית נוספת בפרונט ודורשת משמעת של key factories כדי למנוע drift. |
@@ -314,7 +314,7 @@
 | | |
 |--|--|
 | **בעיה** | `GroupContext` ו-`MyRides` ניהלו fetch/state ידני (`useState` + `useEffect`), כולל עדכוני WS ב-`setState`, מה שהקשה על עקביות cache ועל תחזוקה. |
-| **החלטה** | להעביר `GroupContext` ל-`useQuery(qk.groups.list)` ולשמור את `useGroup()` contract זהה; להעביר `MyRides` ל-`useQuery(qk.rides.list)` + `useMutation(mk.rides.cancel)` עם invalidate על אירועי WS. |
+| **החלטה** | להעביר `GroupContext` ל-`useQuery(qk.groups.list)` ולשמור את `useGroup()` contract זהה; להעביר `MyRides` ל-`useQuery(qk.rides.list)` + `useMutation(mk.rides.cancel)` עם invalidate על אירועי WS. **M2:** `useGroupManageLists` — members/rides lists מוגרו ל-`useQuery(qk.groups.members)` / `useQuery(qk.groups.rides)` עם signal אוטומטי + `invalidateQueries` במקום imperative refetch. |
 | **מדיניות cache** | `GroupContext` משתמש ב-`staleTime=2m`; `MyRides` ב-`staleTime=30s`; `refreshGroups` ממומש דרך `queryClient.invalidateQueries`. |
 | **עדכון בזמן אמת** | אירועי `RIDE_FINISHED/RIDE_CANCELLED/RIDE_ENDED/RIDE_STARTED` גורמים ל-invalidate של `qk.rides.list` במקום patch ידני מרובה. |
 | **יתרון** | מקור אמת יחיד לרשימות קבוצות/נסיעות, פחות race conditions בצד לקוח, ומיגרציה בטוחה בלי שינוי UX או מבנה JSX/CSS. |
@@ -480,7 +480,7 @@
 | | |
 |--|--|
 | **בעיה** | בטאב "הזמנות שלי" מספר קריאות per booking/ride יוצרות N+1 ו-UX איטי. |
-| **החלטה** | Read models מאוגדים לנהג ולנוסע; **הפרדת פעיל מול היסטוריה**: `GET …/driver-summary/active` + `…/driver-summary/history` (ומקבילים לנוסע) עם **קורסור** (`after` + `next_cursor`, Base64 JSON ב־UTC דרך [`core/pagination/cursor.py`](../backend/app/core/pagination/cursor.py)). **Legacy** `GET …/driver-summary` ו-`…/passenger-summary` נשמרים לתאימות ומסומנים **deprecated** ב-FastAPI/OpenAPI. |
+| **החלטה** | Read models מאוגדים לנהג ולנוסע; **הפרדת פעיל מול היסטוריה**: `GET …/driver-summary/active` + `…/driver-summary/history` (ומקבילים לנוסע) עם **קורסור** (`after` + `next_cursor`, Base64 JSON ב־UTC דרך [`core/pagination/cursor.py`](../backend/app/core/pagination/cursor.py)). **`GET /bookings/my-bookings`** הועבר מ-offset (`page`/`total`) ל-**cursor-based keyset** על `(created_at DESC, booking_id DESC)` — עקבי עם כל שאר ה-endpoints. **Legacy** `GET …/driver-summary` ו-`…/passenger-summary` נשמרים לתאימות ומסומנים **deprecated** ב-FastAPI/OpenAPI. |
 | **אלטרנטיבות** | (1) GraphQL עם DataLoader. (2) BFF שמרכז. (3) N+1 עם `joinedload` — עדיין הרבה round-trips אם ה-UI שואל "פר booking". (4) רק endpoint אחד ללא פיצול — payloads בלתי חסומים בהיסטוריה. |
 | **יתרון** | מעט round-trips לפעיל; היסטוריה מדורגת; פחות זיכרון/רשת; נוסעים בהיסטוריית נהג נטענים עם `with_loader_criteria` מתאים (לא רק pending/confirmed). |
 | **Trade-off** | יותר נתיבים ומפתחות React Query (`driverActive` / `driverHistory` וכו’). |
@@ -545,12 +545,12 @@
 | | |
 |--|--|
 | **בעיה** | `users.refresh_token` שמר JWT refresh כ-plaintext ב-DB. דליפת DB = תוקף מחדש sessions ללא הגבלה. בנוסף, `authenticate_with_google` עקף את CRUD ישירות (`user.refresh_token = refresh_token`), וה-generic `update` לא חסם כתיבת plaintext ל-field. |
-| **החלטה** | (1) `hash_refresh_token(token)` ב-`security.py` — SHA-256 (מתאים לטוקנים עם אנטרופיה גבוהה; bcrypt מיותר). (2) `CRUDUser.update_refresh_token` שומר hash בלבד — נקודת כתיבה אחת. (3) `CRUDUser.verify_refresh_token` — `hmac.compare_digest` (constant-time) — **service layer לא מייבא hash ולא יודע על מנגנון האחסון**. (4) `refresh_token` נוסף ל-`protected_fields` ב-generic `update` נגד bypass. (5) Google auth עובר דרך CRUD במקום השמה ישירה. (6) Migration **021**: NULL-ify כל הטוקנים הקיימים (לא ניתן ל-hash plaintext ללא deploy מתואם). |
+| **החלטה** | (1) `hash_refresh_token(token)` ב-`security.py` — SHA-256 (מתאים לטוקנים עם אנטרופיה גבוהה; bcrypt מיותר). (2) `CRUDUser.update_refresh_token` שומר hash בלבד — נקודת כתיבה אחת. (3) `CRUDUser.verify_refresh_token` — `hmac.compare_digest` (constant-time) — **service layer לא מייבא hash ולא יודע על מנגנון האחסון**. (4) **Schema-derived allowlist** ב-`CRUDUser.update`: `_allowed_update_fields = set(UserUpdate.model_fields.keys())` — רק שדות שמוגדרים ב-Pydantic schema ניתנים לעדכון דרך generic `update()`; שדות מורשים (`is_verified`, `is_admin`, `is_premium`, `is_active`, `refresh_token`) דורשים CRUD methods ייעודיים (`mark_as_verified`, `update_refresh_token`) — defense-in-depth נגד mass-assignment **מהשורש** (allowlist מ-schema; הגישה הקודמת הייתה blocklist שביר). (5) **`UserUpdate` הופרד מ-`UserBaseSchema`** — לא יורש `password`/`new_password`; standalone `BaseModel` עם `extra="forbid"` (Pydantic v2 דוחה שדות לא מוכרים ב-422). אותו `extra="forbid"` הוחל גם על `GroupUpdate` ו-`RideUpdate`. (6) Google auth עובר דרך CRUD במקום השמה ישירה. (7) Migration **021**: NULL-ify כל הטוקנים הקיימים (לא ניתן ל-hash plaintext ללא deploy מתואם). |
 | **אלטרנטיבות** | (1) bcrypt — overkill ו-latency מיותרת; refresh tokens הם JWTs עם 256+ bits entropy. (2) Hash existing tokens in migration — אפשרי אך דורש deploy מתואם (migration לפני קוד = breakage). (3) No hash — פשוט אבל "DB leak = game over". |
-| **יתרון** | DB leak לא חושף tokens; service layer decoupled מ-hashing; constant-time comparison. |
-| **Trade-off** | כל המשתמשים הקיימים מנותקים פעם אחת (re-login); SHA-256 לא מגן על tokens עם אנטרופיה נמוכה (לא רלוונטי — הם JWTs). |
-| **Interview pitch (≈30s)** | *"refresh tokens היו plaintext ב-DB. העברתי ל-SHA-256 hash ב-CRUD layer אחד, עם constant-time compare ו-protected_fields נגד bypass — ה-service layer לא יודע שיש hash. מיגרציה 021 מנלנת את הקיימים כי אי אפשר ל-hash בלי deploy מתואם."* |
-| **הפניה** | [`backend/app/core/security.py`](../backend/app/core/security.py) (`hash_refresh_token`), [`backend/app/domain/users/crud.py`](../backend/app/domain/users/crud.py) (`update_refresh_token`, `verify_refresh_token`, `protected_fields`), [`backend/app/domain/auth/service.py`](../backend/app/domain/auth/service.py), [`backend/alembic/versions/021_hash_existing_refresh_tokens.py`](../backend/alembic/versions/021_hash_existing_refresh_tokens.py) |
+| **יתרון** | DB leak לא חושף tokens; service layer decoupled מ-hashing; constant-time comparison; **allowlist מונע mass-assignment גם לשדות עתידיים** — ברירת המחדל היא "חסום" ולא "פתוח". שלוש שכבות הגנה: (1) Pydantic schema `extra="forbid"` דוחה שדות לא מוכרים, (2) CRUD allowlist מסנן שדות known-but-protected, (3) DB constraints כרשת ביטחון אחרונה. |
+| **Trade-off** | כל המשתמשים הקיימים מנותקים פעם אחת (re-login); SHA-256 לא מגן על tokens עם אנטרופיה נמוכה (לא רלוונטי — הם JWTs). שדה חדש שרוצים שהמשתמש יוכל לעדכן חייב להיכנס ל-`UserUpdate` — מודע. |
+| **Interview pitch (≈30s)** | *"refresh tokens היו plaintext ב-DB. העברתי ל-SHA-256 hash ב-CRUD layer אחד, עם constant-time compare ו-schema-derived allowlist (מ-`UserUpdate.model_fields`) נגד mass-assignment — כל שדה רגיש דורש CRUD method ייעודי. ה-service layer לא יודע שיש hash. מיגרציה 021 מנלנת את הקיימים כי אי אפשר ל-hash בלי deploy מתואם."* |
+| **הפניה** | [`backend/app/core/security.py`](../backend/app/core/security.py) (`hash_refresh_token`), [`backend/app/domain/users/crud.py`](../backend/app/domain/users/crud.py) (`update_refresh_token`, `verify_refresh_token`, `_allowed_update_fields`, `mark_as_verified`), [`backend/app/domain/auth/service.py`](../backend/app/domain/auth/service.py), [`backend/alembic/versions/021_hash_existing_refresh_tokens.py`](../backend/alembic/versions/021_hash_existing_refresh_tokens.py) |
 
 ---
 
@@ -692,6 +692,39 @@
 | **Trade-off** | אחרי logout → re-login של אותו משתמש, ה-cache נמחק ב-`cleanupFCM()` ולכן ישלח PATCH אחד "מיותר" — מחיר זניח לעומת נכונות. |
 | **Interview pitch (≈20s)** | *"FCM tokens נשארים יציבים לשבועות, אבל initFCM שלח PATCH בכל reload. הוספתי localStorage cache ב-fcm.ts — קובץ אחד, אנקפסולציה מלאה. Cache נמחק ב-cleanupFCM כדי להימנע מבאג multi-user כש-session פג."* |
 | **הפניה** | [`frontend/src/services/fcm.ts`](../frontend/src/services/fcm.ts), [FCM_SYSTEM_SUMMARY.md](FCM_SYSTEM_SUMMARY.md) §2.2 |
+
+---
+
+<a id="chat-message-push"></a>
+
+## Chat message push — offline fallback (presence-gated + debounce)
+
+| | |
+|--|--|
+| **בעיה** | כשנמען לא מחובר ב-WebSocket (טאב סגור, אפליקציה לא פתוחה), הודעת צ'אט נשמרת ב-DB אבל **אין שום התראה** — המשתמש לא יודע שקיבל הודעה עד שפותח את האפליקציה. |
+| **החלטה** | **Dual-target outbox:** `chat.message_sent` נשלח גם ל-Redis (real-time WS) וגם ל-RabbitMQ (offline push fallback). **Custom handler** ב-`notification_tasks.py` עם שלושה שערים: (1) **Presence check** — `EXISTS presence:{recipient}` ב-Redis DB 1 (מוגדר ע"י chat-ws Go); אם online → דילוג. (2) **Debounce** — `SET NX` עם TTL 30s פר שיחה; מקסימום push אחד ל-30 שניות באותה שיחה. (3) **Dispatch** — `NotificationCommand` עם template `chat_message` וערוץ `push` בלבד. **SW collapsing** — `conversation_id` עובר ב-FCM data; ה-SW משתמש ב-`tag: 'chat-' + conversation_id` כך שהדפדפן מחליף (לא מערם) התראות לאותה שיחה. |
+| **אלטרנטיבות** | (1) Push לכל הודעה בלי presence check — מיותר כשהמשתמש online ומציף FCM quota. (2) Push רק בהודעה ראשונה עד קריאה — מורכב (דורש read-state tracking). (3) Go chat-ws שולח push כשאין connections — הופך את Go service לאחראי על notification decisions (SRP violation). |
+| **יתרון** | zero-change ל-Go service; אותו outbox pipeline; presence check מונע push מיותר; debounce מונע spam; notification collapsing ב-SW. |
+| **Trade-off** | כל הודעת צ'אט עוברת גם דרך RabbitMQ (תוספת עומס קטנה); presence check per-connection ולא per-user (סגירת טאב אחד מתוך שניים מפעילה push מיותר אחד — זניח). |
+| **Interview pitch (≈35s)** | *"הודעות צ'אט עברו רק דרך Redis pub/sub — אם הנמען offline, ההודעה נבלעה. הוספתי dual-target outbox: Redis לזמן אמת, RabbitMQ לfallback. ב-handler בדקתי presence (Redis key של chat-ws), debounce ב-30s, ושלחתי push רק למי שלא מחובר. ב-SW הוספתי tag per conversation כדי שהתראות לא יערמו."* |
+| **הפניה** | [`backend/app/domain/chat/service.py`](../backend/app/domain/chat/service.py), [`backend/app/workers/tasks/notification_tasks.py`](../backend/app/workers/tasks/notification_tasks.py), [`backend/app/domain/notifications/config/templates_map/push_conf.py`](../backend/app/domain/notifications/config/templates_map/push_conf.py), [`frontend/docker/firebase-messaging-sw.template.js`](../frontend/docker/firebase-messaging-sw.template.js), [FCM_SYSTEM_SUMMARY.md](FCM_SYSTEM_SUMMARY.md) §9 |
+
+---
+
+<a id="db-backup-strategy"></a>
+
+## Database Backup Strategy — self-hosted pg_dump → S3
+
+| | |
+|--|--|
+| **בעיה** | PostgreSQL רץ על Docker named volume ב-EC2 יחיד. נפילת דיסק / Instance = **אובדן כל הנתונים**. אין שום גיבוי חיצוני. |
+| **החלטה** | Phase 1: **pg_dump → AES-256-CBC encryption → S3** בשני טריגרים: (1) **daily cron** (03:00 UTC) על ה-host, (2) **pre-deploy hook** (non-blocking) ב-`deploy-ec2.yml` לפני pull של images חדשים. Docker Compose `db-backup` service (profile `backup`) — image עם `postgres:15` (לפי אותו major version), AWS CLI, ו-`openssl`. S3 lifecycle rules: daily → Glacier at 14d, expire 30d; pre-deploy → Glacier 30d, expire 90d. |
+| **אלטרנטיבות** | (1) WAL-G / continuous WAL archiving — RPO קטן יותר (~שניות) אבל מורכבות תפעולית גבוהה; overkill ל-MVP עם RPO ~שעות. (2) AWS RDS managed — מושלם (automated snapshots, PITR, Multi-AZ) אבל עלות גבוהה יותר + migration effort; מתוכנן כ-Phase 2. (3) Volume snapshots (EBS) — מהיר אבל crash-consistent בלבד ולא application-consistent; לא מספק גמישות restore בודד. |
+| **יתרון** | off-site encrypted backups בלי vendor lock; שני RPO layers — daily (~24h) + pre-deploy (כל deploy); restore script מאומת עם row-count sanity check; zero-change לאפליקציה. |
+| **Trade-off** | logical dump = זמן restore לינארי בגודל ה-DB (מקובל ב-MVP); daily cron = RPO מקסימלי ~24h (תלוי בנפח deploys). encryption key חייב להישמר בנפרד מה-backups. |
+| **Phase 2** | Migration ל-AWS RDS: pg_dump מ-Docker → pg_restore ל-RDS; switch `DATABASE_URL` / `PGHOST` → RDS endpoint; הסרת `db` service; שמירת `db-backup` ל-ad-hoc exports. |
+| **Interview pitch (≈30s)** | *"זיהיתי שאין גיבוי ל-Postgres על EC2 — SPOF מלא. הקמתי pipeline: pg_dump → הצפנת AES-256 → S3 עם lifecycle retention, מופעל ב-cron יומי ולפני כל deploy. Zero-change לאפליקציה, restore מאומת. Phase 2 — RDS managed."* |
+| **הפניה** | [`docs/BACKUP_AND_RECOVERY.md`](BACKUP_AND_RECOVERY.md), [`infrastructure/backup/`](../infrastructure/backup/), [`scripts/ops/setup-backup-cron.sh`](../scripts/ops/setup-backup-cron.sh), [`scripts/ops/check-backup-health.sh`](../scripts/ops/check-backup-health.sh), ADR §30 |
 
 ---
 
@@ -873,7 +906,7 @@
 
 <a id="audit-log-admin-billing"></a>
 
-## Audit log (admin + billing webhook attempts)
+## Audit log (admin + billing + auth events)
 
 | | |
 |--|--|
@@ -883,7 +916,8 @@
 | **יתרון** | forensic trail יציב עם סינון לפי actor/resource/action וזמן; מונע blind spot בסנריו של retries מ-Stripe. |
 | **Trade-off** | עוד טבלת write-path בפרודקשן ונפח metadata שדורש משמעת; לכן metadata נשמר קומפקטי ולא payload מלא. |
 | **Interview pitch (≈30s)** | *"הוספתי audit persistence לדברים הרגישים באמת, וב-billing הקפדתי לכתוב audit לפני idempotency כדי שגם retries כפולים יהיו traceable. זה ההבדל בין log נוח לבין evidence אמין לחקירה."* |
-| **הפניה** | `backend/app/domain/admin/router.py`, `backend/app/domain/billing/service.py`, `backend/app/infrastructure/audit/{model.py,repo.py}`, `backend/alembic/versions/015_add_audit_log.py`, ADR §24 |
+| **auth audit** | נוסף audit logging ל-5 endpoints ב-auth router: `login` (success + failure), `logout`, `change_password`, `google_signin` (success + failure), `password_reset/confirm`. IP מחולץ מ-`X-Forwarded-For` דרך shared helper `app.api.helpers.client_ip` (חולץ מ-`rate_limit.py` למודול משותף — בלי שכפול קוד). `resource_type="auth"` לכל ה-actions; failure נתפס ב-try/except, נרשם כ-`login_failed` עם `reason`, ואז re-raise. |
+| **הפניה** | `backend/app/domain/admin/router.py`, `backend/app/domain/auth/router.py`, `backend/app/domain/billing/service.py`, `backend/app/infrastructure/audit/{model.py,repo.py}`, `backend/app/api/helpers.py`, `backend/alembic/versions/015_add_audit_log.py`, ADR §24 |
 
 
 ---
@@ -916,3 +950,19 @@
 | **יתרון** | Contract frontend↔backend מיושר; metadata (total, has_more) זמין ל-UI עתידי. |
 | **Trade-off** | צרכנים ישנים (אם היו) צריכים לגשת ל-`.items` — שינוי מינורי. |
 | **הפניה** | `frontend/src/api/bookings.ts`, `backend/app/domain/bookings/router.py`, `backend/app/domain/bookings/schema.py`, `docs/architecture/API.md` |
+
+---
+
+<a id="container-resource-limits"></a>
+
+## Container resource limits (tiered YAML extension profiles)
+
+| | |
+|--|--|
+| **בעיה** | חלק מהשירותים ב-`docker-compose.yml` רצו ללא הגבלת זיכרון. על EC2 בודד, קונטיינר אחד בורח (Postgres vacuum spike, Node.js leak, Prometheus TSDB growth) → OOM-kill ברמת host → נפילה של כל הסטאק. ערכי `mem_limit` הקיימים היו magic numbers מפוזרים, בלי swap protection, CPU caps, או reservations. |
+| **החלטה** | הגדרת 4 **YAML extension-field profiles** (`x-resources-micro`, `x-resources-light`, `x-resources-medium`, `x-resources-redis`) בראש `docker-compose.yml`. כל profile מכיל `mem_limit`, `mem_reservation`, `memswap_limit` (= `mem_limit` → מניעת swap מוחלטת), `cpus`, `pids_limit`. כל שירות מקבל profile דרך `<<: *resources-<tier>`. תקציב מותאם ל-**t3.medium** (4096MB; usable ~3500MB אחרי OS+Docker). Steady-state: **3264MB**; monitoring profile מוסיף 768MB. |
+| **אלטרנטיבות** | (1) `mem_limit` נפרד לכל שירות — magic numbers, drift, אין DRY. (2) `deploy.resources` (Swarm syntax) — לא רלוונטי ל-Compose standalone. (3) cgroups ידני ברמת host — fragile, לא portable. |
+| **מה סניור עושה** | (1) `memswap_limit = mem_limit` מונע swap שקט שגורם ל-p99 latency spikes בלי alerting. (2) `mem_reservation` נותן ל-Docker OOM scorer לדעת מי "חשוב" — worker ימות לפני DB. (3) `pids_limit` — defense-in-depth נגד fork bomb / container escape. (4) extension fields = single source of truth → tier אחד משתנה, כל השירותים בו מתעדכנים. |
+| **Trade-off** | (1) Postgres ב-512MB דורש tuning מפורש של `shared_buffers` (128MB). (2) monitoring profile חורג מתקציב t3.medium — שימוש זמני בלבד או שדרוג instance. (3) `cpus` הוא soft cap ב-Docker — לא מונע burst קצר, רק ממוצע. |
+| **Interview pitch (≈30s)** | *"הגדרתי resource profiles כ-YAML extension fields ב-Compose — ארבע רמות (micro/light/medium/redis) עם memory limits, no-swap, CPU caps ו-PID protection. תקציב מחושב ל-t3.medium (3264MB steady-state מתוך 3500 usable). שינוי tier אחד מעדכן את כל השירותים — אין magic numbers מפוזרים."* |
+| **הפניה** | `docker-compose.yml` (extension fields + per-service `<<:` merge), `docs/ARCHITECTURE.md`, `docs/architecture/DEVELOPMENT.md` |

@@ -264,7 +264,7 @@ async def send_message(
 ) -> MessageResponse:
     """
     Sends a message: persist in DB + enqueue outbox event (same transaction).
-    Outbox worker publishes to Redis -> chat-ws -> WebSocket.
+    Dual-target: Redis (real-time WS delivery) + RabbitMQ (offline push fallback).
     """
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, sender_id)
     if not conv:
@@ -286,7 +286,7 @@ async def send_message(
         db,
         event_name="chat.message_sent",
         payload=payload,
-        targets=[DispatchTarget.REDIS.value],
+        targets=[DispatchTarget.REDIS.value, DispatchTarget.RABBITMQ.value],
     )
 
     await db.commit()

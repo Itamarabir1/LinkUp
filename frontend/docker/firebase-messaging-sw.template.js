@@ -16,10 +16,46 @@ messaging.onBackgroundMessage((payload) => {
   const data = payload.data || {};
   const title = data.title || 'LinkUp';
   const body = data.body || '';
-  self.registration.showNotification(title, {
+  const options = {
     body,
     icon: '/favicon.png',
     silent: false,
     vibrate: [180, 80, 180],
-  });
+  };
+  if (data.conversation_id) {
+    options.tag = 'chat-' + data.conversation_id;
+    options.renotify = true;
+  }
+  self.registration.showNotification(title, options);
+});
+
+self.addEventListener('push', (event) => {
+  if (event.data) {
+    try {
+      const payload = event.data.json();
+      const data = payload.data || {};
+      const title = data.title || 'LinkUp';
+      const body = data.body || '';
+      const options = {
+        body,
+        icon: '/favicon.png',
+        silent: false,
+        vibrate: [180, 80, 180],
+      };
+      if (data.conversation_id) {
+        options.tag = 'chat-' + data.conversation_id;
+        options.renotify = true;
+      }
+      event.waitUntil(
+        self.registration.showNotification(title, options)
+      );
+    } catch (e) {
+      const title = event.data.text() || 'LinkUp';
+      event.waitUntil(
+        self.registration.showNotification(title, {
+          icon: '/favicon.png',
+        })
+      );
+    }
+  }
 });

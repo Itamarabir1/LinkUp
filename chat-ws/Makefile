@@ -21,8 +21,12 @@ run-all: ## הרץ את שני ה-services במקביל (דורש Redis)
 	@trap 'kill 0' EXIT; \
 	make -j2 run-go run-ai
 
-test-go: ## הרץ בדיקות Go (אם יש)
-	go test ./...
+test-go: ## הרץ בדיקות Go
+	go test -race -count=1 ./...
+
+test-cover: ## הרץ בדיקות Go עם כיסוי קוד
+	go test -race -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out
 
 clean: ## נקה קבצים זמניים
 	find . -type f -name "*.pyc" -delete

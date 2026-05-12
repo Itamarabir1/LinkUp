@@ -81,15 +81,6 @@ class VerifyEmailRequest(BaseModel):
         return normalize_email_for_auth(v)
 
 
-class PasswordResetRequest(BaseModel):
-    email: EmailStr
-
-    @field_validator("email")
-    @classmethod
-    def normalize_email(cls, v: str) -> str:
-        return normalize_email_for_auth(v)
-
-
 class PasswordResetConfirm(BaseModel):
     email: EmailStr
     code: str
@@ -155,7 +146,7 @@ class UserOut(BaseModel):
     user_id: UUID
     full_name: str
     email: EmailStr
-    phone_number: str
+    phone_number: str | None = None
     is_verified: bool
     avatar_key: str | None = None
 

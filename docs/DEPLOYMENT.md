@@ -11,8 +11,10 @@ Related operations docs:
 
 - **Host:** single EC2 instance.
 - **Runtime:** Docker Compose (`--profile prod`).
-- **Ingress:** `nginx` reverse proxy with TLS termination, **gzip compression** (`gzip_proxied any` for all upstream responses), and **API rate limiting** (30r/s per IP on `/api/v1/`, `limit_req_status 429`).
+- **Ingress:** `nginx` reverse proxy with TLS termination (**HTTP/2**, ECDHE-only AEAD ciphers, OCSP stapling, HSTS with `preload` — tuning in **`nginx/snippets/ssl-params.conf`**), **gzip compression** (`gzip_proxied any` for all upstream responses), and **API rate limiting** (30r/s per IP on `/api/v1/`, `limit_req_status 429`).
 - **Images:** נמשכות מ-GHCR — ברירות מחדל ב־**`docker-compose.yml`**: `ghcr.io/<owner>/linkup/{backend,worker,migrate,pgbouncer,frontend,chat-ws}` וגם **`ghcr.io/<owner>/linkup-email-renderer`** (שירות נפרד בלי קידומת `linkup/`). כל ה-images רצים כמשתמש **non-root** (backend/worker/migrate: `appuser`, frontend: `nginx` user, email-renderer: `node`, chat-ws: `appuser`).
+- **Container log rotation:** all services use `json-file` driver with `max-size: 10m` / `max-file: 3` via shared `x-default-logging` YAML anchor — prevents disk exhaustion from container logs.
+- **Monitoring access:** Prometheus and Grafana ports are bound to `127.0.0.1` — reach them via SSH tunnel only.
 - **Public URL:** `https://linkup.itamarabir.com`.
 
 ### Main runtime services
@@ -24,11 +26,14 @@ Related operations docs:
 - `email-renderer` (Node — React Email **`POST /render`**)
 - `notification-worker`, `task-worker`, `ai-worker`
 - `migrate` — Job חד־פעמי (`alembic upgrade head`) לפני עליית ה-API וה-workers
+- `db-backup` — Profile `backup` (on-demand): pg_dump → encrypt → S3. Triggered by daily cron and pre-deploy hook
 - Infra: `db`, `pgbouncer`, `rabbitmq`, `redis`
 
 ## CI/CD Flow (GitHub Actions)
 
 Service workflows (**Backend CI**, **Frontend CI**, **Chat-WS CI**, **Email renderer CI**) lint, test, and **push images to GHCR** when their path filters match and the run is on `main`.
+
+**Supply chain:** all action references (`actions/checkout`, `docker/*`, `appleboy/ssh-action`, etc.) are pinned to **immutable commit SHAs** — the original tag is kept as a trailing comment for readability. Dependabot `github-actions` ecosystem opens weekly PRs when new action versions are available.
 
 Production deploy is centralized in **`deploy-ec2.yml`**, triggered by **`workflow_run`** after **any** of those four workflows completes **successfully** on `main` (same commit). **Concurrency** group `ec2-deploy-production` with **`cancel-in-progress: false`** queues overlapping runs so only one deploy executes at a time.
 
@@ -41,8 +46,9 @@ Production deploy is centralized in **`deploy-ec2.yml`**, triggered by **`workfl
 
 1. SSH to EC2 (`appleboy/ssh-action`); image tag = triggering workflow’s **`head_sha`** (fallback to **`backend:latest`** if that tag is missing from GHCR).
 2. Pull latest git + sync `*.env.production` → compose env files; sync **`JWT_SECRET`** in **`chat-ws/.env`** from **`SECRET_KEY`**. Render **`nginx/nginx.conf`** from template using **`SENTRY_REPORT_URI`** from **`backend/.env`**.
-3. Pull images from GHCR (backend prefers the workflow commit SHA tag, then **`…/backend:latest`** if that tag is absent).
-4. Bring up infra (`db`, single persistent Redis, RabbitMQ), **`pgbouncer`**, run **`migrate`**, then **`email-renderer`**, workers, **`chat-ws`**, **`frontend` + `nginx`** (force-recreate **`nginx`** when nginx/frontend-related files changed in `HEAD`).
+3. **Pre-deploy database backup** (if `BACKUP_S3_BUCKET` + `BACKUP_ENCRYPTION_KEY` are set in `backend/.env`): brings up `db`, runs `db-backup` with `BACKUP_TYPE=pre-deploy`. Non-blocking — warns on failure but does not abort the deploy.
+4. Pull images from GHCR (backend prefers the workflow commit SHA tag, then **`…/backend:latest`** if that tag is absent).
+5. Bring up infra (`db`, single persistent Redis, RabbitMQ), **`pgbouncer`**, run **`migrate`**, then **`email-renderer`**, workers, **`chat-ws`**, **`frontend` + `nginx`** (force-recreate **`nginx`** when nginx/frontend-related files changed in `HEAD`).
 5. **Smoke** from inside containers: **`linkup_frontend`** → **`http://localhost:80/config.js`**, **`linkup_email_renderer`** → **`http://localhost:3001/health`**.
 6. Roll out **`backend`** with **`--wait`**, **`sleep 10`**, then run mandatory checks (Firebase, Redis URL in **`chat-ws`**, internal **`/readyz`** from inside **`linkup_backend`**).
 7. On failure: roll back **`backend`** to the previous tag from **`.deploy_state/backend_prev_tag`**; if **`docker pull`** for that image fails (e.g. old digest removed), fall back to **`…/backend:latest`**.
@@ -79,7 +85,7 @@ Notes:
 - `frontend/.env` provides `VITE_*` + `APP_ENV` for frontend runtime rendering. In **`docker-compose.yml`**, the **`frontend`** service (profile **`prod`**) lists **`env_file: ./frontend/.env`** so the static container receives the same contract as local/EC2 deploys that use **`--env-file frontend/.env`**; without a file at that path, Compose may fail to start the service — keep a file (even a stub) or adjust paths for your environment.
 - `chat-ws/.env` contains chat-ws specific env values (`JWT_SECRET`, `REDIS_URL`). In Compose, **chat-ws only receives `chat-ws/.env`** — not `backend/.env` (secrets isolation).
 - Deploy script enforces backend/frontend env presence and fails fast when missing.
-- **Edge nginx:** CI renders **`nginx/nginx.conf`** from **`nginx/nginx.conf.template`** with `envsubst '${SENTRY_REPORT_URI}'`, reading **`SENTRY_REPORT_URI`** from **`backend/.env`** (same as local: **`bash scripts/ops/render-nginx-conf.sh`**). **PgBouncer:** no host-side `userlist.txt` generation; container startup renders `/var/lib/pgbouncer/userlist.txt` from `POSTGRES_USER` / `POSTGRES_PASSWORD` / `PGBOUNCER_ADMIN_PASSWORD`.
+- **Edge nginx:** CI renders **`nginx/nginx.conf`** from **`nginx/nginx.conf.template`** with `envsubst '${SENTRY_REPORT_URI}'`, reading **`SENTRY_REPORT_URI`** from **`backend/.env`** (same as local: **`bash scripts/ops/render-nginx-conf.sh`**). SSL/TLS tuning lives in **`nginx/snippets/ssl-params.conf`** (static, no `envsubst` needed) — mounted read-only in Compose. Certbot webroot (`/var/www/certbot`) is also mounted for zero-downtime cert renewal. **PgBouncer:** no host-side `userlist.txt` generation; container startup renders `/var/lib/pgbouncer/userlist.txt` from `POSTGRES_USER` / `POSTGRES_PASSWORD` / `PGBOUNCER_ADMIN_PASSWORD`.
 
 ## Frontend Runtime Config (No build-time secrets)
 
@@ -117,7 +123,15 @@ Post-deploy security headers check (recommended):
 curl -I https://linkup.itamarabir.com | grep -E "HTTP|strict|x-content|x-frame|referrer|permissions|content-security-policy"
 ```
 
-For CSP policy (enforcing header, `script-src` without `'unsafe-inline'` and **`/bootstrap.js`** shell, allowlists, `report-uri`, SPA caveats, optional rollback via Report-Only), see [`docs/SECURITY_HEADERS.md`](SECURITY_HEADERS.md).
+Post-deploy TLS check (recommended):
+
+```bash
+curl -vI https://linkup.itamarabir.com 2>&1 | grep -E "SSL connection|subject:|ALPN"
+```
+
+Expected: `ALPN: h2` (HTTP/2), TLSv1.2 or TLSv1.3 connection.
+
+For CSP policy (enforcing header, `script-src` without `'unsafe-inline'` and **`/bootstrap.js`** shell, allowlists, `report-uri`, SPA caveats, optional rollback via Report-Only), see [`docs/SECURITY_HEADERS.md`](SECURITY_HEADERS.md). For SSL/TLS hardening details (ciphers, OCSP stapling, session management), see [`docs/SECURITY_HEADERS.md` — SSL hardening](SECURITY_HEADERS.md#ssl-hardening-nginxsnippetsssl-paramsconf).
 
 ### Validate frontend runtime config
 
@@ -197,6 +211,40 @@ grep -E '^JWT_SECRET=' ~/LinkUp/chat-ws/.env
 
 Values must match.
 
+### 4) Database backup failure (daily cron)
+
+Symptoms:
+
+- `check-backup-health.sh` exits 1 (stale or missing backup)
+- no recent objects in `s3://linkup-db-backups/daily/`
+
+Checks:
+
+```bash
+# On EC2 host
+export BACKUP_S3_BUCKET=linkup-db-backups
+bash ~/LinkUp/scripts/ops/check-backup-health.sh
+
+# Check cron is installed
+crontab -l | grep linkup-db-backup
+
+# Check last cron run log
+tail -50 /var/log/linkup-backup.log
+```
+
+Actions:
+
+```bash
+# Manual backup
+cd ~/LinkUp
+docker compose --env-file backend/.env --profile backup run --rm -e BACKUP_TYPE=daily db-backup
+
+# If image not built
+docker compose --env-file backend/.env build db-backup
+```
+
+Full backup/restore runbook: [`docs/BACKUP_AND_RECOVERY.md`](BACKUP_AND_RECOVERY.md).
+
 ## One-time / maintenance updates
 
 ### Update frontend public config values
@@ -212,3 +260,12 @@ Values must match.
 ### Keep chat-ws secret aligned
 
 No manual step required if deploy runs normally; sync is automatic in deploy script.
+
+### Set up database backups (first time)
+
+1. Generate encryption key: `openssl rand -base64 32`
+2. Add to `backend/.env.production`: `BACKUP_S3_BUCKET=linkup-db-backups`, `BACKUP_ENCRYPTION_KEY=<key>`
+3. Create S3 bucket and apply lifecycle rules — see [`docs/BACKUP_AND_RECOVERY.md`](BACKUP_AND_RECOVERY.md) (Setup section)
+4. Build backup image: `docker compose --env-file backend/.env build db-backup`
+5. Install daily cron: `bash scripts/ops/setup-backup-cron.sh`
+6. Verify: `crontab -l` should show `linkup-db-backup` entry

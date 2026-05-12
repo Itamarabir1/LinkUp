@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useChat } from '../../context/ChatContext';
@@ -10,6 +11,7 @@ import { getApiErrorMessage, isChatIdempotencyKeyMismatch } from '../../utils/ap
 import { applyInboundRealMessage, removePendingByClientId } from '../../utils/chatMessagesMerge';
 import { consumeOrCreateKey, resetOutboundKey } from '../../utils/outboundIdempotencyKey';
 import { apiErr } from '../../utils/i18nError';
+import { useAbortSignal } from '../../hooks/useAbortSignal';
 
 export function useChatPopup(conversationId: string) {
   const { user } = useAuth();
@@ -30,25 +32,29 @@ export function useChatPopup(conversationId: string) {
     resetOutboundKey(chatSendIdempotencyKeyRef);
   }, [conversationId]);
 
+  const getSignal = useAbortSignal();
+
   const fetchData = useCallback(async () => {
     if (!conversationId || !user?.user_id) return;
+    const signal = getSignal();
     setLoading(true);
     setFetchError('');
     try {
       const [convRes, msgRes] = await Promise.all([
-        getConversation(conversationId),
-        getMessages(conversationId, { limit: 30 }),
+        getConversation(conversationId, { signal }),
+        getMessages(conversationId, { limit: 30, signal }),
       ]);
       setConversation(convRes.data);
       setMessages(toConfirmedRows(msgRes.data?.items ?? []));
     } catch (err) {
+      if (axios.isCancel(err)) return;
       setFetchError(getApiErrorMessage(err, apiErr('err_load_chat_popup_fetch')));
       setConversation(null);
       setMessages([]);
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
-  }, [conversationId, user?.user_id]);
+  }, [conversationId, user?.user_id, getSignal]);
 
   useEffect(() => {
     void fetchData();

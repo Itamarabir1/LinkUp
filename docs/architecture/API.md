@@ -51,11 +51,11 @@ Authorization: Bearer <access_token>
 - **נסיעות (חיפוש נוסע)** (`GET /api/v1/passenger/passengers/search-rides`): query נוסף לסינון זמן — **`departure_date`** (תאריך בלבד, יום מלא **Asia/Jerusalem**), או **`departure_time`** (נקודת זמן → חלון **±2 שעות** ב־DB), או **`departure_time`** + **`departure_time_to`** (טווח כולל). **אסור לשלב** `departure_date` עם `departure_time` / `departure_time_to` — **422**. בנוסף: `after` (opaque cursor), `limit`, `pickup_name`, `destination_name`, `search_radius`, **`destination_radius?`**, `group_id?`. תגובה: `items`, `next_cursor`, `has_more`.
 - **הודעות (history)** (`GET /chat/conversations/{id}/messages`): `after` (opaque cursor בלבד) + `limit`. cursor מקודד composite key `(created_at, message_id)` דרך `app.core.pagination.cursor`, עם keyset predicate יציב ו-deterministic ordering. תגובה: `items`, `next_cursor`, `has_more`.
 - **הודעות (reconnect gap)** (`GET /chat/conversations/{id}/messages/gap`): `since_message_id` (int, `>=0`) בלבד. תגובה: `items`, `truncated`, `last_message_id`. אין cursor ואין pagination contract כללי — זה endpoint ייעודי ל-WS reconnect backfill.
-- **התראות משתמש** (`GET /api/v1/users/me/notifications`): `limit` (ברירת מחדל 20, עד 100), `after` (cursor אטום). תגובה: `items`, `next_cursor`, `has_more`, `limit`. סדר keyset יציב: `created_at DESC, booking_id DESC`; cursor פגום מחזיר 400.
+- **התראות משתמש** (`GET /api/v1/users/me/notifications`): `limit` (ברירת מחדל 20, עד 100), `after` (cursor אטום). תגובה: `items` (כולל `is_read: bool` לכל פריט), `next_cursor`, `has_more`, `limit`, **`unread_count`** (ספירת פריטים שלא נקראו בעמוד). סדר keyset יציב: `created_at DESC, booking_id DESC`; cursor פגום מחזיר 400. מצב קריאה מ-`notification_reads` (DB) — לא מ-localStorage.
 
-### Page-based (הזמנות שלי)
+### Cursor-based (הזמנות שלי)
 
-- **הזמנות** (`GET /bookings/my-bookings`): `page` (מ-1), `limit`. תגובה: `items`, `total`, `page`, `limit`, `has_more`.
+- **הזמנות** (`GET /bookings/my-bookings`): `limit`, `after` (cursor אטום). תגובה: `items`, `next_cursor`, `has_more`, `limit`. סדר keyset: `created_at DESC, booking_id DESC`.
 
 ---
 
@@ -93,17 +93,18 @@ Authorization: Bearer <access_token>
 | Method | Path | Auth | תיאור |
 |--------|------|------|--------|
 | POST | /register | לא | רישום — body: UserRegister (email, password, full_name, ...). מחזיר UserOut, שומר cookie לאימות מייל. **Rate limited** (Redis, אותו מנגנון כמו login/refresh). |
-| POST | /login | לא | התחברות — body: LoginRequest (email, password). מחזיר LoginResponse (access_token, user) + **`Set-Cookie: linkup_refresh_token`** (HttpOnly). Rate limited. |
+| POST | /login | לא | התחברות — body: LoginRequest (email, password). מחזיר LoginResponse (access_token, user) + **`Set-Cookie: linkup_refresh_token`** (HttpOnly). Rate limited. **Audit:** `login` / `login_failed` (IP + email + reason). |
 | POST | /refresh | לא | רענון טוקן — refresh token נקרא מ-HttpOnly cookie (לא מגוף הבקשה). מחזיר RefreshResponse (access_token, user) + cookie מעודכן. Rate limited. |
-| POST | /logout | כן | ניקוי refresh ב-DB + **denylist** ל-access token מה-**`Authorization: Bearer`** + **מחיקת refresh cookie** (204). בלי Bearer — רק ניקוי refresh + cookie. |
+| POST | /logout | כן | ניקוי refresh ב-DB + **denylist** ל-access token מה-**`Authorization: Bearer`** + **מחיקת refresh cookie** (204). בלי Bearer — רק ניקוי refresh + cookie. **Audit:** `logout` (IP). |
 | GET | /verify-email/confirm | לא | אימות מייל מקישור — query: email, code. מפנה לפרונט. |
 | POST | /verify-email | לא | אימות מייל מקוד — body: VerifyEmailRequest (email, code). אימייל יכול מה-cookie. |
 | POST | /resend-verification | לא | body: EmailOnlyRequest. |
-| POST | /forgot-password | לא | query: email. Rate limited. |
-| POST | /password-reset/request | לא | body: EmailOnlyRequest. |
-| POST | /password-reset/confirm | לא | body: PasswordResetConfirm (email, code, new_password). |
-| POST | /change-password | כן | body: ChangePasswordRequest (old_password, new_password, new_password_confirm). |
-| POST | /google-signin | לא | body: GoogleSignInRequest (id_token). מחזיר LoginResponse. Rate limited. |
+| POST | /password-reset/request | לא | body: EmailOnlyRequest. Rate limited. |
+| POST | /password-reset/confirm | לא | body: PasswordResetConfirm (email, code, new_password). **Audit:** `password_reset` (IP + email). |
+| POST | /change-password | כן | body: ChangePasswordRequest (old_password, new_password, new_password_confirm). **Audit:** `change_password` (IP). |
+| POST | /google-signin | לא | body: GoogleSignInRequest (id_token). מחזיר LoginResponse. Rate limited. **Audit:** `login` / `login_failed` (IP + provider). |
+
+**Audit logging:** חמישה endpoints (`login`, `logout`, `change-password`, `google-signin`, `password-reset/confirm`) כותבים ל-`audit_log` דרך `audit_repo.record` ברמת ה-router. `resource_type="auth"`, IP מחולץ מ-`X-Forwarded-For` (shared helper `app.api.helpers.client_ip`). כשלונות login/google-signin נתפסים ב-try/except, נרשמים כ-`login_failed` עם `reason=error_code`, ואז re-raise.
 
 הערה חשובה: `LoginResponse.user` הוא payload מינימלי לזיהוי/הרשאות (למשל `user_id`, `full_name`, `email`, `is_admin`) ולא מקור פרטי פרופיל מלאים של משתמשים אחרים. שדות `partner.avatar_url` במסכי צ'אט מגיעים מ-endpoints של `chat` (`/chat/conversations*`), לא מ-login.
 
@@ -153,7 +154,7 @@ Authorization: Bearer <access_token>
 | POST | /{booking_id}/cancel | כן | ביטול הזמנה (בעלים). |
 | POST | /{booking_id}/location | כן | **GPS נהג**: body: lat, lng, heading?, speed?. דורש: משתמש=נהג הנסיעה, נסיעה ב-ACTIVE. מפיץ מיקום לנוסעים המאושרים (204). לוגיקה ב־`BookingLocationService.broadcast_driver_location` (`location_service.py`). |
 | POST | /{booking_id}/passenger-location | כן | **GPS נוסע**: body: lat, lng, heading?, speed?. דורש: משתמש=נוסע הבוקינג. מפיץ מיקום לנהג בערוץ ride_{ride_id}:passenger_locations (204). לוגיקה ב־`BookingLocationService.broadcast_passenger_location` (`location_service.py`). |
-| GET | /my-bookings | לא (query) | query: user_id, status?, page (default 1), limit (default 20, max 50). **Pagination**: page-based. תגובה: items, total, page, limit, has_more. |
+| GET | /my-bookings | לא (query) | query: status?, limit (default 20, max 100), after (cursor אטום). **Pagination**: cursor-based keyset (`created_at DESC, booking_id DESC`). תגובה: items, next_cursor, has_more, limit. |
 | GET | /driver-summary | כן | **Deprecated** (OpenAPI): כל נסיעות הנהג עם נוסעים (pending/confirmed + מחזור נסיעה לפי מימוש legacy) — `DriverSummaryResponse` (`get_driver_summary`). עדיף ללקוחות חדשים: `/driver-summary/active` + `/driver-summary/history`. |
 | GET | /driver-summary/active | כן | נסיעות פעילות בלבד (`open` / `full` / `active`) עם נוסעים רלוונטיים — `DriverActiveResponse`; תקרה רכה **200** שורות בבקאנד. |
 | GET | /driver-summary/history | כן | נסיעות `completed` / `cancelled` עם דפדוף: query **`limit`** (ברירת מחדל 20, עד 100), **`after`** (cursor). `DriverHistoryResponse`: `rides`, `next_cursor`, `has_more`. קורסור: Base64 JSON ב־UTC דרך [`core/pagination/cursor.py`](../../backend/app/core/pagination/cursor.py). |
@@ -185,7 +186,9 @@ Authorization: Bearer <access_token>
 | GET | /me | כן | הפרופיל שלי (UserRead). |
 | PATCH | /me/last-seen | כן | עדכון `last_active_at` (204). |
 | GET | /{user_id}/last-seen | כן | מקור ל-`last_seen` ב-UI צ'אט; נקרא מ-chat-ws ב-`GET /presence/{id}` כשצריך. |
-| GET | /me/notifications | כן | פיד התראות cursor-based: query `limit` (default 20, max 100), `after` (cursor). תגובה: `items`, `next_cursor`, `has_more`, `limit`. מקורות מאוחדים: בקשות הצטרפות ממתינות לנהג + עדכוני הזמנות כנוסע; מיון keyset יציב `created_at DESC, booking_id DESC`. |
+| GET | /me/notifications | כן | פיד התראות cursor-based: query `limit` (default 20, max 100), `after` (cursor). תגובה: `items` (כולל `is_read` לכל פריט), `next_cursor`, `has_more`, `limit`, **`unread_count`**. מקורות מאוחדים: בקשות הצטרפות ממתינות לנהג + עדכוני הזמנות כנוסע; מיון keyset יציב `created_at DESC, booking_id DESC`. מצב קריאה מ-DB (`notification_reads`) — לא מ-localStorage. |
+| PATCH | /me/notifications/read | כן | body: `{ items: [{ booking_id, created_at }] }` (מקסימום 200). סימון התראות ספציפיות כנקראו (idempotent upsert ל-`notification_reads`). תגובה: 204. |
+| PATCH | /me/notifications/read-all | כן | סימון כל ההתראות הנוכחיות כנקראו (batch upsert). תגובה: 204. |
 | PATCH | /fcm-token | כן | body: `FCMTokenUpdate` — `fcm_token` מחרוזת (רישום) או **`null`** (ניקוי ב-DB, למשל logout). |
 | POST | /me/test-push | כן | בדיקת FCM (דורש `fcm_token` בפרופיל). |
 | GET | /me/avatar/upload-url | כן | query: filename?. מחזיר presigned URL + staging_key. |

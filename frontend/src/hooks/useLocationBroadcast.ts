@@ -46,9 +46,9 @@ export function useLocationBroadcast(options: UseLocationBroadcastOptions) {
     onStopRef.current = onStop;
   });
 
-  const fetchOneBookingId = useCallback(async (rId: string): Promise<string | null> => {
+  const fetchOneBookingId = useCallback(async (rId: string, signal?: AbortSignal): Promise<string | null> => {
     try {
-      const { data } = await fetchRideManifest(rId);
+      const { data } = await fetchRideManifest(rId, { signal });
       const confirmed = (data?.passengers ?? []).find((p: RideManifestPassenger) => p.status === 'confirmed');
       return confirmed?.booking_id ?? data?.passengers?.[0]?.booking_id ?? null;
     } catch {
@@ -97,13 +97,11 @@ export function useLocationBroadcast(options: UseLocationBroadcastOptions) {
     if (directBookingId) {
       return;
     }
-    let cancelled = false;
-    fetchOneBookingId(rideId).then((id) => {
-      if (!cancelled) setFetchedBookingId(id);
+    const controller = new AbortController();
+    fetchOneBookingId(rideId, controller.signal).then((id) => {
+      if (!controller.signal.aborted) setFetchedBookingId(id);
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [enabled, rideId, driverId, directBookingId, fetchOneBookingId]);
 
   useEffect(() => {

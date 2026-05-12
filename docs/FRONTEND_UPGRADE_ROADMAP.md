@@ -33,12 +33,12 @@ Legend:
 - `[x]` `stage-1-types` - API types driven by **`frontend/openapi-snapshot.json` → Orval → `src/api/generated/`** with CI drift gate; thin `api/*` wrappers consume generated types.
 - `[x]` `stage-1-adr` - RQ infrastructure and Stage 3+ migration decisions documented (**ADR Frontend §13+**, Stage 3b §15).
 - `[~]` `stage-3a-auth` - finish full auth query ownership — **logout / session-expired / bootstrap-failed teardown semantics shipped** (`tearDownSession`, `auth:session-expired`, RQ **`captureExceptionOnce`** + 401-only Sentry skip); remaining: deeper “auth query ownership” refactors if still desired per product scope
-- `[ ]` `stage-3b-groups` - full groups queries/mutations migration + `GroupContext` slimming
+- `[~]` `stage-3b-groups` - **members/rides lists migrated to RQ** (`useGroupManageLists` → `useQuery` with `qk.groups.members`/`qk.groups.rides` + signal forwarding; `loadMembers`/`loadRides` → `invalidateQueries`); remaining: group mutations + `GroupContext` slimming
 - `[x]` `stage-3b-rides` - **`MyRides.tsx`**: `useInfiniteQuery` (`qk.rides.list`) מול cursor pagination של `/rides/me` + `useMutation` לביטול, invalidation מ־`useUserEvent` + `useRideWebSocket`.
 - `[x]` `stage-3b-bookings` - **`useMyBookingsDriver`** / **`useMyBookingsPassenger`**: `useQuery` לפעיל + `useInfiniteQuery` להיסטוריה (`/driver-summary/active|history`, passenger מקביל), `useMutation` + invalidate כפול; WS/user-event.
 - `[x]` `stage-3b-passengers` - **`useMyRequests`** + **`useSearchRides`** (mutations לחיפוש/load-more/alert) + **`useJoinRide`** עם Idempotency-Key כמתועד ב־Highlights.
 - `[ ]` `stage-3b-uploads` - presigned upload flow migration + readiness polling query
-- `[~]` `stage-3b-createride` - migrate `useCreateRide` operation-token workflow to RQ mutations/signal
+- `[~]` `stage-3b-createride` - `useMutation` for preview+create is shipped; remaining: remove `useOperationToken` race pattern, migrate AI parse to RQ
 - `[~]` `stage-3d-chat` - standalone high-risk chat migration: **optimistic outbound send + `ChatListRow` + WS/REST reconciliation shipped** (`types/chatList`, `applyInboundRealMessage`); **WS reconnect hardening shipped** (`reconnectBackoff.ts` → `useChatWebSocket` / `useReconnectingWebSocket` / `useReconnectingWebSocketState`); **remaining**: React Query for thread/popup/infinite scroll + broader “WS cache sync” if still desired
 - `[ ]` `stage-4-msw` - MSW server/handlers/rqRender + test setup integration
 - `[ ]` `stage-4-tests` - migrate targeted `useAISearch.test.ts` to MSW
@@ -58,11 +58,11 @@ Notes:
 - `[ ]` `tier1-c-a11y-groups` - groups pages remediation
 - `[ ]` `tier1-c-a11y-chat` - messages/chat remediation
 - `[~]` `tier1-d-rum` - **Prod `Sentry.init`**: Browser Tracing + Replay + **web-vitals → Sentry metrics** (`main.tsx`); remaining: **cost/dashboard guardrails** and formal threshold policy (**`docs/FUTURE_WORK.md`** — Web Vitals Thresholds).
-- `[~]` `tier1-e-form-creategroup` - implemented via `useCreateGroup` RHF+Zod migration with full `CreateGroup.tsx` contract compatibility.
-- `[~]` `tier1-e-form-createride` - deferred by architecture decision (wizard/state-machine complexity; risk > ROI at current scale).
-- `[~]` `tier1-e-form-searchrides` - intentionally no-op by architecture decision (`SearchRidesForm` is props-driven/presentational; RHF adds no practical value).
-- `[~]` `tier1-e-form-messagethread` - **לא בתור משימת RHF פעילה** — Composer חד־שדותי + WS; החלטה ב־**`docs/FUTURE_WORK.md`** (E.7).
-- `[~]` `tier1-e-form-chatpopup` - כנ"ל (**E.8** ב־**`docs/FUTURE_WORK.md`**).
+- `[x]` `tier1-e-form-creategroup` - implemented via `useCreateGroup` RHF+Zod migration with full `CreateGroup.tsx` contract compatibility.
+- `[x]` `tier1-e-form-createride` - closed: deferred by architecture decision (wizard/state-machine complexity; risk > ROI at current scale). Documented in **`docs/FUTURE_WORK.md`**.
+- `[x]` `tier1-e-form-searchrides` - closed: intentionally no-op by architecture decision (`SearchRidesForm` is props-driven/presentational; RHF adds no practical value).
+- `[x]` `tier1-e-form-messagethread` - closed: no RHF needed — Composer חד־שדותי + WS; documented in **`docs/FUTURE_WORK.md`** (E.7).
+- `[x]` `tier1-e-form-chatpopup` - closed: כנ"ל (**E.8** ב־**`docs/FUTURE_WORK.md`**).
 - `[ ]` `tier1-f-compiler-setup`
 - `[ ]` `tier1-f-compiler-presentational`
 - `[ ]` `tier1-f-compiler-rq-hooks`
@@ -101,12 +101,12 @@ This is why the first version looked short: it grouped these into macro mileston
 - [ ] Finish Auth migration: move Login/Register flow completely from manual fetch/context handling to RQ ownership.
 
 ### Stage 3b (domain migrations still missing)
-- [ ] Groups full migration: רשימת קבוצות ב־`GroupContext` כבר `useQuery`; **`useGroupManageLists`** עדיין `useEffect` + `useState` ל־members/rides — להעביר ל־RQ + מוטציות הזמנה/הרשאות לפי הצורך; לרזות `GroupContext` אם עדיין רלוונטי.
+- [~] Groups migration: רשימת קבוצות ב־`GroupContext` כבר `useQuery`; **`useGroupManageLists`** הועבר ל-`useQuery` עם `qk.groups.members` / `qk.groups.rides` + signal forwarding (M2 AbortController refactor). נשאר: מוטציות הזמנה/הרשאות ל-RQ + `GroupContext` slimming.
 - [x] Bookings full migration — **בוצע** (`useMyBookingsDriver` / `useMyBookingsPassenger`).
 - [x] Passengers migration (בקשות + חיפוש + join עם Idempotency-Key) — **בוצע** (`useMyRequests`, `useSearchRides`, `useJoinRide`).
 - [x] Rides list (My Rides) — **בוצע** (`MyRides.tsx`).
 - [ ] Upload workflows migration: presigned upload URL + confirm flows (avatar/group image), and readiness polling via RQ (כיום polling ידני ב־`useProfile` / זרימות דומות).
-- [ ] `CreateRide` migration: replace `useOperationToken` pattern with RQ mutation + `signal`, migrate preview/create/parse/geocode calls.
+- [~] `CreateRide` migration: preview + create calls already use `useMutation`; remaining: remove `useOperationToken` pattern in favor of RQ signal/AbortController, migrate AI parse call to RQ.
 
 ### Stage 3c
 - Completed and removed from remaining scope (`stage-3c-admin`).
@@ -135,7 +135,7 @@ Additional progress (recently completed outside full-chat scope):
 - Chat **outbound REST**: stable **Idempotency-Key** lifecycle in `useMessageThread` / `useChatPopup` (shared helpers in `utils/outboundIdempotencyKey.ts`), **`appendMessageDedupById`** for list updates + WebSocket path (`utils/chatMessagesMerge.ts`), **`isChatIdempotencyKeyMismatch` on 422** (`utils/apiError.ts`); documented in `docs/ENGINEERING_HIGHLIGHTS.md`, `docs/architecture/API.md`, ADR Frontend §2 / Backend §25.
 - `useSearchRides` network edges migrated to React Query mutations (`search`, `load more`, `save alert`) while preserving AI/wizard/token-race behavior.
 - `useMyRequests` migrated to React Query (`qk.passengers.requests` + cancel/expire cache updates).
-- `AuthContext` initial mount effect dead-check fixed (cancellable async bootstrap pattern).
+- `AuthContext` initial mount effect uses `AbortController` (upgraded from `cancelled` boolean in M2 AbortController refactor).
 
 ### Stage 4-5
 - [ ] MSW test setup + migrate the targeted test file.
@@ -161,7 +161,7 @@ Additional progress (recently completed outside full-chat scope):
 - [ ] Cost guardrails, dashboard verification, and threshold enforcement policy (**`docs/FUTURE_WORK.md`**).
 
 ### Stage E - Forms Migration
-- [~] רכיבי טפסים שנשארו ב־**RHF+zod** רלוונטיים: לא נשארו מסכים מרכזיים פתוחים; **E.5/E.6/E.7/E.8** מוגדרים כ־defer/no-op ב־**`docs/FUTURE_WORK.md`**.
+- [x] רכיבי טפסים שנשארו ב־**RHF+zod** רלוונטיים: לא נשארו מסכים מרכזיים פתוחים; **E.5/E.6/E.7/E.8** מוגדרים כ־defer/no-op ב־**`docs/FUTURE_WORK.md`**.
 - Current status update:
   - E.1 Login: completed.
   - E.2 Register: completed.
@@ -274,9 +274,9 @@ Status keys:
 - Implemented in code: `Partial`
 - Completion: `PARTIAL`
 - Evidence:
-  - **`MyRides`**, **`MyBookings`** (נהג/נוסע), **`useMyRequests`**, **`useSearchRides`**, **`GroupContext`** list — RQ כמתועד בקוד; ניהול קבוצה (members/rides ב־`useGroupManageLists`) עדיין fetch ידני.
+  - **`MyRides`**, **`MyBookings`** (נהג/נוסע), **`useMyRequests`**, **`useSearchRides`**, **`GroupContext`** list — RQ כמתועד בקוד; **`useGroupManageLists`** (members + rides) הועבר ל-`useQuery` עם signal forwarding (M2 AbortController refactor).
 - Missing for FULL:
-  - הגירת **GroupManage** lists + מוטציות קשורות ל־RQ; **Upload** (polling readiness) תחת RQ; **CreateRide** (מכונת מצבים) לפי יעדי השלב.
+  - מוטציות קבוצה (הזמנה/הרשאות) ל-RQ + `GroupContext` slimming; **Upload** (polling readiness) תחת RQ; **CreateRide** (מכונת מצבים) לפי יעדי השלב.
 
 ### 6.12 `stage-3c` (Admin migration)
 

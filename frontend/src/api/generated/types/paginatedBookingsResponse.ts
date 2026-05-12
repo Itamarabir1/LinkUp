@@ -7,12 +7,11 @@
 import type { BookingResponse } from './bookingResponse';
 
 /**
- * User bookings with page-based pagination.
+ * User bookings with cursor-based keyset pagination.
  */
 export interface PaginatedBookingsResponse {
   has_more?: boolean;
   items?: BookingResponse[];
   limit?: number;
-  page?: number;
-  total?: number;
+  next_cursor?: string | null;
 }

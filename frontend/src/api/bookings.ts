@@ -10,17 +10,16 @@ import type {
 
 export interface PaginatedBookingsResponse {
   items: BookingRow[];
-  total: number;
-  page: number;
-  limit: number;
+  next_cursor: string | null;
   has_more: boolean;
+  limit: number;
 }
 
-export function fetchMyBookings(params?: { page?: number; limit?: number; status?: string }) {
+export function fetchMyBookings(params?: { limit?: number; after?: string; status?: string }) {
   return api.get<PaginatedBookingsResponse>('/bookings/my-bookings', {
     params: {
-      page: params?.page ?? 1,
       limit: params?.limit ?? 20,
+      after: params?.after || undefined,
       status: params?.status,
     },
   });
@@ -56,8 +55,8 @@ export type RideManifestPassenger = {
   destination_name?: string | null;
 };
 
-export function fetchRideManifest(rideId: string) {
-  return api.get<RideManifestResponse>(`/bookings/ride/${rideId}/manifest`);
+export function fetchRideManifest(rideId: string, opts?: { signal?: AbortSignal }) {
+  return api.get<RideManifestResponse>(`/bookings/ride/${rideId}/manifest`, { signal: opts?.signal });
 }
 
 export function approveBooking(bookingId: string) {

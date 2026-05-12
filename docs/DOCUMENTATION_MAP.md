@@ -10,7 +10,7 @@
 | ארכיטקטורה רחבה (קישורים לכל התחומים) | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | הרצה מקומית (CMD/Windows), Docker | [`RUN.md`](../RUN.md), [`docs/architecture/DEVELOPMENT.md`](architecture/DEVELOPMENT.md) |
 | פריסת production, rollback | [`docs/DEPLOYMENT.md`](DEPLOYMENT.md), [`docs/operations/RUNBOOK.md`](operations/RUNBOOK.md) |
-| ניתור, Prometheus, בריאות, Sentry, Better Stack | [`docs/operations/MONITORING.md`](operations/MONITORING.md) (כולל טבלאות מטריקות והערות **wired vs reserved**), [`docs/architecture/API.md`](architecture/API.md) (Health) |
+| ניתור, Prometheus, בריאות, Sentry, Better Stack | [`docs/operations/MONITORING.md`](operations/MONITORING.md) (כולל טבלאות מטריקות והערות **wired vs reserved**; פורטים ב-127.0.0.1 בלבד — SSH tunnel), [`docs/architecture/API.md`](architecture/API.md) (Health) |
 | API endpoints | [`docs/architecture/API.md`](architecture/API.md) |
 | cursor pagination לרכיבות (`/rides/me`, `/groups/{group_id}/rides`) | [`docs/architecture/API.md`](architecture/API.md), [`docs/architecture/DATABASE.md`](architecture/DATABASE.md), [`backend/app/core/pagination/cursor.py`](../backend/app/core/pagination/cursor.py) |
 | סכימת DB, Alembic | [`docs/architecture/DATABASE.md`](architecture/DATABASE.md), [`backend/alembic/README.md`](../backend/alembic/README.md) |
@@ -97,7 +97,7 @@
 | ארכיטקטורה רחבה (קישורים לכל התחומים) | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | הרצה מקומית (CMD/Windows), Docker | [`RUN.md`](../RUN.md), [`docs/architecture/DEVELOPMENT.md`](architecture/DEVELOPMENT.md) |
 | פריסת production, rollback | [`docs/DEPLOYMENT.md`](DEPLOYMENT.md), [`docs/operations/RUNBOOK.md`](operations/RUNBOOK.md) |
-| ניתור, Prometheus, בריאות, Sentry, Better Stack | [`docs/operations/MONITORING.md`](operations/MONITORING.md) (כולל טבלאות מטריקות והערות **wired vs reserved**), [`docs/architecture/API.md`](architecture/API.md) (Health) |
+| ניתור, Prometheus, בריאות, Sentry, Better Stack | [`docs/operations/MONITORING.md`](operations/MONITORING.md) (כולל טבלאות מטריקות והערות **wired vs reserved**; פורטים ב-127.0.0.1 בלבד — SSH tunnel), [`docs/architecture/API.md`](architecture/API.md) (Health) |
 | API endpoints | [`docs/architecture/API.md`](architecture/API.md) |
 | cursor pagination לרכיבות (`/rides/me`, `/groups/{group_id}/rides`) | [`docs/architecture/API.md`](architecture/API.md), [`docs/architecture/DATABASE.md`](architecture/DATABASE.md), [`backend/app/core/pagination/cursor.py`](../backend/app/core/pagination/cursor.py) |
 | סכימת DB, Alembic | [`docs/architecture/DATABASE.md`](architecture/DATABASE.md), [`backend/alembic/README.md`](../backend/alembic/README.md) |

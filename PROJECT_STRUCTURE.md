@@ -23,7 +23,7 @@ LinkUp/
 │   └── settings.json
 ├── .gitignore
 ├── .env.example                   # דוגמה ל-.env בשורש (docker-compose: Postgres/Redis/RabbitMQ)
-├── docker-compose.yml             # כולל frontend + nginx עם profile prod
+├── docker-compose.yml             # כולל frontend + nginx עם profile prod; x-resources-* (resource limits) + x-default-logging (log rotation) YAML anchors
 ├── README.md
 ├── RUN.md
 ├── backend/
@@ -283,6 +283,7 @@ mobile/
     ├── context/
     │   └── AuthContext.tsx
     ├── hooks/
+    │   ├── useAbortSignal.ts
     │   └── useGeo.ts
     ├── navigation/
     │   └── AppNavigator.tsx

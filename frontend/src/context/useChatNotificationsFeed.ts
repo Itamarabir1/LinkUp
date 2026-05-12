@@ -1,17 +1,16 @@
 import { useCallback, useEffect } from 'react';
 import type { Dispatch } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchMyNotifications } from '../api/users';
+import { fetchMyNotifications, markNotificationsReadApi, markAllNotificationsReadApi } from '../api/users';
 import { qk } from '../api/queryKeys';
 import type { NotificationItem } from '../types/api';
 import { getApiErrorMessage } from '../utils/apiError';
 import { apiErr } from '../utils/i18nError';
-import {
-  getNotificationItemKey,
-  getReadNotificationSet,
-  saveReadNotificationSet,
-} from './chatNotificationStorage';
 import type { ChatAction } from './chatState';
+
+export function getNotificationItemKey(n: { booking_id: string; created_at: string }): string {
+  return `${n.booking_id}_${n.created_at}`;
+}
 
 export function useChatNotificationsFeed(
   userId: string | undefined,
@@ -29,7 +28,7 @@ export function useChatNotificationsFeed(
     queryKey: qk.notifications.all(),
     queryFn: async () => {
       const { data } = await fetchMyNotifications({ limit: 20 });
-      return Array.isArray(data.items) ? data.items : [];
+      return data;
     },
     enabled: !!userId,
     staleTime: 0,
@@ -41,24 +40,24 @@ export function useChatNotificationsFeed(
     userId && isError ? getApiErrorMessage(error, apiErr('err_load_notifications')) : '';
 
   const markNotificationRead = useCallback(
-    (key: string) => {
-      const set = getReadNotificationSet();
-      set.add(key);
-      saveReadNotificationSet(set);
+    (n: NotificationItem) => {
+      markNotificationsReadApi([{ booking_id: n.booking_id, created_at: n.created_at }]).catch(
+        () => {}
+      );
       dispatch({ type: 'DECREMENT_UNREAD_NOTIFICATIONS' });
+      void queryClient.invalidateQueries({ queryKey: qk.notifications.all() });
     },
-    [dispatch]
+    [dispatch, queryClient]
   );
 
   const markAllNotificationsRead = useCallback(() => {
-    const set = getReadNotificationSet();
-    notificationList.forEach((n) => set.add(getNotificationItemKey(n)));
-    saveReadNotificationSet(set);
+    markAllNotificationsReadApi().catch(() => {});
     dispatch({ type: 'MARK_ALL_NOTIFICATIONS_READ' });
-  }, [notificationList, dispatch]);
+    void queryClient.invalidateQueries({ queryKey: qk.notifications.all() });
+  }, [dispatch, queryClient]);
 
   const isNotificationRead = useCallback(
-    (key: string) => getReadNotificationSet().has(key),
+    (n: NotificationItem) => !!n.is_read,
     []
   );
 
@@ -75,13 +74,17 @@ export function useChatNotificationsFeed(
       if (import.meta.env.DEV) {
         console.warn('[ChatContext] refreshUnreadNotifications:', notificationsError);
       }
-      dispatch({ type: 'SET_NOTIFICATION_STATE', list: [] });
+      dispatch({ type: 'SET_NOTIFICATION_STATE', list: [], unreadCount: 0 });
     }
   }, [isError, dispatch, notificationsError]);
 
   useEffect(() => {
     if (!userId || data === undefined) return;
-    dispatch({ type: 'SET_NOTIFICATION_STATE', list: data });
+    dispatch({
+      type: 'SET_NOTIFICATION_STATE',
+      list: Array.isArray(data.items) ? data.items : [],
+      unreadCount: data.unread_count ?? 0,
+    });
   }, [data, dispatch, userId]);
 
   const refreshUnreadNotifications = useCallback(() => {

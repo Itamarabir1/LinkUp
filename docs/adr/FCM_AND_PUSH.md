@@ -71,6 +71,22 @@ sequenceDiagram
 
 ---
 
+## 5b. Chat message push — offline fallback
+
+| היבט | פירוט |
+|------|-------|
+| **בעיה** | הודעות צ'אט עברו רק דרך Redis pub/sub → chat-ws WS; אם הנמען לא מחובר ב-WebSocket, ההודעה נשמרת ב-DB אבל **שום push לא נשלח**. |
+| **dual-target outbox** | `chat.message_sent` עובר עכשיו ל-`[REDIS, RABBITMQ]` באותה טרנזקציה — Redis לזמן אמת, RabbitMQ ל-push fallback. |
+| **presence gate** | `handle_chat_message_push` בודק `EXISTS presence:{recipient}` ב-Redis DB 1 (key מנוהל ע"י chat-ws Go; 60s TTL). Online → דילוג. |
+| **debounce** | `SET NX` עם TTL 30s פר conversation + recipient. מקסימום push אחד ל-30 שניות באותה שיחה. |
+| **dispatch** | `NotificationCommand` עם template `chat_message`, channel `push` בלבד, דרך `NotificationManager`. |
+| **SW collapsing** | FCM data payload כולל `conversation_id`; ה-SW משתמש ב-`tag: 'chat-' + conversation_id` + `renotify: true` — הדפדפן מחליף (לא מערם) התראות לאותה שיחה. |
+| **zero-change** | Go chat-ws, `NotificationEvent` enum, `NOTIFICATION_STRATEGY` — ללא שינוי. |
+
+**משפט לראיון:** "הודעות צ'אט עברו רק דרך Redis pub/sub — אם הנמען offline, ההודעה נבלעה. הוספתי dual-target outbox: Redis לזמן אמת, RabbitMQ לfallback. ב-handler בדקתי presence (Redis key של chat-ws), debounce ב-30s, ושלחתי push רק למי שלא מחובר. ב-SW הוספתי tag per conversation כדי שהתראות לא יערמו."
+
+---
+
 ## 6. דיבוג
 
 - לוגים רועשים ב-`fcm.ts` עוברים דרך **`devLog`** רק ב-`import.meta.env.DEV` — פחות רעש בפרודקשן.

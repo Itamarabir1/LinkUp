@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import axios from 'axios';
 import { getConversation, getMessages, markConversationRead } from '../../api/chat';
 import type { ConversationDetail, MessageResponse } from '../../types/api';
 import type { ChatListRow } from '../../types/chatList';
@@ -6,6 +7,7 @@ import { isConfirmedRow, toConfirmedRows } from '../../types/chatList';
 import { useChat } from '../../context/ChatContext';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { apiErr } from '../../utils/i18nError';
+import { useAbortSignal } from '../../hooks/useAbortSignal';
 import { fetchMissedGap } from './fetchMissedGap';
 
 function confirmedMessages(rows: ChatListRow[]): MessageResponse[] {
@@ -43,15 +45,18 @@ export function useConversationMessages(cid: string, userId: string | undefined)
   const lastMessageIdRef = useRef<number | null>(null);
   const isFetchingMissedRef = useRef(false);
   const cidRef = useRef(cid);
+  const getFetchSignal = useAbortSignal();
+  const getLoadMoreSignal = useAbortSignal();
 
   const fetchConversation = useCallback(async () => {
     if (!cid || !userId) return;
+    const signal = getFetchSignal();
     setLoading(true);
     setError('');
     try {
       const [convRes, msgRes] = await Promise.all([
-        getConversation(cid),
-        getMessages(cid, { limit: 30 }),
+        getConversation(cid, { signal }),
+        getMessages(cid, { limit: 30, signal }),
       ]);
       setConversation(convRes.data);
       const paginated = msgRes.data;
@@ -59,28 +64,31 @@ export function useConversationMessages(cid: string, userId: string | undefined)
       setMessagesNextCursor(paginated?.next_cursor ?? null);
       setMessagesHasMore(paginated?.has_more ?? false);
     } catch (err: unknown) {
+      if (axios.isCancel(err)) return;
       setError(getApiErrorMessage(err, apiErr('err_load_conversation')));
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
-  }, [cid, userId]);
+  }, [cid, userId, getFetchSignal]);
 
   const loadMoreMessages = useCallback(async () => {
     if (!cid || !messagesNextCursor || loadingMore) return;
+    const signal = getLoadMoreSignal();
     setLoadingMore(true);
     try {
-      const msgRes = await getMessages(cid, { limit: 30, after: messagesNextCursor });
+      const msgRes = await getMessages(cid, { limit: 30, after: messagesNextCursor, signal });
       const paginated = msgRes.data;
       const older = paginated?.items ?? [];
       setMessages((prev) => [...toConfirmedRows(older), ...prev]);
       setMessagesNextCursor(paginated?.next_cursor ?? null);
       setMessagesHasMore(paginated?.has_more ?? false);
     } catch (err: unknown) {
+      if (axios.isCancel(err)) return;
       setError(getApiErrorMessage(err, apiErr('err_load_older_messages')));
     } finally {
-      setLoadingMore(false);
+      if (!signal.aborted) setLoadingMore(false);
     }
-  }, [cid, messagesNextCursor, loadingMore]);
+  }, [cid, messagesNextCursor, loadingMore, getLoadMoreSignal]);
 
   const fetchMissedMessages = useCallback(
     async (afterMessageId: number) => {

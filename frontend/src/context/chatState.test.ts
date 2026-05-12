@@ -1,9 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
-
-vi.mock('./chatNotificationStorage', () => ({
-  getReadNotificationSet: () => new Set<string>(),
-  getNotificationItemKey: (n: { booking_id: string }) => n.booking_id,
-}));
+import { describe, expect, it } from 'vitest';
 
 import { chatReducer, initialChatState } from './chatState';
 
@@ -38,7 +33,7 @@ describe('chatReducer', () => {
     expect(next.unreadNotifications).toBe(0);
   });
 
-  it('SET_NOTIFICATION_STATE counts unread when read set empty', () => {
+  it('SET_NOTIFICATION_STATE uses server-provided unreadCount', () => {
     const list = [
       {
         type: 'x',
@@ -51,9 +46,10 @@ describe('chatReducer', () => {
         ride_origin: null,
         ride_destination: null,
         status: null,
+        is_read: false,
       },
     ];
-    const next = chatReducer(initialChatState, { type: 'SET_NOTIFICATION_STATE', list });
+    const next = chatReducer(initialChatState, { type: 'SET_NOTIFICATION_STATE', list, unreadCount: 1 });
     expect(next.notificationList).toHaveLength(1);
     expect(next.unreadNotifications).toBe(1);
   });

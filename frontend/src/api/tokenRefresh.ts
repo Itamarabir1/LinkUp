@@ -16,6 +16,7 @@ export function setTokens(access: string): void {
 export function clearTokens(): void {
   localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
   localStorage.removeItem('linkup_refresh_token');
+  localStorage.removeItem('linkup_notif_read');
 }
 
 /* ── session-expired event (single-flight) ────────────────────── */

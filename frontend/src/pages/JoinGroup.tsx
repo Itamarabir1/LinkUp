@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import { getGroupByInviteCode, joinGroup } from '../api/groups';
-import type { Group } from '../types/api';
 import ErrorBanner from '../components/ErrorBanner';
 import LoadingButton from '../components/LoadingButton';
 import { getApiErrorMessage, getApiStatus } from '../utils/apiError';
@@ -12,40 +12,22 @@ export default function JoinGroup() {
   const { t } = useTranslation(['groups', 'common']);
   const { inviteCode } = useParams<{ inviteCode: string }>();
   const navigate = useNavigate();
-  const [group, setGroup] = useState<Group | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState('');
 
-  useEffect(() => {
-    if (!inviteCode) {
-      setLoading(false);
-      setError(t('groups:missingInviteCode'));
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setError('');
-    getGroupByInviteCode(inviteCode)
-      .then((data) => {
-        if (!cancelled) setGroup(data);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setError(t('groups:groupNotFoundOrInvalid'));
-          setGroup(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [inviteCode, t]);
+  const { data: group, isLoading: loading, error: queryError } = useQuery({
+    queryKey: ['groups', 'invite', inviteCode],
+    queryFn: ({ signal }) => getGroupByInviteCode(inviteCode!, { signal }),
+    enabled: !!inviteCode,
+    retry: false,
+  });
+
+  const error = joinError || (queryError ? t('groups:groupNotFoundOrInvalid') : (!inviteCode ? t('groups:missingInviteCode') : ''));
 
   const handleJoin = async () => {
     if (!inviteCode) return;
     setJoining(true);
-    setError('');
+    setJoinError('');
     try {
       const joined = await joinGroup(inviteCode);
       if (joined?.group_id) {
@@ -56,11 +38,11 @@ export default function JoinGroup() {
     } catch (err: unknown) {
       const status = getApiStatus(err);
       if (status === 409) {
-        setError(t('groups:alreadyMember'));
+        setJoinError(t('groups:alreadyMember'));
       } else if (status === 404) {
-        setError(t('groups:invalidJoinCode'));
+        setJoinError(t('groups:invalidJoinCode'));
       } else {
-        setError(getApiErrorMessage(err, t('groups:joinFailed')));
+        setJoinError(getApiErrorMessage(err, t('groups:joinFailed')));
       }
     } finally {
       setJoining(false);

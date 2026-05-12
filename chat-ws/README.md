@@ -84,7 +84,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ## Reliability & Concurrency
 
 - **Redis reconnect:** All Redis subscribers (`RunSubscriber`, `RunUserOfflineSubscriber`, `RunUserOnlineSubscriber`) use an exponential backoff reconnect loop (1s → 30s cap). If Redis disconnects, the goroutine logs a warning and re-subscribes automatically — no permanent message loss.
-- **Safe connection teardown:** Each `Conn` has a `done chan struct{}` that is closed on disconnect (instead of closing the `Send` channel). `RunWritePump` exits on `<-c.done` and sends a proper WebSocket `CloseNormalClosure` frame. All message senders (`SendToUser`, `broadcastOnline`, `broadcastOffline`) include `case <-c.done:` in their select, which prevents panics from sending on a closed channel when a broadcast snapshot races with connection cleanup.
+- **Safe connection teardown:** Each `Conn` has a `done chan struct{}` guarded by `sync.Once` via `Conn.Close()`. Consumers read from `Conn.Done()` (a read-only `<-chan struct{}`). `RunWritePump` exits on `<-c.Done()` and sends a proper WebSocket `CloseNormalClosure` frame. All message senders (`SendToUser`, `broadcastOnline`, `broadcastOffline`) include `case <-c.Done():` in their select, which prevents panics from sending on a closed channel when a broadcast snapshot races with connection cleanup. The `sync.Once` guarantee means double-close panics are structurally impossible — even under concurrent teardown from the handler `defer` and hub broadcast timeout.
 - **Graceful batching:** Multiple JSON payloads may be batched into a single WebSocket text frame separated by `\n`. The frontend splits on `\n` before `JSON.parse`.
 
 ## Presence ו-last seen (תקציר)

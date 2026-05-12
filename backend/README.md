@@ -35,12 +35,15 @@ The same parser endpoint (`POST /api/v1/passenger/passengers/ai-parse-search`) i
 
 **`GET /api/v1/passenger/passengers/search-rides`** supports optional **`departure_date`** (Jerusalem calendar day bounds in UTC), **`departure_time`** (±2h window), or **`departure_time` + `departure_time_to`** (closed range); mixing date with timestamps returns **422**. Pagination cursor is **opaque** (`after`/`next_cursor`) via shared helper (`app/core/pagination/cursor.py`), and destination filtering supports optional **`destination_radius`** (km) in addition to `search_radius` — see **`docs/architecture/API.md`** and **`app/domain/passengers/schema.py`** (`RideSearchRequest`).
 
+**Database backups:** the `db-backup` Docker Compose service (profile `backup`) runs pg_dump → encrypt → S3. Env vars required: `BACKUP_S3_BUCKET` (S3 bucket name), `BACKUP_ENCRYPTION_KEY` (AES-256 key; generate with `openssl rand -base64 32`). See `backend/.env.example` and [`docs/BACKUP_AND_RECOVERY.md`](../docs/BACKUP_AND_RECOVERY.md).
+
 **Database connection pool** (optional tuning): `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT`, `DB_POOL_RECYCLE`. **`DB_STATEMENT_TIMEOUT_MS`** is applied **per session** via SQLAlchemy `connect_args` → asyncpg `server_settings` in [`app/db/session.py`](app/db/session.py) (default 30000ms; set in `.env`/`.env.example`). Alembic **017** also sets a fixed role-level **ceiling of 60000ms** as defense-in-depth — gate of last resort if `connect_args` ever bypasses (e.g., direct connection without the engine). Documented in `.env.example` and `docs/architecture/DEVELOPMENT.md`.
 
 **Migrations:** after pulling, run **`uv run alembic upgrade head`**. Revision **`019_booking_lifecycle_enum`** extends PostgreSQL **`booking_status`** with **`en_route`**, **`arrived`**, **`trip_in_progress`** (required for passenger-request bulk cancel and active-booking filters). See **`docs/architecture/DATABASE.md`**.
 
 ## Security & auth (backend)
 
+- **SECRET_KEY validation (M1):** `model_validator` in `app/core/config.py` enforces SECRET_KEY **non-empty in all environments** (crash at startup if missing/empty); additionally requires **≥32 characters** in production. Signing JWTs with an empty key is impossible regardless of environment.
 - **Password hashing:** bcrypt (passlib); `get_password_hash` / `verify_password` are **async** and offload CPU work via `asyncio.get_running_loop().run_in_executor` so the ASGI event loop stays responsive under load.
 - **Rate limiting:** Redis-backed limiter on **`POST /api/v1/auth/register`** and other sensitive auth routes (see `app/api/dependencies/rate_limit.py`); window/size from `RATE_LIMIT_AUTH_*` in config.
 - **Username enumeration (OWASP):** `authenticate_and_create_token` raises the same **`InvalidCredentialsError`** (401) for unknown email and wrong password so clients cannot infer whether an account exists. Covered in `tests/test_auth.py` (with `DATABASE_URL`).
@@ -106,7 +109,7 @@ See `docs/architecture/API.md` and `docs/architecture/DATABASE.md`.
   - `AsyncSession` usage in API/service paths
   - `select(...)` + `await db.execute(...)` for async querying
   - `await db.flush()` / `await db.commit()` in async transaction boundaries
-- **Transaction ownership (CRUD flush-only):** `CRUDUser` write methods use `db.flush()` only — callers own the transaction with explicit `await db.commit()`. This enables atomic DB writes + outbox events in a single transaction. Session factory uses `expire_on_commit=False`, so no `db.refresh()` is needed after commit. Dedicated methods cover all domain-specific writes: `link_google_account` (Google OAuth linking), `update_last_login`, `update_fcm_token`, `update_refresh_token`, `update_password`, `mark_as_premium`, `update_stripe_customer_id`, etc. — no direct ORM attribute assignment in service code. See `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §29.
+- **Transaction ownership (CRUD flush-only):** CRUD write methods in **users** and **groups** domains use `db.flush()` only — callers own the transaction with explicit `await db.commit()`. This enables atomic DB writes + outbox events in a single transaction, and multi-step mutations (e.g. group rename + description update) to commit or roll back together. Session factory uses `expire_on_commit=False`, so no `db.refresh()` is needed after commit. Dedicated methods cover all domain-specific writes: `link_google_account` (Google OAuth linking), `update_last_login`, `update_fcm_token`, `update_refresh_token`, `update_password`, `mark_as_premium`, `update_stripe_customer_id`, etc. — no direct ORM attribute assignment in service code. See `docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md` §29.
 - **Bookings are async-only** now (no `db.run_sync`): lock-critical paths use `select(...).with_for_update()` directly on `AsyncSession` to prevent races while keeping the call chain fully async.
 - **Workers:** notification handlers (e.g. `notification_tasks.py` — ride created, booking approved, **ride cancelled**) query with `await db.execute(select(...))`; `find_passengers_for_ride_notification` is async. No `db.run_sync` in application code (Alembic `env.py` still uses `connection.run_sync` for migrations).
 - Result: lower event-loop blocking risk, cleaner async call chains, and safer concurrency in booking/ride state transitions.
@@ -169,11 +172,12 @@ k6 run k6/scripts/load_test_auth.js
 
 **Pinned dependency:** `phonenumbers==8.13.48` in `pyproject.toml` / `uv.lock` — stable IL validation used by the API (see `app/core/utils/validators.py`).
 
-## Groups — invite codes
+## Groups — invite codes & transaction ownership
 
 - New groups receive a random **Base62** `invite_code` (8 characters, `secrets.choice` over `a-zA-Z0-9`).
 - **`create_group`** uses **`flush`**, catches **`IntegrityError`**, and retries only when the violation is on **`invite_code`** uniqueness (PostgreSQL `23505` / message match); after **5** failed attempts it raises **`LinkUpError`** with **`INVITE_CODE_GENERATION_FAILED`**.
-- A single **`commit`** persists the group and the creator’s **admin** `GroupMember` row. Implementation: **`app/domain/groups/crud.py`**.
+- All groups CRUD write methods (`create_group`, `join_group`, `remove_member`, `rename_group`, `update_group_description`, `update_group_avatar_key`, `close_group`, `update_member_role`) use **`db.flush()`** only — callers (service/router) own `db.commit()`. This makes multi-step operations like `update_group` (rename + description) **atomic**. Consistent with the users CRUD pattern (ADR §29).
+- The service layer commits after the group and creator’s **admin** `GroupMember` row. Implementation: **`app/domain/groups/crud.py`**.
 
 ## Media (S3, CloudFront, avatars)
 

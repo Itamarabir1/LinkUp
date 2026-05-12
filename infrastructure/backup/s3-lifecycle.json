@@ -1,0 +1,36 @@
+{
+  "Rules": [
+    {
+      "ID": "daily-retention",
+      "Filter": {
+        "Prefix": "daily/"
+      },
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 14,
+          "StorageClass": "GLACIER"
+        }
+      ],
+      "Expiration": {
+        "Days": 30
+      }
+    },
+    {
+      "ID": "pre-deploy-retention",
+      "Filter": {
+        "Prefix": "pre-deploy/"
+      },
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 30,
+          "StorageClass": "GLACIER"
+        }
+      ],
+      "Expiration": {
+        "Days": 90
+      }
+    }
+  ]
+}

@@ -10,15 +10,13 @@ export async function createGroup(payload: {
   return data;
 }
 
-// List my groups
-export async function getMyGroups(): Promise<Group[]> {
-  const { data } = await api.get<Group[]>('/groups/my');
+export async function getMyGroups(opts?: { signal?: AbortSignal }): Promise<Group[]> {
+  const { data } = await api.get<Group[]>('/groups/my', { signal: opts?.signal });
   return data;
 }
 
-// Get group by invite code (join page)
-export async function getGroupByInviteCode(inviteCode: string): Promise<Group> {
-  const { data } = await api.get<Group>(`/groups/join/${inviteCode}`);
+export async function getGroupByInviteCode(inviteCode: string, opts?: { signal?: AbortSignal }): Promise<Group> {
+  const { data } = await api.get<Group>(`/groups/join/${inviteCode}`, { signal: opts?.signal });
   return data;
 }
 
@@ -28,9 +26,8 @@ export async function joinGroup(inviteCode: string): Promise<Group> {
   return data;
 }
 
-// List group members
-export async function getGroupMembers(groupId: string): Promise<GroupMember[]> {
-  const { data } = await api.get<GroupMember[]>(`/groups/${groupId}/members`);
+export async function getGroupMembers(groupId: string, opts?: { signal?: AbortSignal }): Promise<GroupMember[]> {
+  const { data } = await api.get<GroupMember[]>(`/groups/${groupId}/members`, { signal: opts?.signal });
   return data;
 }
 
@@ -96,16 +93,17 @@ export async function deleteGroupImage(groupId: string): Promise<Group> {
   return data;
 }
 
-// Group rides (group screen tab)
 export async function getGroupRides(
   groupId: string,
-  params?: { limit?: number; after?: string }
+  params?: { limit?: number; after?: string; signal?: AbortSignal }
 ): Promise<PaginatedRidesResponse> {
+  const { signal, ...rest } = params ?? {};
   const { data } = await api.get<PaginatedRidesResponse>(`/groups/${groupId}/rides`, {
     params: {
-      limit: params?.limit ?? 20,
-      after: params?.after,
+      limit: rest.limit ?? 20,
+      after: rest.after,
     },
+    signal,
   });
   return data;
 }

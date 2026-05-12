@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -24,20 +25,24 @@ type clientIncoming struct {
 }
 
 func wsUpgrader(cfg config.Config) websocket.Upgrader {
+	allowed := make(map[string]struct{}, len(cfg.AllowedOrigins))
+	for _, o := range cfg.AllowedOrigins {
+		allowed[strings.ToLower(strings.TrimRight(o, "/"))] = struct{}{}
+	}
 	return websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
-			origin := r.Header.Get("Origin")
-			if len(cfg.AllowedOrigins) == 0 {
+			if len(allowed) == 0 {
 				return true
 			}
+			origin := strings.ToLower(strings.TrimRight(r.Header.Get("Origin"), "/"))
 			if origin == "" {
+				slog.Warn("ws origin empty", "component", "hub", "remote", r.RemoteAddr)
+				return false
+			}
+			if _, ok := allowed[origin]; ok {
 				return true
 			}
-			for _, o := range cfg.AllowedOrigins {
-				if o == origin {
-					return true
-				}
-			}
+			slog.Warn("ws origin rejected", "component", "hub", "origin", origin)
 			return false
 		},
 		ReadBufferSize:  1024,
@@ -91,8 +96,8 @@ func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
 				}
 			}
 			h.ScheduleLastSeenDebounce(ctx, userID, token)
-			h.Unregister(userID, c)
-			close(c.done)
+		h.Unregister(userID, c)
+		c.Close()
 		}()
 		go c.RunWritePump()
 

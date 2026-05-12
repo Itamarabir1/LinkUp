@@ -42,7 +42,6 @@ export * from './driverLocationReport';
 export * from './driverSummaryInfo';
 export * from './emailOnlyRequest';
 export * from './fCMTokenUpdate';
-export * from './forgotPasswordApiV1AuthForgotPasswordPostParams';
 export * from './getAddressFromCoordsApiV1GeoAddressGetParams';
 export * from './getAllRidesAdminApiV1PassengerPassengersAllGetParams';
 export * from './getAvatarUploadUrlApiV1UsersMeAvatarUploadUrlGetParams';

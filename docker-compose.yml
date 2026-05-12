@@ -6,12 +6,54 @@
 # secrets: backend/.env. Do not rely on a separate root .env for passwords.
 # -----------------------------------------------------------------------------
 
+# --- Resource profiles (single source of truth) --------------------------------
+# Target: t3.medium (4096MB). OS+Docker ~500MB. Usable: ~3500MB.
+# Steady-state total (excl. migrate): 3264MB. Headroom: ~236MB for page cache.
+# Monitoring profile adds 768MB — requires t3.large or temporary use only.
+# -------------------------------------------------------------------------------
+
+x-resources-micro: &resources-micro
+  mem_limit: 128m
+  mem_reservation: 64m
+  memswap_limit: 128m
+  cpus: 0.25
+  pids_limit: 100
+
+x-resources-light: &resources-light
+  mem_limit: 256m
+  mem_reservation: 128m
+  memswap_limit: 256m
+  cpus: 0.5
+  pids_limit: 200
+
+x-resources-medium: &resources-medium
+  mem_limit: 512m
+  mem_reservation: 256m
+  memswap_limit: 512m
+  cpus: 1.0
+  pids_limit: 300
+
+x-resources-redis: &resources-redis
+  mem_limit: 448m
+  mem_reservation: 256m
+  memswap_limit: 448m
+  cpus: 1.0
+  pids_limit: 100
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # --- Database: PostgreSQL + PostGIS ---
   db:
+    <<: *resources-medium
     image: postgis/postgis:15-3.3
     container_name: linkup_db
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - ./backend/.env
     healthcheck:
@@ -24,17 +66,43 @@ services:
     networks:
       - linkup_network
 
+  # --- Database Backup: pg_dump → encrypt → S3 ---
+  db-backup:
+    <<: *resources-light
+    build:
+      context: ./infrastructure/backup
+      dockerfile: Dockerfile
+    container_name: linkup_db_backup
+    logging: *default-logging
+    env_file:
+      - ./backend/.env
+    environment:
+      - PGHOST=db
+      - PGPORT=5432
+      - S3_BUCKET=${BACKUP_S3_BUCKET:-linkup-db-backups}
+      - BACKUP_ENCRYPTION_KEY=${BACKUP_ENCRYPTION_KEY}
+      - AWS_DEFAULT_REGION=${AWS_REGION:-eu-central-1}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - linkup_network
+    profiles:
+      - backup
+
   # --- Connection Pooler: PgBouncer (internal only) ---
   # Note: never use `docker compose restart pgbouncer` alone after password edits —
   # it keeps the old container/env. Prefer `make up`/`make restart` (recreates via
   # Makefile) or `docker compose … up -d --no-deps --force-recreate pgbouncer`.
   pgbouncer:
+    <<: *resources-micro
     image: ${PGBOUNCER_IMAGE:-ghcr.io/itamarabir1/linkup/pgbouncer:latest}
     build:
       context: ./infrastructure/pgbouncer
       dockerfile: Dockerfile
     container_name: linkup_pgbouncer
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       db:
         condition: service_healthy
@@ -58,9 +126,11 @@ services:
   # DB 0 -> backend (cache, rate-limit, idempotency) + outbox worker
   # DB 1 -> chat-ws pub/sub + chat completion listener
   redis:
+    <<: *resources-redis
     image: redis:7.2-alpine
     container_name: linkup_redis
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - ./backend/.env
     command:
@@ -69,7 +139,6 @@ services:
         "-c",
         "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes --appendfsync everysec --save 900 1 --save 300 10 --maxmemory 400mb --maxmemory-policy allkeys-lru",
       ]
-    mem_limit: 512m
     volumes:
       - redis_data:/data
     healthcheck:
@@ -84,9 +153,11 @@ services:
 
   # --- Message Broker: RabbitMQ ---
   rabbitmq:
+    <<: *resources-light
     image: rabbitmq:3-management
     container_name: linkup_rabbitmq
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - ./backend/.env
     # RabbitMQ image consumes RABBITMQ_DEFAULT_USER/PASS, but backend/.env
@@ -96,7 +167,6 @@ services:
       - sh
       - -c
       - 'export RABBITMQ_DEFAULT_USER="$$RABBITMQ_USER" RABBITMQ_DEFAULT_PASS="$$RABBITMQ_PASSWORD" && exec docker-entrypoint.sh rabbitmq-server'
-    mem_limit: 256m
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -109,12 +179,14 @@ services:
 
   # --- Email Renderer: React Email (Node) ---
   email-renderer:
+    <<: *resources-micro
     image: ${EMAIL_RENDERER_IMAGE:-ghcr.io/itamarabir1/linkup-email-renderer:latest}
     build:
       context: ./email-renderer
       target: production
     container_name: linkup_email_renderer
     restart: unless-stopped
+    logging: *default-logging
     environment:
       - PORT=3001
       - NODE_ENV=production
@@ -129,11 +201,13 @@ services:
 
   # --- DB migration: runs once before backend/workers ---
   migrate:
+    <<: *resources-micro
     image: ${MIGRATE_IMAGE:-ghcr.io/itamarabir1/linkup/migrate:latest}
     build:
       context: ./backend
       target: migrate
     container_name: linkup_migrate
+    logging: *default-logging
     env_file:
       - ./backend/.env
     environment:
@@ -148,12 +222,14 @@ services:
 
   # --- Notification Worker (notifications consumer + outbox dispatcher) ---
   notification-worker:
+    <<: *resources-light
     image: ${WORKER_IMAGE:-ghcr.io/itamarabir1/linkup/worker:latest}
     build:
       context: ./backend
       target: worker
     command: python -m app.workers.notification_worker
     container_name: linkup_notification_worker
+    logging: *default-logging
     env_file:
       - ./backend/.env
     environment:
@@ -165,7 +241,6 @@ services:
       - RABBITMQ_HOST=rabbitmq
       - DB_POOL_SIZE=3
       - DB_MAX_OVERFLOW=5
-    mem_limit: 256m
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -179,18 +254,26 @@ services:
         condition: service_healthy
       email-renderer:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - linkup_network
     restart: unless-stopped
 
   # --- Task Worker (avatar + scheduled tasks) ---
   task-worker:
+    <<: *resources-light
     image: ${WORKER_IMAGE:-ghcr.io/itamarabir1/linkup/worker:latest}
     build:
       context: ./backend
       target: worker
     command: python -m app.workers.task_worker
     container_name: linkup_task_worker
+    logging: *default-logging
     env_file:
       - ./backend/.env
     environment:
@@ -202,7 +285,6 @@ services:
       - RABBITMQ_HOST=rabbitmq
       - DB_POOL_SIZE=3
       - DB_MAX_OVERFLOW=3
-    mem_limit: 256m
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -214,18 +296,26 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - linkup_network
     restart: unless-stopped
 
   # --- AI Worker (chat completion listener) ---
   ai-worker:
+    <<: *resources-light
     image: ${WORKER_IMAGE:-ghcr.io/itamarabir1/linkup/worker:latest}
     build:
       context: ./backend
       target: worker
     command: python -m app.workers.ai_worker
     container_name: linkup_ai_worker
+    logging: *default-logging
     env_file:
       - ./backend/.env
     environment:
@@ -236,7 +326,6 @@ services:
       - REDIS_CHAT_DB=1
       - DB_POOL_SIZE=3
       - DB_MAX_OVERFLOW=3
-    mem_limit: 256m
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -246,18 +335,26 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - linkup_network
     restart: unless-stopped
 
   # --- Backend: FastAPI ---
   backend:
+    <<: *resources-medium
     image: ${BACKEND_IMAGE:-ghcr.io/itamarabir1/linkup/backend:latest}
     build:
       context: ./backend
       target: production
     container_name: linkup_backend
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - ./backend/.env
     environment:
@@ -270,7 +367,6 @@ services:
       - DOCKER_MODE=true
       - DB_POOL_SIZE=5
       - DB_MAX_OVERFLOW=10
-    mem_limit: 512m
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -299,12 +395,14 @@ services:
   # --- WebSocket: Chat (Go) ---
   # JWT_SECRET in chat-ws/.env must match SECRET_KEY in backend/.env
   chat-ws:
+    <<: *resources-light
     image: ${CHAT_WS_IMAGE:-ghcr.io/itamarabir1/linkup/chat-ws:latest}
     build:
       context: ./chat-ws
       dockerfile: Dockerfile
     container_name: linkup_chat_ws
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - ./chat-ws/.env
     environment:
@@ -325,22 +423,26 @@ services:
 
   # --- Monitoring: Prometheus ---
   prometheus:
+    <<: *resources-medium
     profiles: ["monitoring"]
     image: prom/prometheus:v2.51.0
     container_name: linkup_prometheus
+    logging: *default-logging
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     networks:
       - linkup_network
     restart: unless-stopped
 
   # --- Monitoring: Grafana ---
   grafana:
+    <<: *resources-light
     profiles: ["monitoring"]
     image: grafana/grafana:10.4.0
     container_name: linkup_grafana
+    logging: *default-logging
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
@@ -349,7 +451,7 @@ services:
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     ports:
-      - "3002:3000"
+      - "127.0.0.1:3002:3000"
     depends_on:
       - prometheus
     networks:
@@ -358,6 +460,7 @@ services:
 
   # --- Frontend: static build (production profile only) ---
   frontend:
+    <<: *resources-micro
     profiles: ["prod"]
     image: ${FRONTEND_IMAGE:-ghcr.io/itamarabir1/linkup/frontend:latest}
     build:
@@ -365,6 +468,7 @@ services:
       dockerfile: Dockerfile
     container_name: linkup_frontend
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - ./frontend/.env
     healthcheck:
@@ -378,16 +482,20 @@ services:
 
   # --- Reverse proxy: expose ports 80/443 ---
   nginx:
+    <<: *resources-micro
     profiles: ["prod"]
     image: nginx:1.25-alpine
     container_name: linkup_nginx
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
     depends_on:
       frontend:
         condition: service_healthy
