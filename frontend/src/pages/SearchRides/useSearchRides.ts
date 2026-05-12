@@ -207,7 +207,7 @@ export function useSearchRides() {
       },
       { timeout: 10000 }
     );
-  }, [claimLocation, isLocationOpCurrent]);
+  }, [claimLocation, isLocationOpCurrent, t]);
 
   const handleSwap = useCallback(() => {
     setPickup((currentPickup) => {
@@ -433,6 +433,7 @@ export function useSearchRides() {
       destination,
       mutateSearch,
       pickup,
+      t,
     ]
   );
 
@@ -496,7 +497,7 @@ export function useSearchRides() {
         () => setError(t('err_session_expired_join')),
       );
     },
-    [pickup, destination, joinRide],
+    [pickup, destination, joinRide, t],
   );
 
   return {

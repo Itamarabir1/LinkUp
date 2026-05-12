@@ -60,15 +60,6 @@ export default function ConfirmModal({
     return () => cancelAnimationFrame(id);
   }, [open, loading]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !loading) onClose();
-    };
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [open, loading, onClose]);
-
   /** Traps Tab navigation inside the modal. */
   useEffect(() => {
     if (!open) return;
@@ -111,6 +102,10 @@ export default function ConfirmModal({
     if (e.target === e.currentTarget && !loading) onClose();
   };
 
+  const handleBackdropKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape' && !loading) onClose();
+  };
+
   const handleConfirm = async () => {
     await Promise.resolve(onConfirm());
   };
@@ -118,7 +113,9 @@ export default function ConfirmModal({
   return (
     <div
       className={styles.backdrop}
+      role="presentation"
       onClick={handleBackdropClick}
+      onKeyDown={handleBackdropKeyDown}
     >
       <div
         ref={panelRef}

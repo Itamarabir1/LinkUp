@@ -106,10 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-    if (!token) {
-      setState((s) => ({ ...s, isLoading: false }));
-      return;
-    }
+    if (!token) return;
     const controller = new AbortController();
     fetchCurrentUser({ signal: controller.signal })
       .then(({ data }) => {

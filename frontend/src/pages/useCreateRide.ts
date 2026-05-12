@@ -220,7 +220,7 @@ export function useCreateRide() {
       },
       { timeout: 10000 }
     );
-  }, [claim, isCurrent]);
+  }, [claim, isCurrent, t]);
 
   const handleSwap = useCallback(() => {
     setOriginName((prev) => {
@@ -267,7 +267,7 @@ export function useCreateRide() {
         setStatus('idle');
       }
     },
-    [user, groupId, claim, isCurrent, mutatePreviewAsync]
+    [user, groupId, claim, isCurrent, mutatePreviewAsync, t]
   );
 
   const parseWithAI = useCallback(async () => {
@@ -368,7 +368,7 @@ export function useCreateRide() {
       }
       await performPreview(originName, destinationName, selectedDate, seats);
     },
-    [user, originName, destinationName, selectedDate, seats, performPreview]
+    [user, originName, destinationName, selectedDate, seats, performPreview, t]
   );
 
   const createRide = useCallback(async () => {
@@ -391,7 +391,7 @@ export function useCreateRide() {
       setError(getApiErrorMessage(err, apiErr('err_create_ride')));
       setStatus('idle');
     }
-  }, [preview, selectedRouteIndex, groupId, claim, isCurrent, mutateCreateAsync]);
+  }, [preview, selectedRouteIndex, groupId, claim, isCurrent, mutateCreateAsync, t]);
 
   return {
     groupId,
