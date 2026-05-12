@@ -18,6 +18,7 @@ import { STORAGE_KEYS } from '../config/constants';
 import { qk } from '../api/queryKeys';
 import { fetchCurrentUser, patchFcmToken } from '../api/users';
 import { cleanupFCM, initFCM } from '../services/fcm';
+import PageLoading from '../components/PageLoading';
 import type { User } from '../types/api';
 
 type AuthState = {
@@ -46,11 +47,11 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
-  const [state, setState] = useState<AuthState>({
+  const [state, setState] = useState<AuthState>(() => ({
     user: null,
-    isLoading: true,
+    isLoading: !!localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN),
     isAuthenticated: false,
-  });
+  }));
 
   const tearDownSession = useCallback(
     async (opts: { reason: 'user-action' | 'session-expired' | 'bootstrap-failed' }) => {
@@ -106,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (!token) {
-      queueMicrotask(() => setState((s) => ({ ...s, isLoading: false })));
+      setState((s) => ({ ...s, isLoading: false }));
       return;
     }
     const controller = new AbortController();
@@ -175,7 +176,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={value}>
+      {state.isLoading ? <PageLoading /> : children}
+    </AuthContext.Provider>
   );
 }
 

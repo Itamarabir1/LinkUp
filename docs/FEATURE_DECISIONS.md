@@ -95,6 +95,7 @@
 | **Trade-off** | בלי **`patchFcmToken(null)`** בנתיב **session-expired** (מתכוון — מונע רקורסיה 401 והטוקן ב-DB יתעדכן ב-Re-login כשFirebase מחזיר token); משתמש אחר מאותה דפדפן עם אותו install — תלוי בהתנהגות Firebase ובניקוי NotRegistered בעתיד ב-backend אם צריך. |
 | **Interview pitch (≈30s)** | *"מרכזתי teardown לסוג הודעות: logout מפורש מול הרחבת session שמתה. Axios לא משתלב בצורה הגיונית בתוך React — CustomEvent מתנתק, guard מונע storm, והמסך עובר ל-login כי ProtectedRoute רואה isAuthenticated=false."* |
 | **הפניה** | Frontend ADR §21, [`client.ts`](../frontend/src/api/client.ts), [`queryClient.ts`](../frontend/src/api/queryClient.ts), [`AuthContext.tsx`](../frontend/src/context/AuthContext.tsx) |
+| **Render gate (נוסף)** | `AuthProvider` חוסם רינדור children כל עוד `isLoading` — `isLoading` מאותחל סינכרונית מ-`localStorage` (lazy `useState`); כשיש token → `true` (bootstrap חייב להסתיים), כשאין → `false` (עמודים ציבוריים מרונדרים מיד). מונע race condition: `GroupProvider`/`ChatProvider` וכל hooks הנתונים שלהם לא עולים לפני שה-auth state מוכן — ללא 401 על `GET /chat/unread-count` ב-page refresh. |
 
 ---
 
