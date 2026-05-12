@@ -112,18 +112,24 @@ docker compose ps
 - validate `docker compose ... up --wait` status of dependencies
 - rerun deploy after root cause fix
 
-## 5) Frontend Runtime Config Missing (`projectId` / OAuth popup issues)
+## 5) Frontend Runtime Config Missing (`projectId` / OAuth popup / Google Sign-In CSP)
 
 ### Symptoms
 
 - `FirebaseError: Missing App configuration value: "projectId"`
 - Google OAuth popup `postMessage` blocked by COOP policy
+- `accounts.google.com/gsi/log` blocked by CSP `connect-src` (Google Sign-In broken)
+- `ERR_HTTP2_PROTOCOL_ERROR` on `/api/v1/auth/google-signin` (cascading from CSP block)
 
 ### Checks
 
 ```bash
 docker exec linkup_frontend env | grep VITE_FIREBASE_PROJECT_ID
 docker exec linkup_frontend sh -lc "grep -n 'projectId' /usr/share/nginx/html/config.js"
+# Verify CSP includes accounts.google.com in connect-src:
+curl -sI https://linkup.itamarabir.com | grep -i content-security-policy | grep -o 'connect-src[^;]*'
+# Verify COOP header:
+curl -sI https://linkup.itamarabir.com | grep -i cross-origin-opener-policy
 ```
 
 ### Actions
@@ -133,6 +139,7 @@ docker exec linkup_frontend sh -lc "grep -n 'projectId' /usr/share/nginx/html/co
   - `--env-file backend/.env`
   - `--env-file frontend/.env`
 - verify nginx sends COOP/COEP headers for OAuth popup compatibility
+- if Google Sign-In is blocked by CSP: confirm `https://accounts.google.com` is in **`connect-src`** in `nginx/nginx.conf.template`, re-render with `scripts/ops/render-nginx-conf.sh`, recreate nginx (`docker compose … up -d --no-deps --force-recreate nginx`)
 
 ## 6) Admin Access Redirects to `/my-rides`
 

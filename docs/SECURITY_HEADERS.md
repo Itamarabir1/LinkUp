@@ -89,7 +89,7 @@ Port 80 server block includes `location /.well-known/acme-challenge/` serving fr
 ### CSP highlights (Compose `nginx`)
 
 - **`script-src`:** **`'self'`** plus required third-party script hosts (Google gstatic/APIs, Sentry browser CDN, GTM, Google accounts) — **no** `'unsafe-inline'`; same-origin **`/bootstrap.js`**, **`/config.js`**, and Vite chunk URLs are covered by **`'self'`**.
-- **`connect-src`:** API self, **`wss://`** chat host, Firebase (HTTP + **`wss://*.firebaseio.com`**), **`https://*.sentry.io`**, FCM registration, GA, uploads host, etc.
+- **`connect-src`:** API self, **`https://accounts.google.com`** (GIS SDK XHR — `/gsi/log`, `/gsi/status`), **`wss://`** chat host, Firebase (HTTP + **`wss://*.firebaseio.com`**), **`https://*.sentry.io`**, FCM registration, GA, maps, uploads host.
 - **`frame-src`:** Stripe (`js.stripe.com`) and **`https://accounts.google.com`** (GIS / Sign-In iframe flows).
 - **`form-action`:** self + Stripe checkout host.
 - **`report-uri`:** Sentry **CSP / security reports** ingestion URL for the project (region-specific ingest host); prefer **injecting via deploy secrets** rather than committing keys.
