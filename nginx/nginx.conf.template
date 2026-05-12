@@ -56,21 +56,17 @@ http {
     add_header X-Frame-Options "DENY" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "geolocation=(self), microphone=(), camera=(), payment=(self)" always;
-    # CSP: enforcing; report-uri value from backend/.env → SENTRY_REPORT_URI (scripts/ops/render-nginx-conf.sh or CI deploy envsubst '${SENTRY_REPORT_URI}')
-    add_header Content-Security-Policy "
-      default-src 'self';
-      script-src 'self' https://www.gstatic.com https://*.googleapis.com https://browser.sentry-cdn.com https://www.googletagmanager.com https://accounts.google.com;
-      worker-src 'self' blob:;
-      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com;
-      font-src 'self' https://fonts.gstatic.com;
-      img-src 'self' data: blob: https://*.googleusercontent.com https://*.amazonaws.com https://maps.gstatic.com https://*.googleapis.com;
-      connect-src 'self' https://accounts.google.com https://*.firebaseio.com wss://*.firebaseio.com https://fcmregistrations.googleapis.com https://firebaseinstallations.googleapis.com https://*.sentry.io wss://linkup.itamarabir.com https://www.google-analytics.com https://firebase.googleapis.com https://firebaseapp.com https://linkup-uploads.s3.amazonaws.com https://maps.googleapis.com;
-      frame-src https://js.stripe.com https://accounts.google.com;
-      frame-ancestors 'none';
-      base-uri 'self';
-      form-action 'self' https://checkout.stripe.com;
-      report-uri ${SENTRY_REPORT_URI};
-    " always;
+    # CSP directives (single-line required for HTTP/2 compliance):
+    #   default-src:  'self'
+    #   script-src:   'self', gstatic, googleapis, sentry CDN, GTM, Google accounts
+    #   worker-src:   'self', blob:
+    #   style-src:    'self', 'unsafe-inline', Google Fonts, Google accounts
+    #   font-src:     'self', Google Fonts static
+    #   img-src:      'self', data/blob, googleusercontent, amazonaws, maps
+    #   connect-src:  'self', Google accounts (GIS SDK), Firebase, Sentry, analytics, maps, uploads
+    #   frame-src:    Stripe, Google accounts
+    #   report-uri:   Sentry CSP ingestion (from SENTRY_REPORT_URI env)
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://www.gstatic.com https://*.googleapis.com https://browser.sentry-cdn.com https://www.googletagmanager.com https://accounts.google.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.googleusercontent.com https://*.amazonaws.com https://maps.gstatic.com https://*.googleapis.com; connect-src 'self' https://accounts.google.com https://*.firebaseio.com wss://*.firebaseio.com https://fcmregistrations.googleapis.com https://firebaseinstallations.googleapis.com https://*.sentry.io wss://linkup.itamarabir.com https://www.google-analytics.com https://firebase.googleapis.com https://firebaseapp.com https://linkup-uploads.s3.amazonaws.com https://maps.googleapis.com; frame-src https://js.stripe.com https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://checkout.stripe.com; report-uri ${SENTRY_REPORT_URI};" always;
 
     # Liveness probe — public. Innocuous payload, safe for external uptime
     # monitors (UptimeRobot etc.). Probes live at root (not /api/v1/) on
