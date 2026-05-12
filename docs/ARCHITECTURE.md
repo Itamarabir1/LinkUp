@@ -44,7 +44,7 @@ All 16 services reference `logging: *default-logging` from the shared `x-default
 
 ## Monitoring network exposure
 
-Prometheus and Grafana ports are bound to `127.0.0.1` in `docker-compose.yml` (not `0.0.0.0`). Access from a workstation requires an SSH tunnel (`ssh -L 9090:127.0.0.1:9090 ec2-host`).
+Prometheus, Grafana, and RabbitMQ management UI ports are bound to `127.0.0.1` in `docker-compose.yml` (not `0.0.0.0`). AMQP (5672) stays internal to the Docker network with no host port mapping. Access from a workstation requires an SSH tunnel (e.g. `ssh -L 15672:127.0.0.1:15672 ec2-host`).
 
 ## Supply chain & automation
 
