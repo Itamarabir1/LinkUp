@@ -87,6 +87,7 @@ function makeVm(overrides: Partial<MessageThreadViewModel> = {}): MessageThreadV
     partnerPresence: null,
     partnerReadUpToId: 2,
     messagesEndRef: createRef<HTMLDivElement>(),
+    scrollerRef: createRef<HTMLDivElement>(),
     loadMoreMessages: vi.fn(async () => {}),
     handleSend: vi.fn(async () => {}),
     onInputChange: vi.fn(),

@@ -14,4 +14,5 @@ export interface PaginatedNotificationsResponse {
   items?: NotificationItemResponse[];
   limit?: number;
   next_cursor?: string | null;
+  unread_count?: number;
 }

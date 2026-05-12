@@ -14,7 +14,7 @@ export function getNotificationItemKey(n: { booking_id: string; created_at: stri
 
 export function useChatNotificationsFeed(
   userId: string | undefined,
-  notificationList: NotificationItem[],
+  _notificationList: NotificationItem[],
   dispatch: Dispatch<ChatAction>
 ) {
   const queryClient = useQueryClient();

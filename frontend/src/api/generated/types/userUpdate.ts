@@ -5,10 +5,11 @@
  * OpenAPI spec version: 1.0.0
  */
 
+/**
+ * Profile update: only the fields a user may change about themselves.
+ */
 export interface UserUpdate {
   email?: string | null;
   full_name?: string | null;
-  new_password?: string | null;
-  password?: string | null;
   phone_number?: string | null;
 }

@@ -43,7 +43,7 @@ export default function RouteMapModal({ data, onClose }: RouteMapModalProps) {
     staleTime: Infinity,
   });
 
-  const resolvedKey = GOOGLE_MAPS_API_KEY || fetchedKey ?? null;
+  const resolvedKey = GOOGLE_MAPS_API_KEY || (fetchedKey ?? null);
   const [scriptLoaded, setScriptLoaded] = useState(!!window.google?.maps);
   const [loadError, setLoadError] = useState<string | null>(null);
 

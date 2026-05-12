@@ -12,6 +12,6 @@ export interface UserOut {
   email: string;
   full_name: string;
   is_verified: boolean;
-  phone_number: string;
+  phone_number?: string | null;
   user_id: string;
 }

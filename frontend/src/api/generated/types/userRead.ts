@@ -16,6 +16,6 @@ export interface UserRead {
   full_name: string;
   is_admin?: boolean;
   is_verified?: boolean;
-  phone_number: string;
+  phone_number?: string | null;
   user_id: string;
 }

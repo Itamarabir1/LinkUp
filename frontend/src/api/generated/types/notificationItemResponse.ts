@@ -10,6 +10,7 @@ export interface NotificationItemResponse {
   body?: string | null;
   booking_id: string;
   created_at: string;
+  is_read?: boolean;
   other_party_name?: string | null;
   ride_destination?: string | null;
   ride_id: string;
