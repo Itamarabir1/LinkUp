@@ -31,7 +31,7 @@ dependencies = [
     "aio-pika>=9.4.0",
     "redis>=5.0.0",
     # --- File Handling ---
-    "python-multipart>=0.0.9",
+    "python-multipart>=0.0.28",
     "Pillow>=10.4.0",
     # --- AWS & S3 ---
     "aioboto3==13.1.1",
