@@ -38,7 +38,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     isNotificationRead,
     notificationsLoading,
     notificationsError,
-  } = useChatNotificationsFeed(user?.user_id, state.notificationList, dispatch);
+  } = useChatNotificationsFeed(user?.user_id, dispatch);
 
   const migrated = useRef(false);
   useEffect(() => {
