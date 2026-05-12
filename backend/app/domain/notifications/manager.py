@@ -48,6 +48,7 @@ class NotificationManager:
         """Check Redis; fail-open (False) if Redis is unreachable."""
         try:
             from app.infrastructure.redis.client import redis_client
+
             if redis_client.client is None:
                 return False
             return bool(await redis_client.client.exists(key))
@@ -58,6 +59,7 @@ class NotificationManager:
     async def _mark_sent(self, key: str) -> None:
         try:
             from app.infrastructure.redis.client import redis_client
+
             if redis_client.client is None:
                 return
             await redis_client.client.set(key, "1", ex=DEDUP_TTL_SECONDS)
@@ -114,7 +116,10 @@ class NotificationManager:
             if isinstance(result, PermanentNotificationError):
                 logger.warning(
                     "[NOTIF] %s permanent failure for %s (user_id=%s): %s",
-                    ch_name, cmd.event_key, user_id, result,
+                    ch_name,
+                    cmd.event_key,
+                    user_id,
+                    result,
                 )
             elif isinstance(result, TransientNotificationError):
                 transient_failures.append(f"{ch_name}: {result}")
@@ -124,8 +129,7 @@ class NotificationManager:
         if transient_failures:
             raise TransientNotificationError(
                 f"{len(transient_failures)} channel(s) failed transiently for "
-                f"event={cmd.event_key} user_id={user_id}: "
-                + "; ".join(transient_failures)
+                f"event={cmd.event_key} user_id={user_id}: " + "; ".join(transient_failures)
             )
 
         if dedup_key:
@@ -151,9 +155,7 @@ class NotificationManager:
                 getattr(cmd.user, "user_id", getattr(cmd.user, "id", "N/A")),
                 exc,
             )
-            raise TransientNotificationError(
-                f"{channel_name}: unexpected error: {exc}"
-            ) from exc
+            raise TransientNotificationError(f"{channel_name}: unexpected error: {exc}") from exc
 
 
 notification_manager = NotificationManager()

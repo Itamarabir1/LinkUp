@@ -98,6 +98,7 @@ class UserCreate(BaseModel):
         if v is None:
             return v
         import re
+
         if not re.match(r"^\+?[1-9]\d{1,14}$", v):
             raise ValueError("Invalid phone number format (E.164)")
         return v

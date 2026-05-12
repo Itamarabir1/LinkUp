@@ -85,9 +85,7 @@ async def mark_notifications_read(
     current_user: User = Depends(get_current_user),
 ):
     """Mark specific notifications as read (idempotent upsert)."""
-    await BookingReadsService.mark_notifications_read(
-        db, current_user.user_id, body.items
-    )
+    await BookingReadsService.mark_notifications_read(db, current_user.user_id, body.items)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -219,5 +217,3 @@ async def update_my_profile(
         user_id=current_user.user_id,
         update_data=data,  # pass the full schema through
     )
-
-

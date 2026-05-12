@@ -76,9 +76,7 @@ async def get_group_by_id(db: AsyncSession, group_id: UUID) -> Group | None:
 
 async def get_group_for_update(db: AsyncSession, group_id: UUID) -> Group | None:
     """Lock the group row — serializes concurrent writes (joins, removes)."""
-    result = await db.execute(
-        select(Group).where(Group.group_id == group_id).with_for_update()
-    )
+    result = await db.execute(select(Group).where(Group.group_id == group_id).with_for_update())
     return result.scalar_one_or_none()
 
 

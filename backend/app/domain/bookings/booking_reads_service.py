@@ -252,9 +252,7 @@ class BookingReadsService:
             except CursorDecodeError as e:
                 raise BadRequestError("מסמן עמוד לא תקין") from e
 
-        bookings = await crud_booking.get_user_bookings_filtered_async(
-            db, user_id, status, limit=limit, after=cursor_tuple
-        )
+        bookings = await crud_booking.get_user_bookings_filtered_async(db, user_id, status, limit=limit, after=cursor_tuple)
         has_more = len(bookings) > limit
         page = bookings[:limit]
         next_cursor = None
@@ -409,12 +407,9 @@ class BookingReadsService:
             return set()
         pairs = [(item.booking_id, item.created_at) for item in items]
         booking_ids = list({p[0] for p in pairs})
-        stmt = (
-            select(NotificationRead.booking_id, NotificationRead.created_at)
-            .where(
-                NotificationRead.user_id == user_id,
-                NotificationRead.booking_id.in_(booking_ids),
-            )
+        stmt = select(NotificationRead.booking_id, NotificationRead.created_at).where(
+            NotificationRead.user_id == user_id,
+            NotificationRead.booking_id.in_(booking_ids),
         )
         rows = (await db.execute(stmt)).all()
         return {(row[0], row[1]) for row in rows}
@@ -426,32 +421,20 @@ class BookingReadsService:
         items: list[NotificationReadItem],
     ) -> None:
         """Upsert notification read-state rows (idempotent)."""
-        values = [
-            {"user_id": user_id, "booking_id": it.booking_id, "created_at": it.created_at}
-            for it in items
-        ]
+        values = [{"user_id": user_id, "booking_id": it.booking_id, "created_at": it.created_at} for it in items]
         stmt = pg_insert(NotificationRead).values(values)
-        stmt = stmt.on_conflict_do_nothing(
-            index_elements=["user_id", "booking_id", "created_at"]
-        )
+        stmt = stmt.on_conflict_do_nothing(index_elements=["user_id", "booking_id", "created_at"])
         await db.execute(stmt)
         await db.commit()
 
     @staticmethod
     async def mark_all_notifications_read(db: AsyncSession, user_id: UUID) -> None:
         """Mark every current notification as read in one pass."""
-        all_items_resp = await BookingReadsService.get_notifications_for_user(
-            db, user_id, limit=NOTIFICATIONS_MAX_LIMIT
-        )
+        all_items_resp = await BookingReadsService.get_notifications_for_user(db, user_id, limit=NOTIFICATIONS_MAX_LIMIT)
         if not all_items_resp.items:
             return
-        values = [
-            {"user_id": user_id, "booking_id": item.booking_id, "created_at": item.created_at}
-            for item in all_items_resp.items
-        ]
+        values = [{"user_id": user_id, "booking_id": item.booking_id, "created_at": item.created_at} for item in all_items_resp.items]
         stmt = pg_insert(NotificationRead).values(values)
-        stmt = stmt.on_conflict_do_nothing(
-            index_elements=["user_id", "booking_id", "created_at"]
-        )
+        stmt = stmt.on_conflict_do_nothing(index_elements=["user_id", "booking_id", "created_at"])
         await db.execute(stmt)
         await db.commit()

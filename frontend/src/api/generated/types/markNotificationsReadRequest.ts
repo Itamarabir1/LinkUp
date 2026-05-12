@@ -7,5 +7,9 @@
 import type { NotificationReadItem } from './notificationReadItem';
 
 export interface MarkNotificationsReadRequest {
+  /**
+     * @minItems 1
+     * @maxItems 200
+     */
   items: NotificationReadItem[];
 }

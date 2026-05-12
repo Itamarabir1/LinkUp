@@ -14,7 +14,15 @@ from app.domain.users.model import User
 from app.infrastructure.audit.model import AuditLog
 
 __all__ = [
-    "AuditLog", "Booking", "Group", "GroupMember", "IdempotencyKey",
-    "NotificationRead", "PassengerRequest", "Payment", "Ride",
-    "ScheduledNotification", "User",
+    "AuditLog",
+    "Booking",
+    "Group",
+    "GroupMember",
+    "IdempotencyKey",
+    "NotificationRead",
+    "PassengerRequest",
+    "Payment",
+    "Ride",
+    "ScheduledNotification",
+    "User",
 ]

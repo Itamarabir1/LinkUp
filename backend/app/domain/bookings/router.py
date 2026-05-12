@@ -93,9 +93,7 @@ async def get_user_bookings(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await BookingReadsService.get_user_bookings(
-        db, user_id=current_user.user_id, status=status, limit=limit, after=after
-    )
+    return await BookingReadsService.get_user_bookings(db, user_id=current_user.user_id, status=status, limit=limit, after=after)
 
 
 @router.get("/driver-summary/active", response_model=DriverActiveResponse)
