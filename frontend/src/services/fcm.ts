@@ -26,7 +26,7 @@ export function cleanupFCM(): void {
 }
 
 function showForegroundNotification(payload: MessagePayload): void {
-  // Backend sends data-only FCM (title/body in `data` map). SDK may leave `notification` empty.
+  if (payload.data?.event_key === 'chat.message_sent') return;
   const d = payload.data;
   const fromDataTitle = typeof d?.title === 'string' ? d.title.trim() : '';
   const fromDataBody = typeof d?.body === 'string' ? d.body.trim() : '';

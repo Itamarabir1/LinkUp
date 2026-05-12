@@ -3,6 +3,7 @@
 All routes require authentication (get_current_user).
 """
 
+import json
 import logging
 from uuid import UUID
 
@@ -14,7 +15,7 @@ from app.api.dependencies.auth import get_current_user
 from app.api.dependencies.rate_limit import rate_limit_chat
 from app.core.exceptions.base import LinkUpError
 from app.core.exceptions.chat import ChatRoomNotFound
-from app.db.session import get_db
+from app.db.session import get_db, SessionLocal
 from app.domain.chat import crud as chat_crud
 from app.domain.chat.message_idempotency import (
     chat_message_redis_key,
@@ -41,6 +42,7 @@ from app.domain.chat.service import (
 )
 from app.domain.users.crud import crud_user
 from app.domain.users.model import User
+from app.infrastructure.redis.chat_pubsub import redis_chat_pubsub
 from app.infrastructure.redis.client import redis_client
 
 router = APIRouter(tags=["Chat"])
@@ -190,7 +192,7 @@ async def post_message(
         claimed = True
 
     try:
-        msg = await send_message(
+        msg, recipient_id = await send_message(
             db,
             conversation_id=conversation_id,
             sender_id=current_user.user_id,
@@ -198,6 +200,23 @@ async def post_message(
         )
         await crud_user.update_last_active(db, user_id=current_user.user_id)
         await db.commit()
+
+        try:
+            async with SessionLocal() as fresh_db:
+                unread = await chat_crud.get_unread_conversations_count(
+                    fresh_db, recipient_id,
+                )
+            await redis_chat_pubsub.publish(
+                f"user:{recipient_id}:events",
+                json.dumps({
+                    "type": "invalidate",
+                    "resource": "unread_messages",
+                    "count": unread,
+                }),
+            )
+        except Exception as e:
+            logger.warning("Publish unread_count failed: %s", e, exc_info=True)
+
         if claimed and redis_key:
             await redis_client.idempotency_set_result(
                 redis_key,

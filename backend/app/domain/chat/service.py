@@ -261,10 +261,12 @@ async def send_message(
     conversation_id: UUID,
     sender_id: UUID,
     body: str,
-) -> MessageResponse:
+) -> tuple[MessageResponse, UUID]:
     """
-    Sends a message: persist in DB + enqueue outbox event (same transaction).
-    Dual-target: Redis (real-time WS delivery) + RabbitMQ (offline push fallback).
+    Persist a message + enqueue outbox event (flush only, no commit).
+
+    Returns (MessageResponse, recipient_id).  Caller owns db.commit()
+    and any post-commit side-effects (e.g. unread-count notification).
     """
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, sender_id)
     if not conv:
@@ -289,24 +291,14 @@ async def send_message(
         targets=[DispatchTarget.REDIS.value, DispatchTarget.RABBITMQ.value],
     )
 
-    await db.commit()
-    await db.refresh(msg)
-
-    try:
-        await redis_chat_pubsub.publish(
-            f"user:{recipient_id}:events",
-            json.dumps({"type": "invalidate", "resource": "unread_messages"}),
-        )
-    except Exception as e:
-        logger.warning("Publish unread_count failed: %s", e, exc_info=True)
-
-    return MessageResponse(
+    response = MessageResponse(
         message_id=msg.message_id,
         conversation_id=msg.conversation_id,
         sender_id=msg.sender_id,
         body=msg.body,
         created_at=msg.created_at,
     )
+    return response, recipient_id
 
 
 async def get_messages(

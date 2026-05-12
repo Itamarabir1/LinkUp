@@ -58,6 +58,7 @@ FCM delivery has two connected paths:
 - **Foreground**
   - File: [`frontend/src/services/fcm.ts`](../frontend/src/services/fcm.ts)
   - `onMessage` → `showForegroundNotification`:
+    - **Guard:** `chat.message_sent` events are filtered out (`if (payload.data?.event_key === 'chat.message_sent') return`) — chat messages already arrive in real-time via WebSocket, so a duplicate FCM toast is suppressed.
     - [`triggerNotificationToast`](../frontend/src/components/NotificationToast/NotificationToast.tsx) — fixed toast at top of app (mounted in Layout).
     - [`playNotificationChime`](../frontend/src/utils/notificationSound.ts) — optional sound (subject to browser autoplay rules).
   - Title/body are taken from **`payload.data.title` / `payload.data.body`** first, then fall back to `payload.notification` if the SDK surfaces them — see [`frontend/src/services/fcm.ts`](../frontend/src/services/fcm.ts) (`showForegroundNotification`).

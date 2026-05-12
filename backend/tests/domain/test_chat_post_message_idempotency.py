@@ -29,22 +29,32 @@ async def test_post_message_leader_calls_set_result(monkeypatch, db_session):
         created_at=datetime.now(timezone.utc),
     )
 
+    recipient_id = uuid4()
+
     async def fake_send(db, *args, **kwargs):
-        # Router passes sender_id=; older/alternate mocks used sender_sid.
         sid = kwargs.get("sender_id", kwargs.get("sender_sid"))
         assert kwargs["conversation_id"] == conv_id
         assert kwargs["body"] == "hi"
         assert sid == dummy_user.user_id
-        return sent
+        return sent, recipient_id
 
     mock_redis = MagicMock()
     mock_redis.idempotency_try_begin = AsyncMock(return_value="leader")
     mock_redis.idempotency_set_result = AsyncMock()
     mock_redis.idempotency_delete = AsyncMock()
 
+    mock_fresh_db = AsyncMock()
+    mock_fresh_db.execute = AsyncMock(return_value=MagicMock(scalar=MagicMock(return_value=1)))
+
+    mock_session_local = MagicMock()
+    mock_session_local.return_value.__aenter__ = AsyncMock(return_value=mock_fresh_db)
+    mock_session_local.return_value.__aexit__ = AsyncMock(return_value=False)
+
     monkeypatch.setattr(chat_router_module, "send_message", fake_send)
     monkeypatch.setattr(chat_router_module, "redis_client", mock_redis)
     monkeypatch.setattr(chat_router_module.crud_user, "update_last_active", AsyncMock())
+    monkeypatch.setattr(chat_router_module, "SessionLocal", mock_session_local)
+    monkeypatch.setattr(chat_router_module, "redis_chat_pubsub", MagicMock(publish=AsyncMock()))
 
     out = await chat_router_module.post_message(
         conversation_id=conv_id,
