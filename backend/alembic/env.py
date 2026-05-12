@@ -2,20 +2,54 @@ import os
 import sys
 import asyncio
 from logging.config import fileConfig
+from pathlib import Path
+
 from sqlalchemy import pool
 from alembic import context
 from sqlalchemy.ext.asyncio import async_engine_from_config
+
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.core.config import settings
 from app.db.base import Base
 
-import app.db.models  # רישום כל המודלים ב-metadata לפני autogenerate
+import app.db.models  # register all models in metadata before autogenerate
+
+
+def _resolve_database_url() -> str:
+    """Resolve DATABASE_URL for migrations without instantiating full app Settings.
+
+    Migrations are a schema-only concern and must not depend on application
+    runtime secrets (SECRET_KEY, Firebase, Stripe, etc.).
+
+    Priority:
+      1. ``DATABASE_URL`` env var (CI, managed databases, production).
+      2. Compose from individual ``POSTGRES_*`` env vars (local dev ``.env``).
+
+    URL normalisation mirrors ``Settings.DATABASE_URL`` (asyncpg driver).
+    """
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
+
+    url = os.environ.get("DATABASE_URL")
+    if url:
+        if url.startswith("postgres://"):
+            return "postgresql+asyncpg://" + url[len("postgres://"):]
+        if url.startswith("postgresql://"):
+            return "postgresql+asyncpg://" + url[len("postgresql://"):]
+        return url
+
+    user = os.environ.get("POSTGRES_USER", "")
+    password = os.environ.get("POSTGRES_PASSWORD", "")
+    host = os.environ.get("POSTGRES_HOST", "localhost")
+    port = os.environ.get("POSTGRES_PORT", "5432")
+    db = os.environ.get("POSTGRES_DB", "")
+    return f"postgresql+asyncpg://{user}:{password}@{host}:{port}/{db}"
 
 
 config = context.config
 
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", _resolve_database_url())
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
