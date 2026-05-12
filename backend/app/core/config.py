@@ -270,9 +270,7 @@ class Settings(BaseSettings):
     def validate_production_secrets(self) -> "Settings":
         if self.ENVIRONMENT.lower() == "production":
             if not self.SECRET_KEY or self.SECRET_KEY == _DEV_SECRET_KEY:
-                raise ValueError(
-                    "SECRET_KEY must be explicitly set in production (do not use the dev default)"
-                )
+                raise ValueError("SECRET_KEY must be explicitly set in production (do not use the dev default)")
             if len(self.SECRET_KEY) < 32:
                 raise ValueError("SECRET_KEY must be at least 32 characters in production")
         return self
