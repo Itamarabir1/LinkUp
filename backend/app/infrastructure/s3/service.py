@@ -25,7 +25,7 @@ class StorageService:
 
     async def generate_avatar_upload_url(
         self,
-        user_id: UUID | int | str,
+        user_id: UUID | str,
         filename: str | None = None,
         expiration: int = 300,
     ) -> tuple[str, str]:

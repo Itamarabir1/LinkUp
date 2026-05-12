@@ -11,7 +11,8 @@ Fixtures for async tests.
 
 הפרדת סשנים:
 - db_session — טרנזקציה אחת; commit ממופה ל-flush ואז rollback (מהיר לשירותים).
-- e2e_session_factory — סשן לכל שימוש בלי monkeypatch; מתאים ל-HTTP עם commit אמיתי בין בקשות.
+- e2e_session_factory — עטוף בטרנזקציה חיצונית; session.commit() יוצר SAVEPOINT,
+  והכל מתבטל ב-teardown — כך שנתוני e2e לא מצטברים ב-DB בין הרצות.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ import pytest
 import pytest_asyncio
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import app.db.models  # noqa: F401
@@ -60,11 +62,28 @@ def test_db_url() -> str:
     return _require_test_db_url()
 
 
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _purge_leaked_e2e_rows():
+    """
+    One-time cleanup of rows committed by previous e2e runs (before the
+    savepoint fix was in place). Factory-created users have emails matching
+    '*@*.linkup'; cascading FKs handle rides, bookings, etc.
+    """
+    url = _require_test_db_url()
+    engine = create_async_engine(url, connect_args={"ssl": False})
+    async with engine.begin() as conn:
+        await conn.execute(text(
+            "DELETE FROM users WHERE email LIKE '%@%.linkup'"
+        ))
+    await engine.dispose()
+
+
 @pytest_asyncio.fixture
 async def e2e_session_factory(test_db_url: str):
     """
-    Session factory without commit monkeypatch.
-    Useful for API-like flows where each request should see real commit boundaries.
+    Session factory for API-like flows where each request needs real commit
+    boundaries.  Wraps everything in a connection-level transaction; sessions
+    use SAVEPOINTs for their commits, so all data is rolled back at teardown.
     """
     engine = create_async_engine(
         test_db_url,
@@ -72,17 +91,19 @@ async def e2e_session_factory(test_db_url: str):
         pool_pre_ping=True,
         connect_args={"ssl": False},
     )
-    factory = async_sessionmaker(
-        bind=engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-        autocommit=False,
-        autoflush=False,
-    )
-    try:
-        yield factory
-    finally:
-        await engine.dispose()
+    async with engine.connect() as conn:
+        outer_tx = await conn.begin()
+        factory = async_sessionmaker(
+            bind=conn,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        )
+        try:
+            yield factory
+        finally:
+            await outer_tx.rollback()
+    await engine.dispose()
 
 
 @pytest_asyncio.fixture

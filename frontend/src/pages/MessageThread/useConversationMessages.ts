@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { getConversation, getMessages, markConversationRead } from '../../api/chat';
 import type { ConversationDetail, MessageResponse } from '../../types/api';
@@ -9,6 +9,12 @@ import { getApiErrorMessage } from '../../utils/apiError';
 import { apiErr } from '../../utils/i18nError';
 import { useAbortSignal } from '../../hooks/useAbortSignal';
 import { fetchMissedGap } from './fetchMissedGap';
+
+type ScrollIntent = 'bottom' | 'preserve' | 'none';
+
+function isNearBottom(el: HTMLElement, threshold = 150): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+}
 
 function confirmedMessages(rows: ChatListRow[]): MessageResponse[] {
   return rows.filter(isConfirmedRow).map((r) => r.message);
@@ -42,6 +48,9 @@ export function useConversationMessages(cid: string, userId: string | undefined)
   const [error, setError] = useState('');
   const [partnerReadUpToId, setPartnerReadUpToId] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const scrollIntentRef = useRef<ScrollIntent>('bottom');
+  const prevScrollSnapshotRef = useRef<{ scrollTop: number; scrollHeight: number } | null>(null);
   const lastMessageIdRef = useRef<number | null>(null);
   const isFetchingMissedRef = useRef(false);
   const cidRef = useRef(cid);
@@ -60,6 +69,7 @@ export function useConversationMessages(cid: string, userId: string | undefined)
       ]);
       setConversation(convRes.data);
       const paginated = msgRes.data;
+      scrollIntentRef.current = 'bottom';
       setMessages(toConfirmedRows(paginated?.items ?? []));
       setMessagesNextCursor(paginated?.next_cursor ?? null);
       setMessagesHasMore(paginated?.has_more ?? false);
@@ -79,6 +89,13 @@ export function useConversationMessages(cid: string, userId: string | undefined)
       const msgRes = await getMessages(cid, { limit: 30, after: messagesNextCursor, signal });
       const paginated = msgRes.data;
       const older = paginated?.items ?? [];
+      scrollIntentRef.current = 'preserve';
+      if (scrollerRef.current) {
+        prevScrollSnapshotRef.current = {
+          scrollTop: scrollerRef.current.scrollTop,
+          scrollHeight: scrollerRef.current.scrollHeight,
+        };
+      }
       setMessages((prev) => [...toConfirmedRows(older), ...prev]);
       setMessagesNextCursor(paginated?.next_cursor ?? null);
       setMessagesHasMore(paginated?.has_more ?? false);
@@ -100,6 +117,7 @@ export function useConversationMessages(cid: string, userId: string | undefined)
           shouldAbort: () => cidRef.current !== startedCid,
         });
         if (newMsgs.length === 0) return;
+        scrollIntentRef.current = 'none';
         setMessages((prev) => {
           if (cidRef.current !== startedCid) return prev;
           const tail = pendingTail(prev);
@@ -154,8 +172,27 @@ export function useConversationMessages(cid: string, userId: string | undefined)
     setPartnerReadUpToId((prev) => (prev !== null ? Math.max(prev, readUpToId) : readUpToId));
   }, []);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const requestScrollToBottom = useCallback(() => {
+    if (scrollerRef.current && isNearBottom(scrollerRef.current)) {
+      scrollIntentRef.current = 'bottom';
+    }
+  }, []);
+
+  const forceScrollToBottom = useCallback(() => {
+    scrollIntentRef.current = 'bottom';
+  }, []);
+
+  useLayoutEffect(() => {
+    const intent = scrollIntentRef.current;
+    scrollIntentRef.current = 'none';
+
+    if (intent === 'bottom') {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    } else if (intent === 'preserve' && scrollerRef.current && prevScrollSnapshotRef.current) {
+      const { scrollTop, scrollHeight } = prevScrollSnapshotRef.current;
+      scrollerRef.current.scrollTop = scrollTop + (scrollerRef.current.scrollHeight - scrollHeight);
+      prevScrollSnapshotRef.current = null;
+    }
   }, [messages]);
 
   return {
@@ -172,6 +209,9 @@ export function useConversationMessages(cid: string, userId: string | undefined)
     lastMessageIdRef,
     fetchMissedMessages,
     messagesEndRef,
+    scrollerRef,
+    requestScrollToBottom,
+    forceScrollToBottom,
     loadMoreMessages,
     refreshUnread,
   };

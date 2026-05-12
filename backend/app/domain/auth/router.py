@@ -78,6 +78,7 @@ async def register(
         httponly=True,
         secure=getattr(settings, "FORCE_HTTPS_REDIRECT", False),  # Secure flag in HTTPS only
         samesite="lax",
+        path="/api/v1/auth",
     )
 
     return new_user

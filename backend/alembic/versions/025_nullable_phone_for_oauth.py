@@ -27,7 +27,12 @@ def upgrade() -> None:
         nullable=True,
     )
 
-    op.drop_index("ix_users_phone_number", table_name="users")
+    op.execute(
+        "DROP INDEX IF EXISTS ix_users_phone_number"
+    )
+    op.execute(
+        "ALTER TABLE users DROP CONSTRAINT IF EXISTS users_phone_number_key"
+    )
 
     op.execute(
         "CREATE UNIQUE INDEX ix_users_phone_partial "

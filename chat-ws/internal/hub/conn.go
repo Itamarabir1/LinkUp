@@ -21,7 +21,7 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 
 	// Maximum message size allowed from peer.
-	maxMessageSize = 2048
+	maxMessageSize = 8192
 )
 
 // Conn represents a WebSocket connection for a user.
@@ -60,20 +60,16 @@ func (c *Conn) RunWritePump() {
 			return
 		case message := <-c.Send:
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
-			w, err := c.Conn.NextWriter(websocket.TextMessage)
-			if err != nil {
+			if err := c.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
 				return
 			}
-			w.Write(message)
 
+			// Drain queued messages — each as a separate frame
 			n := len(c.Send)
 			for i := 0; i < n; i++ {
-				w.Write([]byte{'\n'})
-				w.Write(<-c.Send)
-			}
-
-			if err := w.Close(); err != nil {
-				return
+				if err := c.Conn.WriteMessage(websocket.TextMessage, <-c.Send); err != nil {
+					return
+				}
 			}
 		case <-ticker.C:
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))

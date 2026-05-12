@@ -24,6 +24,7 @@ export function useChatWebSocket(options: {
   lastMessageIdRef: React.MutableRefObject<number | null>;
   fetchMissedMessages: (afterId: number) => Promise<void>;
   setConversationRead: (readUpToId: number) => void;
+  requestScrollToBottom: () => void;
 }) {
   const {
     cid,
@@ -39,6 +40,7 @@ export function useChatWebSocket(options: {
     lastMessageIdRef,
     fetchMissedMessages,
     setConversationRead,
+    requestScrollToBottom,
   } = options;
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -102,29 +104,26 @@ export function useChatWebSocket(options: {
       };
 
       ws.onmessage = (event) => {
-        const chunks = String(event.data).split('\n');
-        for (const line of chunks) {
-          if (!line.trim()) continue;
-          let data: Record<string, unknown>;
-          try {
-            data = JSON.parse(line) as Record<string, unknown>;
-          } catch {
-            continue;
-          }
-          processChatWebSocketMessage(data, {
-            cid,
-            userId,
-            refreshUnread,
-            partnerIdRef,
-            setMessages,
-            setPartnerTyping,
-            setPartnerTypingName,
-            setPartnerPresence,
-            typingHideTimeoutRef,
-            setConversationRead,
-            outboundPendingRef,
-          });
+        let data: Record<string, unknown>;
+        try {
+          data = JSON.parse(String(event.data)) as Record<string, unknown>;
+        } catch {
+          return;
         }
+        processChatWebSocketMessage(data, {
+          cid,
+          userId,
+          refreshUnread,
+          partnerIdRef,
+          setMessages,
+          setPartnerTyping,
+          setPartnerTypingName,
+          setPartnerPresence,
+          typingHideTimeoutRef,
+          setConversationRead,
+          outboundPendingRef,
+          requestScrollToBottom,
+        });
       };
 
       ws.onclose = () => {
@@ -178,6 +177,7 @@ export function useChatWebSocket(options: {
     fetchMissedMessages,
     setConversationRead,
     outboundPendingRef,
+    requestScrollToBottom,
   ]);
 
   const sendTypingIfNeeded = useCallback(

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
@@ -38,6 +38,8 @@ function getDisplayType(type: string): DisplayType {
 
 export default function Notifications() {
   const navigate = useNavigate();
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
   const { t } = useTranslation(['common', 'nav']);
   const pageTitle = t('nav:notifications');
   usePageTitle(pageTitle);
@@ -145,9 +147,9 @@ export default function Notifications() {
     (n: NotificationItem) => {
       if (!isNotificationRead(n)) markNotificationRead(n);
       const target = getNotificationTarget(n.type);
-      if (target) navigate(target);
+      if (target) navigateRef.current(target);
     },
-    [isNotificationRead, markNotificationRead, navigate]
+    [isNotificationRead, markNotificationRead]
   );
 
   function getAvatarColorClass(displayType: DisplayType): string {

@@ -142,7 +142,7 @@ class UserLocationUpdate(BaseModel):
 
 
 class FCMTokenUpdate(BaseModel):
-    fcm_token: str | None = Field(None)
+    fcm_token: str | None = Field(None, max_length=512)
 
 
 # --- Generic responses ---

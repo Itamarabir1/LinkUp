@@ -44,6 +44,7 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
     partnerPresence,
     partnerReadUpToId,
     messagesEndRef,
+    scrollerRef,
     loadMoreMessages,
     handleSend,
     onInputChange,
@@ -116,7 +117,7 @@ export default function MessageThreadPanel({ vm, embedded }: MessageThreadPanelP
 
       {error ? <ErrorBanner message={error} className={styles.pageError} /> : null}
 
-      <div className={scrollerClass}>
+      <div ref={scrollerRef} className={scrollerClass}>
         {messagesHasMore ? (
           <button
             type="button"

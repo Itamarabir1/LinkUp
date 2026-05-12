@@ -35,6 +35,7 @@ type Hub struct {
 	mu          sync.RWMutex
 	users       map[string][]*Conn
 	redisClient *redis.Client
+	httpClient  *http.Client
 
 	chatSubAt    atomic.Int64
 	offlineSubAt atomic.Int64
@@ -47,6 +48,14 @@ func NewHub(redisClient *redis.Client) *Hub {
 	h := &Hub{
 		users:       make(map[string][]*Conn),
 		redisClient: redisClient,
+		httpClient: &http.Client{
+			Timeout: 5 * time.Second,
+			Transport: &http.Transport{
+				MaxIdleConns:        20,
+				MaxIdleConnsPerHost: 10,
+				IdleConnTimeout:     30 * time.Second,
+			},
+		},
 	}
 	now := time.Now().UnixMilli()
 	h.chatSubAt.Store(now)
@@ -236,8 +245,7 @@ func (h *Hub) flushDueLastSeen(ctx context.Context, cfg config.Config) {
 				continue
 			}
 			req.Header.Set("Authorization", "Bearer "+token)
-			client := &http.Client{Timeout: 2 * time.Second}
-			resp, err := client.Do(req)
+			resp, err := h.httpClient.Do(req)
 			if err != nil {
 				slog.Error("flushDueLastSeen PATCH last-seen failed", "component", "hub", "op", "flushDueLastSeen", "error_code", "BACKEND_PATCH_FAILED", "err", err)
 			}
@@ -284,9 +292,13 @@ func (h *Hub) RunUserOfflineSubscriber(ctx context.Context, subClient *redis.Cli
 		if ctx.Err() != nil {
 			return
 		}
+		start := time.Now()
 		h.runUserOfflineOnce(ctx, subClient)
 		if ctx.Err() != nil {
 			return
+		}
+		if time.Since(start) > maxBackoff {
+			backoff = time.Second
 		}
 		slog.Warn("user offline subscriber disconnected, reconnecting", "backoff", backoff)
 		select {
@@ -337,9 +349,13 @@ func (h *Hub) RunUserOnlineSubscriber(ctx context.Context, subClient *redis.Clie
 		if ctx.Err() != nil {
 			return
 		}
+		start := time.Now()
 		h.runUserOnlineOnce(ctx, subClient)
 		if ctx.Err() != nil {
 			return
+		}
+		if time.Since(start) > maxBackoff {
+			backoff = time.Second
 		}
 		slog.Warn("user online subscriber disconnected, reconnecting", "backoff", backoff)
 		select {

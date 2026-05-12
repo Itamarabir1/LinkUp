@@ -22,25 +22,22 @@ export function useUserEventStream({
     buildUrl: (token) => WS_URLS.chat(token),
     enabled,
     onMessage: (ev) => {
-      const chunks = String(ev.data).split('\n');
-      for (const line of chunks) {
-        if (!line.trim()) continue;
-        try {
-          const raw = JSON.parse(line);
+      let raw: unknown;
+      try {
+        raw = JSON.parse(String(ev.data));
+      } catch {
+        return;
+      }
 
-          const invalidate = InvalidateEventSchema.safeParse(raw);
-          if (invalidate.success) {
-            onInvalidate(invalidate.data);
-            continue;
-          }
+      const invalidate = InvalidateEventSchema.safeParse(raw);
+      if (invalidate.success) {
+        onInvalidate(invalidate.data);
+        return;
+      }
 
-          const userEvent = UserEventSchema.safeParse(raw);
-          if (userEvent.success) {
-            onUserEvent(userEvent.data);
-          }
-        } catch {
-          continue;
-        }
+      const userEvent = UserEventSchema.safeParse(raw);
+      if (userEvent.success) {
+        onUserEvent(userEvent.data);
       }
     },
   });

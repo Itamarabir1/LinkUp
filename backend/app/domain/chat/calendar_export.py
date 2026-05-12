@@ -3,6 +3,7 @@
 """
 
 import logging
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 async def get_conversation_for_calendar_export(
     db: AsyncSession,
-    conversation_id: int,
-    current_user_id: int,
+    conversation_id: UUID,
+    current_user_id: UUID,
 ) -> dict | None:
     """
     אוסף נתוני שיחה לייצוא ללוח שנה.

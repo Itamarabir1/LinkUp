@@ -133,13 +133,27 @@ class NotificationManager:
 
     async def _safe_send(self, provider, channel_name: str, cmd: NotificationCommand):
         """Run a single provider; returns None on success, exception instance on failure."""
-        ctx = {**cmd.context, "event_key": cmd.event_key}
-        await provider.send(cmd.user, cmd.template, ctx, db=cmd.db)
-        logger.info(
-            "%s sent to user_id=%s",
-            channel_name,
-            getattr(cmd.user, "user_id", getattr(cmd.user, "id", "N/A")),
-        )
+        try:
+            ctx = {**cmd.context, "event_key": cmd.event_key}
+            await provider.send(cmd.user, cmd.template, ctx, db=cmd.db)
+            logger.info(
+                "%s sent to user_id=%s",
+                channel_name,
+                getattr(cmd.user, "user_id", getattr(cmd.user, "id", "N/A")),
+            )
+            return None
+        except (PermanentNotificationError, TransientNotificationError):
+            raise
+        except Exception as exc:
+            logger.error(
+                "%s unexpected error for user_id=%s: %s",
+                channel_name,
+                getattr(cmd.user, "user_id", getattr(cmd.user, "id", "N/A")),
+                exc,
+            )
+            raise TransientNotificationError(
+                f"{channel_name}: unexpected error: {exc}"
+            ) from exc
 
 
 notification_manager = NotificationManager()

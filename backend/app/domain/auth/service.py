@@ -123,12 +123,12 @@ class AuthService:
     async def verify_user_email(self, db: AsyncSession, email: str, code: str):
         # Normalize email before lookup (same as register)
         normalized_email = normalize_email_for_auth(email)
-        logger.info(f"🔍 Verifying email - Original: '{email}', Normalized: '{normalized_email}'")
+        logger.info(f"[VERIFY] Verifying email - Original: '{email}', Normalized: '{normalized_email}'")
         user = await self.crud_user.get_by_email(db, email=normalized_email)
         if not user:
-            logger.error(f"❌ User not found for email: '{normalized_email}' (original: '{email}')")
+            logger.error(f"[ERROR] User not found for email: '{normalized_email}' (original: '{email}')")
             raise UserNotFoundError()
-        logger.info(f"✅ User found: user_id={user.user_id}, email={user.email}")
+        logger.info(f"[OK] User found: user_id={user.user_id}, email={user.email}")
 
         # Single Redis-backed OTP verification
         await verification_service.verify_otp(str(user.user_id), "email_verification", code)
@@ -415,6 +415,10 @@ class AuthService:
         if ttl > 0:
             await redis_client.add_to_denylist(str(jti), ttl)
 
+    async def _invalidate_sessions(self, db: AsyncSession, user) -> None:
+        """Clear refresh token so no existing session can renew."""
+        await self.crud_user.update_refresh_token(db, user=user, refresh_token=None)
+
     async def change_password(self, db: AsyncSession, user_id: UUID, data: ChangePasswordRequest) -> dict:
         """
         Change password for logged-in user: verify old password, set new hash.
@@ -427,6 +431,7 @@ class AuthService:
             raise InvalidPasswordError()
         hashed = await get_password_hash(data.new_password)
         await self.crud_user.update_password(db, user=user, hashed_password=hashed)
+        await self._invalidate_sessions(db, user)
         await db.commit()
         return {"message": "הסיסמה עודכנה בהצלחה", "status": "success"}
 
@@ -439,5 +444,6 @@ class AuthService:
         await verification_service.verify_otp(str(user.user_id), "password_reset", code)
         hashed = await get_password_hash(new_password)
         await self.crud_user.update_password(db, user=user, hashed_password=hashed)
+        await self._invalidate_sessions(db, user)
         await db.commit()
         return {"message": "Password reset successfully.", "status": "success"}

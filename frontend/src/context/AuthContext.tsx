@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -186,13 +187,15 @@ export function useAuth() {
 }
 
 export function useCurrentUser() {
+  const hasToken = useRef(!!localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN));
+
   return useQuery({
     queryKey: qk.auth.me(),
     queryFn: async ({ signal }) => {
       const { data } = await fetchCurrentUser({ signal });
       return data;
     },
-    enabled: !!localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN),
+    enabled: hasToken.current,
     staleTime: 5 * 60_000,
   });
 }

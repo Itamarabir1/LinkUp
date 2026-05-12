@@ -58,7 +58,7 @@ Notification providers classify errors to enable correct retry behavior at the R
 - **Push (`PushProvider`):** `UnregisteredError` / `SenderIdMismatchError` → permanent (token cleared); all other exceptions → transient.
 - **Email (`EmailProvider`):** `ValueError` (missing API key) / `EmailProviderCircuitOpenError` → permanent; all other exceptions → transient.
 
-**`NotificationManager.process_and_send`** runs all channels via `asyncio.gather(return_exceptions=True)`, collects results, and re-raises `TransientNotificationError` if any channel had a transient failure (so the message is nack'd for broker retry). Permanent failures are logged but do not block other channels.
+**`NotificationManager._safe_send`** wraps each provider call in `try/except`: known `PermanentNotificationError`/`TransientNotificationError` are re-raised; unknown exceptions are logged and wrapped as `TransientNotificationError` (safe default — retry rather than drop). **`process_and_send`** runs all channels via `asyncio.gather(return_exceptions=True)` as defense-in-depth, collects results, and re-raises `TransientNotificationError` if any channel had a transient failure (so the message is nack'd for broker retry). Permanent failures are logged but do not block other channels.
 
 **Idempotency guard:** Redis key `notif_dedup:{event_key}:{user_id}:{msg_id}` with 24h TTL prevents duplicate notification sends across retries (set after all channels succeed). Source: [`backend/app/domain/notifications/manager.py`](../../backend/app/domain/notifications/manager.py), [`backend/app/domain/notifications/exceptions.py`](../../backend/app/domain/notifications/exceptions.py).
 

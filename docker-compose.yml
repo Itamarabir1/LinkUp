@@ -61,6 +61,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -137,12 +139,12 @@ services:
       [
         "sh",
         "-c",
-        "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes --appendfsync everysec --save 900 1 --save 300 10 --maxmemory 400mb --maxmemory-policy allkeys-lru",
+        "printf 'requirepass %s\\n' \"$$REDIS_PASSWORD\" > /tmp/redis.conf && exec redis-server /tmp/redis.conf --appendonly yes --appendfsync everysec --save 900 1 --save 300 10 --maxmemory 400mb --maxmemory-policy allkeys-lru",
       ]
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
       interval: 5s
       timeout: 5s
       retries: 5

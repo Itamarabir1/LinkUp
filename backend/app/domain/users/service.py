@@ -1,4 +1,5 @@
 import logging
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,7 +31,7 @@ class UserService:
         self.s3 = storage_service
         self.crud = crud_user
 
-    async def get_user_by_id(self, db: AsyncSession, user_id: int) -> User:
+    async def get_user_by_id(self, db: AsyncSession, user_id: UUID) -> User:
         user = await self.crud.get_by_id(db, id=user_id)
         if not user:
             raise UserNotFoundError(user_id=user_id)
@@ -101,7 +102,7 @@ class UserService:
         await db.commit()
         logger.info("Avatar removed for user %s (outbox user.avatar_remove)", user_id)
 
-    async def update_user_location(self, db: AsyncSession, user_id: int, lat: float, lon: float) -> bool:
+    async def update_user_location(self, db: AsyncSession, user_id: UUID, lat: float, lon: float) -> bool:
         if not (-90 <= lat <= 90) or not (-180 <= lon <= 180) or (lat == 0 and lon == 0):
             raise InvalidLocationError(lat=lat, lon=lon)
 
@@ -111,7 +112,7 @@ class UserService:
         await db.commit()
         return True
 
-    async def update_user_info(self, db: AsyncSession, user_id: int, update_data: UserUpdate) -> User:
+    async def update_user_info(self, db: AsyncSession, user_id: UUID, update_data: UserUpdate) -> User:
         db_user = await self.get_user_by_id(db, user_id=user_id)
         update_dict = update_data.model_dump(exclude_unset=True)
 
@@ -143,7 +144,7 @@ class UserService:
         await db.refresh(db_user)
         return db_user
 
-    async def update_fcm_token(self, db: AsyncSession, user_id: int, fcm_token: str | None) -> bool:
+    async def update_fcm_token(self, db: AsyncSession, user_id: UUID, fcm_token: str | None) -> bool:
         db_user = await self.get_user_by_id(db, user_id=user_id)
         await self.crud.update_fcm_token(db, user=db_user, token=fcm_token)
         await db.commit()

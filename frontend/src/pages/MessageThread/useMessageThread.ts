@@ -34,6 +34,9 @@ export function useMessageThread(conversationIdOverride?: string) {
     lastMessageIdRef,
     fetchMissedMessages,
     messagesEndRef,
+    scrollerRef,
+    requestScrollToBottom,
+    forceScrollToBottom,
     loadMoreMessages,
     refreshUnread,
   } = useConversationMessages(cid, user?.user_id);
@@ -100,6 +103,7 @@ export function useMessageThread(conversationIdOverride?: string) {
     lastMessageIdRef,
     fetchMissedMessages,
     setConversationRead,
+    requestScrollToBottom,
   });
 
   const recipientId = conversation?.partner?.user_id;
@@ -121,6 +125,7 @@ export function useMessageThread(conversationIdOverride?: string) {
         body,
         created_at: new Date().toISOString(),
       };
+      forceScrollToBottom();
       setMessages((prev) => [...prev, pendingRow]);
       setInput('');
       try {
@@ -192,6 +197,7 @@ export function useMessageThread(conversationIdOverride?: string) {
     partnerPresence,
     partnerReadUpToId,
     messagesEndRef,
+    scrollerRef,
     loadMoreMessages,
     handleSend,
     onInputChange,

@@ -74,6 +74,14 @@ async def get_group_by_id(db: AsyncSession, group_id: UUID) -> Group | None:
     return result.scalars().first()
 
 
+async def get_group_for_update(db: AsyncSession, group_id: UUID) -> Group | None:
+    """Lock the group row — serializes concurrent writes (joins, removes)."""
+    result = await db.execute(
+        select(Group).where(Group.group_id == group_id).with_for_update()
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_group_by_invite_code(db: AsyncSession, invite_code: str) -> Group | None:
     result = await db.execute(select(Group).where(Group.invite_code == invite_code))
     return result.scalars().first()

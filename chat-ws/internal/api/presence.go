@@ -32,6 +32,14 @@ type lastSeenBackendBody struct {
 // HandlePresence serves GET /presence/{userID}. Online from Redis key presence:{id}.
 // last_seen: if last_seen:hold: holds an ISO timestamp, use it; else GET backend (last_active_at or last_login).
 func HandlePresence(cfg config.Config, rdb *redisv9.Client) http.HandlerFunc {
+	backendClient := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        10,
+			MaxIdleConnsPerHost: 5,
+			IdleConnTimeout:     30 * time.Second,
+		},
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		allowCORS(cfg, w, r)
 		if r.Method == http.MethodOptions {
@@ -81,7 +89,7 @@ func HandlePresence(cfg config.Config, rdb *redisv9.Client) http.HandlerFunc {
 			}
 		}
 		if lastSeen == nil {
-			ls, fetchErr := fetchLastSeenFromBackend(ctx, cfg.BackendURL, userID, authHeader)
+			ls, fetchErr := fetchLastSeenFromBackend(ctx, backendClient, cfg.BackendURL, userID, authHeader)
 			if fetchErr != nil {
 				slog.Error("presence fetchLastSeenFromBackend failed", "component", "presence", "op", "HandlePresence", "error_code", "BACKEND_LAST_SEEN_FAILED", "err", fetchErr)
 			} else {
@@ -116,14 +124,13 @@ func parseAsLastSeen(s string) (string, bool) {
 	return "", false
 }
 
-func fetchLastSeenFromBackend(ctx context.Context, baseURL, userID, authorization string) (*string, error) {
+func fetchLastSeenFromBackend(ctx context.Context, client *http.Client, baseURL, userID, authorization string) (*string, error) {
 	url := strings.TrimRight(baseURL, "/") + "/api/v1/users/" + userID + "/last-seen"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("last-seen request: %w", err)
 	}
 	req.Header.Set("Authorization", authorization)
-	client := &http.Client{Timeout: 8 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("last-seen do: %w", err)

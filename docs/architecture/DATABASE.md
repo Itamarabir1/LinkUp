@@ -148,7 +148,9 @@ PostgreSQL 15 + PostGIS. מקור: `backend/app/domain/*/model.py`, `backend/ale
 | user_id | UUID FK users NOT NULL | index (004) |
 | role | VARCHAR(20) DEFAULT 'member' | |
 | joined_at | TIMESTAMPTZ | |
-| UNIQUE(group_id, user_id) | | |
+| UNIQUE(group_id, user_id) | `uq_group_member` — prevents duplicate membership at DB level |
+
+**Concurrency:** `join_by_invite` acquires `SELECT ... FOR UPDATE` on the parent `groups` row before checking `max_members` count — serializes concurrent joins and prevents TOCTOU overfill. `IntegrityError` from `uq_group_member` is caught as defense-in-depth (returns 409).
 
 ### rides
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -26,6 +26,7 @@ export function useChatPopup(conversationId: string) {
   const [sendError, setSendError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const shouldScrollRef = useRef(true);
   const chatSendIdempotencyKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -45,6 +46,7 @@ export function useChatPopup(conversationId: string) {
         getMessages(conversationId, { limit: 30, signal }),
       ]);
       setConversation(convRes.data);
+      shouldScrollRef.current = true;
       setMessages(toConfirmedRows(msgRes.data?.items ?? []));
     } catch (err) {
       if (axios.isCancel(err)) return;
@@ -60,8 +62,11 @@ export function useChatPopup(conversationId: string) {
     void fetchData();
   }, [fetchData]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  useLayoutEffect(() => {
+    if (shouldScrollRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    shouldScrollRef.current = false;
   }, [messages]);
 
   const setInputFromUi = useCallback((value: string) => {
@@ -85,6 +90,7 @@ export function useChatPopup(conversationId: string) {
         body,
         created_at: new Date().toISOString(),
       };
+      shouldScrollRef.current = true;
       setMessages((prev) => [...prev, pendingRow]);
       setInput('');
       try {

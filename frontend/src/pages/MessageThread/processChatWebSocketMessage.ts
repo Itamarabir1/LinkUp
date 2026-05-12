@@ -24,6 +24,7 @@ export interface ChatWebSocketProcessContext {
   typingHideTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
   setConversationRead: (readUpToId: number) => void;
   outboundPendingRef: OutboundPendingRef;
+  requestScrollToBottom?: () => void;
 }
 
 /**
@@ -115,6 +116,7 @@ export function processChatWebSocketMessage(
     const dropPendingClientId =
       isOwn && pending ? pending.client_message_id : null;
 
+    ctx.requestScrollToBottom?.();
     ctx.setMessages((prev) => {
       const next = applyInboundRealMessage(prev, msg, { dropPendingClientId });
       return next;

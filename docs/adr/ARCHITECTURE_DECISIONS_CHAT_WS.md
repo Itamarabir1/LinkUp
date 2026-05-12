@@ -95,6 +95,20 @@
 
 ---
 
+## 9. Per-frame WebSocket writes (C1 — audit fix)
+
+| | |
+|--|--|
+| **בעיה** | `RunWritePump` השתמש בדפוס gorilla chat example: drain ה-`Send` channel, שרשור כל ההודעות עם `\n` ל-`NextWriter` אחד, וסגירת writer — מספר אובייקטי JSON ב-frame יחיד. הפרונט פיצל לפני parse, אבל כל consumer חיצוני (mobile, CLI, tests) חייב היה לדעת על הקונבנציה הלא-סטנדרטית. |
+| **החלטה** | `RunWritePump` שולח כל הודעה כ-frame עצמאי: `c.Conn.WriteMessage(websocket.TextMessage, message)`. Drain optimization נשאר (לולאה על `len(c.Send)` אחרי ההודעה הראשונה), אבל כל פריט → frame נפרד. |
+| **אלטרנטיבות** | (1) JSON-Lines רשמי (NDJSON) — עדיין דורש parser מיוחד. (2) Frame batching with length prefix — over-engineering לצ'אט. |
+| **יתרון** | כל frame הוא JSON תקני; consumers פשוטים (`JSON.parse(event.data)` בלי split); תואם ל-WebSocket spec (הודעות עצמאיות). |
+| **Trade-off** | יותר syscalls/frames כשיש burst (במקום frame אחד עם 3 הודעות, יש 3 frames); בפועל ה-overhead זניח ב-TCP_NODELAY + buffer בדפדפן. |
+| **בקצרה לראיון** | "תיקנתי את write pump מ-batch-to-one-frame ל-frame-per-message — הפרונט כבר לא צריך לפצל, וכל consumer חיצוני מקבל JSON תקני." |
+| **קוד** | [`conn.go`](../../chat-ws/internal/hub/conn.go) |
+
+---
+
 ## קישורים
 
 - [../../README.md](../../README.md) — Architecture Decisions  

@@ -25,6 +25,15 @@ def _mock_group(**kwargs):
     return SimpleNamespace(**defaults)
 
 
+def _mock_db() -> AsyncMock:
+    """AsyncMock standing in for AsyncSession — satisfies await db.commit() etc."""
+    db = AsyncMock()
+    db.commit = AsyncMock()
+    db.flush = AsyncMock()
+    db.rollback = AsyncMock()
+    return db
+
+
 @pytest.mark.asyncio
 async def test_create_group_returns_group_with_admin():
     """create_group sets admin_id on the returned DTO."""
@@ -42,8 +51,9 @@ async def test_create_group_returns_group_with_admin():
         mock_crud.create_group = AsyncMock(return_value=mock_group)
         mock_crud.get_member_count = AsyncMock(return_value=1)
 
+        db = _mock_db()
         data = GroupCreate(name="קבוצת טסט")
-        result = await create_group(None, data, admin_id)
+        result = await create_group(db, data, admin_id)
 
         assert result.admin_id == admin_id
         assert result.name == "קבוצת טסט"
@@ -68,15 +78,17 @@ async def test_join_by_invite_adds_member():
             max_members=None,
         )
         mock_crud.get_group_by_invite_code = AsyncMock(return_value=mock_group)
+        mock_crud.get_group_for_update = AsyncMock(return_value=mock_group)
         mock_crud.get_membership = AsyncMock(return_value=None)
         mock_crud.join_group = AsyncMock(return_value=None)
         mock_crud.get_member_count = AsyncMock(return_value=2)
 
-        result = await join_by_invite(None, "INVITE123", user_id)
+        db = _mock_db()
+        result = await join_by_invite(db, "INVITE123", user_id)
 
         assert result.group_id == group_id
         assert result.member_count == 2
-        mock_crud.join_group.assert_called_once_with(None, group_id, user_id)
+        mock_crud.join_group.assert_called_once_with(db, group_id, user_id)
 
 
 @pytest.mark.asyncio
@@ -95,11 +107,13 @@ async def test_join_full_group_raises_error():
             max_members=5,
         )
         mock_crud.get_group_by_invite_code = AsyncMock(return_value=mock_group)
+        mock_crud.get_group_for_update = AsyncMock(return_value=mock_group)
         mock_crud.get_membership = AsyncMock(return_value=None)
         mock_crud.get_member_count = AsyncMock(return_value=5)
 
+        db = _mock_db()
         with pytest.raises(LinkUpError) as exc_info:
-            await join_by_invite(None, "FULL123", user_id)
+            await join_by_invite(db, "FULL123", user_id)
 
         assert exc_info.value.status_code == 400
         assert exc_info.value.error_code == "GROUP_FULL"

@@ -63,4 +63,4 @@ Prometheus and Grafana ports are bound to `127.0.0.1` in `docker-compose.yml` (n
 - [`docs/adr/README.md`](adr/README.md)
 - [`docs/adr/ARCHITECTURE_DECISIONS_BACKEND.md`](adr/ARCHITECTURE_DECISIONS_BACKEND.md)
 - [`docs/adr/ARCHITECTURE_DECISIONS_FRONTEND.md`](adr/ARCHITECTURE_DECISIONS_FRONTEND.md)
-- [`docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`](adr/ARCHITECTURE_DECISIONS_CHAT_WS.md) — §1–§8 (כולל §8: הקשחה תפעולית H7–H11 — `/healthz` + subscriber liveness, graceful shutdown, pong/read deadline, panic recovery, `sync.Once`-guarded `Conn.Close()`)
+- [`docs/adr/ARCHITECTURE_DECISIONS_CHAT_WS.md`](adr/ARCHITECTURE_DECISIONS_CHAT_WS.md) — §1–§9 (כולל §8: הקשחה תפעולית H7–H11 — `/healthz` + subscriber liveness, graceful shutdown, pong/read deadline, panic recovery, `sync.Once`-guarded `Conn.Close()`; §9: per-frame WebSocket writes — כל הודעה כ-frame עצמאי במקום newline-batch)

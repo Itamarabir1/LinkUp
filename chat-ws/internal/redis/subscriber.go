@@ -26,9 +26,13 @@ func RunSubscriber(ctx context.Context, client *redis.Client, h *hub.Hub) {
 		if ctx.Err() != nil {
 			return
 		}
+		start := time.Now()
 		runOnce(ctx, client, h)
 		if ctx.Err() != nil {
 			return
+		}
+		if time.Since(start) > maxBackoff {
+			backoff = time.Second
 		}
 		slog.Warn("redis subscriber disconnected, reconnecting", "backoff", backoff)
 		select {

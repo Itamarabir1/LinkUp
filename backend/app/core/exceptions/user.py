@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from .base import LinkUpError
 
 
@@ -6,7 +8,7 @@ class UserNotFoundError(LinkUpError):
     error_code = "USER_NOT_FOUND"
     message = "המשתמש המבוקש לא נמצא במערכת"
 
-    def __init__(self, user_id: int | None = None, identifier: str | None = None):
+    def __init__(self, user_id: UUID | str | None = None, identifier: str | None = None):
         msg = self.message
         payload = {}
         if user_id is not None:

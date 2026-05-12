@@ -221,34 +221,3 @@ async def update_my_profile(
     )
 
 
-# --- 3. Location update (for nearby ride search) ---
-# @router.patch("/me/location", response_model=MessageResponse)
-# async def update_my_location(
-#     data: UserLocationUpdate,
-#     db: AsyncSession = Depends(get_db),
-#     current_user: User = Depends(get_current_user),
-# ):
-#     # Logic and LinkUpError raises live in the service
-#     await user_service.update_user_location(
-#         db,
-#         user_id=current_user.user_id,
-#         lat=data.latitude,
-#         lon=data.longitude
-#     )
-
-#     return MessageResponse(
-#         message="Location updated successfully",
-#         status="success"
-#     )
-# --- 4. Public profile view ---
-# @router.get("/{user_id}", response_model=UserPublicRead)
-# async def get_user_public_profile(
-#     user_id: int,
-#     db: Session = Depends(get_db),
-#     current_user: User = Depends(get_current_user)
-# ):
-#     """View another driver/passenger — returns only name, photo, rating, join date"""
-#     user = await UserService.get_user_by_id(db, user_id=user_id)
-#     if not user:
-#         raise HTTPException(status_code=404, detail="User not found")
-#     return user

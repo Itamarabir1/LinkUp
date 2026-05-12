@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions.base import LinkUpError
@@ -37,6 +38,15 @@ async def join_by_invite(db: AsyncSession, invite_code: str, user_id: UUID) -> G
             error_code="GROUP_NOT_FOUND",
         )
 
+    # Lock the group row — serializes concurrent joins
+    locked_group = await crud.get_group_for_update(db, group.group_id)
+    if not locked_group:
+        raise LinkUpError(
+            message="קבוצה לא נמצאה",
+            status_code=404,
+            error_code="GROUP_NOT_FOUND",
+        )
+
     existing = await crud.get_membership(db, group.group_id, user_id)
     if existing:
         raise LinkUpError(
@@ -45,16 +55,25 @@ async def join_by_invite(db: AsyncSession, invite_code: str, user_id: UUID) -> G
             error_code="GROUP_ALREADY_MEMBER",
         )
 
-    if group.max_members:
+    if locked_group.max_members:
         count = await crud.get_member_count(db, group.group_id)
-        if count >= group.max_members:
+        if count >= locked_group.max_members:
             raise LinkUpError(
                 message="הקבוצה מלאה",
                 status_code=400,
                 error_code="GROUP_FULL",
             )
 
-    await crud.join_group(db, group.group_id, user_id)
-    await db.commit()
+    try:
+        await crud.join_group(db, group.group_id, user_id)
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise LinkUpError(
+            message="כבר חבר בקבוצה",
+            status_code=409,
+            error_code="GROUP_ALREADY_MEMBER",
+        )
+
     count = await crud.get_member_count(db, group.group_id)
     return group_to_out(group, count)
