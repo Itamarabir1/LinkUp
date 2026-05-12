@@ -116,17 +116,6 @@ jobs:
             [ -f "$PREV_TAG_FILE" ] && PREV_TAG="$(cat "$PREV_TAG_FILE")"
             PREV_IMAGE="$GHCR_BASE/backend:$PREV_TAG"
 
-            NGINX_INPUTS_CHANGED=0
-            while IFS= read -r changed_file; do
-              case "$changed_file" in
-                nginx/nginx.conf.template|nginx/nginx.conf|docker-compose.yml|frontend/Dockerfile|frontend/nginx.conf)
-                  NGINX_INPUTS_CHANGED=1
-                  ;;
-              esac
-            done <<EOF
-            $(git diff-tree --no-commit-id --name-only -r HEAD)
-            EOF
-
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
             docker image prune -f
@@ -165,13 +154,8 @@ jobs:
 
             $COMPOSE --profile prod up -d --no-deps --wait --wait-timeout 30 frontend
 
-            $COMPOSE --profile prod up -d --no-deps nginx
-            if [ "$NGINX_INPUTS_CHANGED" -eq 1 ]; then
-              echo "Detected nginx-related changes in HEAD; forcing nginx recreate."
-              $COMPOSE --profile prod up -d --no-deps --force-recreate nginx
-            else
-              echo "No nginx-related changes in HEAD; skipping forced nginx recreate."
-            fi
+            $COMPOSE --profile prod up -d --no-deps --force-recreate nginx
+            echo "Nginx container recreated (always force-recreate to pick up rendered config)."
 
             docker exec linkup_frontend wget -qO- http://localhost:8080/config.js > /dev/null \
               && echo "Frontend smoke OK" \
