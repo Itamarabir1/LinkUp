@@ -34,7 +34,7 @@ export function useGroupManage() {
     loadingMembers,
     loadingRides,
     loadMembers,
-  } = useGroupManageLists(groupId, activeTab, refreshGroups, setError);
+  } = useGroupManageLists(groupId, activeTab, refreshGroups);
 
   const [dateChip, setDateChip] = useState<string>('all');
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);

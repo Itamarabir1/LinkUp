@@ -8,7 +8,6 @@ export function useGroupManageLists(
   groupId: string | undefined,
   activeTab: GroupTab,
   refreshGroups: () => Promise<void>,
-  _setError: (message: string) => void
 ) {
   const queryClient = useQueryClient();
 

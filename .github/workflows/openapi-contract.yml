@@ -64,6 +64,8 @@ jobs:
 
       - name: Export OpenAPI schema from FastAPI
         working-directory: backend
+        env:
+          SECRET_KEY: ci-openapi-export-dummy-key-not-production
         run: uv run python scripts/export_openapi.py --out ../frontend/openapi-snapshot.json
 
       - name: Set up Node

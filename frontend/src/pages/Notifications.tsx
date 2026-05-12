@@ -39,7 +39,7 @@ function getDisplayType(type: string): DisplayType {
 export default function Notifications() {
   const navigate = useNavigate();
   const navigateRef = useRef(navigate);
-  navigateRef.current = navigate;
+  useEffect(() => { navigateRef.current = navigate; });
   const { t } = useTranslation(['common', 'nav']);
   const pageTitle = t('nav:notifications');
   usePageTitle(pageTitle);

@@ -13,4 +13,8 @@ from app.domain.scheduled_notifications.model import ScheduledNotification
 from app.domain.users.model import User
 from app.infrastructure.audit.model import AuditLog
 
-__all__ = ["AuditLog", "Booking", "Group", "GroupMember", "IdempotencyKey", "NotificationRead", "PassengerRequest", "Payment", "Ride", "ScheduledNotification", "User"]
+__all__ = [
+    "AuditLog", "Booking", "Group", "GroupMember", "IdempotencyKey",
+    "NotificationRead", "PassengerRequest", "Payment", "Ride",
+    "ScheduledNotification", "User",
+]

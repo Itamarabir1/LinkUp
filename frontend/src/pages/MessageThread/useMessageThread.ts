@@ -159,7 +159,7 @@ export function useMessageThread(conversationIdOverride?: string) {
         setSending(false);
       }
     },
-    [input, cid, sending, recipientId, user?.user_id, setMessages, setError, sendTypingStop]
+    [input, cid, sending, recipientId, user?.user_id, setMessages, setError, sendTypingStop, forceScrollToBottom]
   );
 
   const onInputChange = useCallback(
