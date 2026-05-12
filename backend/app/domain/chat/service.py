@@ -292,12 +292,10 @@ async def send_message(
     await db.commit()
     await db.refresh(msg)
 
-    # Publish unread-count notification to recipient (for instant badge updates via chat-ws).
     try:
-        unread = await chat_crud.get_unread_conversations_count(db, recipient_id)
         await redis_chat_pubsub.publish(
             f"user:{recipient_id}:events",
-            json.dumps({"type": "invalidate", "resource": "unread_messages", "count": unread}),
+            json.dumps({"type": "invalidate", "resource": "unread_messages"}),
         )
     except Exception as e:
         logger.warning("Publish unread_count failed: %s", e, exc_info=True)
