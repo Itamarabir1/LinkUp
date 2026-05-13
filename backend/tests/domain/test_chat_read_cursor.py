@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.domain.chat import crud as chat_crud
 from app.domain.chat.model import Conversation, ConversationParticipant
@@ -24,6 +24,51 @@ async def _make_conversation_with_participants(db_session):
     )
     await db_session.flush()
     return conv, user_a, user_b
+
+
+async def _make_conversation_without_participants(db_session):
+    """Legacy-shaped row: conversation exists but no conversation_participants (pre-fix data)."""
+    user_a = await make_user(db_session, "chat-legacy-a", email_suffix="chat")
+    user_b = await make_user(db_session, "chat-legacy-b", email_suffix="chat")
+    user_1_id, user_2_id = (user_a.user_id, user_b.user_id) if user_a.user_id < user_b.user_id else (user_b.user_id, user_a.user_id)
+    conv = Conversation(conversation_id=uuid4(), user_id_1=user_1_id, user_id_2=user_2_id)
+    db_session.add(conv)
+    await db_session.flush()
+    return conv, user_a, user_b
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_conversation_inserts_participant_rows(db_session):
+    user_a = await make_user(db_session, "chat-new-a", email_suffix="chat")
+    user_b = await make_user(db_session, "chat-new-b", email_suffix="chat")
+    conv = await chat_crud.get_or_create_conversation(db_session, user_a.user_id, user_b.user_id)
+    n = await db_session.scalar(
+        select(func.count()).select_from(ConversationParticipant).where(ConversationParticipant.conversation_id == conv.conversation_id)
+    )
+    assert n == 2
+
+
+@pytest.mark.asyncio
+async def test_mark_conversation_read_creates_missing_participant_row(db_session):
+    conv, reader, partner = await _make_conversation_without_participants(db_session)
+    await chat_crud.create_message(db_session, conv.conversation_id, partner.user_id, "hello")
+
+    before = await chat_crud.get_unread_conversations_count(db_session, reader.user_id)
+    assert before == 1
+
+    await chat_crud.mark_conversation_read(db_session, conv.conversation_id, reader.user_id)
+
+    after = await chat_crud.get_unread_conversations_count(db_session, reader.user_id)
+    assert after == 0
+
+    participant = await db_session.scalar(
+        select(ConversationParticipant).where(
+            ConversationParticipant.conversation_id == conv.conversation_id,
+            ConversationParticipant.user_id == reader.user_id,
+        )
+    )
+    assert participant is not None
+    assert participant.last_read_at is not None
 
 
 @pytest.mark.asyncio

@@ -39,6 +39,15 @@ async def get_or_create_conversation(db: AsyncSession, user_id_a: UUID, user_id_
 
     conv = Conversation(user_id_1=u1, user_id_2=u2)
     db.add(conv)
+    await db.flush()
+    # One row per participant — required for mark_conversation_read / unread-count;
+    # migration 006 only backfilled existing conversations at upgrade time.
+    db.add_all(
+        [
+            ConversationParticipant(conversation_id=conv.conversation_id, user_id=u1),
+            ConversationParticipant(conversation_id=conv.conversation_id, user_id=u2),
+        ]
+    )
     await db.commit()
     await db.refresh(conv)
     return conv
@@ -398,6 +407,9 @@ async def mark_conversation_read(db: AsyncSession, conversation_id: UUID, user_i
     cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
     uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
 
+    if not await get_conversation_by_id(db, cid, uid):
+        return
+
     now = datetime.now(UTC)
     # Assumes the full conversation is visible when the thread opens.
     # "Read all" = max message_id from the other party at open time.
@@ -419,10 +431,18 @@ async def mark_conversation_read(db: AsyncSession, conversation_id: UUID, user_i
     )
     participant = result.scalars().first()
     if not participant:
-        return
-    participant.last_read_at = now
-    if max_message_id is not None and (participant.last_read_message_id is None or max_message_id > participant.last_read_message_id):
-        participant.last_read_message_id = max_message_id
+        db.add(
+            ConversationParticipant(
+                conversation_id=cid,
+                user_id=uid,
+                last_read_at=now,
+                last_read_message_id=max_message_id if max_message_id is not None else None,
+            )
+        )
+    else:
+        participant.last_read_at = now
+        if max_message_id is not None and (participant.last_read_message_id is None or max_message_id > participant.last_read_message_id):
+            participant.last_read_message_id = max_message_id
     await db.commit()
 
 
