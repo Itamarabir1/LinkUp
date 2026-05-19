@@ -1,8 +1,6 @@
-import { Search } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useGroup } from '../../context/GroupContext';
 import { useTranslation } from 'react-i18next';
-import PageTypeBadge from '../../components/PageTypeBadge';
 import { useSearchRides } from './useSearchRides';
 import { SearchRidesForm } from './SearchRidesForm';
 import { SearchRideCard } from './SearchRideCard';
@@ -30,12 +28,9 @@ export default function SearchRides() {
         </div>
       )}
       <div className={styles.pageHeader}>
-        <PageTypeBadge icon={Search} label={t('rides:searchRideLabel')} variant="search" />
         <h1 className={styles.pageTitle}>{t('rides:searchRideTitle')}</h1>
+        <p className={styles.pageMeta}>{t('rides:searchMeta')}</p>
       </div>
-      <p className={styles.pageMeta}>
-        {t('searchMeta')}
-      </p>
 
       <SearchRidesForm
         error={s.error}
