@@ -24,7 +24,7 @@ export default function SearchRides() {
       <h1 className="sr-only">{pageTitle}</h1>
       {activeGroupName && (
         <div className={styles.groupBanner}>
-          {t('groupContext', { name: activeGroupName })}
+          {t('rides:groupContext', { name: activeGroupName })}
         </div>
       )}
       <div className={styles.pageHeader}>
@@ -60,7 +60,7 @@ export default function SearchRides() {
       <div className={styles.cardList}>
         {s.results.length === 0 && s.hasSearched && !s.searching ? (
           <div>
-            <p className={styles.emptyText}>{t('noSearchResults')}</p>
+            <p className={styles.emptyText}>{t('rides:noSearchResults')}</p>
             {user && !s.alertSaved ? (
               <div style={{ textAlign: 'center' }}>
                 <button
@@ -69,19 +69,19 @@ export default function SearchRides() {
                   onClick={() => void s.saveAlert()}
                   disabled={s.savingAlert}
                 >
-                  {s.savingAlert ? t('savingAlert') : t('saveAlert')}
+                  {s.savingAlert ? t('rides:savingAlert') : t('rides:saveAlert')}
                 </button>
               </div>
             ) : null}
             {s.alertSaved ? (
-              <p className={styles.savedSearchBanner}>{t('alertSaved')}</p>
+              <p className={styles.savedSearchBanner}>{t('rides:alertSaved')}</p>
             ) : null}
           </div>
         ) : (
           <>
             {s.results.length > 0 && (
               <div className={styles.resultsHeader}>
-                <span className={styles.resultsLabel}>{t('ridesFound', { count: s.results.length })}</span>
+                <span className={styles.resultsLabel}>{t('rides:ridesFound', { count: s.results.length })}</span>
                 {user && !s.alertSaved ? (
                   <button
                     type="button"
@@ -89,10 +89,10 @@ export default function SearchRides() {
                     onClick={() => void s.saveAlert()}
                     disabled={s.savingAlert}
                   >
-                    {s.savingAlert ? t('savingAlert') : t('searchSaved')}
+                    {s.savingAlert ? t('rides:savingAlert') : t('rides:searchSaved')}
                   </button>
                 ) : s.alertSaved ? (
-                  <span className={styles.savedSearchBanner}>{t('searchSaved')}</span>
+                  <span className={styles.savedSearchBanner}>{t('rides:searchSaved')}</span>
                 ) : null}
               </div>
             )}
@@ -120,7 +120,7 @@ export default function SearchRides() {
                   onClick={s.loadMoreResults}
                   disabled={s.loadingMore}
                 >
-                  {s.loadingMore ? t('loadingMore') : t('loadMore')}
+                  {s.loadingMore ? t('rides:loadingMore') : t('rides:loadMore')}
                 </button>
               </div>
             )}

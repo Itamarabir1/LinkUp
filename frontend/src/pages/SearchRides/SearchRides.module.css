@@ -6,7 +6,7 @@
 }
 
 .pageHeader {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.75rem;
 }
 
 .pageTitle {
@@ -15,12 +15,14 @@
   color: var(--text-primary);
   margin: 0 0 8px;
   letter-spacing: -0.03em;
+  line-height: 1.2;
+  text-align: right;
 }
 
 .pageMeta {
   font-size: 0.875rem;
   color: var(--text-tertiary);
-  margin: 0 0 1.75rem;
+  margin: 0;
   line-height: 1.6;
 }
 
