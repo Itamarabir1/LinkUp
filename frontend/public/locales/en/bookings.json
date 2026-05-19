@@ -28,5 +28,6 @@
   "approvedCount": "{count, plural, one {# approved} other {# approved}}",
   "pickup": "Pickup",
   "dropoff": "Dropoff",
+  "seatsBooked": "{count, plural, one {# seat} other {# seats}}",
   "loadMoreHistory": "Load more"
 }

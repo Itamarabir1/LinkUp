@@ -28,5 +28,6 @@
   "approvedCount": "{count, plural, one {# מאושר} other {# מאושרים}}",
   "pickup": "עולה",
   "dropoff": "יורד",
+  "seatsBooked": "{count, plural, one {# מקום} two {# מקומות} other {# מקומות}}",
   "loadMoreHistory": "טען עוד"
 }
