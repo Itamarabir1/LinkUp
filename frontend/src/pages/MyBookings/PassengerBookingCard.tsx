@@ -1,9 +1,11 @@
+import { Car } from 'lucide-react';
 import { formatRideDate } from '../../utils/date';
 import { useTranslation } from 'react-i18next';
 import { STATUS_LABEL } from './myBookings.constants';
 import { canPassengerShare, getSource } from './myBookings.utils';
 import type { PassengerBookingItem } from './myBookings.types';
 import RouteArrow from '../../components/RouteArrow/RouteArrow';
+import { BookingCardActionBar } from './BookingCardActionBar';
 import styles from './MyBookings.module.css';
 
 type MyGroup = { group_id: string; name: string };
@@ -72,14 +74,15 @@ export default function PassengerBookingCard({
           ) : null}
         </div>
         {driverName ? (
-          <div className={styles.cardDriverRow}>
-            {t('bookings:driver')} {driverName}
-          </div>
+          <span className={styles.driverChip}>
+            <Car size={12} aria-hidden />
+            {driverName}
+          </span>
         ) : null}
       </div>
 
       {(bookingStatus === 'pending_approval' || bookingStatus === 'confirmed') && (
-        <div className={styles.bookingCardActions}>
+        <BookingCardActionBar>
           {canPassengerShare(bookingStatus, ride.status) ? (
             <>
               <button
@@ -112,7 +115,7 @@ export default function PassengerBookingCard({
               </button>
               <button
                 type="button"
-                className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
+                className={`${styles.btnOutline} ${styles.btnCancelSubtle}`}
                 onClick={() => handlers.onCancelBooking(bookingId)}
                 disabled={cancelling}
               >
@@ -131,7 +134,7 @@ export default function PassengerBookingCard({
               </button>
               <button
                 type="button"
-                className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
+                className={`${styles.btnOutline} ${styles.btnCancelSubtle}`}
                 onClick={() => handlers.onCancelBooking(bookingId)}
                 disabled={cancelling}
               >
@@ -139,7 +142,7 @@ export default function PassengerBookingCard({
               </button>
             </>
           )}
-        </div>
+        </BookingCardActionBar>
       )}
     </div>
   );

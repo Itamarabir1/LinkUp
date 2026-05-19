@@ -13,7 +13,9 @@ import {
   Sparkles,
   RotateCcw,
   Bot,
+  Car,
 } from 'lucide-react';
+import PageTypeBadge from '../components/PageTypeBadge';
 import LoadingButton from '../components/LoadingButton';
 import RouteMapModal from '../components/RouteMapModal';
 import { useGroup } from '../context/GroupContext';
@@ -134,6 +136,7 @@ export default function CreateRide() {
       {!hasPreview && (
         <>
           <div className={styles.pageHeader}>
+            <PageTypeBadge icon={Car} label={t('rides:createRideLabel')} variant="offer" />
             {activeGroupName && (
               <div className={styles.groupPill}>
                 <span className={styles.groupPillDot} />

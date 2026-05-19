@@ -1,7 +1,7 @@
-import { MessageCircle } from 'lucide-react';
+import { Check, MessageCircle, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AVATAR_COLORS } from './myBookings.constants';
-import { avatarInitial } from './myBookings.utils';
+import { avatarInitial, formatPickupDropoffLine } from './myBookings.utils';
 import type { PassengerInRide } from './myBookings.types';
 import styles from './MyBookings.module.css';
 
@@ -22,7 +22,13 @@ export default function DriverBookingPassengerRow({
   onApprove,
   onReject,
 }: DriverBookingPassengerRowProps) {
-  const { t } = useTranslation(['bookings', 'common']);
+  const { t } = useTranslation(['bookings']);
+  const pickupDropoffLine = formatPickupDropoffLine(
+    passenger.pickupName,
+    passenger.dropoffName,
+    t
+  );
+
   return (
     <li className={styles.passengerRow}>
       <div
@@ -35,12 +41,15 @@ export default function DriverBookingPassengerRow({
         {avatarInitial(passenger.passengerName)}
       </div>
       <div className={styles.passengerInfo}>
-        <div className={styles.passengerName}>{passenger.passengerName}</div>
-        <div className={styles.passengerMeta}>
-          {t('common:seats', { count: passenger.numSeats })}
-          {passenger.pickupName ? ` · ${t('bookings:pickup')}: ${passenger.pickupName}` : ''}
-          {passenger.dropoffName ? ` · ${t('bookings:dropoff')}: ${passenger.dropoffName}` : ''}
+        <div className={styles.passengerNameRow}>
+          <span className={styles.passengerName}>{passenger.passengerName}</span>
+          <span className={styles.seatsBadge}>
+            {t('bookings:seatsBooked', { count: passenger.numSeats })}
+          </span>
         </div>
+        {pickupDropoffLine ? (
+          <div className={styles.passengerDropoff}>{pickupDropoffLine}</div>
+        ) : null}
       </div>
       <div className={styles.passengerActions}>
         {passenger.status === 'pending_approval' && (
@@ -48,27 +57,29 @@ export default function DriverBookingPassengerRow({
             <button
               type="button"
               className={`${styles.btnOutline} ${styles.btnAccentGreen}`}
+              aria-label={t('bookings:approve')}
               onClick={() => onApprove(passenger.bookingId)}
               disabled={actionBookingId === passenger.bookingId}
             >
-              ✅ {t('bookings:approve')}
+              <Check size={15} aria-hidden />
             </button>
             <button
               type="button"
               className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
+              aria-label={t('bookings:reject')}
               onClick={() => onReject(passenger.bookingId)}
               disabled={actionBookingId === passenger.bookingId}
             >
-              ❌ {t('bookings:reject')}
+              <X size={15} aria-hidden />
             </button>
             <button
               type="button"
               className={styles.btnOutline}
+              aria-label={t('bookings:chat')}
               onClick={() => onOpenChat(passenger.bookingId)}
               disabled={chatLoading === passenger.bookingId}
             >
-              <MessageCircle size={15} />
-              {t('bookings:chat')}
+              <MessageCircle size={15} aria-hidden />
             </button>
           </div>
         )}
@@ -78,15 +89,17 @@ export default function DriverBookingPassengerRow({
             <button
               type="button"
               className={styles.btnOutline}
+              aria-label={t('bookings:chat')}
               onClick={() => onOpenChat(passenger.bookingId)}
               disabled={chatLoading === passenger.bookingId}
             >
-              <MessageCircle size={15} />
-              {t('bookings:chat')}
+              <MessageCircle size={15} aria-hidden />
             </button>
           </>
         )}
-        {passenger.status === 'rejected' && <span className={styles.statusRejected}>{t('bookings:bookingStatus_rejected')}</span>}
+        {passenger.status === 'rejected' && (
+          <span className={styles.statusRejected}>{t('bookings:bookingStatus_rejected')}</span>
+        )}
       </div>
     </li>
   );

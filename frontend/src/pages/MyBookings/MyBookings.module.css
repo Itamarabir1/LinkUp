@@ -146,15 +146,6 @@
   flex-shrink: 0;
 }
 
-.cardDriverRow {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
 .cardTagWrap {
   margin-top: 8px;
 }
@@ -191,10 +182,8 @@
   border-radius: 999px;
 }
 
-.driverBlockTagWrap { margin-top: 6px; }
-
-/* Action bar at bottom of passenger card */
-.bookingCardActions {
+/* Action bar (passenger card + driver block) */
+.cardActionBar {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -257,6 +246,19 @@
 }
 .btnDangerOutline:hover:not(:disabled) { background: var(--danger-border); }
 
+.btnCancelSubtle {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 500;
+  background: transparent;
+  border-color: var(--danger-border);
+  color: var(--danger-text);
+}
+.btnCancelSubtle:hover:not(:disabled) {
+  background: var(--danger-bg);
+}
+
 /* ── Driver block ── */
 .driverBlock {
   background: var(--bg-card);
@@ -272,26 +274,21 @@
 .driverBlockHeader {
   padding: 16px 20px;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.driverBlockLeft { flex: 1; min-width: 0; }
-
-.driverBlockRight {
+.driverBlockTopRow {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 8px;
-  flex-shrink: 0;
 }
 
 .driverBlockCounts {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  margin-top: 6px;
 }
 
 .countBadge {
@@ -313,13 +310,6 @@
 .rideStatusOpen   { background: var(--info-bg);    color: var(--info-text);    border: 1px solid var(--info-tint-border); }
 .rideStatusActive { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
 .rideStatusDone   { background: var(--neutral-bg); color: var(--neutral-text); border: 1px solid var(--border); }
-
-.driverBlockActionRow {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
 
 /* ── Passenger list ── */
 .passengerList { list-style: none; margin: 0; padding: 0; }
@@ -351,16 +341,51 @@
 
 .passengerInfo { flex: 1; min-width: 0; }
 
+.passengerNameRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
 .passengerName {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.passengerMeta {
+.passengerDropoff {
   font-size: 12px;
   color: var(--text-tertiary);
   margin-top: 2px;
+  line-height: 1.5;
+}
+
+.driverChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-light);
+  border: 1px solid var(--primary-soft-border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  margin-bottom: 4px;
+}
+
+.seatsBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--neutral-bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-inline-start: 6px;
 }
 
 .passengerActions {
@@ -403,6 +428,5 @@
 
 /* ── Responsive ── */
 @media (max-width: 600px) {
-  .driverBlockHeader { flex-direction: column; }
-  .driverBlockRight { align-items: flex-start; }
+  .driverBlockTopRow { flex-wrap: wrap; }
 }

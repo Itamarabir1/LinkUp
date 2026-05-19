@@ -5,6 +5,10 @@
   text-align: right;
 }
 
+.pageHeader {
+  margin-bottom: 0;
+}
+
 .pageTitle {
   font-size: 1.75rem;
   font-weight: 700;

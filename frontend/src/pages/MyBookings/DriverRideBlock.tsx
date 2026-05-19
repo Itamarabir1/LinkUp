@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { canDriverOpenMap, canDriverShare, getSource } from './myBookings.utils';
 import type { DriverBookingItem } from './myBookings.types';
 import DriverBookingPassengerRow from './DriverBookingPassengerRow';
+import { BookingCardActionBar } from './BookingCardActionBar';
 import RouteArrow from '../../components/RouteArrow/RouteArrow';
 import styles from './MyBookings.module.css';
 
@@ -56,17 +57,30 @@ export default function DriverRideBlock({
   return (
     <div className={styles.driverBlock}>
       <div className={styles.driverBlockHeader}>
-        <div className={styles.driverBlockLeft}>
+        <div className={styles.driverBlockTopRow}>
           <div className={styles.cardRoute}>
             <span>{ride.origin_name ?? '?'}</span>
             <RouteArrow />
             <span>{ride.destination_name ?? '?'}</span>
           </div>
-          <div className={styles.cardMeta}>
-            <span>{formatRideDate(ride.departure_time)}</span>
-            <span className={styles.cardMetaSep} />
-            <span>{t('common:seats', { count: ride.available_seats ?? 0 })}</span>
-          </div>
+          <span className={`${styles.rideStatusBadge} ${rideStatusClass(ride.status)}`}>
+            {t(rideStatusLabel(ride.status))}
+          </span>
+        </div>
+
+        <div className={styles.cardMeta}>
+          <span>{formatRideDate(ride.departure_time)}</span>
+          <span className={styles.cardMetaSep} />
+          <span>{t('common:seats', { count: ride.available_seats ?? 0 })}</span>
+          <span className={styles.cardMetaSep} />
+          {ride.group_id ? (
+            <span className={styles.groupTag}>{ride.group_name ?? getSource(ride, myGroups)}</span>
+          ) : (
+            <span className={styles.groupTagPublic}>{t('common:public')}</span>
+          )}
+        </div>
+
+        {(pendingCount > 0 || confirmedCount > 0) && (
           <div className={styles.driverBlockCounts}>
             {pendingCount > 0 && (
               <span className={`${styles.countBadge} ${styles.countBadgePending}`}>
@@ -79,68 +93,7 @@ export default function DriverRideBlock({
               </span>
             )}
           </div>
-          <div className={styles.driverBlockTagWrap}>
-            {ride.group_id ? (
-              <span className={styles.groupTag}>{ride.group_name ?? getSource(ride, myGroups)}</span>
-            ) : (
-              <span className={styles.groupTagPublic}>{t('common:public')}</span>
-            )}
-          </div>
-        </div>
-
-        <div className={styles.driverBlockRight}>
-          <span className={`${styles.rideStatusBadge} ${rideStatusClass(ride.status)}`}>
-            {t(rideStatusLabel(ride.status))}
-          </span>
-          <div className={styles.driverBlockActionRow}>
-            {canDriverShare(confirmedCount) && (
-              <>
-                <button
-                  type="button"
-                  className={`${styles.btnOutline} ${
-                    sharingRideId === ride.ride_id ? styles.btnAccentBlueActive : ''
-                  }`}
-                  onClick={() => handlers.onSharingToggle(ride.ride_id)}
-                >
-                  {sharingRideId === ride.ride_id ? t('bookings:stopSharing') : t('bookings:shareLocation')}
-                </button>
-                {ride.status === 'active' ? (
-                  <button
-                    type="button"
-                    className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
-                    onClick={() => void handlers.onShareStop(ride.ride_id)}
-                  >
-                    {t('bookings:endRide')}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className={styles.btnOutline}
-                    onClick={() => void handlers.onShareStart(ride.ride_id)}
-                  >
-                    {t('bookings:startRide')}
-                  </button>
-                )}
-                {canDriverOpenMap(confirmedCount) && (
-                  <button
-                    type="button"
-                    className={`${styles.btnOutline} ${styles.btnAccentBlue}`}
-                    onClick={() => handlers.onOpenMap(ride.ride_id)}
-                  >
-                    {t('bookings:openMap')}
-                  </button>
-                )}
-              </>
-            )}
-            <button
-              type="button"
-              className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
-              onClick={() => handlers.onCancelRide(ride.ride_id)}
-            >
-              {t('rides:cancelRide')}
-            </button>
-          </div>
-        </div>
+        )}
       </div>
 
       <ul className={styles.passengerList}>
@@ -156,6 +109,55 @@ export default function DriverRideBlock({
           />
         ))}
       </ul>
+
+      <BookingCardActionBar>
+        {canDriverShare(confirmedCount) && (
+          <>
+            <button
+              type="button"
+              className={`${styles.btnOutline} ${
+                sharingRideId === ride.ride_id ? styles.btnAccentBlueActive : ''
+              }`}
+              onClick={() => handlers.onSharingToggle(ride.ride_id)}
+            >
+              {sharingRideId === ride.ride_id ? t('bookings:stopSharing') : t('bookings:shareLocation')}
+            </button>
+            {ride.status === 'active' ? (
+              <button
+                type="button"
+                className={`${styles.btnOutline} ${styles.btnDangerOutline}`}
+                onClick={() => void handlers.onShareStop(ride.ride_id)}
+              >
+                {t('bookings:endRide')}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={styles.btnOutline}
+                onClick={() => void handlers.onShareStart(ride.ride_id)}
+              >
+                {t('bookings:startRide')}
+              </button>
+            )}
+            {canDriverOpenMap(confirmedCount) && (
+              <button
+                type="button"
+                className={`${styles.btnOutline} ${styles.btnAccentBlue}`}
+                onClick={() => handlers.onOpenMap(ride.ride_id)}
+              >
+                {t('bookings:openMap')}
+              </button>
+            )}
+          </>
+        )}
+        <button
+          type="button"
+          className={`${styles.btnOutline} ${styles.btnCancelSubtle}`}
+          onClick={() => handlers.onCancelRide(ride.ride_id)}
+        >
+          {t('rides:cancelRide')}
+        </button>
+      </BookingCardActionBar>
     </div>
   );
 }
