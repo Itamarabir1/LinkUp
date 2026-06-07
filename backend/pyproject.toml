@@ -46,7 +46,7 @@ dependencies = [
     # --- Validation & Utilities ---
     "email-validator>=2.0.0",
     "phonenumbers==8.13.48",
-    "tenacity==8.5.0",
+    "tenacity==9.1.4",
     # --- Admin Interface ---
     "sqladmin==0.16.1",
     # --- Calendar Export ---
