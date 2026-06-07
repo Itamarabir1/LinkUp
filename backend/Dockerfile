@@ -1,6 +1,6 @@
 # ===== BUILDER =====
 # Installs build tools + all Python dependencies. Used as base for development.
-FROM python:3.11-slim AS builder
+FROM python:3.14-slim AS builder
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir uv \
 
 # ===== RUNTIME =====
 # Clean image without build tools. Base for production, worker, and migrate.
-FROM python:3.11-slim AS runtime
+FROM python:3.14-slim AS runtime
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
